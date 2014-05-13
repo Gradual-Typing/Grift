@@ -1,0 +1,2 @@
+(let ((a (lambda ((i : int)): Int i)))
+  (a 100))

@@ -11,9 +11,8 @@
 (struct If Expr (test conseq alt)  #:transparent)
 (struct Let Expr (dec* body)  #:transparent)
 (struct Const Expr (k)  #:transparent)
-(struct Typed-Fml Expr (ident type)  #:transparent)
-(struct Untyped-Fml Expr (ident)  #:transparent)
-(struct Typed-Binding Expr (ident type expr)  #:transparent)
-(struct Untyped-Binding Expr (ident expr)  #:transparent)
+
+(struct Fml (ident type)  #:transparent)
+(struct Bnd (ident type expr)  #:transparent)
 
 (define (implicit-core? x) #t)

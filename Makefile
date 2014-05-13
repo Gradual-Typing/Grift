@@ -2,8 +2,10 @@ PATH := ${PATH}:${HOME}/.local/bin
 
 .PHONY: test clean
 test:
-	racket testing/dev-tests.rkt
-
+	racket testing/tests.rkt
+install:
+	raco pkg install
 clean:
-	rm -r */compiled
-	rm -r doc/
+	rm -rf */compiled
+	rm -rf doc/
+	rm -rf compiled

@@ -38,7 +38,10 @@
                  (let-values ([(t ...) (proc (vector-ref vec i))])
                    (vector-set! r i t) ...)))))])))
 
-
+(define (make-empty-env)  (hasheq))
+(define (env-extend env key val) (hash-set env key val))
+(define (env-lookup env key failure) 
+  (hash-ref env key failure))
 
 
 

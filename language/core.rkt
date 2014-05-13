@@ -1,46 +1,97 @@
 #lang racket
-
-(define ground-types '(Fix Flo Bool))
-
-(define dynamic '?)
-(define relops '(< <= = >= >))
-(define predefined-funcs '(* + - *. +. -.))
+(provide (all-defined-out))
 
 
+(define ground-types '(Fix Bool Dyn))
+(define fix-binops '(op:fix:* 
+                     op:fix:+ op:fix:-
+                     op:fix:and op:fix:or
+                     op:fix:>> op:fix:<<))
 
-(struct Lambda (fml* type body src))
-(struct App (rator rand* src))
-(struct Op (prim rand* src))
-(struct Quote (const src))
-(struct Var (ident type src))
-(struct Cast (expr type src))
-(struct If (test conseq alt src))
-
-(struct Letrec (dec* body src))
-(struct Let (dec* body src))
-
-
-;(struct Begin (effect* expr src))
-;(struct Quote (datum src))
-;(struct Define (var expr))
-;(struct Type-Dec (type1 type2))
+(struct Prog (name exprs type))
+(struct Expr (src type))
+(struct Lambda Expr (fmls body))
+(struct Var Expr (ident))
+(struct App Expr (expr expr*))
+(struct Op Expr (prim expr*))
+(struct Cast Expr (expr blame))
+(struct If Expr (test conseq alt))
+(struct Let Expr (dec* body type src))
+(struct Const Expr (const))
+(struct Bnd (ident type expr))
+(struct Fml (ident type))
 
 (define (Constant? x)
-  (or (boolean? x)
-      (fixnum? x)
-      (flonum? x)))
+  (or (boolean? x) (integer? x)))
 
-(define (Datum? x)
-  (define (vector-andmap p? v)
-    (let loop ((i (sub1 (vector-length v))))
-      (or (< i 0) (and (p? (vector-ref v i)) (loop (sub1 n))))))
-  (or (Constant? x)
-      ;; (and (pair? x)
-      ;;      (datum? (car x))
-      ;;      (datum? (cdr x)))
-      ;; (and (vector? x)
-      ;;      (vector-andmap datum? x)))
-      ))
+(define (implicit-core? x)
+  (define (expr? x)
+    (and (Expr? x) (srcloc? (Expr-src x))
+         (match x
+           [(Lambda s t f b) (and (fmls? f) (expr? b))]
+           [(Var s t i) (and (not t) (uvar? i))]
+           [(App s t e e*) (and (not t) (expr? e) (andmap expr? e*))]
+           [(Op s t o e*) (and (not t) (prim? o) (andmap expr? e*))]
+           [(If s t c r a) (and (not t) (expr? c) (expr? r) (expr? a))]
+           [(Let s t b* b) (and (not t) (bnd? b*) (expr? b))]
+           [(Const s t k) (and (not t) (Constant? k))]
+           [(Cast s t e b) (and (not t) (expr? e) (string? b))]
+           [otherwise #f])))
+  (define (fmls? x)
+    (and (list? x)
+         (match x)))
+  (and (Prog? x)
+       (string? (Prog-name x))
+       (list? (Prog-exprs x))
+       (andmap (lambda (x) (and (Expr? x)
+                           (or ()))) )))
+
+(define (explicit-core? x) #t)
+
+#|
+(define explicit-core
+  (grammar->Language?
+   (Terminal (Str string?)
+             (U Uvar?)
+             (K Constant?)
+             (S Src?)
+             (P Prim?)
+             (B Blame?)
+             (BS BindSet?)
+             (T Type?))
+   (Prog ((Prog Str Expr* T)))
+   (Expr ((Lambda Uvar* T Expr S)
+          (Var Uvar T S)
+          (App Expr Expr* T S)
+          (Op P Expr* T S)
+          (Cast Expr T T B)
+          (If Expr Expr Expr T S)
+          (Let BS Expr T S)
+          (Const K T S)))))
+ 
+
+(define (explicit-core? x)
+  (define (gmr:star x? x)
+    (and (list? f2) (andmap grm:TExpr? f2)))
+  (define (gmr:Prog? x)
+    (match x
+      [(Prog f1 f2) (and (grmr:Str? f1) (grmr:star grmr:TExpr? f2))]
+      [a #f]))
+  (define (gmr:TExpr? x)
+    (and (grmr:Expr? x)))
+  (define (grmr:Expr x)
+    (match x
+      [(Lambda f1 f2 f3 f4) (and (grmr:fml*))]
+      [(Var f1 f2 f3)]
+      [(App f1 f2 f3 f4)]
+      [(Op f1 f2 f3 f4)]
+      [(Cast f1 f2 f3)]
+      [(If f1 f2 f3 f4 f5)]
+      [(Let f1 f2 f3 f4)]
+      [(Const f1 f2 f3)]))
+  (grmr:Prog? x))
+|#
+
 
 
 

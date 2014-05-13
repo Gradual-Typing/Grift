@@ -39,22 +39,18 @@
 		  (loop (add1 n))))))
       (values #f 0)))
 
-;; Source Locations
-
-(struct Src-Loc (file line col span))
-
 ;; Operators
 (define (symbolic-primitiveq s)
   (and (symbol? s)
        (case s
-         [(<) (Prim:Rel:Int:<)]
-         [(>) (Prim:Rel:Int:>)]
-         [(=) (Prim:Rel:Int:=)]
-         [(<=) (Prim:Rel:Int:<=)]
-         [(>=) (Prim:Rel:Int:>=)]
-         [(*)   (Prim:Bin:Int:*)]
-         [(+)   (Prim:Bin:Int:+)]
-         [(-)   (Prim:Bin:Int:-)]
+         [(%<) (Prim:Rel:Int:<)]
+         [(%>) (Prim:Rel:Int:>)]
+         [(%=) (Prim:Rel:Int:=)]
+         [(%<=) (Prim:Rel:Int:<=)]
+         [(%>=) (Prim:Rel:Int:>=)]
+         [(%*)   (Prim:Bin:Int:*)]
+         [(%+)   (Prim:Bin:Int:+)]
+         [(%-)   (Prim:Bin:Int:-)]
          [(%and) (Prim:Bin:Int:and)]
          [(%or) (Prim:Bin:Int:or)]
          [(%>>) (Prim:Bin:Int:>>)]
