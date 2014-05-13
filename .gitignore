@@ -1,0 +1,7 @@
+# emacs and vim temporary files
+*.*~
+\#*.*\#
+
+# object files, archives, assembly, and out
+*.[oas]
+*.out

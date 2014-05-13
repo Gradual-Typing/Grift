@@ -1,0 +1,36 @@
+#lang racket
+(require rackunit rackunit/text-ui
+         Schml/framework/build-compiler)
+         
+(define tests
+  (test-suite "compiler"
+    (test-suite "casts"
+      (let ((c1 (compiler-config 'ld 'none 'none)))
+        (local-require Schml/compiler/casts/typecheck
+                       (prefix-in i: Schml/language/implicit-core))
+        (test-suite "typecheck"
+          (test-not-exn "valid datum 1" 
+                        (lambda () 
+                          (typecheck (i:Prog "vd1" (i:Const "src" 5)) c1)))
+          (test-not-exn "valid datum 2" 
+                        (lambda () 
+                          (typecheck (i:Prog "vd2" (i:Const "src" #t)) c1)))
+          (test-not-exn "valid datum 3" 
+                        (lambda () 
+                          (typecheck 
+                           (i:Prog "vd3" 
+                                   (i:Lambda "src" #() 
+                                             (i:Const "src" 5))) 
+                           c1)))
+          (test-not-exn "valid datum 4" 
+                        (lambda () 
+                          (typecheck 
+                           (i:Prog "vd4" 
+                                   (i:Lambda "src" #() 
+                                             (i:Const "src" #f)))
+                           c1))))))))
+
+(module+ main
+  (run-tests tests))
+
+     
