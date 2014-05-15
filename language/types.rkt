@@ -15,6 +15,13 @@
 (define Binop-Int-Type
   (Function (vector-immutable Int-Type Int-Type) Int-Type))
 
+(define (type? x)
+  (or (Dyn? x) (Bool? x) (Int? x)
+      (and (Function? x)
+           (vector? (Function-from x))
+           (sequence-andmap type? (in-vector (Function-from x)))
+           (type? (Function-to x)))))
+
 (define (consistent? t g types)
   (or (Dyn? t) (Dyn? g)
       (and (Int? t) (Int? g))

@@ -44,7 +44,7 @@ assemble - convert a code tree to the targeted assembly language
 ;; will be a collection of records with a pretty printing function.
 (define (compiler file-name settings) 
   (compose-compiler (file-name settings)
-                    read ;;parse
+                    read parse
                     ))
 
 ;; Since #f is a valid expression a different value is

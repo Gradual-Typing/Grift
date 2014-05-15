@@ -40,39 +40,9 @@
       (values #f 0)))
 
 ;; Operators
-(define (symbolic-primitiveq s)
-  (and (symbol? s)
-       (case s
-         [(%<) (Prim:Rel:Int:<)]
-         [(%>) (Prim:Rel:Int:>)]
-         [(%=) (Prim:Rel:Int:=)]
-         [(%<=) (Prim:Rel:Int:<=)]
-         [(%>=) (Prim:Rel:Int:>=)]
-         [(%*)   (Prim:Bin:Int:*)]
-         [(%+)   (Prim:Bin:Int:+)]
-         [(%-)   (Prim:Bin:Int:-)]
-         [(%and) (Prim:Bin:Int:and)]
-         [(%or) (Prim:Bin:Int:or)]
-         [(%>>) (Prim:Bin:Int:>>)]
-         [(%<<) (Prim:Bin:Int:<<)])))
 
-(struct Prim ())
-(struct Prim:Rel Prim ())
-(struct Prim:Rel:Int Prim:Rel ())
-(struct Prim:Rel:Int:<  Prim:Rel:Int ())
-(struct Prim:Rel:Int:>  Prim:Rel:Int ())
-(struct Prim:Rel:Int:=  Prim:Rel:Int ())
-(struct Prim:Rel:Int:<= Prim:Rel:Int ())
-(struct Prim:Rel:Int:>= Prim:Rel:Int ())
-(struct Prim:Bin Prim ())
-(struct Prim:Bin:Int Prim:Bin ())
-(struct Prim:Bin:Int:*   Prim:Bin:Int ())
-(struct Prim:Bin:Int:+   Prim:Bin:Int ())
-(struct Prim:Bin:Int:-   Prim:Bin:Int ())
-(struct Prim:Bin:Int:and Prim:Bin:Int ())
-(struct Prim:Bin:Int:or  Prim:Bin:Int ())
-(struct Prim:Bin:Int:>>  Prim:Bin:Int ())
-(struct Prim:Bin:Int:<<  Prim:Bin:Int ())
+
+
 
 
 

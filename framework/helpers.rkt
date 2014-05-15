@@ -38,10 +38,18 @@
                  (let-values ([(t ...) (proc (vector-ref vec i))])
                    (vector-set! r i t) ...)))))])))
 
-(define (make-empty-env)  (hasheq))
+(define (empty-env) (hasheq))
 (define (env-extend env key val) (hash-set env key val))
 (define (env-lookup env key failure) 
   (hash-ref env key failure))
+(define (env-extend/env f s)
+  (for/fold ([h f]) ([(k v) (in-hash s)]) (hash-set h k v))) 
 
+(define (length=? l n)
+  (define (do-it l n) (or (and (pair? l) (positive? n) (do-it (cdr l) (sub1 n)))
+                          (and (not (pair? l)) (zero? n))))
+  (if (and (number? n) (pair? l))
+      (do-it l n)
+      (error 'length=? "type mismatch")))
 
 

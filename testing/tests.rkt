@@ -122,15 +122,15 @@
                    "Print the input and output to passes"
                    (trace 'all)]
                   #:multi
-                  [("-t" "--trace-passes") str-pass
+                  [("-t" "--trace-pass") str-pass
                    "Same but only turns on tracing for a pass"
                    (trace (cons (string->symbol str-pass) (get-ls trace)))]
                   #:once-any
-                  [("-v" "--trace-all") 
+                  [("-s" "--check-all") 
                    "Run type checks for data between passes"
                    (check 'all)]
                   #:multi
-                  [("-c" "--trace-passes") str-pass
+                  [("-c" "--check-pass") str-pass
                    "Same but only turns on checking for a specific pass"
                    (check (cons (string->symbol str-pass) (get-ls check)))]
                   #:args ()
