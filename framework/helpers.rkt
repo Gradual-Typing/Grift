@@ -52,4 +52,6 @@
       (do-it l n)
       (error 'length=? "type mismatch")))
 
-
+(define-syntax th
+  (syntax-rules ()
+    ((_ e) (lambda () e))))

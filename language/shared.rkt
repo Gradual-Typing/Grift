@@ -29,12 +29,12 @@
       (let* ((w (symbol->string d))
 	     (l (string-length w)))
 	(let loop ((n 0))
-	  (if (not (< n l))
+	  (if (>= n l)
 	      (values #f 0)
-	      (if (char=? (string-ref w n) #\$)
-		  (let ((n (string->number (substring w (add1 n) l))))
-		    (if n 
-			(values (substring w 0 n) n)
+	      (if (and (char=? (string-ref w n) #\$) (< (add1 n) l))
+		  (let ((i (string->number (substring w (add1 n) l))))
+		    (if i 
+			(values (substring w 0 n) i)
 			(values #f 0)))
 		  (loop (add1 n))))))
       (values #f 0)))

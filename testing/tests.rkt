@@ -19,9 +19,20 @@
     ((_ cc p ... n)
      (cc (simplify-path (build-path test-suite-path p ... n)) (config)))))
 
+(define-syntax test-pred/exn
+  (syntax-rules ()
+    ((_ n p t)
+     (test-pred n p 
+      (with-handlers 
+	  ([exn? 
+	    (lambda (e)
+	      ((error-display-handler) (exn-message e) e)
+	      (fail))])
+	t)))))
+
 (define-syntax test-file
   (syntax-rules ()
-    ((_ cc p n) (test-not-exn n (lambda () (stdcc cc p n))))))
+    ((_ cc p n) (test-pred/exn n (lambda a #t) (stdcc cc p n)))))
 
 (define compiler-tests
   (test-suite "compiler"
@@ -136,6 +147,6 @@
                   #:args ()
                   (parameterize 
                    ([config (compiler-config (cast-sem) (trace) (check))])
-                   (run-tests all-tests)))))
+                   (run-tests all-tests 'verbose)))))
 
      
