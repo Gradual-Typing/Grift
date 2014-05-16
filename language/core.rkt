@@ -228,13 +228,14 @@
   (and (Prog? x) (string? (Prog-name x)) (list? (Prog-expr* x))
        (andmap expr? (Prog-expr* x))))
 
-(pretty-print 
-  (vs-append 
-   (text "(let") 
-   (v-append
-    (h-append lparen 
-    (align 
-     (v-append 
-      (text "(kdfjakljfdsklgj kdjsfkajfkfjakdsj)") 
-      (h-append (text "(kadsfj dkjfk)") rparen))))
-    (h-append (indent 4 (text "bango!")) rparen)))))
+
+;; (pretty-print 
+;;   (vs-append 
+;;    (text "(let") 
+;;    (v-append
+;;     (h-append lparen 
+;;     (align 
+;;      (v-append 
+;;       (text "(kdfjakljfdsklgj kdjsfkajfkfjakdsj)") 
+;;       (h-append (text "(kadsfj dkjfk)") rparen))))
+;;     (indent 4 (h-append  (text "bango!") rparen)))))
