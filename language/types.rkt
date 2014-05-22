@@ -1,44 +1,44 @@
 #lang racket
+(require Schml/framework/helpers)
 (provide (all-defined-out))
 
 (struct Dyn ())
 (struct Bool ())
 (struct Int ())
-(struct Function (from to))
+(struct Function (from to) #:transparent)
 ;; Not that allocation takes up to much space but you only ever need
 ;; one of each of these types because they have no fields
 (define Dyn-Type (Dyn))
 (define Bool-Type (Bool))
 (define Int-Type (Int))
 (define Relop-Int-Type
-  (Function (vector-immutable Int-Type Int-Type) Bool-Type))
+  (Function `(,Int-Type ,Int-Type) Bool-Type))
 (define Binop-Int-Type
-  (Function (vector-immutable Int-Type Int-Type) Int-Type))
+  (Function `(,Int-Type ,Int-Type) Int-Type))
 
-(define (type? x)
-  (or (Dyn? x) (Bool? x) (Int? x)
-      (and (Function? x)
-           (vector? (Function-from x))
-           (sequence-andmap type? (in-vector (Function-from x)))
-           (type? (Function-to x)))))
+(define/match (type? x)
+  [((Dyn)) #t]
+  [((Bool)) #t]
+  [((Int)) #t]
+  [((Function (list (? type?) ...) (? type?))) #t]
+  [(otherwise) #f])
 
-(define (consistent? t g types)
+(define (consistent? t g)
   (or (Dyn? t) (Dyn? g)
       (and (Int? t) (Int? g))
       (and (Bool? t) (Bool? g))
-      (and (Function? t) (Function? g)
-           (let ((t-from (Function-from t))
-                 (g-from (Function-from g))
-                 (t-to (Function-to t))
-                 (g-to (Function-to t)))
-             (let ((t-arrity (vector-length t-from))
-                   (g-arrity (vector-length g-from)))
-               (and (= t-arrity g-arrity)
-                    (let loop ((i 0))
-                      (or (and (= i t-arrity) (consistent? t-to g-to)) 
-                          (and (consistent? (vector-ref t-from i)
-                                            (vector-ref g-from i))
-                               (loop (add1 i)))))))))))
+      (function-consistent? t g)))
+
+(define (function-consistent? t g)
+  (and (Function? t) (Function? g)
+       (andmap/length= consistent? (Function-from t) (Function-from g))
+       (consistent? (Function-to t) (Function-to g))))
+
+(define (shallow-consistent? t g)
+  (or (Dyn? t) (Dyn? g)
+      (and (Int? t) (Int? g))
+      (and (Bool? t) (Bool? g))
+      (and (Function? t) (Function? g))))
 
 (define (meet t g err)
   (cond
@@ -59,6 +59,7 @@
                        (meet t-to g-to)) 
              (err "Function type with incorrect arrity"))))]
     [else (err "Types are not consistent")]))
+
 
 
 

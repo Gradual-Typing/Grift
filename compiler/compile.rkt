@@ -1,7 +1,5 @@
 #lang racket
 (require Schml/framework/build-compiler)
-(require Schml/compiler/read
-         Schml/compiler/parse)
 (provide compile compiler)
 
 #|
@@ -43,9 +41,13 @@ assemble - convert a code tree to the targeted assembly language
 ;; passes listed bellow on the s-expr after parsing the expression
 ;; will be a collection of records with a pretty printing function.
 (define (compiler file-name settings) 
+  (local-require Schml/compiler/read
+                 Schml/compiler/parse
+                 Schml/compiler/type-check)
   (compose-compiler (file-name settings)
-                    read parse
-                    ))
+                    read
+                    parse
+                    type-check))
 
 ;; Since #f is a valid expression a different value is
 ;; use to represent false for the expression variable.

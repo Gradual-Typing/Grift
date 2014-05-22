@@ -4,15 +4,11 @@
          Schml/compiler/compile
          Schml/framework/build-compiler)
 
-(provide run-tests
-         all-tests
-         compiler-tests
-         srcloc-tests
-         config)
+(provide (all-defined-out))
 
 (define config 
   (make-parameter 
-   (compiler-config 'ld 'none 'none)))
+   (compiler-config #f #f 'none 'none)))
 
 (define-syntax stdcc
   (syntax-rules ()
@@ -34,8 +30,8 @@
   (syntax-rules ()
     ((_ cc p n) (test-pred/exn n (lambda a #t) (stdcc cc p n)))))
 
-(define compiler-tests
-  (test-suite "compiler"
+(define ld-tests
+  (test-suite "lazy downcast"
     (test-suite "valid"
       (test-file compiler "compiler" "const-bool.schml") 
       (test-file compiler "compiler" "const-false.schml")
@@ -87,45 +83,14 @@
       ;; (test-file compiler "compiler" "if13.schml")
       )))
 
-(define srcloc-tests
-  (test-suite "source locations"
-    ;; Unit tests exploring and testing the behavior
-    ;; of source locations in the read and parse passes
-    (let ()
-      (local-require Schml/language/syntax
-                     Schml/compiler/read
-                     Schml/compiler/parse
-                     syntax/srcloc)
-      (let* ((cc read)
-             (cc (lambda (f)
-                   (cc
-                    (simplify-path
-                     (build-path test-suite-path "dev-valid" f))
-                    (config)))))
-        (test-suite "read"
-          (test-pred "source" string?
-                     (syntax-source
-                      (car (File-stx* (cc "4.schml")))))
-          (test-pred "line"  number?
-                     (syntax-line
-                      (car (File-stx* (cc "4.schml")))))
-          (test-pred "column" number?
-                     (syntax-column
-                      (car (File-stx* (cc "4.schml")))))
-          (test-false "source-location?"
-                      (source-location?
-                       (syntax-source
-                        (car (File-stx* (cc "4.schml")))))))))))
-
 (define all-tests
-  (test-suite "All"
-             compiler-tests
-             srcloc-tests))
+  (test-suite "All" ld-tests))
 
 (module+ main 
   (let ((trace (make-parameter 'none))
         (check (make-parameter 'none))
-        (cast-sem (make-parameter 'ld))
+        (cast-strictness (make-parameter 'lazy))
+        (cast-blame (make-parameter 'downcast))
         (get-ls (lambda (p) (let ((p (p))) (if (pair? p) p '())))))
     (command-line #:program "Schml-compiler-tests"
                   #:once-any
@@ -146,7 +111,10 @@
                    (check (cons (string->symbol str-pass) (get-ls check)))]
                   #:args ()
                   (parameterize 
-                   ([config (compiler-config (cast-sem) (trace) (check))])
+                   ([config (compiler-config (cast-strictness)
+                                             (cast-blame)
+                                             (trace)
+                                             (check))])
                    (run-tests all-tests 'verbose)))))
 
      

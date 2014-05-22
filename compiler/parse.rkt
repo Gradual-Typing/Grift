@@ -1,16 +1,15 @@
 #lang racket
-(require Schml/framework/debug
-         Schml/framework/build-compiler
+(require Schml/framework/build-compiler
          Schml/framework/helpers
-	 Schml/framework/errors
-         Schml/language/shared
-         Schml/language/types
+         Schml/framework/errors
          Schml/language/syntax
-         Schml/language/core
-         syntax/parse)
+         Schml/language/core)
+
+;; May use the syntax parse form soon to create a more modular parser
+;; with better error messages.
+(require syntax/parse)
 
 (provide parse)
-
 
 (define-pass (parse stx-tree comp-config)
   (lang-syntax? -> implicit-core?)
@@ -156,11 +155,11 @@
 (define (cast-transformer stx env)
   (syntax-case stx ()
     [(_ e t l) (string (syntax-e #'l))
-     (Cast (syntax-srcloc stx) #f
-           (parse-expr #'e) (parse-type #'t) (syntax-e #'l))]
+     (Cast (syntax-srcloc stx) (parse-type #'t)
+           (parse-expr #'e) #f (syntax-e #'l))]
     [(_ e t)
      (let ((src (syntax-srcloc stx)))
-       (Cast src #f (parse-expr #'e) (parse-type #'t) (srcloc->string src)))]))
+       (Cast src (parse-type #'t) (parse-expr #'e) #f (srcloc->string src)))]))
 
 (define (lt-transformer stx env)
   (syntax-case stx ()
@@ -201,8 +200,7 @@
 
 (define (function-type-transformer stx env)
   (syntax-case stx ()
-    [(_ f . t) (Function (parse-type* (syntax-e #'f) env) 
-			 (parse-type* (syntax-e #'t) env))]))
+    [(_ f t) (Function (parse-type* (syntax-e #'f) env) (parse-type #'t env))]))
 
 (struct Binding (value))
 (struct Bnd:Var  Binding ())
@@ -236,7 +234,7 @@
 
 (match stx-tree
   [(File name stx*)
-   (Prog name #f (for/list ([stx stx*]) (parse-expr stx core-env)))]
+   (Prog name (for/list ([stx stx*]) (parse-expr stx core-env)))]
   [otherwise (match-pass-error pass 'parse-file stx-tree)]))
 
 

@@ -1,9 +1,10 @@
 #lang racket
+
 ;; Unique Variables
-(provide (all-defined-out))
 (provide uvar uvar? uvar-prefix uvar-suffix uvar=? split-uvar)
 
 (define unique (box 1))
+
 (define (uvar p)
   (let ((u (string->symbol 
 	    (format "~a$~a" p (unbox unique)))))
@@ -38,8 +39,6 @@
 			(values #f 0)))
 		  (loop (add1 n))))))
       (values #f 0)))
-
-;; Operators
 
 
 

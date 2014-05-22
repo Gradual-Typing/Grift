@@ -19,7 +19,8 @@
 ;; it is easy to display and store specific setting.
 
 (struct compiler-config
-        (cast-semantics
+        (cast-strictness
+         cast-blame
          trace-passes
          type-checks))
 
@@ -50,7 +51,7 @@ configuration stuct.
                  (printf "Pass ~a input:\n ~a\n" pass tree))
                (when (and (debug? pass tycks)
                           (not (L1? tree)))
-                 (pass-error pass 'pre-pass-type-check tree))
+                 (pass-error pass "post pass check error with ~a" tree))
                (let ()
                  decls ...
                  (let ((result expr))
@@ -58,5 +59,5 @@ configuration stuct.
                      (printf "Pass ~a output:\n ~a\n" pass result))
                    (when (and (debug? pass tycks)
                               (not (L2? result)))
-                     (pass-error pass 'post-pass-check result))
+                     (pass-error pass "post pass check error with ~a" result))
                    result)))))])))
