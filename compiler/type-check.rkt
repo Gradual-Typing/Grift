@@ -85,7 +85,12 @@
                     (srcloc->string src) id site)))
 
 ;;; The type rules for core forms that have interesting type rules
-
+  (define (lambda-type-rule src ty* t-body t-ann)
+    (cond
+      [(not t-ann) (Function ty* t-body)]
+      [(consistent? t-body t-ann) (Function ty* t-ann)]
+      [else  (lambda/inconsistent-types-error src t-body t-ann)]))
+  
   ;; The type of a cast is the cast-type if the expression type and
   ;; the cast type are consistent.
   (define (cast-type-rule ty-exp ty-cast label)
@@ -97,11 +102,12 @@
   ;; types if the type of the branches are consistent and the test is
   ;; consistent with Bool.
   (define (if-type-rule t-tst t-csq t-alt src)
-    (when (not (consistent? t-tst Bool-Type))
-      (if/inconsistent-test-error src t-tst))
-    (when (not (consistent? t-csq t-alt))
-      (if/inconsistent-branches-error src t-csq t-alt))
-    (meet t-csq t-alt))
+    (cond
+      [(not (consistent? t-tst Bool-Type))
+       (if/inconsistent-test-error src t-tst)]
+      [(not (consistent? t-csq t-alt))
+       (if/inconsistent-branches-error src t-csq t-alt)]
+      [else (meet t-csq t-alt)]))
 
   ;; The type of literal constants are staticly known
   (define (const-type-rule c)
@@ -116,9 +122,9 @@
   (define (application-type-rule t-rator t-rand* src)
     (match t-rator
       [(Function t-arg* return)
-       (if  (not (andmap/length= consistent? t-arg* t-rand*))
-            (app-inconsistent-error src t-rator t-rand*)
-            return)]
+       (if (not (andmap/length= consistent? t-arg* t-rand*))
+           (app-inconsistent-error src t-rator t-rand*)
+           return)]
       [(Dyn) Dyn-Type]
       [otherwise (app-non-function-error src t-rator)]))
 
@@ -127,12 +133,9 @@
   (define (tyck-expr exp env)
     (define (recur e) (tyck-expr e env))
     (match exp
-      ;; Notice that in this line we are currently throwing away any
-      ;; type information about the return. This is bad and will not
-      ;; work once we introduce letrec as a core form.
-      [(Lambda src _ (and fml* (list (Fml id* ty*) ...)) body)
+      [(Lambda src t-ann (and fml* (list (Fml id* ty*) ...)) body)
        (let-values (((body t-body) (tyck-expr body (env-extend* env id* ty*))))
-         (let ([ty-lambda (Function ty* t-body)])
+         (let ([ty-lambda (lambda-type-rule src ty* t-body t-ann)])
            (values (Lambda src ty-lambda fml* body) ty-lambda)))]
       ;; Let is unconditionally typed at the type of its body
       [(Let src _ (list (app (tyck-binding (Expr-src exp) env) id* ty* rhs*) ...) body)
@@ -161,36 +164,14 @@
   ;; Type checks a primitive expression with the given environment 
   (define (tyck-prim prim-exp env)
     (define (tyck-arg e) (tyck-expr e env))
-    ;; While it looks like more could be abstacted out these
-    ;; primitives are fundementally different there is nothing that
-    ;; says a new class of primitives that are ternary could not be
-    ;; added it is unfortunate that there is not abstract way to
-    ;; extract the constructor for these types.
+    
     (match prim-exp
       [(Prim:Bin:Int src _ (app tyck-arg fst t-fst) (app tyck-arg snd t-snd))
        (let ((ty (application-type-rule Binop-Int-Type `(,t-fst ,t-snd) src)))
-         (values
-          ((match prim-exp
-             [(struct Prim:Bin:Int:* _) Prim:Bin:Int:*]
-             [(struct Prim:Bin:Int:+ _) Prim:Bin:Int:+]
-             [(struct Prim:Bin:Int:- _) Prim:Bin:Int:-]
-             [(struct Prim:Bin:Int:and _)  Prim:Bin:Int:and]
-             [(struct Prim:Bin:Int:or _)  Prim:Bin:Int:or]
-             [(struct Prim:Bin:Int:>> _)  Prim:Bin:Int:>>]
-             [(struct Prim:Bin:Int:<< _)  Prim:Bin:Int:<<])
-           src ty fst snd)
-          ty))]
+         (values ((mk-struct prim-exp) src ty fst snd) ty))]
       [(Prim:Rel:Int src _ (app tyck-arg fst t-fst) (app tyck-arg snd t-snd))
-       (let ((ty (application-type-rule Binop-Int-Type `(,t-fst ,t-snd) src)))
-         (values
-          ((match prim-exp
-             [(struct Prim:Rel:Int:< _) Prim:Rel:Int:<]
-             [(struct Prim:Rel:Int:> _) Prim:Rel:Int:>]
-             [(struct Prim:Rel:Int:= _) Prim:Rel:Int:=]
-             [(struct Prim:Rel:Int:<= _) Prim:Rel:Int:<=]
-             [(struct Prim:Rel:Int:>= _) Prim:Rel:Int:>=])
-           src ty fst snd)
-          ty))]
+       (let ((ty (application-type-rule Relop-Int-Type `(,t-fst ,t-snd) src)))
+         (values ((mk-struct prim-exp) src ty fst snd) ty))]
       [otherwise (match-pass-error pass 'tyck-prim prim-exp)]))
 
   ;; Type checks the rhs to be consistent with type annotation if
@@ -199,14 +180,10 @@
     (lambda (bnd)
       (let-values ([(exp t-exp) (tyck-expr (Bnd-expr bnd) env)])
         (values (Bnd-ident bnd) t-exp exp))))
-
+  
   ;; This is the body of the type-check
   (match prgm
-    [(Prog n e*) (Prog n (for/list ([e (in-list e*)])
-                           (let-values ([(e t) (tyck-expr e (empty-env))])
-                             e)))]
+    [(Prog n e) (let-values (((e t) (tyck-expr e (empty-env))))
+                  (Prog n e))]
     [otherwise (match-pass-error pass pass prgm)]))
-
-
-
 

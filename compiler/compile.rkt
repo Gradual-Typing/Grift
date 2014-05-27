@@ -43,11 +43,13 @@ assemble - convert a code tree to the targeted assembly language
 (define (compiler file-name settings) 
   (local-require Schml/compiler/read
                  Schml/compiler/parse
-                 Schml/compiler/type-check)
+                 Schml/compiler/type-check
+                 Schml/compiler/insert-implicit-casts)
   (compose-compiler (file-name settings)
                     read
                     parse
-                    type-check))
+                    type-check
+                    insert-implicit-casts))
 
 ;; Since #f is a valid expression a different value is
 ;; use to represent false for the expression variable.

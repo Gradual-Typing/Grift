@@ -1,3 +1,3 @@
 (let ((l (lambda ((a : Dyn)) a)))
-  ((lambda (l) (l)) 
-   (lambda () (l l))))
+  ((lambda (l) (l))
+   (lambda () (l l)))) 

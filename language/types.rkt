@@ -40,7 +40,7 @@
       (and (Bool? t) (Bool? g))
       (and (Function? t) (Function? g))))
 
-(define (meet t g err)
+(define (meet t g)
   (cond
     [(Dyn? t) g]
     [(Dyn? g) t]
@@ -57,8 +57,8 @@
                                                     [g (in-vector g-from)]) 
                                    (meet t g))
                        (meet t-to g-to)) 
-             (err "Function type with incorrect arrity"))))]
-    [else (err "Types are not consistent")]))
+             (error 'meet "Function type with incorrect arrity"))))]
+    [else (error 'meet "Types are not consistent")]))
 
 
 

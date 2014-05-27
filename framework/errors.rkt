@@ -68,6 +68,13 @@
 
 (struct Schml:Type Schml ())
 
+(define (lambda/inconsistent-types-error src tb ta)
+  (configure-for-external-error)
+  (raise (Schml:Type
+          (format "~a: Lambda annotated return type ~a is inconsistent with actual return type ~a"
+                  (srcloc->string src) ta tb)
+          (current-continuation-marks))))
+
 (define (cast/inconsistent-types-error location t-exp t-cast)
   (configure-for-external-error)
   (raise (Schml:Type
@@ -86,7 +93,7 @@
   (configure-for-external-error)
   (raise (Schml:Type
           (format "~a: If test is of type which is not consistent with Bool"
-                  (srcloc->string src) tst)
+                  (srcloc->string src))
           (current-continuation-marks))))
 
 (define (app-inconsistent-error src rator rand*)

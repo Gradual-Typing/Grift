@@ -13,6 +13,13 @@
 
 (define-pass (parse stx-tree comp-config)
   (lang-syntax? -> implicit-core?)
+
+  ;; Eventually we should do something besides throwing everything
+  ;; but the first expression away
+  (define (parse-top-level exp* env)
+    (if (null? exp*)
+        (pass-error pass 'parse-top-level "Empty File")
+        (parse-expr (car exp*) env)))
   
   (define (parse-expr* exp* env) 
     (for/list ([exp (in-list exp*)]) (parse-expr exp env)))
@@ -63,26 +70,29 @@
     [else (cond-pass-error pass 'parse-type (strip ty))])))
 
 (define (desugar-infix-notation stx-ls env)
+  (printf "din ~a ~a\n" stx-ls env)
   (match stx-ls
     [(list (? (lambda (s) 
-		(match (env-lookup env (syntax-e s) #f)
-		  [(Bnd:Infix sym) #f]
-		  [otherwise #t])) args) ...
-	   (app (lambda (s) 
-		  (match (env-lookup env (syntax-e s) #f)
-		    [(Bnd:Infix sym) sym]
-		    [otherwise #f])) (and (not #f) sym)) 
-	   returns ...)
+                (match (env-lookup env (syntax-e s) #f)
+                  [(Bnd:Infix sym) #f]
+                  [otherwise #t])) args) ...
+           (app (lambda (s) 
+                  (match (env-lookup env (syntax-e s) #f)
+                    [(Bnd:Infix sym) sym]
+                    [otherwise #f])) (and (not #f) sym)) 
+	       returns ...)
      ;; This is ugly but I think that it is a less wasteful
      ;; version of (syntax-e #`(#,sym #,args #,@returns))
      ;; Just trying to get back to syntax-ls format after
      ;; having completely destroyed it.
+     (printf "din->matched ~a ~a ~a\n" sym args returns)
      `(,#`#,sym ,#`#,args ,@returns)]
-    [otherwise stx-ls]))
+    [otherwise (printf "din->else ~a\n" stx-ls) stx-ls]))
 
 (define (handle-complex-type src ty ty-ls env)
+  (printf "hct ~a ~a ~a ~a\n" src ty ty-ls env)
   (let* ((rator (car ty-ls))
-	 (te (syntax-e rator)))
+         (te (syntax-e rator)))
     (cond
      [(pair? te) (bad-syntax src (strip rator) (strip ty))]
      [(symbol? te)
@@ -148,18 +158,18 @@
 (define (if-transformer stx env)
   (syntax-case stx ()
     [(_ t c a) (If (syntax-srcloc stx) #f
-                   (parse-expr #'t) 
-                   (parse-expr #'c) 
-                   (parse-expr #'a))]))
+                   (parse-expr #'t env) 
+                   (parse-expr #'c env) 
+                   (parse-expr #'a env))]))
 
 (define (cast-transformer stx env)
   (syntax-case stx ()
-    [(_ e t l) (string (syntax-e #'l))
-     (Cast (syntax-srcloc stx) (parse-type #'t)
-           (parse-expr #'e) #f (syntax-e #'l))]
+    [(_ e t l) (string? (syntax-e #'l))
+     (Cast (syntax-srcloc stx) (parse-type #'t env)
+           (parse-expr #'e env) #f (syntax-e #'l))]
     [(_ e t)
      (let ((src (syntax-srcloc stx)))
-       (Cast src (parse-type #'t) (parse-expr #'e) #f (srcloc->string src)))]))
+       (Cast src (parse-type #'t env) (parse-expr #'e env) #f (srcloc->string src)))]))
 
 (define (lt-transformer stx env)
   (syntax-case stx ()
@@ -199,8 +209,18 @@
                              (parse-expr #'n env) (parse-expr #'m env))]))
 
 (define (function-type-transformer stx env)
-  (syntax-case stx ()
-    [(_ f t) (Function (parse-type* (syntax-e #'f) env) (parse-type #'t env))]))
+  (letrec ([recur (lambda (stx)
+                    (syntax-case stx ()
+                      [(_ tok1 tok2 tok* ...) (and (eq? (syntax-e #'tok1) '->)
+                                                   (null? (syntax-e #'(tok* ...)))) 
+                       (values '() #'tok2)]
+                      [(_ tok1 tok2 tok* ...) (eq? (syntax-e #'tok1) '->) 
+                       (values '() #'(tok2 tok* ...))]
+                      [(_ tok1 tok2 tok* ...)
+                       (let-values ([(from to) (recur #'(_ tok2 tok* ...))])
+                         (values (cons #'tok1 from) to))]))])
+    (let-values ([(from to) (recur stx)])
+      (Function (parse-type* from env) (parse-type to env)))))
 
 (struct Binding (value))
 (struct Bnd:Var  Binding ())
@@ -232,9 +252,10 @@
      '%+     (Bnd:Core plus-transformer)
      '%-     (Bnd:Core minus-transformer))))
 
+
 (match stx-tree
   [(File name stx*)
-   (Prog name (for/list ([stx stx*]) (parse-expr stx core-env)))]
+   (Prog name (parse-top-level stx* core-env))]
   [otherwise (match-pass-error pass 'parse-file stx-tree)]))
 
 

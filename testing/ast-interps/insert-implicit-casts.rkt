@@ -54,14 +54,14 @@
         [(Lambda _ _ (list (Fml id* _) ...) body)
          (lambda arg* (recur body (env-extend* env id* arg*)))]
         [(Let _ _ (list (Bnd id* _ (app recur/env exp*)) ...) body)
-         (recur body (env-extend* id* exp*))]
-        [(Var _ _ id) (env-lookup env id (unbound-var-error id))]
+         (recur body (env-extend* env id* exp*))]
+        [(Var _ _ id) (env-lookup env id (th (unbound-var-error id)))]
         [(Const _ _ k) k]
         [(If _ _ (app recur/env tst) csq alt)
          (if tst (recur/env csq) (recur/env alt))]
         [(App src _ (app recur/env v) (list (app recur/env v*) ...))
          (apply v v*)]
-        [(and (Prim _ _) p-exp) (interp-prim p-exp recur/env)]
+        [(and (Prim _ _) p-exp) (interp-prim recur/env p-exp)]
         [(Cast _ t-casted (app recur/env val) t-exp label)
          (cast label val t-exp t-casted)]
         [e (error 'interp "Umatched expression ~a" e)]))
@@ -87,18 +87,23 @@
         (if (Dyn? t1)
             (match v1
               [(casted-value l2 v2 t3 t1)
-               (apply-cast-ld l1 v2 t3 t2)])
+               (apply-cast-ld l1 v2 t3 t2)]
+              [o (error 'interp "Unexpected value in apply-cast-ld match ~a" o)])
             (mk-cast l1 v1 t1 t2))
         (raise l1)))
 
   (define (apply-lazy cast)
+    (define (arrity-mismatch l) (th (raise l)))
     (define (recur rator rands)
       (match rator
         [(casted-value l rator^ (Function t1* t2) (Function t3* t4))
-         (let* ((rands^ (map/length= cast (map (lambda (e) l) rands) rands t3* t1* ))
+         (let* ((rands^ (map/length= (lambda (e t1 t2)
+                                       (cast l e t1 t2)) rands t3* t1*
+                                     (arrity-mismatch l))) 
                 (result (recur rator^ rands^)))
            (cast l result t2 t4))]
-        [(? procedure? p) (apply p rands)]))
+        [(? procedure? p) (apply p rands)]
+        [o (error 'interp "Unexpected value in apply-lazy match ~a" o)]))
     recur)
   
   (define (observe-lazy interp exp env)
@@ -107,7 +112,8 @@
         [(? constant? k) k]
         [(? procedure? p) 'procedure]
         [(casted-value label v t (Function t2 t3)) 'procedure]
-        [(casted-value l v t (Dyn)) 'dynamic])))
+        [(casted-value l v t (Dyn)) 'dynamic]
+        [o (error 'interp "Unexpected value in observe-lazy match ~a" o)])))
   
   (define (get-interp)
     (interp-expr apply-cast-ld (apply-lazy apply-cast-ld)))
@@ -152,5 +158,7 @@
                                              (Const '_ '_ #f)
                                              (Bool) "1")
                                        (Dyn) "2")
-                      '(blame "2")))))))
+                      '(blame "2"))
+
+         )))))
 

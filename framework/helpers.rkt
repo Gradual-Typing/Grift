@@ -47,16 +47,17 @@
 
 (define-syntax (map/length= stx)
   (syntax-case stx ()
-    [(_ p ls ...)
-     (with-syntax (((t ...) (generate-temporaries #'(ls ...))))
-       #'(let ([t ls] ...)
-           (letrec ([recur (lambda (t ...)
-                             (if (and (null? t) ...)
-                                 '()
-                                 (and (or (null? t) ...)
-                                      (cons (p (car ls) ...)
-                                            (recur (cdr ls) ...)))))])
-             (recur t ...))))]))
+    [(_ p ls ... th)
+     (with-syntax (((t ...) (generate-temporaries #'(ls ...)))
+                   ((n ...) (generate-temporaries #'(ls ...))))
+       #'(letrec ([recur (lambda (t ...)
+                             (let ((n (null? t)) ...)
+                               (cond
+                                 [(and n ...) '()]
+                                 [(or n ...) (th)]
+                                 [else (cons (p (car t) ...)
+                                             (recur (cdr t) ...))])))])
+             (recur ls ...)))]))
 
 ;;
 
@@ -77,3 +78,9 @@
 (define-syntax th
   (syntax-rules ()
     ((_ e) (lambda () e))))
+
+(define (mk-struct struct)
+  (let-values (((type not-specific) (struct-info struct)))
+    (if not-specific
+        (error 'mk-struct "could not make a struct of this type ~a" struct)
+        (struct-type-make-constructor type))))
