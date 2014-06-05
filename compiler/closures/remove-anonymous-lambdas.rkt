@@ -14,7 +14,8 @@
          Schml/framework/errors)
 ;; The constuctors of the core language
 (require Schml/language/shared
-         Schml/language/sourceless-core)
+         (prefix-in sc Schml/language/sourceless-core)
+         (prefix-in il Schml/language/closures-il1))
 ;; Only the pass is provided by this module
 (provide remove-anonymous-lambdas)
 

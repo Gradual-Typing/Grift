@@ -53,7 +53,7 @@
                       (exp Expr?))]
   [struct (Const Expr) ((src srcloc?) (const constant?))]
   ;; There is curren
-  [struct (Prim Expr) ((src srcloc?) (pexp (Prim-Expr? Expr?)))]))
+  [struct (Prim Expr) ((src srcloc?) (pexp (Prim/args? Expr?)))]))
 
 (define (core? x)
   (define (expr? x)

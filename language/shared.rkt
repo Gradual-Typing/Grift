@@ -151,14 +151,23 @@
     [(_ print-exp p)
      (begin (reset-label-table!)
             print-exp
+            (newline p)
             (print-label-table p))]))
 
 
 ;; The type of typed and untyped bindings
-(struct Bnd (ident expr) #:transparent)
-(struct Fml (ident) #:transparent)
+(struct Bnd (id exp) #:transparent)
+(struct Fml (id) #:transparent)
 (struct Bnd:Ty Bnd (type) #:transparent)
 (struct Fml:Ty Fml (type) #:transparent)
+
+(define (Bnd/rhs? e?) 
+  (make-flat-contract
+   #:name 'Bnd/rhs?
+   #:first-order
+   (lambda (o)
+     (and (Bnd? o)
+          (e? (Bnd-exp o))))))
 
 (define (mk-bnd->doc expr->doc)
   (lambda (o)
@@ -178,7 +187,7 @@
   (iic-delta primitive eval)
   (prim-expr? primitive expr?))
 
-(define (Prim-Expr? x?)
+(define (Prim/args? x?)
   (make-flat-contract
    #:name 'Prim?
    #:first-order

@@ -1,7 +1,7 @@
 #lang racket
 
 (require Schml/framework/build-compiler
-         Schml/compiler/closures/remove-anonymous-lambdas
+         Schml/compiler/closures/label-lambdas
          ;;Schml/compiler/closures/sanitize-binding-forms
          )
 
@@ -9,7 +9,7 @@
 
 (define-pass (make-closures-explicit ast config)
   (compose-compiler (ast config)
-                    remove-anonymous-lambdas
+                    label-lambdas
                     ;;sanitize-binding-forms
                     ;;uncover-free
                     ;;convert-closure
