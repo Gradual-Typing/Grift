@@ -79,6 +79,12 @@
   (syntax-rules ()
     ((_ e) (lambda () e))))
 
+(define-syntax (apply/overflow stx)
+  (let ((limit (expt 2 64)))
+    (syntax-case stx ()
+      ((_ o a ...)
+       #`(modulo (o a ...) #,limit)))))
+
 (define (mk-struct struct)
   (let-values (((type not-specific) (struct-info struct)))
     (if not-specific

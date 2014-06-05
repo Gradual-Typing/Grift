@@ -68,14 +68,13 @@
          Schml/framework/helpers
          Schml/framework/errors)
 ;; The constuctors of the core language
-(require Schml/language/core
-         Schml/language/types
-         Schml/language/shared)
+(require Schml/language/shared
+         (prefix-in c: Schml/language/core)
+         (prefix-in tc: Schml/language/typed-core))
 ;; Only the pass is provided by this module
 (provide type-check)
 
 (define-pass (type-check prgm comp-config)
-  (implicit-core? -> explicit-core?)
 ;;; Procedures that are used to throw errors
   ;; The error that occurs when a variable is not found. It is an internal
   ;; error because it is a syntax error to have an unbound variable.
@@ -83,13 +82,23 @@
     (th (pass-error pass
                     "Var ~a:~a was not in env during lookup at ~a."
                     (srcloc->string src) id site)))
-
+  
 ;;; The type rules for core forms that have interesting type rules
+  ;; The type of a lambda that is annotated is the type of the annotation
+  ;; as long as the annotation is consistent with the type of the
+  ;; body
   (define (lambda-type-rule src ty* t-body t-ann)
     (cond
       [(not t-ann) (Function ty* t-body)]
       [(consistent? t-body t-ann) (Function ty* t-ann)]
       [else  (lambda/inconsistent-types-error src t-body t-ann)]))
+  
+  ;; The type of a annotated let binding is the type of the annotation
+  ;; as long as it is consistent with the type of the expression.
+  (define (let-binding-type-rule t-bnd t-exp id src)
+    (cond
+      [(consistent? t-bnd t-exp) t-bnd]
+      [else (let-binding/inconsistent-type-error src id t-bnd t-exp)]))
   
   ;; The type of a cast is the cast-type if the expression type and
   ;; the cast type are consistent.
@@ -98,7 +107,7 @@
         (cast/inconsistent-types-error label ty-exp ty-cast))
     ty-cast)
 
-  ;; The type of an if is the meet of the consequence and alternative
+  ;; The type of an if is the join of the consequence and alternative
   ;; types if the type of the branches are consistent and the test is
   ;; consistent with Bool.
   (define (if-type-rule t-tst t-csq t-alt src)
@@ -107,7 +116,7 @@
        (if/inconsistent-test-error src t-tst)]
       [(not (consistent? t-csq t-alt))
        (if/inconsistent-branches-error src t-csq t-alt)]
-      [else (meet t-csq t-alt)]))
+      [else (join t-csq t-alt)]))
 
   ;; The type of literal constants are staticly known
   (define (const-type-rule c)
@@ -133,57 +142,65 @@
   (define (tyck-expr exp env)
     (define (recur e) (tyck-expr e env))
     (match exp
-      [(Lambda src t-ann (and fml* (list (Fml id* ty*) ...)) body)
+      [(c:Lambda src (list (or (Fml:Ty id* ty*)
+                                     (and (Fml id*)
+                                          (app (lambda (f) Dyn-Type) ty*))) ...)
+                 t-ann body)
        (let-values (((body t-body) (tyck-expr body (env-extend* env id* ty*))))
          (let ([ty-lambda (lambda-type-rule src ty* t-body t-ann)])
-           (values (Lambda src ty-lambda fml* body) ty-lambda)))]
+           (values (tc:Lambda src ty-lambda (map Fml:Ty id* ty*) body) ty-lambda)))]
       ;; Let is unconditionally typed at the type of its body
-      [(Let src _ (list (app (tyck-binding (Expr-src exp) env) id* ty* rhs*) ...) body)
+      [(c:Let src (list (app (tyck-let-binding (c:Expr-src exp) recur)
+                             id* ty* rhs*) ...)
+              body)
        (let-values ([(body t-body) (tyck-expr body (env-extend* env id* ty*))])
-         (values (Let src t-body (map Bnd id* ty* rhs*) body) t-body))]
+         (values (tc:Let src t-body (map Bnd:Ty id* rhs* ty*) body) t-body))]
       ;; Variables are typed at the type associated with it in environment
       ;; If it isn't found then there must be a mistake in the
       ;; compiler because all unbound variable should be caught during parsing.
-      [(Var src _ id)
+      [(c:Var src id)
        (let ((ty (env-lookup env id (var-not-found-error src id 'tyck-expr-var))))
-         (values (Var src ty id) ty))]
-      [(Cast src t-cast (app recur exp t-exp) _ label)
+         (values (tc:Var src ty id) ty))]
+      [(c:Cast src (app recur exp t-exp) t-cast label)
        (let ((ty-casted (cast-type-rule t-exp t-cast label)))
-         (values (Cast src ty-casted exp t-exp label) ty-casted))]
-      [(If src _ (app recur tst t-tst) (app recur csq t-csq) (app recur alt t-alt))
+         (values (tc:Cast src ty-casted exp t-exp label) ty-casted))]
+      [(c:If src (app recur tst t-tst) (app recur csq t-csq) (app recur alt t-alt))
        (let ((t-if (if-type-rule t-tst t-csq t-alt src)))
-         (values (If src t-if tst csq alt) t-if))]
-      [(Const src _ (and const (app const-type-rule t-const)))
-       (values (Const src t-const const) t-const)]
-      [(App src _ (app recur exp t-exp) (list (app recur exp* t-exp*) ...))
+         (values (tc:If src t-if tst csq alt) t-if))]
+      [(c:Const src (and const (app const-type-rule t-const)))
+       (values (tc:Const src t-const const) t-const)]
+      [(c:App src (app recur exp t-exp) (list (app recur exp* t-exp*) ...))
        (let ((t-app (application-type-rule t-exp t-exp* src)))
-         (values (App src t-app exp exp*) t-app))]
-      [(and (Prim _ _) p-exp) (tyck-prim p-exp env)]
+         (values (tc:App src t-app exp exp*) t-app))]
+      [(c:Prim src pexp) (tyck-prim pexp src recur)]
       [e (match-pass-error pass 'tyck-expr e)]))
 
   ;; Type checks a primitive expression with the given environment 
-  (define (tyck-prim prim-exp env)
-    (define (tyck-arg e) (tyck-expr e env))
-    
-    (match prim-exp
-      [(Prim:Bin:Int src _ (app tyck-arg fst t-fst) (app tyck-arg snd t-snd))
-       (let ((ty (application-type-rule Binop-Int-Type `(,t-fst ,t-snd) src)))
-         (values ((mk-struct prim-exp) src ty fst snd) ty))]
-      [(Prim:Rel:Int src _ (app tyck-arg fst t-fst) (app tyck-arg snd t-snd))
-       (let ((ty (application-type-rule Relop-Int-Type `(,t-fst ,t-snd) src)))
-         (values ((mk-struct prim-exp) src ty fst snd) ty))]
-      [otherwise (match-pass-error pass 'tyck-prim prim-exp)]))
+  (define (tyck-prim p src tyck-arg)
+    (match p
+        [(Rel:IntxInt (app tyck-arg fst t-fst)
+                      (app tyck-arg snd t-snd))
+         (values (tc:Prim src Bool-Type (mk-rel:int-int p fst snd))
+                 (application-type-rule IntxInt->Bool `(,t-fst ,t-snd) src))]
+        [(Op:IntxInt (app tyck-arg fst t-fst)
+                     (app tyck-arg snd t-snd))
+         (values (tc:Prim src Int-Type  (mk-op:int-int p fst snd))
+                 (application-type-rule IntxInt->Int `(,t-fst ,t-snd) src))]
+        [otherwise (match-pass-error pass 'tyck-prim otherwise)]))
 
   ;; Type checks the rhs to be consistent with type annotation if
   ;; provided the resulting type is the type of the annotation.
-  (define (tyck-binding src env)
+  (define (tyck-let-binding src tyck-exp)
     (lambda (bnd)
-      (let-values ([(exp t-exp) (tyck-expr (Bnd-expr bnd) env)])
-        (values (Bnd-ident bnd) t-exp exp))))
+      (match bnd
+        [(Bnd:Ty id (app tyck-exp exp t-exp) t-bnd)
+         (values id (let-binding-type-rule t-bnd t-exp id src) exp)]
+        [(Bnd id (app tyck-exp exp t-exp)) (values id t-exp exp)]
+        [otherwise (match-pass-error pass 'tyck-binding otherwise)])))
   
   ;; This is the body of the type-check
   (match prgm
-    [(Prog n e) (let-values (((e t) (tyck-expr e (empty-env))))
-                  (Prog n e))]
+    [(c:Prog n e) (let-values (((e t) (tyck-expr e (empty-env))))
+                    (tc:Prog n e))]
     [otherwise (match-pass-error pass pass prgm)]))
 

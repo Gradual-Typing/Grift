@@ -1,9 +1,7 @@
 #lang racket
 (require rackunit rackunit/text-ui
          Schml/framework/paths
-         Schml/compiler/compile
-         Schml/framework/build-compiler
-         Schml/testing/ast-interps/insert-implicit-casts)
+         Schml/framework/build-compiler)
 
 (provide (all-defined-out))
 
@@ -11,76 +9,80 @@
   (make-parameter 
    (compiler-config #f #f 'none 'none)))
 
-(define-syntax stdcc
-  (syntax-rules ()
-    ((_ cc p ... n)
-     (interp (cc (simplify-path (build-path test-suite-path p ... n)) (config))
-             (config)))))
+(define (test-compiler path config expected)
+  (local-require Schml/compiler/read
+                 Schml/compiler/parse
+                 Schml/compiler/type-check
+                 Schml/compiler/insert-implicit-casts
+                 (prefix-in iic: Schml/testing/ast-interps/insert-implicit-casts)
+                 Schml/compiler/closures/make-closures-explicit)
+  (compose-compiler
+   (path config)
+   read parse type-check insert-implicit-casts
+   (ast-> ast (check-equal? (iic:interp ast config) expected))
+   make-closures-explicit))
 
-(define-syntax test-equal?/exn
+(define-syntax test-compile
   (syntax-rules ()
-    ((_ name test expect)
-     (test-equal? name
-      (with-handlers 
-          ([exn? (lambda (temp)
-                   ((error-display-handler) (exn-message temp) temp)
-                   (raise temp))])
-        test)
-      expect))))
-
-(define-syntax test-file
-  (syntax-rules ()
-    ((_ cc p ... n e)
-     (test-equal?/exn n (stdcc cc p ... n) e))))
+    ((_ p ... n e)
+     (test-case n
+       (with-handlers
+           ([exn? (lambda (temp)
+                    ((error-display-handler) (exn-message temp) temp)
+                    (raise temp))])
+         (test-compiler
+          (simplify-path (build-path test-suite-path p ... n))
+          (config)
+          e))))))
 
 (define ld-tests
   (test-suite "lazy downcast"
     (test-suite "valid"
-      (test-file compiler "compiler" "const-false.schml" #f)
-      (test-file compiler "compiler" "const-true.schml" #t)
-      (test-file compiler "compiler" "const-one.schml" 1)
-      (test-file compiler "compiler" "const-ninetynine.schml" 99)
-      (test-file compiler "compiler" "const-larg-int.schml" 123456)
-      (test-file compiler "compiler" "prim-minus.schml" 80)
-      (test-file compiler "compiler" "prim-lt.schml" #f)
-      (test-file compiler "compiler" "prim-gt.schml" #t)
-      (test-file compiler "compiler" "prim-plus.schml" 120)
-      (test-file compiler "compiler" "prim-times.schml" 2000)
-      (test-file compiler "compiler" "lambda1.schml" 'procedure)
-      (test-file compiler "compiler" "lambda2.schml" 'procedure)
-      (test-file compiler "compiler" "lambda3.schml" 'procedure)
-      (test-file compiler "compiler" "lambda4.schml" 'procedure)
-      (test-file compiler "compiler" "lambda5.schml" 'procedure)
-      (test-file compiler "compiler" "lambda6.schml" 'procedure)
-      (test-file compiler "compiler" "lambda7.schml" 'procedure)
-      (test-file compiler "compiler" "lambda8.schml" 'procedure)
-      (test-file compiler "compiler" "let0.schml" #t)
-      (test-file compiler "compiler" "let1.schml" 2)
-      (test-file compiler "compiler" "let2.schml" #f)
-      (test-file compiler "compiler" "let3.schml" 1)
-      (test-file compiler "compiler" "let4.schml" 2)
-      (test-file compiler "compiler" "let5.schml" 4)
-      (test-file compiler "compiler" "let6.schml" 0)
-      (test-file compiler "compiler" "let7.schml" 'dynamic)
-      (test-file compiler "compiler" "let8.schml" 0)
-      (test-file compiler "compiler" "let9.schml" 100)
-      (test-file compiler "compiler" "let10.schml" 'dynamic)
-      (test-file compiler "compiler" "let11.schml" #f)
-      (test-file compiler "compiler" "let12.schml" 'dynamic)
-      (test-file compiler "compiler" "let13.schml" 'dynamic)
-      (test-file compiler "compiler" "let14.schml" 5)
-      (test-file compiler "compiler" "let15.schml" 'procedure)
-      (test-file compiler "compiler" "let16.schml" 7)
-      (test-file compiler "compiler" "let17.schml" #f)
-      (test-file compiler "compiler" "let18.schml" #f)
-      (test-file compiler "compiler" "let19.schml" #f)
-      (test-file compiler "compiler" "let20.schml" #t)
-      (test-file compiler "compiler" "if0.schml" 0)
-      (test-file compiler "compiler" "if1.schml" 0)
-      (test-file compiler "compiler" "if2.schml" 1)
-      (test-file compiler "compiler" "if3.schml" 4)
-      
-      (test-file compiler "compiler" "fact5.schml" 120)
+      (test-compile "const-false.schml" #f)
+      (test-compile "const-true.schml" #t)
+      (test-compile "const-one.schml" 1)
+      (test-compile "const-ninetynine.schml" 99)
+      (test-compile "const-larg-int.schml" 123456)
+      (test-compile "prim-minus.schml" 80)
+      (test-compile "prim-lt.schml" #f)
+      (test-compile "prim-gt.schml" #t)
+      (test-compile "prim-plus.schml" 120)
+      (test-compile "prim-times.schml" 2000)
+      (test-compile "lambda1.schml" 'procedure)
+      (test-compile "lambda2.schml" 'procedure)
+      (test-compile "lambda3.schml" 'procedure)
+      (test-compile "lambda4.schml" 'procedure)
+      (test-compile "lambda5.schml" 'procedure)
+      (test-compile "lambda6.schml" 'procedure)
+      (test-compile "lambda7.schml" 'procedure)
+      (test-compile "lambda8.schml" 'procedure)
+      (test-compile "let0.schml" #t)
+      (test-compile "let1.schml" 2)
+      (test-compile "let2.schml" #f)
+      (test-compile "let3.schml" 1)
+      (test-compile "let4.schml" 2)
+      (test-compile "let5.schml" 4)
+      (test-compile "let6.schml" 0)
+      (test-compile "let7.schml" 'dynamic)
+      (test-compile "let8.schml" 0)
+      (test-compile "let9.schml" 100)
+      (test-compile "let10.schml" 'dynamic)
+      (test-compile "let11.schml" #f)
+      (test-compile "let12.schml" 'dynamic)
+      (test-compile "let13.schml" 'dynamic)
+      (test-compile "let14.schml" 5)
+      (test-compile "let15.schml" 'procedure)
+      (test-compile "let16.schml" 7)
+      (test-compile "let17.schml" #f)
+      (test-compile "let18.schml" #f)
+      (test-compile "let19.schml" #f)
+      (test-compile "let20.schml" #t)
+      (test-compile "if0.schml" 0)
+      (test-compile "if1.schml" 0)
+      (test-compile "if2.schml" 1)
+      (test-compile "if3.schml" 4)
+      (test-compile "fact5.schml" 120)
+
       ;; pretty printer doesn't like this currently
       ;; and it isn not yet type safe
       ;;(test-file compiler "compiler" "simple-map.schml" 3)

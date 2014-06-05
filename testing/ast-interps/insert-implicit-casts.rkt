@@ -34,7 +34,7 @@
          Schml/framework/helpers
          Schml/framework/errors)
 ;; The constuctors of the core language
-(require Schml/language/core)
+(require Schml/language/sourceless-core)
 ;; Only the pass is provided by this module
 (provide interp)
 
@@ -51,37 +51,23 @@
     (define (recur exp env)
       (define (recur/env e) (recur e env))
       (match exp
-        [(Lambda _ _ (list (Fml id* _) ...) body)
+        [(Lambda _ (list (Fml:Ty id* _) ...) body)
          (lambda arg* (recur body (env-extend* env id* arg*)))]
-        [(Let _ _ (list (Bnd id* _ (app recur/env exp*)) ...) body)
+        [(Let _ (list (Bnd:Ty id* (app recur/env exp*) _) ...) body)
          (recur body (env-extend* env id* exp*))]
-        [(Var _ _ id) (env-lookup env id (th (unbound-var-error id)))]
-        [(Const _ _ k) k]
-        [(If _ _ (app recur/env tst) csq alt)
+        [(Var _ id) (env-lookup env id (th (unbound-var-error id)))]
+        [(Const _ k) k]
+        [(If _ (app recur/env tst) csq alt)
          (if tst (recur/env csq) (recur/env alt))]
-        [(App src _ (app recur/env v) (list (app recur/env v*) ...))
+        [(App _ (app recur/env v) (list (app recur/env v*) ...))
          (apply v v*)]
-        [(and (Prim _ _) p-exp) (interp-prim recur/env p-exp)]
-        [(Cast _ t-casted (app recur/env val) t-exp label)
+        [(Prim _ pexp) (iic-delta pexp recur/env)]
+        [(Cast t-casted (app recur/env val) t-exp label)
          (cast label val t-exp t-casted)]
         [e (error 'interp "Umatched expression ~a" e)]))
     recur)
-
-  ;; a generic implementation of interpretation for the primitive
-  ;; operations it does not yet handle numeric truncation.
-  (define (interp-prim interp prim)
-    (match prim
-      [(Prim:Bin:Int:* _ _ f s) (* (interp f) (interp s))]
-      [(Prim:Bin:Int:+ _ _ f s) (+ (interp f) (interp s))]
-      [(Prim:Bin:Int:- _ _ f s) (- (interp f) (interp s))]
-      [(Prim:Rel:Int:< _ _ f s) (< (interp f) (interp s))]
-      [(Prim:Rel:Int:> _ _ f s) (> (interp f) (interp s))]
-      [(Prim:Rel:Int:= _ _ f s) (= (interp f) (interp s))]
-      [(Prim:Rel:Int:<= _ _ f s)(<=  (interp f) (interp s))]
-      [(Prim:Rel:Int:>= _ _ f s)(>=  (interp f) (interp s))]
-      [o (error 'interp "Prim ~a not implemented in interp" prim)]))
-
-;; The lazy-d parts
+  
+  ;; The lazy-d parts
   (define (apply-cast-ld l1 v1 t1 t2)
     (if (shallow-consistent? t1 t2)
         (if (Dyn? t1)
@@ -91,7 +77,7 @@
               [o (error 'interp "Unexpected value in apply-cast-ld match ~a" o)])
             (mk-cast l1 v1 t1 t2))
         (raise l1)))
-
+  
   (define (apply-lazy cast)
     (define (arrity-mismatch l) (th (raise l)))
     (define (recur rator rands)
@@ -99,7 +85,7 @@
         [(casted-value l rator^ (Function t1* t2) (Function t3* t4))
          (let* ((rands^ (map/length= (lambda (e t1 t2)
                                        (cast l e t1 t2)) rands t3* t1*
-                                     (arrity-mismatch l))) 
+                                       (arrity-mismatch l))) 
                 (result (recur rator^ rands^)))
            (cast l result t2 t4))]
         [(? procedure? p) (apply p rands)]
@@ -141,22 +127,16 @@
      (parameterize ((conf (compiler-config 'lazy 'downcast 'none 'none)))
        (test-suite "lazy downcast"
          ;; tests for the literals
-         (test-interp "lit int" (Const '_ '_ 5) 5)
-         (test-interp "lit int" (Const '_ '_ #t) #t)
-         (test-interp "cast lit" (Cast '_ (Dyn)
-                                       (Const '_ '_ 10)
-                                       (Int) "1")
+         (test-interp "lit int" (Const '_ 5) 5)
+         (test-interp "lit int" (Const '_ #t) #t)
+         (test-interp "cast lit" (Cast (Dyn) (Const '_ 10) (Int) "1")
                       'dynamic)
-         (test-interp "cast lit" (Cast '_ (Dyn)
-                                       (Cast '_ (Dyn)
-                                             (Const '_ '_ 10)
-                                             (Int) "1")
+         (test-interp "cast lit" (Cast (Dyn) (Cast (Dyn) (Const '_ 10)
+                                                   (Int) "1")
                                        (Dyn) "1")
                       'dynamic)
-         (test-interp "cast lit" (Cast '_ (Int)
-                                       (Cast '_ (Dyn)
-                                             (Const '_ '_ #f)
-                                             (Bool) "1")
+         (test-interp "cast lit" (Cast (Int) (Cast (Dyn) (Const '_ #f)
+                                                   (Bool) "1")
                                        (Dyn) "2")
                       '(blame "2"))
 

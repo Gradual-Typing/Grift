@@ -75,6 +75,13 @@
                   (srcloc->string src) ta tb)
           (current-continuation-marks))))
 
+(define (let-binding/inconsistent-type-error src id t-bnd t-exp)
+  (configure-for-external-error)
+  (raise (Schml:Type
+          (format "~a: ~a binding in let annotated by ~a is inconsistent with actual type ~a"
+                  (srcloc->string src) id t-bnd t-exp)
+          (current-continuation-marks))))
+
 (define (cast/inconsistent-types-error location t-exp t-cast)
   (configure-for-external-error)
   (raise (Schml:Type

@@ -7,10 +7,14 @@
 
 
 (define-syntax compose-compiler
-  (syntax-rules ()
+  (syntax-rules (ast->)
     [(_ (e s))
      (raise-syntax-error 'compose-compiler)]
     [(_ (e s) p0) (p0 e s)]
+    [(_ (e s) (ast-> ast t* ...) p* ...)
+     (let ((ast e))
+       t* ...
+       (compose-compiler (ast s) p* ...))]
     [(_ (e s) p0 p1 p* ...)
      (let ((e^ (p0 e s)))
        (compose-compiler (e^ s) p1 p* ...))]))
@@ -39,25 +43,17 @@ configuration stuct.
 |#
 (define-syntax define-pass
   (lambda (stx)
-    (syntax-case stx (->)
-      [(_ (name tree config) (L1? -> L2?)
-          decls ... expr)
+    (syntax-case stx ()
+      [(_ (name tree config) decls ... expr)
        (with-syntax ((pass (datum->syntax #'name 'pass)))
          #'(define (name tree config)
              (let ((pass 'name)
-                   (traces (compiler-config-trace-passes config))
-                   (tycks (compiler-config-type-checks config)))
+                   (traces (compiler-config-trace-passes config)))
                (when (debug? pass traces)
-                 (printf "Pass ~a input:\n ~a\n" pass tree))
-               (when (and (debug? pass tycks)
-                          (not (L1? tree)))
-                 (pass-error pass "post pass check error with ~a" tree))
+                 (printf "Pass ~a input:\n ~a\n" pass tree)) 
                (let ()
                  decls ...
                  (let ((result expr))
                    (when (debug? pass traces)
-                     (printf "Pass ~a output:\n ~a\n" pass result))
-                   (when (and (debug? pass tycks)
-                              (not (L2? result)))
-                     (pass-error pass "post pass check error with ~a" result))
+                     (printf "Pass ~a output:\n ~a\n" pass result)) 
                    result)))))])))

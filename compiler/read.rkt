@@ -4,7 +4,6 @@
 (provide read)
 
 (define-pass (read file-path settings)
-  (path? -> lang-syntax?)
   (parameterize
         ([read-case-sensitive #t]
          [read-square-bracket-as-paren #t]
