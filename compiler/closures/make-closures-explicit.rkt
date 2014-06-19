@@ -2,7 +2,8 @@
 
 (require Schml/framework/build-compiler
          Schml/compiler/closures/label-lambdas
-         ;;Schml/compiler/closures/sanitize-binding-forms
+         Schml/compiler/closures/uncover-free
+         Schml/compiler/closures/convert-closures
          )
 
 (provide make-closures-explicit)
@@ -10,8 +11,7 @@
 (define-pass (make-closures-explicit ast config)
   (compose-compiler (ast config)
                     label-lambdas
-                    ;;sanitize-binding-forms
-                    ;;uncover-free
-                    ;;convert-closure
+                    uncover-free
+                    convert-closures
                     ;;introduce-procedure-primitives
                     ))

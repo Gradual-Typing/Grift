@@ -15,12 +15,13 @@
                  Schml/compiler/type-check
                  Schml/compiler/insert-implicit-casts
                  (prefix-in iic: Schml/testing/ast-interps/insert-implicit-casts)
-                 Schml/compiler/closures/make-closures-explicit)
-  (compose-compiler
-   (path config)
-   read parse type-check insert-implicit-casts
-   (ast-> ast (check-equal? (iic:interp ast config) expected))
-   make-closures-explicit))
+                 Schml/compiler/closures/make-closures-explicit
+                 )
+  
+  (compose-compiler (path config)
+                    read parse type-check insert-implicit-casts
+                    (ast-> ast (check-equal? (iic:interp ast config) expected))
+                    make-closures-explicit))
 
 (define-syntax test-compile
   (syntax-rules ()

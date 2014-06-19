@@ -8,37 +8,113 @@
 
 (provide (all-from-out Schml/language/shared))
 
-(struct Prog (name exp)
+
+;; The Program is the type passed from one pass to another
+(struct Prog (name unique exp)
         #:methods gen:custom-write
-        [(define write-proc (lambda (o p d)
-                              (with-printed-labels
-                               (pretty-print
-                                (hang prog-indent-size
-                                      (doc-list
-                                       (v-append
-                                        (hs-append (text "Prog:")
-                                                   (text (Prog-name o)))
-                                        (expr->doc (Prog-exp o)))))
-                                p)
-                               p)))]
+        [(define write-proc ast-pretty-write-proc)]
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((name  (text (Prog-name o)))
+                 (unique (text (format "unique: ~a" (Prog-unique o))))
+                 (exp (->d (Prog-exp o))))
+             (hang prog-indent-size
+                   (doc-list (v-append (text "Prog:") name unique exp)))))]
         #:transparent)
+
+;; The Expression is a core for with a source location
+;; Lambda, Application, Variables, Constants, Primitive Operations
+;; Lets, and Ifs are all Expressions
+(struct Expr (src) #:transparent
+        #:methods gen:pretty
+        [(define (->doc o)
+           (text (format "#<Expr at ~a>" (srcloc->string (Expr-src o)))))])
+
+(struct Lambda Expr (fmls ty exp) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((fmls (doc-list
+                        (align
+                         (vs-concat
+                          (map ->d (Lambda-fmls o))))))
+                 (exp (->d (Lambda-exp o))))
+             (let ((exp (let ((ty (Lambda-ty o)))
+                          (if ty (hs-append colon (->d ty) line exp) exp))))
+               (hang
+                lambda-indent-size
+                (doc-list
+                 (v-append (vs-append (text "lambda") fmls) exp))))))])
+
+(struct Var Expr (id) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (->d (Var-id o)))])
+
+(struct App Expr (exp exp*) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((exp (->d (App-exp o)))
+                 (exp* (vs-concat (map ->d (App-exp* o)))))
+             (doc-list (align (vs-append exp exp*)))))])
+
+(struct Cast Expr (exp ty lbl) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (Cast->doc o)
+           (let ((exp (->d (Cast-exp o)))
+                 (ty (->d (Cast-ty o))) 
+                 (lbl (label->doc! (Cast-lbl o))))
+             (doc-list
+              (align
+               (vs-append
+                (hs-append colon lbl)
+                (align exp)
+                ty)))))])
+
+(struct If Expr (tst csq alt) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((tst (->d (If-tst o)))
+                 (csq (->d (If-csq o)))
+                 (alt (->d (If-alt o))))
+             (doc-list
+              (hs-append
+               (text "if")
+               (align (v-append tst csq alt))))))])
+
+(struct Let Expr (bnds exp) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((bnds (doc-list (v-concat (map ->d (Let-bnds o)))))
+                 (exp (->d (Let-exp o))))
+             (hang
+              let-indent-size
+              (doc-list
+               (v-append
+                (hs-append (text "let") (hang 1 bnds))
+                exp)))))])
+
+(struct Const Expr (const) #:transparent
+        #:methods gen:pretty
+        [(define (->doc o) (format->doc (Const-const o)))])
+
+(struct Prim Expr (pexp) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (->d (Prim-pexp o)))])
+
 (provide
  (contract-out
-  [struct Prog ((name string?) (exp Expr?))]))
-
-;; The super type of core forms that are considered expressions
-(struct Expr (src) #:transparent)
-(struct Lambda Expr (fmls ty exp) #:transparent)
-(struct Var Expr (id) #:transparent)
-(struct App Expr (exp exp*) #:transparent)
-(struct Cast Expr (exp ty lbl) #:transparent)
-(struct If Expr (tst csq alt) #:transparent)
-(struct Let Expr (bnds exp) #:transparent)
-(struct Const Expr (const) #:transparent)
-(struct Prim Expr (pexp) #:transparent)
-
-(provide
- (contract-out
+  [struct Prog ((name string?)
+                (unique (and/c positive? integer?))
+                (exp Expr?))]
   [struct Expr ((src srcloc?))]
   [struct (Lambda Expr) ((src srcloc?)
                          (fmls (listof (or/c Fml? Fml:Ty?)))
@@ -52,51 +128,4 @@
                       (bnds (listof (or/c Bnd? Bnd:Ty?)))
                       (exp Expr?))]
   [struct (Const Expr) ((src srcloc?) (const constant?))]
-  ;; There is curren
   [struct (Prim Expr) ((src srcloc?) (pexp (Prim/args? Expr?)))]))
-
-(define (core? x)
-  (define (expr? x)
-    (match x
-      [(or (Lambda (? srcloc?) (list (Fml (? uvar?))  ...)
-                   (or #f (? type?)) (? expr?))
-           (Var (? srcloc?) (? uvar?))
-           (App (? srcloc?) (? expr?) (list (? expr?) ...))
-           (Prim (? srcloc?) (? prim?))
-           (If (? srcloc?) (? expr?) (? expr?) (? expr?))
-           (Let (? srcloc?) (list (Bnd (? uvar?) (? expr?)) ...) (? expr?))
-           (Const (? srcloc?) (? constant?))
-           (Cast (? srcloc?) (? expr?) (? type?) (? label?)))  #t]
-      [otherwise #f]))
-  (define prim? (mk-prim? expr?))
-  (match x ((Prog (? string?) (? expr?)) #t) (o #f)))
-
-(provide core?)
-
-
-(define/match (expr->doc o)
-  [((App _ (app expr->doc exp) (list (app expr->doc exp*) ...)))
-   (doc-list (align (hs-append exp (vs-concat exp*))))]
-  [((Lambda s (list (app bnd->doc fmls) ...) t (app expr->doc body))) 
-   (hang lambda-indent-size
-         (doc-list (v-append (vs-append (text "lambda") (doc-list (vs-concat fmls)))
-                             (h-append (if t (hs-append colon (type->doc t) line) empty)
-                                       body))))]
-  [((Let s (list (app bnd->doc bnds) ...) (app expr->doc body)))
-   (hang let-indent-size
-         (doc-list (v-append (hs-append (text "let")
-                                        (hang 1 (doc-list (v-concat bnds))))
-                             body)))]
-  [((Cast s (app expr->doc e) (app type->doc ty) l))
-   (doc-list (align (vs-append (hs-append colon (label->doc! l))
-                               (align e)
-                               ty)))]
-  [((If s (app expr->doc tst) (app expr->doc csq) (app expr->doc alt)))
-   (doc-list (hs-append (text "if") (align (v-append tst csq alt))))]
-  [((Var s (app format->doc i))) i]
-  [((Const s (app format->doc k))) k]
-  [((Prim _ (app prim->doc p))) p]
-  [(o) (text "Non printable expr")])
-
-(define prim->doc (mk-prim->doc expr->doc))
-(define bnd->doc (mk-bnd->doc expr->doc))

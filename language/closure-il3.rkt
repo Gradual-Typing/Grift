@@ -2,9 +2,10 @@
 
 ;; Require and Provide other language details 
 (require Schml/language/shared
-         Schml/framework/pprint)
+         Schml/framework/pprint
+         racket/contract)
 
-(provide (all-from-out Schml/language/shared)) 
+(provide (all-from-out Schml/language/shared))
 
 (struct Prog (name unique ty exp)
         #:methods gen:custom-write
@@ -28,27 +29,8 @@
                 (exp Expr?))]))
 
 ;; The super type of core forms that are considered expressions
-(struct Expr (src ty) #:transparent
-        #:methods gen:pretty
-        [(define (->doc o)
-           (text (format "#<Expr at ~a>" (srcloc->string (Expr-src o)))))])
 
-(struct Lambda Expr (fmls exp) #:transparent
-        #:methods gen:pretty
-        [(define/generic ->d ->doc)
-         (define (->doc o)
-           (let ((fmls (doc-list
-                        (align
-                         (vs-concat
-                          (map ->d (Lambda-fmls o))))))
-                 (ty (->d (Expr-ty o)))
-                 (exp (->d (Lambda-exp o))))
-             (hang
-              lambda-indent-size
-              (doc-list
-               (v-append (vs-append (text "lambda") fmls)
-                         (hs-append colon ty)
-                         exp)))))])
+(struct Expr (ty) #:transparent)
 
 (struct Var Expr (id) #:transparent
         #:methods gen:pretty
@@ -113,24 +95,75 @@
         [(define/generic ->d ->doc)
          (define (->doc o)
            (->d (Prim-pexp o)))])
+
+(struct Let-Proc Expr (bindings closures exp) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((bnds (doc-list (v-concat (map ->d (Let-Proc-bindings o)))))
+                 (clos (doc-list (v-concat (map ->d (Let-Proc-closures o)))))
+                 (exp (->d (Let-Proc-exp o)))
+                 (ty (->d (Expr-ty o))))
+             (hang
+              let-indent-size
+              (doc-list
+               (v-append
+                (hs-append (text "let") (hang 1 bnds))
+                clos
+                (hs-append colon ty)
+                exp)))))])
+
+(struct Close-Over (code vars)
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((code (->d (Close-Over-code o)))
+                 (vars (align (vs-concat (map ->d (Close-Over-vars o))))))
+             (doc-list (align (vs-append (text "Close-over") code vars)))))])
+
+
+(struct Lambda (ty fmls free exp) #:transparent
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((fmls (doc-list
+                        (align
+                         (vs-concat
+                          (map ->d (Lambda-fmls o))))))
+                 (free (doc-list
+                        (align
+                         (vs-concat
+                          (map ->d (Lambda-free o))))))
+                 (ty (->d (Lambda-ty o))) 
+                 (exp (->d (Lambda-exp o))))
+             (hang
+              lambda-indent-size
+              (doc-list
+               (v-append (vs-append (text "lambda")
+                                    (align (v-append fmls free)))
+                         (hs-append colon ty)
+                         exp)))))])
+
 (provide
  (contract-out
-  [struct Expr ((src srcloc?) (ty Type?))]
-  [struct (Lambda Expr) ((src srcloc?) (ty Type?)
-                         (fmls (listof (or/c Fml? Fml:Ty?))) 
-                         (exp Expr?))]
-  [struct (Var Expr) ((src srcloc?) (ty Type?) (id uvar?))] 
-  [struct (App Expr) ((src srcloc?) (ty Type?) (exp Expr?) (exp* (listof Expr?)))]
-  [struct (Cast Expr) ((src srcloc?)
-                       (ty Type?)
-                       (exp Expr?)
-                       (ty-exp Type?)
-                       (lbl label?))]
-  [struct (If Expr) ((src srcloc?) (ty Type?) (tst Expr?) (csq Expr?) (alt Expr?))]
-  [struct (Let Expr) ((src srcloc?) (ty Type?)
-                      (bnds (listof (or/c Bnd? Bnd:Ty?)))
-                      (exp Expr?))]
-  [struct (Const Expr) ((src srcloc?) (ty Type?) (const constant?))]
-  ;; There is curren
-  [struct (Prim Expr) ((src srcloc?) (ty Type?) (pexp (Prim/args? Expr?)))]))
-
+  [struct Expr ((ty Type?))]
+  [struct Var ((ty Type?) (id uvar?))] 
+  [struct App
+    ((ty Type?) (exp Expr?) (exp* (listof Expr?)))]
+  [struct Cast
+    ((ty Type?) (exp Expr?) (ty-exp Type?) (lbl label?))]
+  [struct If
+    ((ty Type?) (tst Expr?) (csq Expr?) (alt Expr?))]
+  [struct Let
+    ((ty Type?) (bnds (listof (Bnd/rhs? Expr?)))
+     (exp Expr?))]
+  [struct Let-Proc
+    ((ty Type?)
+     (bindings (listof (Bnd/rhs? Lambda?)))
+     (closures (listof (Bnd/rhs? Close-Over?)))
+     (exp Expr?))]
+  [struct Const ((ty Type?) (const constant?))]
+  [struct Prim ((ty Type?) (pexp (Prim/args? Expr?)))]
+  [struct Close-Over ((code clabel?) [vars (listof Fml:Ty?)])]
+  [struct Lambda
+    ((ty Type?) (fmls (listof Fml:Ty?)) (free (listof Fml:Ty?)) (exp Expr?))]))

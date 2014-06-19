@@ -29,9 +29,9 @@
                 (exp Expr?))]))
 
 ;; The super type of core forms that are considered expressions
+
 (struct Expr (ty) #:transparent
-        #:methods gen:pretty
-        [(define (->doc o) (text (~a o)))])
+        )
 
 (struct Var Expr (id) #:transparent
         #:methods gen:pretty
@@ -113,7 +113,7 @@
                 exp)))))])
 
 
-(struct Lambda (ty fmls exp) #:transparent
+(struct Lambda (ty fmls free exp) #:transparent
         #:methods gen:pretty
         [(define/generic ->d ->doc)
          (define (->doc o)
@@ -121,32 +121,77 @@
                         (align
                          (vs-concat
                           (map ->d (Lambda-fmls o))))))
-                 (ty (->d (Lambda-ty o)))
+                 (free (doc-list
+                        (align
+                         (vs-concat
+                          (map ->d (Lambda-free o))))))
+                 (ty (->d (Lambda-ty o))) 
                  (exp (->d (Lambda-exp o))))
              (hang
               lambda-indent-size
               (doc-list
-               (v-append (vs-append (text "lambda") fmls)
+               (v-append (vs-append (text "lambda")
+                                    (align (v-append fmls free)))
                          (hs-append colon ty)
                          exp)))))])
 
 (provide
  (contract-out
   [struct Expr ((ty Type?))]
-  [struct (Var Expr) ((ty Type?) (id uvar?))] 
-  [struct (App Expr)
+  [struct Var ((ty Type?) (id uvar?))] 
+  [struct App
     ((ty Type?) (exp Expr?) (exp* (listof Expr?)))]
-  [struct (Cast Expr)
+  [struct Cast
     ((ty Type?) (exp Expr?) (ty-exp Type?) (lbl label?))]
-  [struct (If Expr)
+  [struct If
     ((ty Type?) (tst Expr?) (csq Expr?) (alt Expr?))]
-  [struct (Let Expr)
+  [struct Let
     ((ty Type?) (bnds (listof (Bnd/rhs? Expr?)))
      (exp Expr?))]
-  [struct (Let-Proc Expr)
+  [struct Let-Proc
     ((ty Type?) (bnds (listof (Bnd/rhs? Lambda?))) (exp Expr?))]
-  [struct (Const Expr) ((ty Type?) (const constant?))]
-  [struct (Prim Expr) ((ty Type?) (pexp (Prim/args? Expr?)))]
+  [struct Const ((ty Type?) (const constant?))]
+  [struct Prim ((ty Type?) (pexp (Prim/args? Expr?)))]
   [struct Lambda
-    ((ty Type?) (fmls (listof Fml:Ty?)) (exp Expr?))]))
+    ((ty Type?) (fmls (listof Fml:Ty?)) (free (listof Fml:Ty?)) (exp Expr?))]))
 
+(define (expr->doc o)
+  (define bnd->doc (mk-bnd->doc expr->doc))
+  (define prim->doc (mk-prim->doc expr->doc))
+  (define/match (proc->doc p)
+    [((Lambda (app type->doc t)
+              (list (app bnd->doc b*) ...)
+              (list (app bnd->doc f*) ...)
+              (app expr->doc e)))
+     (hang lambda-indent-size
+           (doc-list (v-append (vs-append (text "lambda")
+                                          (align (doc-list (vs-concat b*))))
+                               (doc-list  (vs-append (text "free") (align (vs-concat f*))))
+                               (hs-append colon t)
+                               e)))])
+  (define let-proc-bnd->doc (mk-bnd->doc proc->doc))
+  (match o
+    [(Let-Proc (app type->doc t)
+               (list (app let-proc-bnd->doc bnds) ...)
+               (app expr->doc body))
+     (hang let-indent-size
+           (doc-list (v-append (hs-append (text "letp")
+                                          (hang 1 (doc-list (v-concat bnds))))
+                               (hs-append colon t line body))))]
+    [(App (app type->doc t) (app expr->doc exp) (list (app expr->doc exp*) ...))
+     (doc-list (align (vs-append exp (vs-concat exp*) (hs-append  colon t))))]
+    [(Let (app type->doc t) (list (app bnd->doc bnds) ...) (app expr->doc body))
+     (hang let-indent-size
+           (doc-list (v-append
+                      (hs-append (text "let") (hang 1 (doc-list (v-concat bnds))))
+                      (hs-append colon t)
+                      body)))]
+    [(Cast (app type->doc t2) (app expr->doc e) (app type->doc t1) l)
+     (doc-list
+      (align (vs-append (hs-append colon (label->doc! l)) (align e) t1 t2)))]
+    [(If (app type->doc t) (app expr->doc tst) (app expr->doc csq) (app expr->doc alt))
+     (doc-list
+      (hs-append (text "if") (align (v-append tst csq alt (hs-append colon t)))))]
+    [(or (Var _ (app format->doc k)) (Const _ (app format->doc k))) k]
+    [(Prim t pe) (prim->doc pe)]
+    [o (text "Non printable expr")]))

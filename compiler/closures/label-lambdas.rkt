@@ -26,7 +26,7 @@
     ;; from a let-proc
     (match exp
       [(s:Lambda ty fmls (app ll-expr exp))
-       (let ((tmp-name (uvar 'annon)))
+       (let ((tmp-name (mk-uvar 'annon)))
          (Let-Proc ty
                    `(,(Bnd:Ty tmp-name (Lambda ty fmls exp) ty))
                    (Var ty tmp-name)))]
@@ -45,7 +45,7 @@
       [(s:Var t k) (Var t k)]
       [(s:Const t k) (Const t k)]
       [e (match-pass-error pass 'tyck-expr e)]))
-
+  
   ;; ll-let takes the fields of from core and pulls all
   ;; bound procedures out into the let-proc form. Placing
   ;; the rest of the let as the body of the let-proc
@@ -68,7 +68,7 @@
         [(null? br*) (if (null? bp*) e (Let-Proc t bp* e))]
         [(null? bp*) (Let t br* e)] 
         [else (Let-Proc t bp* (Let t br* e))])))
-
+  
   (define (ll-prim ty pexp)
     (match pexp
       [(Op:IntxInt (app ll-expr fst) (app ll-expr snd))
@@ -76,9 +76,15 @@
       [(Rel:IntxInt (app ll-expr fst) (app ll-expr snd))
        (Prim ty (mk-rel:int-int pexp fst snd))] 
       [otherwise (match-pass-error pass 'iic-prim otherwise)]))
+
+  (define mk-uvar 'undefined)
   
   (match prgm
-    [(s:Prog n e) (Prog n (ll-expr e))]
+    [(s:Prog n c t e)
+     (let* ((_ (set! mk-uvar (get-uvar-maker c)))
+            (e (ll-expr e))
+            (c (mk-uvar)))
+       (Prog n c t e))]
     [otherwise (match-pass-error pass 'body prgm)]))
 
 

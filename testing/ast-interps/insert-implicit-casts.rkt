@@ -108,7 +108,7 @@
   
   ;; This is the body of the type-check
   (match prgm
-    [(Prog n e) ((get-observe) (get-interp) e (empty-env))]
+    [(Prog _ _ _ e) ((get-observe) (get-interp) e (empty-env))]
     [otherwise (error 'interp "Not a program ~a" prgm)]))
 
   (define (unbound-var-error id) (error 'eval "Unbound variable ~a" id))

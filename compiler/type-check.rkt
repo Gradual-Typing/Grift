@@ -200,7 +200,8 @@
   
   ;; This is the body of the type-check
   (match prgm
-    [(c:Prog n e) (let-values (((e t) (tyck-expr e (empty-env))))
-                    (tc:Prog n e))]
+    [(c:Prog n c e)
+     (let-values (((e t) (tyck-expr e (empty-env))))
+       (tc:Prog n c t e))]
     [otherwise (match-pass-error pass pass prgm)]))
 

@@ -129,7 +129,7 @@
   
   ;; This is the body of the Insert Implicit Casts
   (match prgm
-    [(tc:Prog n e*) (sc:Prog n (iic-expr e*))]
+    [(tc:Prog n c t e) (sc:Prog n c t (iic-expr e))]
     [otherwise (match-pass-error pass 'body prgm)]))
 
 
