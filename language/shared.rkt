@@ -27,10 +27,21 @@
            (doc-list (vs-append (vs-concat (map ->d (Function-from o)))
                                 (->d (Function-to o)))))])
 
+;; Internal types used to indicate the type of internal constructs
+(struct Void Type ()
+        #:methods gen:pretty
+        [(define (->doc _) (text "Void"))])
+(struct Code-Label Type ()
+        #:methods gen:pretty
+        [(define (->doc _) (text "Code"))])
+
+
 ;; Fly Weight the types keeps us from using heap space for no reason
 (define Bool-Type (Bool))
 (define Int-Type (Int))
 (define Dyn-Type (Dyn))
+(define Void-Type (Void))
+(define Code-Label-Type (Code-Label))
 
 (define/match (type->doc t)
   [((Dyn)) (text "Dyn")]
@@ -47,10 +58,14 @@
   [struct (Dyn Type) ()]
   [struct (Bool Type) ()]
   [struct (Int Type) ()]
+  [struct (Void Type) ()]
+  [struct (Code-Label Type) ()]
   [struct (Function Type) ([from (listof Type?)] [to Type?])]
   [Bool-Type Bool?]
   [Int-Type Int?]
-  [Dyn-Type Dyn?]))
+  [Dyn-Type Dyn?]
+  [Void-Type Void?]
+  [Code-Label-Type Code-Label?]))
 
 (define (consistent? t g)
   (or (Dyn? t) (Dyn? g)
@@ -129,12 +144,13 @@
         #:methods gen:pretty
         [(define ->doc
            (lambda (o)
-             (text (format "~a_~a" (uvar-prefix o) (uvar-suffix o)))))])
+             (text (uvar->string o))))])
 
 (define (uvar=? u v)
   (or (eq? u v)
       (eq? (uvar-suffix u)
            (uvar-suffix v))))
+
 
 (define (get-uvar-maker seed)
   (let ((unique (box seed)))
@@ -145,6 +161,11 @@
                   (uvar (if (symbol? prefix) (symbol->string prefix) prefix)
                         suffix))])))
 
+;; creates the string representation of a uvar
+;; (uvar? . -> . string?)
+(define (uvar->string u)
+  (format "~a_~a" (uvar-prefix u) (uvar-suffix u)))
+
 (provide
  (contract-out
   [struct uvar ([prefix string?] [suffix (and/c integer? positive?)])]
@@ -152,7 +173,8 @@
                    (case->
                     ((or/c string? symbol?) . -> . uvar?)
                     (-> (and/c integer? positive?))))]
-  [uvar=? (uvar? uvar? . -> . boolean?)]))
+  [uvar=? (uvar? uvar? . -> . boolean?)]
+  [uvar->string (uvar? . -> . string?)]))
 
 ;; code labels
 
@@ -516,6 +538,73 @@
  (struct-out Op:IntxInt:+)
  (struct-out Op:IntxInt:-)
  (struct-out Op:IntxInt:*))
+
+(struct Closure-field PExpr ())
+(struct Closure-field:Set! Closure-field (closure field exp)
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((closure (->d (Closure-field:Set!-closure o)))
+                 (field (text (Closure-field:Set!-field o)))
+                 (exp (->d (Closure-field:Set!-exp o)))
+                 (prim (text "closure-set!")))
+             (doc-list (hs-append prim closure field exp))))]
+        #:methods gen:primitive
+        [(define (prim-expr? p e?)
+           (and (e? (Closure-field:Set!-closure p))
+                (string? (Closure-field:Set!-field p))
+                (e? (Closure-field:Set!-exp p))))
+         (define (op-string p) "%closure-field-set!")
+         (define (iic-delta p e)
+           (error 'iic-delta "%closure-field-set!"))])
+
+(struct Closure-field:Ref  Closure-field (closure field)
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((closure (->d (Closure-field:Ref-closure o)))
+                 (field (text (Closure-field:Ref-field o))) 
+                 (prim (text "closure-ref")))
+             (doc-list (hs-append prim closure field))))]
+        #:methods gen:primitive
+        [(define (prim-expr? p e?)
+           (and (e? (Closure-field:Ref-closure p))
+                (string? (Closure-field:Ref-field p))))
+         (define (op-string p) "%closure-field-ref")
+         (define (iic-delta p e)
+           (error 'iic-delta "%closure-field-ref"))])
+
+(struct Closure-field:Build Closure-field (fields)
+        #:methods gen:pretty
+        [(define/generic ->d ->doc)
+         (define (->doc o)
+           (let ((fields (v-concat 
+                          (map (lambda (t.f) 
+                                 (hs-append 
+                                  (->d (car t.f)) 
+                                  (text (cdr t.f))))
+                               (Closure-field:Build o))))
+                 (prim (text "closure-build")))
+             (doc-list (hs-append prim fields))))]
+        #:methods gen:primitive
+        [(define (prim-expr? p e?)
+           (andmap (lambda (t.f) 
+                     (and (Type? (car t.f))
+                          (string? (cdr t.f))))
+                   (Closure-field:Build-fields p)))
+         (define (op-string p) "%closure-field-build")
+         (define (iic-delta p e)
+           (error 'iic-delta "%closure-field-build"))]) 
+
+(provide 
+ (contract-out
+  [struct (Closure-field:Build Closure-field)
+    ([fields (listof (cons/c Type? string?))])]
+  [struct (Closure-field:Set! Closure-field) 
+    ([closure any/c] [field string?] [exp any/c])]
+  [struct (Closure-field:Ref Closure-field) 
+    ([closure any/c] [field string?])]))
+
 
 (define (mk-prim? expr?)
   (lambda (x)

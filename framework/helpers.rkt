@@ -90,3 +90,23 @@
     (if not-specific
         (error 'mk-struct "could not make a struct of this type ~a" struct)
         (struct-type-make-constructor type))))
+
+(define-syntax map/values
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ p (base ...) exp ...)
+       (with-syntax ([(tmp-step ...) (generate-temporaries #'(base ...))]
+                     [(tmp-acc ...) (generate-temporaries #'(base ...))]
+                     [(tmp-ls ...) (generate-temporaries #'(exp ...))])
+         #'(letrec 
+               ([recur 
+                 (lambda (tmp-ls ...)
+                   (cond 
+                    [(and (null? tmp-ls) ...) (values base ...)] 
+                    [else 
+                     (let-values ([(tmp-acc ...) (recur (cdr tmp-ls) ...)]
+                                  [(tmp-step ...) (p (car tmp-ls) ...)])
+                       (values (cons tmp-step tmp-acc) ...))]))])
+             (recur exp ...)))])))
+       
+        

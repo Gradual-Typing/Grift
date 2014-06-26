@@ -4,6 +4,8 @@
          Schml/compiler/closures/label-lambdas
          Schml/compiler/closures/uncover-free
          Schml/compiler/closures/convert-closures
+         Schml/compiler/closures/introduce-closure-primitives
+         
          )
 
 (provide make-closures-explicit)
@@ -13,5 +15,5 @@
                     label-lambdas
                     uncover-free
                     convert-closures
-                    ;;introduce-procedure-primitives
+                    introduce-closure-primitives
                     ))

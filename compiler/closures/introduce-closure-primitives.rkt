@@ -14,169 +14,129 @@
          Schml/framework/errors)
 
 (require Schml/language/shared
-         (prefix-in s: Schml/language/closure-il1)
-         (prefix-in t: Schml/language/closure-il2))
+         (prefix-in s: Schml/language/closure-il3)
+         (prefix-in t: Schml/language/closure-il4))
 ;; Only the pass is provided by this module
 (provide introduce-closure-primitives)
 
 (define-pass (introduce-closure-primitives prgm comp-config)
   ;; A holder for now of a check that we must perform if we
   ;; are going to optimize direct calls
-  (define s:Label? (lambda (a) #f))
-  (define code-field-name (uvar "code" 0))
-  (define (mk-pset-form var)
-        (lambda (i var)
-          (t:Prim Void-Type (Closure-Set! var (Const Int-Type i) v))))
-      (define (calculate-offsets start ls)
-        (if (null? ls)
-            '()
-            (cons start
-                  (calculate-offsets
-                   (+ (size-of-rt-obj (car ls)) start)
-                 (cdr ls)))))
-    (define (icp-binding lbl ty fml* free* exp)
-      (Bnd:Ty lbl (t:Lambda ty fml*
-                    ((icp-expr (mk-env (car free*) (cdr free*))) exp))
-              ty))
-    (define (icp-closures var lbl free* ty)
-      (Bnd:Ty var (Closure:Build lbl free*) ty))
-    (define (cset-fold env)
-      (lambda (var lbl free* cset*) ;; cset is an accumulator
-        (cons (mk-cset var code-field-name lbl env)
-              (for/fold ([cset* cset*])
-                  ([free (in-list free*)]
-                   (let ((fvar (Fml-id free))
-                         (fvar-ty (Fml:Ty-type free)))
-                     (cons (mk-cset clos fvar fvar fvar-ty env) cset*)))))))
-    (define (mk-cset clos field free free-ty env)
-      (T:Prim Void-Type (Closure:Set clos field (lookup free free-ty env)))) 
-    (define (lookup var var-ty env)
-      (env-lookup env var (th (t:Var var-ty var))))
-    (define (extend clos)
-      (lambda (var var-ty env)
-        (env-extend env var (t:Prim var-ty (Closure:Ref clos var)))))
-    (define (mk-env clos free*)
-      (foldr (extend clos)
-             (empty-env) (map Fml-id free*) (map Fml:Ty-type free*)))
-    (define (icp-expr env)
-      (define (recur exp)
-        (match exp
-          [(Let-Proc ty
-                     (list
-                      (Bnd:Ty bnd-lbl*
-                              (S:Lambda lam-ty* lam-fml** lam-free** lam-exp*)
-                              bnd-ty*) ...)
-                     (list
-                      (Bnd:Ty clos-var*
-                              (S:Close-Over clo-lbl* clos-free**)
-                              clos-ty*) ...)
-                     (app (icp-expr env) body))
-           (t:Let-Proc
-              ty 
-              (map icp-binding bnd-lbl* lam-ty* lam-fml** lam-free** lam-exp*)
-              (t:Let
-               ty
-               (map (icp-closures env) clos-var* clos-lbl* clos-free** clos-ty)
-               (t:Begin
-                ty
-                (foldr cset-fold clos-var* clos-lbl* clos-free**)
-                body)))]
-          [(s:Let ty (list (Bnd:Ty i* (app recur e*) t*) ...) exp)
-           (t:Let ty (map Bnd:Ty i* e* t*) (recur exp))]
-          [(s:Cast ty-cast (app recur exp) ty-exp label)
-           (t:Cast ty-cast exp ty-exp label)]
-          [(s:If ty tst csq alt)
-           (t:If ty (recur tst) (recur csq) (recur alt))]
-          [(s:App ty exp (list (app recur exp*) ...))
-           (if (s:Label? exp)
-               (t:App ty exp exp*)
-               (let ((exp (recur exp)))
-                 (t:App ty
-                        (t:Prim Expr-ty
-                                (Closure:Ref exp code-field-name))
-                        exp*)))]
-          [(s:Prim ty pexp) (icp-prim recur ty pexp)]
-          [(s:Var t i) (lookup i t env)]
-          [(s:Const t k) (t:Const t k)]
-          [e (match-pass-error pass 'icp-expr e)])
-        recur))
+  (define uvar->field-name uvar->string)
+  (define s:Code-Label? (lambda (a) #f))
+  (define code-field-name "code")
+  (define (icp-binding lbl ty fml* free* exp)
+    (let* ((env (mk-env (car free*) (cdr free*)))
+           (exp ((icp-expr env) exp))
+           (lam (t:Lambda ty fml* exp)))
+      (Bnd:Ty lbl lam ty)))
+  (define (fml->type.field f)
+    `(,(Fml:Ty-type f) . ,(uvar->field-name (Fml-id f))))
+  (define (icp-closures var lbl free* ty)
+    (let* ((field-decl (cons `(,Code-Label-Type . "code") (map fml->type.field free*)))
+           (pexp (t:Prim ty (Closure-field:Build field-decl))))
+      (Bnd:Ty var pexp ty)))
+  (define (cset-fold env)
+    ;; cset* is an accumulator that is used with foldr in icp-let-proc 
+    ;; in order to append the sublist together 
+    (lambda (clos-var clos-ty clos-code-lbl free-fml* clos-set-exp*) 
+      ;; Build the first cset by hand because it it made from a label
+      (let* ((lhs-exp (t:Var clos-ty clos-var))
+             (rhs-exp (t:Label Code-Label-Type clos-code-lbl))
+             (cset (Closure-field:Set! lhs-exp code-field-name rhs-exp))
+             (pexp (t:Prim Void-Type cset)))
+        (cons pexp
+              (for/fold ([cset* clos-set-exp*]) 
+                  ([free-fml (in-list free-fml*)])
+                (let ((free-var (Fml-id free-fml))
+                      (free-var-ty (Fml:Ty-type free-fml)))
+                  (cons (mk-cset lhs-exp free-var free-var free-var-ty env) 
+                        cset*)))))))
+  (define (mk-cset clos field-var free-var free-var-ty env)
+    (let ((rhs-exp (lookup free-var free-var-ty env))
+          (field-name (uvar->field-name field-var)))
+      (t:Prim Void-Type (Closure-field:Set! clos field-name rhs-exp)))) 
+  (define (lookup var var-ty env)
+    (env-lookup env var (th (t:Var var-ty var))))
+  (define (extend clos)
+    (let ((clos-var (t:Var (Fml:Ty-type clos) (Fml-id clos))))
+      (lambda (free env)
+        (let* ((free-uvar (Fml-id free))
+               (free-ty   (Fml:Ty-type free))
+               (clos-prim (Closure-field:Ref clos-var (uvar->field-name free-uvar)))
+               (prim-exp (t:Prim free-ty clos-prim)))
+          (env-extend env free-uvar prim-exp)))))
+  (define (mk-env clos free*)
+    (foldr (extend clos) (empty-env) free*))
+  ;; A destructuring of let-proc view
+  (define (destruct-let-proc o)
+    (values (s:Expr-ty o) (s:Let-Proc-bindings o) 
+            (s:Let-Proc-closures o) (s:Let-Proc-exp o)))
+  (define (destruct-bnd:ty o) (values (Bnd-id o) (Bnd-exp o) (Bnd:Ty-type o)))
+  (define (destruct-lambda o)
+    (values (s:Lambda-ty o) (s:Lambda-fmls o) (s:Lambda-free o) (s:Lambda-exp o)))
+  (define (destruct-close-over o)
+    (values (s:Close-Over-code o) (s:Close-Over-vars o)))
+  (define (rebuild-let-proc ty bindings closures closure-inits body)
+    (t:Let-Proc ty bindings 
+                (t:Let ty closures 
+                       (t:Begin ty closure-inits body))))
+  (define (icp-let-proc icp-expr/env env exp)
+    ;; I could do better than this by restructuring instead the three step process
+    ;; The catamorphism of let-proc
+    ;; Destructure the let-proc form a little complicated
+    (let*-values ([(lp-ty lp-bnd-lam* lp-bnd-clos* exp) 
+                   (destruct-let-proc exp)]
+                  [(lam-lbl* lam* lam-ty*) 
+                   (map/values destruct-bnd:ty ('() '() '()) lp-bnd-lam*)]
+                  [(clos-var* clos* clos-ty*) 
+                   (map/values destruct-bnd:ty ('() '() '()) lp-bnd-clos*)]
+                  [(lam-ty* lam-fml** lam-free** lam-exp*)
+                   (map/values destruct-lambda ('() '() '() '()) lam*)]
+                  [(clos-lbl* clos-free**) 
+                   (map/values destruct-close-over ('() '()) clos*)]
+                  ;; rebuild and process the components
+                  [(body) (icp-expr/env exp)]
+                  [(bindings)
+                   (map icp-binding lam-lbl* lam-ty* lam-fml** lam-free** lam-exp*)]
+                  [(closures)
+                   (map icp-closures clos-var* clos-lbl* clos-free** clos-ty*)]
+                  [(closure-inits)
+                   (foldr (cset-fold env) '() clos-var* clos-ty* clos-lbl* clos-free**)])
+      (rebuild-let-proc lp-ty bindings closures closure-inits body)))
+  (define (icp-expr env)
+    (define (recur exp)
+      (match exp
+        [(? s:Let-Proc? lp) (icp-let-proc recur env lp)]
+        [(s:Var t i) (lookup i t env)]
+        [(s:App ty exp (list (app recur exp*) ...))
+         (let* ((exp (recur exp))
+                (exp-ty (t:Expr-ty exp))
+                (prim (Closure-field:Ref exp code-field-name))
+                (pexp (t:Prim exp-ty prim)))
+           (t:App ty pexp exp*))
+         ;; (if (s:Code-Label? exp)
+         ;;    (t:App ty exp exp*))
+         ] 
+        [(? s:Code-Label? cl) cl]
+        [(s:Let ty (list (Bnd:Ty i* (app recur e*) t*) ...) exp)
+         (t:Let ty (map Bnd:Ty i* e* t*) (recur exp))]
+        [(s:Cast ty-cast (app recur exp) ty-exp label)
+         (t:Cast ty-cast exp ty-exp label)]
+        [(s:If ty tst csq alt)
+         (t:If ty (recur tst) (recur csq) (recur alt))]
+        [(s:Prim ty pexp) (icp-prim recur ty pexp)]
+        [(s:Const t k) (t:Const t k)]
+        [e (match-pass-error pass 'icp-expr e)]))
+    recur)
   (define (icp-prim icp-expr ty pexp)
     (match pexp
       [(Op:IntxInt (app icp-expr fst) (app icp-expr snd))
-       (t:Prim ty (mk-op:int-int pexp fst snd))
-       (values 
-               (set-union fstf* sndf*))]
-      [(Rel:IntxInt (app icp-expr fst fstf*) (app icp-expr snd sndf*))
-       (values (t:Prim ty (mk-rel:int-int pexp fst snd))
-               (set-union fstf* sndf*))] 
+       (t:Prim ty (mk-op:int-int pexp fst snd))]
+      [(Rel:IntxInt (app icp-expr fst) (app icp-expr snd))
+       (t:Prim ty (mk-rel:int-int pexp fst snd))] 
       [otherwise (match-pass-error pass 'iic-prim otherwise)]))
-  (define (icp-let-proc letp env)
-    
-    (match letp
-      []))
   (match prgm
     [(s:Prog n u t e)
-     (s:Prog n u t ((icp-expr (empty-env)) e))]
+     (t:Prog n u t ((icp-expr (empty-env)) e))]
     [otherwise (match-pass-error pass 'body prgm)]))
-
-
-
-
-
-  (define-who (introduce-procedure-primitives ast)
-    (define (Expr exp als)
-      (match exp
-        [,label (guard (label? label)) label]
-        [,uvar (guard (uvar? uvar)) (Lookup-Free uvar als)]
-        [(quote ,i ) `(quote ,i)]
-        [(if ,[t] ,[c] ,[a]) `(if ,t ,c ,a)]
-        [(begin ,[e*] ... ,[v]) `(begin ,e* ... ,v)]
-        [(let ([,new-u* ,[exp*]] ...) ,[exp])`(let ([,new-u* ,exp*] ...) ,exp)]
-        [(letrec ([,lbl* (lambda (,fml** ...)
-                           (bind-free ,[(Update-als als) -> als*]
-                                      ,exp*))] ...)
-           ,[(Letrec-Body als) -> body])
-         `(letrec ([,lbl* (lambda (,fml** ...) ,(map Expr exp* als*))] ...)
-            ,body)]         
-        [(,prim ,[exp*] ...) (guard (primitiveq prim)) `(,prim ,exp* ...)]
-        [(,exp1 ,exp2 ,[exp*] ...)
-         (cond
-           [(label? exp1) `(,exp1 ,(Expr exp2 als) ,exp* ...)]
-           [else `((procedure-code ,(Expr exp1 als))
-                   ,(Expr exp2 als) ,exp* ...)])]
-        [,x (errorf who "Unmatched datum in Expr ~a" x)]))
-
-      (define (Letrec-Body als)
-        (define (pset-form var free*)
-          (map (lambda (i f)
-                 `(procedure-set! ,var ,i ,(Lookup-Free f als)))
-               (list->i* 0 free*) free*))
-        (define (list->i* i ls)
-          (if (null? ls) '() (cons `',i (list->i* (add1 i) (cdr ls)))))
-        (define (mk-procs-form lbl free*)
-          `(make-procedure ,lbl ',(length free*)))
-        (lambda (exp)
-          (match exp
-            [(closures ([,var* ,lbl* ,free** ...] ...) ,exp)
-             (let ((exp (Expr exp als))
-                   (psets** (map pset-form var* free**))
-                   (mk-procs* (map mk-procs-form lbl* free**)))
-               `(let ([,var* ,mk-procs*] ...)
-                  (begin ,psets** ... ... ,exp)))])))
-
-      (define (Lookup-Free uvar als)
-        (let ((tmp (assq uvar als)))
-            (if tmp
-                `(procedure-ref ,(cadr tmp) ,(cddr tmp))
-                uvar)))
-        
-      
-      (define (Update-als als)
-        (lambda (var*)
-          (let ((cp (car var*)))
-            (let loop ((i 0) (v (cdr var*)))
-              (if (null? v)
-                  als
-                  (cons `(,(car v) ,cp . ',i) (loop (add1 i) (cdr v))))))))
-                     
-        (Expr ast '()))

@@ -9,8 +9,9 @@
 
 (define gen-indent-size 4)
 (define prog-indent-size 2)
-(define lambda-indent-size 3)
+(define lambda-indent-size 2)
 (define let-indent-size 2)
+(define begin-indent-size 2)
 
 (define (doc-list a)
   (h-append lparen a rparen))
