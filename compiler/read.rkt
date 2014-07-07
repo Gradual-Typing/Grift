@@ -3,8 +3,12 @@
          Schml/framework/build-compiler)
 (provide read)
 
+;; The read pass takes a file-path and returns a s-expression
+
 (define-pass (read file-path settings)
   (parameterize
+      ;; The following parameters change what the reader is willing
+      ;; to accept as input.
         ([read-case-sensitive #t]
          [read-square-bracket-as-paren #t]
          [read-curly-brace-as-paren #t]

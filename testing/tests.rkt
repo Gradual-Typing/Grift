@@ -1,7 +1,8 @@
 #lang racket
 (require rackunit rackunit/text-ui
          Schml/framework/paths
-         Schml/framework/build-compiler)
+         Schml/framework/build-compiler
+         Schml/framework/errors)
 
 (provide (all-defined-out))
 
@@ -13,13 +14,14 @@
   (local-require Schml/compiler/read
                  Schml/compiler/parse
                  Schml/compiler/type-check
-                 Schml/compiler/insert-implicit-casts
+                 Schml/compiler/casts/make-casts-explicit
                  (prefix-in iic: Schml/testing/ast-interps/insert-implicit-casts)
                  Schml/compiler/closures/make-closures-explicit
                  )
   
   (compose-compiler (path config)
-                    read parse type-check insert-implicit-casts
+                    read parse type-check
+                    make-casts-explicit
                     (ast-> ast (check-equal? (iic:interp ast config) expected))
                     make-closures-explicit))
 
@@ -27,14 +29,49 @@
   (syntax-rules ()
     ((_ p ... n e)
      (test-case n
-       (with-handlers
-           ([exn? (lambda (temp)
-                    ((error-display-handler) (exn-message temp) temp)
-                    (raise temp))])
-         (test-compiler
-          (simplify-path (build-path test-suite-path p ... n))
-          (config)
-          e))))))
+       (test-compiler (simplify-path (build-path test-suite-path p ... n))
+                      (config) e)))))
+
+(define-syntax test-type-checker
+  (syntax-rules ()
+    ((_ p ... n [(exn hndlr) ...])
+     (test-not-exn n
+       (lambda ()
+         (with-handlers [(exn hndlr) ...]
+           (begin
+             (test-compiler
+              (simplify-path (build-path test-suite-path p ... n))
+              (config) "Error expected but not thrown during type-checking"))))))))
+
+(define-syntax test-type-exn
+  (syntax-rules (static dynamic custom dynamic-pass dynamic-not-fail)
+    ((_ static p ... n)
+     (test-type-checker p ... n ([Schml:Type:Static? (lambda (e) #t)])))
+    ((_ dynamic p ... n)
+     (test-type-checker p ... n ([Schml:Type:Dynamic? (lambda (e) #t)])))
+    ((_ custom p? path ... n)
+     (test-type-checker path ... n ([exn? p?])))
+    ((_ dynamic-not-fail p ... n)
+     (test-type-exn custom not-fail-blame-label? p ... n))
+    ((_ dynamic-pass p ... n)
+     (test-type-exn custom pass-blame-label? p ... n))
+    ((_ p ... n)
+     (test-type-checker p ... n ([Schml:Type? (lambda (e) #t)])))))
+
+(define (blame-label=? bl)
+  (lambda (e)
+    (unless (equal? (exn-message e) bl) 
+      (raise e))))
+
+(define not-fail-blame-label?
+  (lambda (e)
+    (unless (not (equal? (exn-message e) "Fail"))
+      (raise e))))
+
+(define pass-blame-label? (blame-label=? "Pass"))
+
+
+
 
 (define ld-tests
   (test-suite "lazy downcast"
@@ -83,7 +120,19 @@
       (test-compile "if2.schml" 1)
       (test-compile "if3.schml" 4)
       (test-compile "fact5.schml" 120)
-
+      (test-compile "blame1.schml" 2)
+      (test-type-exn static "blame2.schml")
+      (test-type-exn dynamic "blame3.schml")
+      (test-type-exn static "blame4.schml")
+      (test-type-exn dynamic-not-fail "blame5.schml")
+      (test-type-exn dynamic-not-fail "blame6.schml")
+      (test-compile "blame7.schml" 2)
+      (test-type-exn static "blame8.schml")
+      (test-type-exn dynamic-pass "blame9.schml")
+      (test-type-exn dynamic-not-fail "blame10.schml")
+      (test-type-exn dynamic-not-fail "blame11.schml")
+      (test-type-exn dynamic-pass "blame12.schml")
+      (test-type-exn dynamic-pass "blame13.schml")
       ;; pretty printer doesn't like this currently
       ;; and it isn not yet type safe
       ;;(test-file compiler "compiler" "simple-map.schml" 3)
@@ -92,7 +141,8 @@
 (define all-tests
   (test-suite "All" ld-tests))
 
-(module+ main 
+(module+ main
+  (pretty-print-depth #f)
   (let ((trace (make-parameter 'none))
         (check (make-parameter 'none))
         (cast-strictness (make-parameter 'lazy))

@@ -122,7 +122,10 @@
                          (exp Expr?))]
   [struct (Var Expr) ((src srcloc?) (id uvar?))] 
   [struct (App Expr) ((src srcloc?) (exp Expr?) (exp* (listof Expr?)))]
-  [struct (Cast Expr) ((src srcloc?) (exp Expr?) (ty Type?) (lbl label?))]
+  [struct (Cast Expr) ((src srcloc?)
+                       (exp Expr?)
+                       (ty Type?)
+                       (lbl (or/c label? false?)))]
   [struct (If Expr) ((src srcloc?) (tst Expr?) (csq Expr?) (alt Expr?))]
   [struct (Let Expr) ((src srcloc?)
                       (bnds (listof (or/c Bnd? Bnd:Ty?)))

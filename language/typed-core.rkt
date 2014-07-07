@@ -125,7 +125,7 @@
                        (ty Type?)
                        (exp Expr?)
                        (ty-exp Type?)
-                       (lbl label?))]
+                       (lbl (or/c label? false?)))]
   [struct (If Expr) ((src srcloc?) (ty Type?) (tst Expr?) (csq Expr?) (alt Expr?))]
   [struct (Let Expr) ((src srcloc?) (ty Type?)
                       (bnds (listof (or/c Bnd? Bnd:Ty?)))

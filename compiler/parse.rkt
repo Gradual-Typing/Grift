@@ -162,7 +162,7 @@
       (Cast (syntax-srcloc stx) (parse-expr e env) (parse-type t env) l))
     (syntax-case stx ()
       [(_ e t l) (string? (syntax-e #'l)) (help #'e #'t (syntax-e #'l))]
-      [(_ e t) (help #'e #'t (srcloc->string (syntax-srcloc stx)))]))
+      [(_ e t) (help #'e #'t #f)]))
 
   (define (lt-transformer stx env)
     (syntax-case stx ()

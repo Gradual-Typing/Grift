@@ -67,38 +67,40 @@
           src exp)))
 
 (struct Schml:Type Schml ())
+(struct Schml:Type:Static Schml:Type ())
+(struct Schml:Type:Dynamic Schml:Type ())
+
 
 (define (lambda/inconsistent-types-error src tb ta)
   (configure-for-external-error)
-  (raise (Schml:Type
+  (raise (Schml:Type:Static
           (format "~a: Lambda annotated return type ~a is inconsistent with actual return type ~a"
                   (srcloc->string src) ta tb)
           (current-continuation-marks))))
 
 (define (let-binding/inconsistent-type-error src id t-bnd t-exp)
   (configure-for-external-error)
-  (raise (Schml:Type
+  (raise (Schml:Type:Static
           (format "~a: ~a binding in let annotated by ~a is inconsistent with actual type ~a"
                   (srcloc->string src) id t-bnd t-exp)
           (current-continuation-marks))))
 
-(define (cast/inconsistent-types-error location t-exp t-cast)
+(define (cast/inconsistent-types-error src label t-exp t-cast)
   (configure-for-external-error)
-  (raise (Schml:Type
-          (format "~a: Cast between inconsistent types ~a and ~a"
-                  location t-exp t-cast)
-          (current-continuation-marks))))
+  (let ((msg (or label (format "~a: Cast between inconsistent types ~a and ~a"
+                               (srcloc->string src) t-exp t-cast))))
+    (raise (Schml:Type:Static msg (current-continuation-marks)))))
 
 (define (if/inconsistent-branches-error src t-csq t-alt)
   (configure-for-external-error)
-  (raise (Schml:Type
+  (raise (Schml:Type:Static
           (format "~a: If branches have inconsistent types ~a and ~a"
                   (srcloc->string src) t-csq t-alt)
           (current-continuation-marks))))
 
 (define (if/inconsistent-test-error src tst)
   (configure-for-external-error)
-  (raise (Schml:Type
+  (raise (Schml:Type:Static
           (format "~a: If test is of type which is not consistent with Bool"
                   (srcloc->string src))
           (current-continuation-marks))))
@@ -108,11 +110,21 @@
   (let ((line1 (format "~a: Application of function with type ~a\n"
                        (srcloc->string src) rator))
         (line2 (format "to arguments of inconsistent types ~a" rand*)))
-    (raise (Schml:Type (string-append line1 line2) (current-continuation-marks)))))
+    (raise (Schml:Type:Static (string-append line1 line2) (current-continuation-marks)))))
 
 (define (app-non-function-error src t-rator)
   (configure-for-external-error)
-  (raise (Schml:Type
+  (raise (Schml:Type:Static
           (format "~a: Application of non function type ~a"
                   (srcloc->string src) t-rator)
           (current-continuation-marks))))
+
+(define raise-dynamic-type-error
+  (case-lambda
+    [(blame-label)
+     (configure-for-external-error)
+     (raise (Schml:Type:Dynamic blame-label (current-continuation-marks)))]
+    [(down up)
+     (configure-for-external-error)
+     (let ((msg (format "Blame ~a and ~a" down up)))
+       (raise (Schml:Type:Dynamic msg (current-continuation-marks))))]))

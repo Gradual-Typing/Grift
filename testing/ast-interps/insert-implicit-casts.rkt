@@ -76,7 +76,22 @@
                (apply-cast-ld l1 v2 t3 t2)]
               [o (error 'interp "Unexpected value in apply-cast-ld match ~a" o)])
             (mk-cast l1 v1 t1 t2))
-        (raise l1)))
+        (raise-dynamic-type-error l1)))
+
+  (define (apply-cast-lp label val val-type cast-type)
+    (define static-type-error (th (error 'static-type-error)))
+    (define (blame l1 l2)
+      (th (raise-dynamic-type-error l1 l2)))
+    (define (value-check curr-label val val-type cast-type)
+      (match val
+        [(casted-value org-label val val-type _)
+         (cast-check org-label val val-type cast-type (blame org-label curr-label))]
+        [o (mk-cast curr-label val val-type cast-type)]))
+    (define (cast-check curr-label val val-type cast-type error-th) 
+      (if (shallow-consistent? val-type cast-type)
+          (value-check curr-label val val-type cast-type)
+          (error-th)))
+    (cast-check label val val-type cast-type static-type-error))
   
   (define (apply-lazy cast)
     (define (arrity-mismatch l) (th (raise l)))
@@ -93,7 +108,11 @@
     recur)
   
   (define (observe-lazy interp exp env)
-    (with-handlers ([string? (lambda (e) `(blame ,e))])
+    ;; I am leaving the handler here just to signify that
+    ;; I know there is an exceptional value being passes up
+    ;; the stack. This makes it easier to run predicates on
+    ;; it in the test suite.
+    (with-handlers ([Schml:Type:Dynamic? (lambda (e) (raise e))])
       (match (interp exp env)
         [(? constant? k) k]
         [(? procedure? p) 'procedure]

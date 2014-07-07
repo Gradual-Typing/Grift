@@ -102,10 +102,10 @@
   
   ;; The type of a cast is the cast-type if the expression type and
   ;; the cast type are consistent.
-  (define (cast-type-rule ty-exp ty-cast label)
-    (when (not (consistent? ty-exp ty-cast))
-        (cast/inconsistent-types-error label ty-exp ty-cast))
-    ty-cast)
+  (define (cast-type-rule ty-exp ty-cast src label)
+    (if (not (consistent? ty-exp ty-cast))
+        (cast/inconsistent-types-error src label ty-exp ty-cast)
+        ty-cast))
 
   ;; The type of an if is the join of the consequence and alternative
   ;; types if the type of the branches are consistent and the test is
@@ -162,7 +162,7 @@
        (let ((ty (env-lookup env id (var-not-found-error src id 'tyck-expr-var))))
          (values (tc:Var src ty id) ty))]
       [(c:Cast src (app recur exp t-exp) t-cast label)
-       (let ((ty-casted (cast-type-rule t-exp t-cast label)))
+       (let ((ty-casted (cast-type-rule t-exp t-cast src label)))
          (values (tc:Cast src ty-casted exp t-exp label) ty-casted))]
       [(c:If src (app recur tst t-tst) (app recur csq t-csq) (app recur alt t-alt))
        (let ((t-if (if-type-rule t-tst t-csq t-alt src)))

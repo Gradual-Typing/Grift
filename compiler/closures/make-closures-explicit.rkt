@@ -5,7 +5,7 @@
          Schml/compiler/closures/uncover-free
          Schml/compiler/closures/convert-closures
          Schml/compiler/closures/introduce-closure-primitives
-         
+         Schml/compiler/closures/lift-functions
          )
 
 (provide make-closures-explicit)
@@ -16,4 +16,5 @@
                     uncover-free
                     convert-closures
                     introduce-closure-primitives
+                    lift-functions
                     ))

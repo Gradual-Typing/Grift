@@ -79,7 +79,8 @@
        (consistent? (Function-to t) (Function-to g))))
 
 (define (shallow-consistent? t g)
-  (or (Dyn? t) (Dyn? g)
+  (or (Dyn? t)
+      (Dyn? g)
       (and (Int? t) (Int? g))
       (and (Bool? t) (Bool? g))
       (and (Function? t) (Function? g))))
