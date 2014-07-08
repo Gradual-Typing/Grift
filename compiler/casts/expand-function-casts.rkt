@@ -4,7 +4,7 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-| Description: 
+| Description: This pass is simplifies the runtime
 +-------------------------------------------------------------------------------+
 | Grammer:
 +------------------------------------------------------------------------------|#
@@ -19,6 +19,7 @@
 (provide expand-function-casts)
 
 (define-pass (expand-function-casts prgm comp-config)
+  (define mk-uvar 'implicit-boxed-function)
   (define (efc-expr exp)
     (match exp
       ;; The only important rule everything else is just a catamorphism
@@ -63,23 +64,54 @@
       (if (Var? exp)
           (Dyn:Closure:Make exp label ty-from ty-to)
           (let ((tmp (mk-uvar "fun_inj_tmp")))
-            (Let ty-casted '((Bnd:Ty tmp exp ty-exp))
+            (Let ty-casted `(,(Bnd:Ty tmp exp ty-exp))
                  (Dyn:Closure:Make (Var ty-exp tmp) label ty-to ty-from))))))
-  (define (efc-projected-function ty-casted ty-exp exp blame-label)
-    (define (help ty-casted ty-exp var blame-label)
-      (let)
-      (If ty-casted (Dyn:Is var Tag:Closure)
-          ()))
+  (define (efc-projected-function ty-casted ty-exp exp b-lbl)
+    (define (help ty-casted ty-var var blame-label)
+      (let* ((mk-arg-cast (lambda (cast-ty exp-ty uvar) 
+			    (Cast exp-ty (Var cast-ty uvar) cast-ty b-lbl)))
+	     (cast-from (Function-from ty-casted))
+	     (cast-to (Function-to ty-casted))
+	     (cast-arrity (length cast-to))
+	     (uvars (map mk-cast-tmp cast-from))
+	     (fmls  (map Fml:Ty uvars cast-from))
+	     (dyn-tmp (mk-uvar "dyn_fn_struct_tmp"))
+	     (unbox-dyn (Dyn:Cast-to-Closure var b-lbl))
+	     (unbox-bnd* `(,(Bnd:Ty dyn-tmp unbox-dyn Dyn-Clos-Type)))
+	     (exp*  (map mk-arg-cast exp-to cast-to uvar)))
+	(Lambda ty-casted fmls
+		(Let cast-to unbox-bnd*
+		     (When/Blame cast-to b-lbl arrity-check
+				 (Cast cast-to 
+				       (App exp-return exp exp*) 
+				       exp-to b-lbl)))))
     (if (Var? exp)
         (help ty-casted ty-exp exp blame-label)
         (let ((tmp (mk-uvar "fun_proj_tmp")))
           (Let ty-casted '((Bnd:Ty tmp exp ty-exp))
                (help ty-casted ty-exp (Var ty-exp tmp) blame-label)))))
-  (define (efc-function-cast ty-casted ty-exp exp blame-label)
-    )
+  ;; If we are aiming at space efficieciency this line seems like the
+  ;; logical place to start.
+  (define (efc-function-cast ty-casted ty-exp exp b-lbl)
+    (define (mk-cast-tmp _) (mk-uvar "fn_cast_tmp"))
+    (let* ((mk-arg-cast (lambda (cast-ty exp-ty uvar) 
+			  (Cast exp-ty (Var cast-ty uvar) cast-ty b-lbl)))
+	   (cast-from (Function-from ty-casted))
+	   (cast-to (Function-to ty-casted))
+	   (exp-from (Function-from ty-exp))
+	   (exp-to (Function-to ty-exp))
+	   (uvars (map mk-cast-tmp cast-from))
+	   (fmls  (map Fml:Ty uvars cast-from))
+	   (exp*  (map mk-arg-cast exp-to cast-to uvar)))
+      (Lambda ty-casted fmls
+	      (Cast cast-to (App exp-return exp exp*) exp-to b-lbl))))
   
   (match prgm
-    [(Prog n c t e) (Prog n c t (efc-expr e))]
+    [(Prog n c t e)
+     (let* ((_ (set! mk-uvar (get-uvar-maker c))) 
+	    (e (efc-expr e))
+	    (c (get-uvar-maker)))
+       (Prog n c t e))]
     [otherwise (match-pass-error pass 'body prgm)]))
 
 
