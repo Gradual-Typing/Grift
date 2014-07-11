@@ -1,10 +1,12 @@
-#lang racket
+#lang racket/typed
 (require Schml/framework/errors)
+
+
+
 (provide compiler-config
          compose-compiler
          define-pass
          debug?)
-
 
 (define-syntax compose-compiler
   (syntax-rules (ast->)
@@ -22,11 +24,7 @@
 ;; I will likely want to come back and override these settings so that
 ;; it is easy to display and store specific setting.
 
-(struct compiler-config
-        (cast-strictness
-         cast-blame
-         trace-passes
-         type-checks))
+(struct compiler-config (semantics trace-passes))
 
 
 (define (debug? pass pass*)

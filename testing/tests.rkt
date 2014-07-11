@@ -7,8 +7,7 @@
 (provide (all-defined-out))
 
 (define config 
-  (make-parameter 
-   (compiler-config #f #f 'none 'none)))
+  (make-parameter (compiler-config 'lazy-d '())))
 
 (define (test-compiler path config expected)
   (local-require Schml/compiler/read

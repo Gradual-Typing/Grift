@@ -1,29 +1,38 @@
-#lang racket
-(require Schml/framework/build-compiler)
-(provide compile compiler)
+#lang typed/racket
 
-;; The compiler takes an s-expr and performs the various compiler
-;; passes listed below on the s-expr after parsing the expression
-;; will be a collection of records with a pretty printing function.
-(define (compiler file-name settings) 
-  (local-require Schml/compiler/read
-                 Schml/compiler/parse
-                 Schml/compiler/type-check
-                 Schml/compiler/casts/make-casts-explicit
-                 Schml/compiler/closures/make-closures-explicit)
-  (compose-compiler (file-name settings)
-                    read
-                    parse
-                    type-check
-                    make-casts-explicit
-                    make-closures-explicit))
 
-;; Since #f is a valid expression a different value is
-;; use to represent false for the expression variable.
-(define hidden-false (gensym))
+
+(require/typed 
+ Schml/framework/build-compiler
+ [#:struct compiler-config 
+	   ([semantics : Symbol]
+	    [trace-passes : (listof Symbol)])])
+	   
+(provide (all-defined-out))
+
+(define-type Result (U error success))
+(struct: error ([obj : exn?]))
+(struct: success ())
+
+(: default-compiler-config (Parameter compiler-config?))
+(define default-compiler-config
+  (make-parameter
+   (compiler-config 'lazy-d 'none 'none)))
+    
+
+
+(: compile (Path compiler-config? -> Result))
+(define (compile/conf file-name settings) 
+  (with-handlers ((exn? (lambda (e) (error e))))
+    (let* ()
+      (success))))
+
 
 ;; Invokes the compiler on an s-expr obtained by various means
-(define compile
-  (lambda (#:file-name [f #f])
-    (compiler f (compiler-config 'ld 'all 'all))))
+(: compile ((U Path String) -> Result))
+(define (compile file)
+  (let ((config (default-compiler-config))) 
+    (if (string? file)
+	(compile/conf (string->path file) config)
+	(compile/conf file config))))
 
