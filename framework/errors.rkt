@@ -1,37 +1,34 @@
-#lang racket/typed
+#lang typed/racket
 
 (provide (all-defined-out))
 
 (struct: exn:schml exn ())
-(struct: exn:schml:Pass exn:schml ())
-(struct: exn:schml:Pass:Match exn:schml:Pass ())
-(struct: exn:schml:Pass:Cond  exn:schml:Pass ())
+(struct: exn:schml:pass exn:schml ())
 
-(define (pass-error who fmt . a)
-  (configure-for-internal-error)
-  (raise (exn:schml:Pass
-          (apply format `(,(format "~~a:~a" fmt) ,who ,@a))  
-          (current-continuation-marks))))
+;; This is a generic error handler that is usefull for
+;; quick testing it should not be used for actuall errors
+;; once the code is complete.
 
-(define (match-pass-error who which thing)
-    (configure-for-internal-error)
-    (raise (exn:schml:Pass:Match
-	    (format "~a:Match Error at ~a with irritant ~a"
-		    who which thing)
-	    (current-continuation-marks))))
 
-(define (cond-pass-error who which thing)
-    (configure-for-internal-error)
-    (raise (exn:schml:Pass:Match
-	    (format "~a:Cond Error at ~a with irritant ~a"
-		    who which thing)
-	    (current-continuation-marks))))
+(define: (pass-error [who : Symbol] [msg : String])
+  (raise (exn:schml:pass (format "~a:~a" who msg) 
+			 (current-continuation-marks))))
 
-(struct exn:schml:Syntax exn:schml ())
-(struct exn:schml:Syntax:unbound exn:schml:Syntax ())
-(struct exn:schml:Syntax:not-supported exn:schml:Syntax ())
+(struct: exn:schml:read exn:schml ())
+(struct: exn:schml:read:file-name ([p : Path])
 
-(define (bad-syntax src datum exp)
+(define: (file-name-error [p : Path])
+  (let ((msg "[Error] could't extract file name from path"))
+    (raise (exn:schml:read:file-name 
+	    (format msg p)
+	    p
+	    (current-continuation-marks)))))
+
+(struct: exn:schml:Syntax exn:schml ())
+(struct: exn:schml:Syntax:unbound exn:schml:Syntax ())
+(struct: exn:schml:Syntax:not-supported exn:schml:Syntax ())
+
+(define: (bad-syntax [s : srcloc] [d : Any] [e : E)
   (configure-for-external-error)
   (raise (exn:schml:Syntax 
           (format "~a: Invalid Syntax ~a in ~a" 

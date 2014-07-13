@@ -1,38 +1,27 @@
 #lang typed/racket
 
-
-
-(require/typed 
- Schml/framework/build-compiler
- [#:struct compiler-config 
-	   ([semantics : Symbol]
-	    [trace-passes : (listof Symbol)])])
+(require Schml/framework/build-compiler)
 	   
 (provide (all-defined-out))
 
 (define-type Result (U error success))
-(struct: error ([obj : exn?]))
+(struct: error ([value : exn]))
 (struct: success ())
 
-(: default-compiler-config (Parameter compiler-config?))
-(define default-compiler-config
+
+(define: default-compiler-config : (Parameter Config)
   (make-parameter
-   (compiler-config 'lazy-d 'none 'none)))
+   (Config 'Lazy-D)))
     
-
-
-(: compile (Path compiler-config? -> Result))
-(define (compile/conf file-name settings) 
-  (with-handlers ((exn? (lambda (e) (error e))))
-    (let* ()
+(define: (compile/conf [path : Path] [config : Config]) : Result 
+  (local-require Schml/compiler/read)
+  (with-handlers ((exn? (lambda: ((e : exn)) (error e))))
+    (let* ((stx (read path config)))
       (success))))
 
-
-;; Invokes the compiler on an s-expr obtained by various means
-(: compile ((U Path String) -> Result))
-(define (compile file)
+(define: (compile [path : (U Path String)]) : Result
   (let ((config (default-compiler-config))) 
-    (if (string? file)
-	(compile/conf (string->path file) config)
-	(compile/conf file config))))
+    (if (string? path)
+	(compile/conf (string->path path) config)
+	(compile/conf path config))))
 

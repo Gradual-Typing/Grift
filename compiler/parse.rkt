@@ -12,8 +12,6 @@
 (provide parse)
 
 (define-pass (parse stx-tree comp-config)
-  ;; Eventually we should do something besides throwing everything
-  ;; but the first expression away
   (define (parse-top-level exp* env)
     (if (null? exp*)
         (pass-error pass 'parse-top-level "Empty File")
