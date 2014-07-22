@@ -1,281 +1,463 @@
-#lang racket
+#lang typed/racket
+#|------------------------------------------------------------------------------+
+|Pass: compiler/casts/parse                                    |
++-------------------------------------------------------------------------------+
+|Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
++-------------------------------------------------------------------------------+
+|Discription: The parse pass takes racket's native syntax objects to a set of   |
+|core structures that are annotated with the source location.                   |
+|                                                                               |
++-------------------------------------------------------------------------------+
+|Grammar for Core-Prog found in Schml/languages/core-forms                      |
+|Core-Prog = (Core-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr})             |
+|Core-Expr = (Lambda {Formals}* {Type}? {Core-Expr} {Src})                      |
+|          | (Var {Uvar} {Src})                                                 |
+|          | (App {Expr} {Expr}* {Src})                                         |
+|          | (Op {Prim} {Expr}* {Src})                                          |
+|          | (Ascrip {Expr} {Type} {Blame?} {Src})                              |
+|          | (If {Expr} {Expr} {Expr} {Src})                                    |
+|          | (Let {Binding} {Expr} {Src})                                       |
+|          | (Quote {Datum} {Src})                                              |
+|Binding   = (Bnd {Uvar} {Expr}) | (Bnd-Typed {Uvar} {Type} {Expr})             |
+|Formal    = (Fml {Uvar}) | (Fmlt {Uvar} {Type})                                |
+|Src       = Racket's native srcloc type                                        |
+|Blame?    = String | #f                                                        |
+|Type?     = {Type} | #f                                                        |
+|Type     = Int | Bool | (Fn {Type}* {Type})                                     |
+|Uvar      = (Uvar String Natural)                                              |
+|Datum     = Integer |  Boolean                                                 |
+|Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
+|                                                                               |
++------------------------------------------------------------------------------|#
+
 (require Schml/framework/build-compiler
-         Schml/framework/helpers
-         Schml/framework/errors
+	 Schml/language/types
          Schml/language/syntax
-         Schml/language/core)
+         Schml/language/core-forms)
 
 ;; May use the syntax parse form soon to create a more modular parser
 ;; with better error messages.
-(require syntax/parse)
 
+(require/typed racket/base
+	       [srcloc->string (srcloc . -> . (U False String))])
 (provide parse)
 
-(define-pass (parse stx-tree comp-config)
-  (define (parse-top-level exp* env)
-    (if (null? exp*)
-        (pass-error pass 'parse-top-level "Empty File")
-        (parse-expr (car exp*) env)))
-  
-  (define (parse-expr* exp* env) 
-    (for/list ([exp (in-list exp*)]) (parse-expr exp env)))
-  
-  (define (parse-expr exp env)
-    (let ((src (syntax-srcloc exp)) 
-          (exp^ (syntax-e exp)))
+
+
+#| Exceptions thrown during parse 
+   Note: exceptions are defined as macros so that the 
+   stacktraces are more accurate.
+|#
+(struct exn:schml:parse exn ())
+
+(define-syntax-rule (raise-parse-exn l fmt args ...)
+  (raise (exn:schml:parse
+	  (format "Exception in parse:~a: ~a" 
+		  (srcloc->str l) 
+		  (format fmt args ...))
+	  (current-continuation-marks))))
+	    
+
+(define-syntax-rule (raise-unbound-variable-exn s l)
+  (raise-parse-exn l "Unbound variable ~a" s))
+
+(define-syntax-rule (raise-file-empty-exn f)
+  (raise-parse-exn (file->srcloc f) "The file is empty"))
+
+(define-syntax-rule (raise-<1-exp-exn f)
+  (raise-parse-exn (file->srcloc f) 
+		   "The file contains more than one expression"))
+
+(define-syntax-rule (raise-unsupported-stx-exn stx src)
+  (raise-parse-exn src 
+		   "unsupported syntax in expression ~a" 
+		   (syntax->datum stx)))
+
+(define-syntax-rule (bad-syntax-application stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "bad syntax in application ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-unsupported-syntax-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "Unsupported syntax in ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-blame-label-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "Expected a string for a blame label got ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-type-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "Expected a type for got ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-duplicate-binding sym src)
+  (raise-parse-exn src "duplicate bindings for ~a" sym))
+
+(define-syntax-rule (raise-reservered-sym sym src)
+  (raise-parse-exn src "attemp to bind reserved symbol ~a" sym))
+
+(define-syntax-rule (raise-fml-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "bad syntax in formal(s) ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-bnd-exn stx)
+  (raise-parse-exn (syntax->srcloc stx) 
+		   "bad syntax in bnd(s) ~a" 
+		   (syntax->datum stx)))
+
+(define-syntax-rule (rebuild-stx* s s*)
+  (cons s (map syntax->datum s*)))
+
+(define-syntax-rule (raise-lambda-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'lambda stx*)))
+
+(define-syntax-rule (raise-let-exn form stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'form stx*)))
+
+(define-syntax-rule (raise-if-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'if stx*)))
+
+(define-syntax-rule (raise-ascribe-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* ': stx*)))
+
+#| The type of the enviroment bindings and symbol-sets|#
+(define-type Env (HashTable Symbol Uvar))
+
+(: env-lookup (Env Symbol srcloc . -> . Uvar))
+(define (env-lookup e s l)
+  (hash-ref e s (lambda () (raise-unbound-variable-exn s l))))
+
+(: env-extend (Env Symbol Uvar . -> . Env))
+(define env-extend hash-set)
+
+#| pattern helpers |#
+(: seq? (Stx Symbol . -> . Boolean))
+(define (seq? s p) (eq? (syntax-e s) p))
+
+(: colon? (Stx . -> . Boolean))
+(define (colon? x) (seq? x ':))
+
+(: arrow? (Stx . -> . Boolean))
+(define (arrow? x) (seq? x '->))
+
+#| The type of source locations and syntax helpers|#	     
+
+(: srcloc->str (srcloc . -> . String))
+(define (srcloc->str s)
+  (let ((s (srcloc->string s)))
+    (or s "")))
+	 
+(: syntax->srcloc (Stx . -> . srcloc))
+(define (syntax->srcloc x)
+  (srcloc (syntax-source x) 
+	  (syntax-line x)
+          (syntax-column x) 
+	  (syntax-position x) 
+	  (syntax-span x)))
+
+(: syntax-unroll (Stx . -> . (U Symbol Literal (Listof Stx))))
+(define (syntax-unroll stx)
+  (let ((a (syntax-e stx)))
+    (if ((make-predicate (U Symbol Literal (Listof Stx)))
+	 a)
+	a
+	(raise-unsupported-syntax-exn stx))))
+
+
+;; stx-list? is equivalent to (and (list? o) (andmap syntax? o))
+(define-predicate stx-list? (Listof Stx))	   
+
+(: file->srcloc (String . -> . srcloc))
+(define (file->srcloc n)
+  (srcloc n #f #f #f #f))
+
+(: reserved-symbol? (Symbol . -> . Boolean))
+(define (reserved-symbol? x)
+  (case x
+    [(lambda letrec let if :) #t]
+    [(* + - binary-and binary-or << >> < <= = >= >) #t]
+    [else #f]))
+
+
+   
+#| The parser |#
+(: parse-expr (Stx Env Natural . -> . (values Core-Form Natural)))
+(define (parse-expr stx env next)
+  (let ((src (syntax->srcloc stx))
+	(exp (syntax-unroll stx)))
+    (cond
+     [(symbol? exp) (values (parse-variable exp src env) next)]
+     [(pair? exp) 
+      (let* ((rator (car exp)) 
+	     (rand* (cdr exp)) 
+	     (exp^ (syntax-unroll rator)))
+	(cond
+	 [(symbol? exp^)
+	  (case exp^
+	      [(lambda) (parse-lambda rand* src env next)]
+	      [(letrec) (parse-letrec rand* src env next)]
+	      [(let)    (parse-let rand* src env next)]
+	      [(if)     (parse-if rand* src env next)]
+	      [(:)      (parse-ascription rand* src env next)]
+	      [else
+	       (if (primitive-id? exp^) 
+		   (parse-primitive exp^ rand* src env next)
+		   (parse-application rator rand* src env next))])]
+	 [(pair? exp^) (parse-application rator rand* src env next)]
+	 [else (bad-syntax-application stx)]))]
+     [(Literal? exp) (values (Quote exp src) next)] 
+     [else (raise-unsupported-syntax-exn stx)])))
+
+(: parse-variable (Symbol srcloc Env . -> . Core-Form))
+(define (parse-variable v s e)
+  (Var (env-lookup e v s) s))
+
+(: parse-blame-label (Stx . -> . String))
+(define (parse-blame-label s)
+  (let ([e (syntax-unroll s)])
+    (if (string? e) e (raise-blame-label-exn s))))
+
+
+(define-type Acc2 (List (Listof (Fml Core-Type)) 
+			(Listof Symbol) 
+			Env 
+			Natural))
+(: parse-lambda ((Listof Stx) srcloc Env Natural . -> . 
+		 (values Core-Form Natural)))
+(define (parse-lambda stx* src env next)
+  (define (help [stx : Stx] 
+		[t : (U Stx False)]
+		[b : Stx] 
+		[s : srcloc] 
+		[e : Env] 
+		[n : Natural])
+    : (values Core-Form Natural)
+    (let ([f* (syntax-unroll stx)])
+      (if (stx-list? f*)
+	  (let ([a : Acc2 (list '() '() e n)])
+	    (match-let ([`(,f* ,_ ,e ,n) (foldr parse-fml a f*)])
+	      (let-values ([(t) (and t (parse-type t))]
+			   [(b n) (parse-expr b e n)])
+		(values (Lambda f* t b s) n))))
+	  (raise-fml-exn stx))))
+  (match stx*
+    [(list fmls body)
+     (help fmls #f body src env next)]
+    [(list fmls (? colon?) type body)
+     (help fmls type body src env next)]
+    [otherwise (raise-lambda-exn stx* src)]))
+
+(: parse-fml (Stx Acc2 . -> . Acc2))
+(define (parse-fml stx acc)
+  (define (help [s : Symbol] [t : (U Stx False)] [l : srcloc] [a : Acc2]) 
+    : Acc2 
+    (match-let ([`(,f* ,s* ,e ,n) a])
+      (let* ([t (if t (parse-type t) Dyn-Type)]
+	     [u (Uvar (symbol->string s) n)]
+	     [f (Fml u t)]
+	     [e (env-extend e s u)])
+	(cond
+	 [(memq s s*) (raise-duplicate-binding s l)]
+	 [(reserved-symbol? s) (raise-reservered-sym s l)]
+	 [else (list (cons f f*) (cons s s*) e (add1 n))]))))
+  (let ((src (syntax->srcloc stx)))
+    (match (syntax-unroll stx)
+      [(list (app syntax-unroll (? symbol? sym)) (? colon?) type) 
+       (help sym type src acc)]
+      [(? symbol? sym) (help sym #f src acc)]
+      [otherwise (raise-fml-exn stx)])))
+
+(struct bnd ([u : Uvar]
+	     [t : (U Stx False)] 
+	     [r : Stx]))
+
+(struct Acc0 ([b* : (Listof bnd)]
+	      [s* : (Listof Symbol)]
+	      [e : Env]
+	      [n : Natural]))
+
+(define-type Acc1 (Pair (Listof (Bnd Core-Form Maybe-Type)) 
+			Natural))
+
+(define-syntax-rule 
+  (parse-let-form form cnstrct init-env body-env bnd-env)
+  (lambda ([stx* : (Listof Stx)]
+	   [loc  : srcloc]
+	   [init-env : Env]
+	   [next : Natural])
+    (match stx*
+      [(list s b)
+       (let ([b* (syntax-unroll s)])
+	 (if (not (stx-list? b*))
+	     (raise-bnd-exn s)
+	     (let* ([a (Acc0 '() '() init-env next)]
+		    [a : Acc0 (foldr unsplice-bnd a b*)]
+		    [b* : (Listof bnd) (Acc0-b* a)]
+		    [body-env : Env (Acc0-e a)]
+		    [n : Natural (Acc0-n a)]
+		    [a : Acc1 (cons '() n)]
+		    [a : Acc1 
+		       (foldr (parse-bnd bnd-env) a b*)]
+		    [b* (car a)]
+		    [n  (cdr a)])
+	       (let-values ([(b n) (parse-expr b body-env n)])
+		 (values (cnstrct b* b loc) n)))))]
+      [otherwise (raise-let-exn form stx* loc)])))
+
+(: parse-letrec ((Listof Stx) srcloc Env Natural . -> . 
+		 (values Core-Form Natural)))
+(define parse-letrec (parse-let-form letrec Letrec e1 e2 e2)) 
+
+(: parse-let ((Listof Stx) srcloc Env Natural . -> . 
+	      (values Core-Form Natural)))
+(define parse-let (parse-let-form let Let e1 e2 e1))
+#|
+(define (parse-let stx* loc env next)
+  (match stx*
+    [(list (app syntax-unroll (list stx* ...)) b)
+     (match-let* ([acc `(() () () () ,env ,next)]
+		  [`(,_ ,u* ,t* ,r* ,e ,n) (foldr unsplice-bnd acc stx*)]
+		  [`(,b* . ,n) (foldr (parse-bnd env) `(() . ,n) u* t* r*)])
+      (let-values ([(b n) (parse-expr b e n)])
+	(values (Let b* b loc) n)))]
+    [otherwise (raise-let-exn stx* loc)]))
+|#
+(: parse-bnd (Env . -> . (bnd Acc1 . -> . Acc1)))
+(define (parse-bnd env)
+  (lambda ([b : bnd] [a : Acc1]) 
+    : Acc1
+    (let ([b* (car a)]
+	  [n  (cdr a)]
+	  [u  (bnd-u b)]
+	  [t  (bnd-t b)]
+	  [e  (bnd-r b)])
+      (let-values ([(e n) (parse-expr e env n)]
+		   [(t) (and t (parse-type t))])
+	(let ([b (Bnd u t e)])
+	  `((,b . ,b*) . ,n))))))
+
+
+(: unsplice-bnd (Stx Acc0 -> Acc0))
+(define (unsplice-bnd stx acc)
+  (define (help [s : Symbol] [t : (U Stx False)] 
+		[r : Stx] [l : srcloc] [a : Acc0]) 
+    : Acc0
+    (let* ([b* (Acc0-b* a)]
+	   [s* (Acc0-s* a)]
+	   [e  (Acc0-e  a)]
+	   [n  (Acc0-n  a)]
+	   [u (Uvar (symbol->string s) n)])
       (cond
-        [(pair? exp^) 
-         (let* ((rator (car exp^)) 
-                (rands (cdr exp^)) 
-                (e (syntax-e rator)))
-           (cond
-             [(pair? e)
-              (App src (parse-expr rator env) (parse-expr* rands env))]
-             [(symbol? e)
-              (match (env-lookup env e (env-err src e exp))
-                [(Bnd:Var b)
-                 (let ((vsrc (syntax-srcloc rator)))
-                   (App src (Var vsrc b) (parse-expr* rands env)))]
-                [(Bnd:Core t) (t exp env)]
-                [else (bad-syntax src e (strip exp))])]
-             [else (bad-syntax src e (strip exp))]))]
-        [(symbol? exp^)
-         (match (env-lookup env exp^ (env-err src exp^ #'expression))
-           [(Bnd:Var b) (Var src b)]
-           [otherwise (bad-syntax src exp^ 'expression)])]
-        [(constant? exp^) (Const src exp^)]
-        [else (cond-pass-error pass 'parse-expr exp)])))
+	 [(memq s s*) (raise-duplicate-binding s l)]
+	 [(reserved-symbol? s) (raise-reservered-sym s l)]
+	 [else (Acc0 (cons (bnd u t r) b*)
+		     (cons s s*)
+		     (env-extend e s u)
+		     (add1 n))])))
+  (let ([loc (syntax->srcloc stx)])
+    (match (syntax-unroll stx)
+      [(list (app syntax-unroll (? symbol? sym)) (? colon?) type rhs)
+       (help sym type rhs loc acc)]
+      [(list (app syntax-unroll (? symbol? sym)) rhs)
+       (help sym #f rhs loc acc)]
+      [otherwise (raise-bnd-exn stx)])))
 
 
-  (define (parse-type* ty* env)
-    (for/list ((ty (in-list ty*))) (parse-type ty env)))
+(: parse-if ((Listof Stx) srcloc Env Natural . -> . 
+		 (values Core-Form Natural)))
+(define (parse-if stx* src env next)
+  (match stx*
+    [(list test then else)
+     (let*-values ([(tst next) (parse-expr test env next)]
+		   [(csq next) (parse-expr then env next)]
+		   [(alt next) (parse-expr else env next)])
+       (values (If tst csq alt src) next))]
+    [othewise (raise-if-exn stx* src)]))
 
-  (define (parse-type ty env)
-    (let ((ty^ (syntax-e ty))
-          (src (syntax-srcloc ty)))
-      (cond
-        [(pair? ty^)
-         (handle-complex-type 
-          src ty (desugar-infix-notation ty^ env) env)]
-        [(symbol? ty^)
-         (match (env-lookup env ty^ (env-err src ty^ ty))
-           [(Bnd:Type t) t]
-           [otherwise (bad-syntax (syntax-srcloc ty) ty^ 'type)])]
-        [(constant? ty^) (bad-syntax (syntax-srcloc ty) ty 'type)]
-        [else (cond-pass-error pass 'parse-type (strip ty))])))
+(: parse-ascription ((Listof Stx) srcloc Env Natural . -> . 
+		     (values Core-Form Natural)))
+(define (parse-ascription stx* src env next)
+  (define (help [s : Stx] [t : Stx] [l : (U Stx False)] 
+		[src : srcloc] [e : Env] [n : Natural]) 
+    : (values Core-Form Natural) 
+    (let*-values ([(exp next) (parse-expr s e n)]
+		  [(type) (parse-type t)]
+		  [(lbl) (and l (parse-blame-label l))])
+      (values (Ascribe exp type lbl src) next)))
+  (match stx*
+    [(list exp type) (help exp type #f src env next)]
+    [(list exp type lbl) (help exp type lbl src env next)]
+    [othewise (raise-ascribe-exn stx* src)]))
 
-  (define (desugar-infix-notation stx-ls env)
-    (match stx-ls
-      [(list (? (lambda (s) 
-                  (match (env-lookup env (syntax-e s) #f)
-                    [(Bnd:Infix sym) #f]
-                    [otherwise #t])) args) ...
-                    (app (lambda (s) 
-                           (match (env-lookup env (syntax-e s) #f)
-                             [(Bnd:Infix sym) sym]
-                             [otherwise #f])) (and (not #f) sym)) 
-                    returns ...)
-       ;; This is ugly but I think that it is a less wasteful
-       ;; version of (syntax-e #`(#,sym #,args #,@returns))
-       ;; Just trying to get back to syntax-ls format after
-       ;; having completely destroyed it.
-       `(,#`#,sym ,#`#,args ,@returns)]
-      [otherwise (printf "din->else ~a\n" stx-ls) stx-ls]))
+(: parse-primitive (Primitive-id (Listof Stx) srcloc Env Natural . -> . 
+			      (values Core-Form Natural)))
+(define (parse-primitive sym stx* src env next)
+  (let-values ([(args next) (parse-expr* stx* env next)])
+    (values (Op sym args src) next)))
 
-  (define (handle-complex-type src ty ty-ls env)
-    (let* ((rator (car ty-ls))
-           (te (syntax-e rator)))
-      (cond
-        [(pair? te) (bad-syntax src (strip rator) (strip ty))]
-        [(symbol? te)
-         (match (env-lookup env te (env-err src te ty))
-           ;; could add type transformers here
-           [(Bnd:Type-Core t) (t ty env)]
-           [otherwise (bad-syntax src te (strip ty))])]
-        [else (bad-syntax src te ty)])))
+(: parse-application (Stx (Listof Stx) srcloc Env Natural . -> .
+		      (values Core-Form Natural)))
+(define (parse-application stx stx* src env next)
+  (let*-values ([(rator next) (parse-expr stx env next)]
+		[(rands next) (parse-expr* stx* env next)])
+    (values (App rator rands src) next)))
 
-  (define (lambda-transformer exp env)
-    (define (from-to-fml fml env)
-      (syntax-case fml ()
-        [(i k t) (and (eq? ': (syntax-e #'k))
-                      (symbol? (syntax-e #'i)))
-         (let* ((i (syntax-e #'i)) (u (mk-uvar i)))
-           (values i (Bnd:Var u) (Fml:Ty u (parse-type #'t env))))]
-        [i (symbol? (syntax-e #'i))
-           (let* ((i (syntax-e #'i)) (u (mk-uvar i)))
-             (values i (Bnd:Var u) (Fml u)))]))
-    (define (dup-args-error)
-      (bad-syntax (syntax-srcloc exp) "identicle bindings" (strip exp)))
-    (define (help type fmls body env)
-      (let-values 
-          ([(fmls env) (parsef*/no-dup from-to-fml fmls env dup-args-error)]
-           [(src) (syntax-srcloc exp)])
-        (Lambda src fmls (and type (parse-type type env)) (parse-expr body env))))
-    (syntax-case exp ()
-      [(_ (f ...) k t b) (eq? ': (syntax-e #'k)) (help #'t #'(f ...) #'b env)]
-      [(_ (f ...) b) (help #f #'(f ...) #'b env)]))
+(: parse-expr* ((Listof Stx) Env Natural . -> . (values (Listof Core-Form) Natural)))
+(define (parse-expr* s* e n) 
+  (if (null? s*)
+      (values '() n)
+      (let*-values ([(cf new-n) (parse-expr (car s*) e n)]
+		    [(cf* newer-n) (parse-expr* (cdr s*) e new-n)])
+         (values (cons cf cf*) newer-n))))
 
-  (define (parsef*/no-dup make-from-to-struct s* env err-th)
-    (let-values (((p* ext-env)
-                  (let loop ((s* (syntax-e s*)))
-                    (if (null? s*)
-                        (values '() (empty-env))
-                        (let*-values
-                            (((p* ext-env-set) (loop (cdr s*)))
-                             ((from to p) (make-from-to-struct (car s*) env)))
-                          (when (env-lookup ext-env-set from #f)
-                            (err-th))
-                          (values (cons p p*)
-                                  (env-extend ext-env-set from to)))))))
-      (values p* (env-extend/env env ext-env))))
+(: parse-type (Stx . -> . Core-Type))
+(define (parse-type stx)
+  (match (syntax-unroll stx)
+    ['Int (Int)]
+    ['Bool (Bool)]
+    ['Dyn  (Dyn)]
+    [(list stx* ...) (parse-fn-type stx)]
+    [othewise (raise-type-exn stx)]))
 
-  (define (let-transformer exp env)
-    (define (from-to-bnd bnd env^)
-      (syntax-case bnd ()
-        [(i k t e) (and (eq? ': (syntax-e #'k)) (symbol? (syntax-e #'i)))
-         (let* ((i (syntax-e #'i))
-                (u (mk-uvar i)))
-           (values i (Bnd:Var u)
-                   (Bnd:Ty u (parse-expr #'e env) (parse-type #'t env))))]
-        [(i e) (symbol? (syntax-e #'i))
-         (let* ((i (syntax-e #'i)) (u (mk-uvar i)))
-           (values i (Bnd:Var u) (Bnd u (parse-expr #'e env))))]))
-    (define (dup-err)
-      (bad-syntax (syntax-srcloc exp) "identicle bindings" (strip exp)))
-    (let ((src (syntax-srcloc exp)))
-      (syntax-case exp ()
-        [(_ (b ...) body) 
-         (let-values ([(binds env) (parsef*/no-dup from-to-bnd #'(b ...) env dup-err)])
-           (Let src binds (parse-expr #'body env)))])))
-
-  (define (if-transformer stx env)
-    (syntax-case stx ()
-      [(_ t c a) (If (syntax-srcloc stx)
-                     (parse-expr #'t env)
-                     (parse-expr #'c env)
-                     (parse-expr #'a env))]))
-
-  (define (cast-transformer stx env)
-    (define (help e t l)
-      (Cast (syntax-srcloc stx) (parse-expr e env) (parse-type t env) l))
-    (syntax-case stx ()
-      [(_ e t l) (string? (syntax-e #'l)) (help #'e #'t (syntax-e #'l))]
-      [(_ e t) (help #'e #'t #f)]))
-
-  (define (lt-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Rel:IntxInt:< (parse-expr #'n env)
-                                    (parse-expr #'m env)))]))
-
-  (define (gt-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Rel:IntxInt:> (parse-expr #'n env)
-                                    (parse-expr #'m env)))]))
-
-  (define (eq-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Rel:IntxInt:= (parse-expr #'n env)
-                                    (parse-expr #'m env)))]))
-
-  (define (lteq-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Rel:IntxInt:<= (parse-expr #'n env)
-                                     (parse-expr #'m env)))]))
-  (define (gteq-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Rel:IntxInt:>= (parse-expr #'n env)
-                                     (parse-expr #'m env)))]))
-
-  (define (mult-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Op:IntxInt:* (parse-expr #'n env)
-                                   (parse-expr #'m env)))]))
-  (define (plus-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Op:IntxInt:+ (parse-expr #'n env)
-                                   (parse-expr #'m env)))]))
-  (define (minus-transformer stx env)
-    (syntax-case stx ()
-      [(_ n m) (Prim (syntax-srcloc stx)
-                     (Op:IntxInt:- (parse-expr #'n env)
-                                   (parse-expr #'m env)))]))
-
-  (define (function-type-transformer stx env)
-    (letrec ([recur (lambda (stx)
-                      (syntax-case stx ()
-                        [(_ tok1 tok2 tok* ...) (and (eq? (syntax-e #'tok1) '->)
-                                                     (null? (syntax-e #'(tok* ...)))) 
-                         (values '() #'tok2)]
-                        [(_ tok1 tok2 tok* ...) (eq? (syntax-e #'tok1) '->) 
-                         (values '() #'(tok2 tok* ...))]
-                        [(_ tok1 tok2 tok* ...)
-                         (let-values ([(from to) (recur #'(_ tok2 tok* ...))])
-                           (values (cons #'tok1 from) to))]))])
-      (let-values ([(from to) (recur stx)])
-        (Function (parse-type* from env) (parse-type to env)))))
-
-  (struct Binding (value))
-  (struct Bnd:Var  Binding ())
-  (struct Bnd:Core Binding ())
-  (struct Bnd:Type Binding ())
-  (struct Bnd:Type-Core Binding ())
-  (struct Bnd:Infix Binding ())
-
-  (define core-env
-    (let ((-> (gensym)))
-      (hasheq
-       'lambda (Bnd:Core lambda-transformer)
-       'let    (Bnd:Core let-transformer)
-       'if     (Bnd:Core if-transformer)
-       ':      (Bnd:Core cast-transformer)
-       'Dyn    (Bnd:Type Dyn-Type)
-       'Int    (Bnd:Type Int-Type)
-       'Bool   (Bnd:Type Bool-Type)
-       '->     (Bnd:Infix ->)
-       ->      (Bnd:Type-Core function-type-transformer)
-       '%<     (Bnd:Core lt-transformer)
-       '%>     (Bnd:Core gt-transformer)
-       '%=     (Bnd:Core eq-transformer)
-       '%<=    (Bnd:Core lteq-transformer)
-       '%>=    (Bnd:Core gteq-transformer)
-       '%*     (Bnd:Core mult-transformer)
-       '%+     (Bnd:Core plus-transformer)
-       '%-     (Bnd:Core minus-transformer))))
-
-  (define mk-uvar (get-uvar-maker 1))
-
-  (match stx-tree
-    [(File name stx*)
-     (let ((e (parse-top-level stx* core-env)))
-       (Prog name (mk-uvar) e))]
-    [otherwise (match-pass-error pass 'parse-file stx-tree)]))
-
-
-;; Unnoteworthy helpers
-(define (syntax-srcloc exp)
-  (srcloc (syntax-source exp) (syntax-line exp)
-          (syntax-column exp) (syntax-position exp) (syntax-span exp)))
-
-(define-syntax strip
-  (syntax-rules ()
-    [(_ stx) (syntax->datum stx)]))
-
-(define-syntax env-err
-  (syntax-rules ()
-   ((_ src sym stx) (th (unbound src sym (strip stx))))))
-    
-
-
-
-
-
-          
+(: parse-fn-type (Stx . -> . Core-Type))
+(define (parse-fn-type stx)
+  (let ([stx* (syntax-unroll stx)])
+    (if (not (stx-list? stx*))
+	(raise-type-exn stx)
+	(letrec ([loop : ((Listof Stx) . -> . 
+			  (values (Listof Stx) (Listof Stx)))
+		  (lambda ([s* : (Listof Stx)])
+		    (if (null? s*) 
+			(raise-type-exn stx)
+			(let ((fst : Stx (car s*))
+			      (rst : (Listof Stx) (cdr s*)))
+			  (if (arrow? fst)
+			      (values '() rst)
+			      (let-values ([(from to) (loop rst)])
+				(values (cons fst from) to))))))])
+	  (let-values ([(from to) (loop stx*)])
+	    (: from (Listof Stx))
+	    (: to (Listof Stx))
+	    (Fn (map parse-type from) (map parse-type to)))))))
   
+(: parse-top-level
+   (String (Listof Stx) Env Natural . -> . (values Core-Form Natural)))
+(define (parse-top-level name stx* env next) 
+  : (values Core-Form Natural)
+  (cond
+   [(null? stx*) (raise-file-empty-exn name)]
+   [(not (null? (cdr stx*))) (raise-<1-exp-exn name)]
+   [else (parse-expr (car stx*) env next)]))
 
+(define (parse [ast : Stx-Prog] [c : Config]) : Core-Prog
+  (let ((name : String (Stx-Prog-name ast))
+	(stx* : (Listof Stx) (Stx-Prog-syntax* ast))
+	(next-uvar : Natural 0)
+	(env : Env (hasheq)))
+    (let-values ([(core-form next-uvar) 
+		  (parse-top-level name stx* env next-uvar)])
+      (Core-Prog name next-uvar core-form))))

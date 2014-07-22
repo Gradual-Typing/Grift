@@ -5,22 +5,22 @@
 (provide (all-defined-out))
 
 (define-type Result (U error success))
-(struct: error ([value : exn]))
-(struct: success ())
+(struct error ([value : exn]))
+(struct success ())
 
-
-(define: default-compiler-config : (Parameter Config)
+(define compiler-config : (Parameter Config)
   (make-parameter
    (Config 'Lazy-D)))
     
-(define: (compile/conf [path : Path] [config : Config]) : Result 
+(define (compile/conf [path : Path] [config : Config]) : Result 
   (local-require Schml/compiler/read)
   (with-handlers ((exn? (lambda: ((e : exn)) (error e))))
-    (let* ((stx (read path config)))
+    (let* ((stx-prog (read path config))
+	   (core-forms (parse stx-prog config)))
       (success))))
 
-(define: (compile [path : (U Path String)]) : Result
-  (let ((config (default-compiler-config))) 
+(define (compile [path : (U Path String)]) : Result
+  (let ((config (compiler-config))) 
     (if (string? path)
 	(compile/conf (string->path path) config)
 	(compile/conf path config))))

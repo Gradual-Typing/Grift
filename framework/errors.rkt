@@ -2,28 +2,33 @@
 
 (provide (all-defined-out))
 
-(struct: exn:schml exn ())
-(struct: exn:schml:pass exn:schml ())
+(struct exn:schml exn ())
+(struct exn:schml:pass exn:schml ())
 
 ;; This is a generic error handler that is usefull for
 ;; quick testing it should not be used for actuall errors
 ;; once the code is complete.
 
+(define-syntax-rule (raise-pass-exn who fmt args ...)
+  (raise 
+   (exn:schml:pass 
+    (format "Error in ~a: ~a"
+	    who
+	    (format fmt args ...))
+    (current-continuation-marks))))
 
-(define: (pass-error [who : Symbol] [msg : String])
-  (raise (exn:schml:pass (format "~a:~a" who msg) 
-			 (current-continuation-marks))))
-
+#| Errors thrown in the read pass |#
 (struct: exn:schml:read exn:schml ())
-(struct: exn:schml:read:file-name ([p : Path])
 
-(define: (file-name-error [p : Path])
-  (let ((msg "[Error] could't extract file name from path"))
-    (raise (exn:schml:read:file-name 
-	    (format msg p)
-	    p
-	    (current-continuation-marks)))))
+(define file-name-fmt
+  "Error in read: unable to extract file name from the path ~a")
 
+(define-syntax-rule (raise-file-name-exn p)
+  (raise (exn:schml:read
+	  (format file-name-fmt (path->string p))
+	  (current-continuation-marks))))
+
+#| Errors thrown in the parse pass 
 (struct: exn:schml:Syntax exn:schml ())
 (struct: exn:schml:Syntax:unbound exn:schml:Syntax ())
 (struct: exn:schml:Syntax:not-supported exn:schml:Syntax ())
@@ -114,3 +119,4 @@
      (configure-for-external-error)
      (let ((msg (format "Blame ~a and ~a" down up)))
        (raise (exn:schml:Type:Dynamic msg (current-continuation-marks))))]))
+|#
