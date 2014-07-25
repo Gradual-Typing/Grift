@@ -1,4 +1,29 @@
-#lang racket
+#lang typed/racket
+
+(provide (all-defined-out))
+
+#| Environments are persistent hash tables |#
+
+(begin-for-syntax
+ (define (null-list n)
+   (if (= 0 n)
+       '()
+       (cons ''() (null-list (sub1 n))))))
+
+(define-syntax (map/values stx)
+  (syntax-case stx (:)
+    [(_  p (T ...) exp ...)
+     (with-syntax ([(step ...) (generate-temporaries #'(exp ...))]
+		   [(acc ...) (generate-temporaries #'(T ...))]
+		   [(ls ...) (generate-temporaries #'(exp ...))])
+	 #'(let ([proc p] 
+		 [ls exp] ...)
+	     (for/lists : (values (Listof T) ...)
+	       ([acc : (Listof T)] ...) 
+	       ([step (in-list ls)] ...)
+	       (proc step ...))))]))
+
+#|
 (require (for-syntax  racket/list))
 
 (provide (all-defined-out))
@@ -90,23 +115,5 @@
     (if not-specific
         (error 'mk-struct "could not make a struct of this type ~a" struct)
         (struct-type-make-constructor type))))
-
-(define-syntax map/values
-  (lambda (stx)
-    (syntax-case stx ()
-      [(_ p (base ...) exp ...)
-       (with-syntax ([(tmp-step ...) (generate-temporaries #'(base ...))]
-                     [(tmp-acc ...) (generate-temporaries #'(base ...))]
-                     [(tmp-ls ...) (generate-temporaries #'(exp ...))])
-         #'(letrec 
-               ([recur 
-                 (lambda (tmp-ls ...)
-                   (cond 
-                    [(and (null? tmp-ls) ...) (values base ...)] 
-                    [else 
-                     (let-values ([(tmp-acc ...) (recur (cdr tmp-ls) ...)]
-                                  [(tmp-step ...) (p (car tmp-ls) ...)])
-                       (values (cons tmp-step tmp-acc) ...))]))])
-             (recur exp ...)))])))
-       
         
+|#

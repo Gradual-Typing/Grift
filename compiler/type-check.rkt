@@ -1,4 +1,4 @@
-#lang racket
+#lang typed/racket
 #|------------------------------------------------------------------------------+
 |Pass: compiler/casts/typecheck                                                  |
 +-------------------------------------------------------------------------------+
@@ -19,189 +19,345 @@
 |      and their sub-structures are consistent.                                 |
 |                                                                               |
 +-------------------------------------------------------------------------------+
-|Input Grammar "Implicitly-Typed-Core-Forms" found in Schml/languages/core.rkt  |
-|Prog   = (Prog File-Name {TExpr})                                              |
-|TExpr  = {Expr}                                                                |
-|Expr   = (Lambda {Fml}* {Expr} Src)                                            |
-|       | (Var {Uvar} Src)                                                      |
-|       | (App {Expr} {Expr}* Src)                                              |
-|       | (Op Prim {Expr}* Src)                                                 |
-|       | (Cast {Expr} {Type} Src)                                              |
-|       | (If {Expr} {Expr} {Expr} Src)                                         |
-|       | (Let {BndSet} {Expr} Src)                                             |
-|       | (Const {Imdt})                                                        |
-|BndSet = ({Fml} {Expr})*                                                       |
-|Fml    = {Uvar} | ({Uvar} {Type})                                              |
-|Src    = (Src File Line Col Span)                                              |
-|Blame  = {Src} | {String}                                                      |
-|Uvar   = A Symbol with the format 'original$uniqueness                         |
-|Imdt   = Fixnums and Booleans                                                  |
-|Prim   = op:fix:* | op:fix:+ | op:fix:- | op:fix:and | op:fix:or | op:fix:>>   |
-|       | op:fix:<< | relop:fix:< | relop:fix:<= | relop:fix:=  | relop:fix:>=  |
-|       | relop:fix:>                                                           |
-|Type   = Fix | Bool | Dyn | ({Type}* -> {Type})                                |
+|Grammar for Core-Prog found in Schml/languages/core-forms                      |
+|Core-Prog = (Core-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr})             |
+|Core-Expr = (Lambda {Formals}* {Type}? {Core-Expr} {Src})                      |
+|          | (Var {Uvar} {Src})                                                 |
+|          | (App {Expr} {Expr}* {Src})                                         |
+|          | (Op {Prim} {Expr}* {Src})                                          |
+|          | (Ascribe {Expr} {Type} {Blame?} {Src})                              |
+|          | (If {Expr} {Expr} {Expr} {Src})                                    |
+|          | (Let {Binding} {Expr} {Src})                                       |
+|          | (Quote {Datum} {Src})                                              |
+|Binding   = (Bnd {Uvar} {Type?} {Expr})                         |
+|Formal    = (Fmlt {Uvar} {Type})                                           |
+|Src       = Racket's native srcloc type                                        |
+|Blame?    = String | #f                                                        |
+|Type?     = {Type} | #f                                                        |
+|Type      = Int | Bool | (Fn {Type}* {Type}*)                                    |
+|Uvar      = (Uvar String Natural)                                              |
+|Datum     = Integer |  Boolean                                                 |
+|Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
+|                                                                               |
 +-------------------------------------------------------------------------------+
-|Input Grammar "Explicitly-Typed-Core-Forms" found in Schml/languages/core.rkt  |
-|Prog   = (Prog File-Name {TExpr} Type)                                         |
-|TExpr  = {Expr}                                                                |
-|Expr   = (Lambda {uvar}* {Type} {Expr} {Src})                                  |
-|       | (Var {Uvar} {Type} {Src})                                             |
-|       | (App {Expr} {Expr}* {Type} {Src})                                     |
-|       | (Op Prim {Expr}* {Type} {Src})                                        |
-|       | (Cast {Expr} {Type} {Type} {Blame})                                   |
-|       | (If {Expr} {Expr} {Expr} {Type} {Src})                                |
-|       | (Let {BndSet} {Expr} {Type} {Src})                                    |
-|       | (Const {Imdt} {Type})                                                 |
-|BndSet = ({Uvar} {Expr})                                                       |
-|Fml    = {Uvar} | ({Uvar} {Type})                                              |
-|Src    = (Src File Line Col Span)                                              |
-|Blame  = {Src} | {String}                                                      |
-|Uvar   = A Symbol with the format 'original$uniqueness                         |
-|Imdt   = Fixnums and Booleans                                                  |
-|Prim   = op:fix:* | op:fix:+ | op:fix:- | op:fix:and | op:fix:or | op:fix:>>   |
-|       | op:fix:<< | relop:fix:< | relop:fix:<= | relop:fix:=  | relop:fix:>=  |
-|       | relop:fix:>                                                           |
-|Type   = Fix | Bool | Dyn | ({Type}* -> {Type})                                |
+|Grammar for Typed-Prog found in Schml/languages/typed-forms                    |
+|Typed-Prog = (Typed-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr} {Core-Type})
+|Typed-Expr = (Lambda {Formals}* {Type} {Typed-Expr} {Src} {Core-Type})         |
+|           | (Var {Uvar} {Src} {Core-Type})                                    |
+|           | (App {Expr} {Expr}* {Src} {Core-Type})                            |
+|           | (Op {Prim} {Expr}* {Src})                                         |
+|           | (Ascribe {Expr} {Type} {Blame?} {Src} {Core-Type})                |
+|           | (If {Expr} {Expr} {Expr} {Src} {Core-Type})                       |
+|           | (Let {Binding} {Expr} {Src} {Core-Type})                          |
+|           | (Quote {Literal} {Src} {Core-Type})                               |
+|Binding   = (Bnd {Uvar} {Core-Type} {Expr})                                    |
+|Formal    = (Fml {Uvar} {Type})                                                |
+|Src       = Racket's native srcloc type                                        |
+|Label?    = String | #f                                                        |
+|Type      = Int | Bool | (Fn {Type}* {Type})                                   |
+|Uvar      = (Uvar String Natural)                                              |
+|Literal   = Integer |  Boolean                                                 |
+|Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
 +------------------------------------------------------------------------------|#
-;; The define-pass syntax
 (require Schml/framework/build-compiler
-         Schml/framework/helpers
-         Schml/framework/errors)
+         Schml/framework/errors
+	 Schml/framework/helpers)
 ;; The constuctors of the core language
-(require Schml/language/shared
-         (prefix-in c: Schml/language/core)
-         (prefix-in tc: Schml/language/typed-core))
+(require Schml/language/types
+	 Schml/language/core-forms
+         Schml/language/typed-forms)
 ;; Only the pass is provided by this module
 (provide type-check)
 
-(define-pass (type-check prgm comp-config)
+(: type-check (Core-Prog Config . -> . Typed-Prog)) 
+(define (type-check prgm comp-config)
+  
+  ;; Shorter type names
+  (define-type VT Valid-Type)
+  (define-type Env (HashTable Uvar VT))
+  
+  (define-syntax-rule (env-extend* e x* v*)
+    (for/fold ([t : Env e]) ([x x*] [v v*])
+      (hash-set t x v)))
+
+  (: map-Fml ((Listof Uvar) (Listof VT) . -> . (Listof (Fml VT))))
+  (define (map-Fml id* ty*)
+    (for/list : (Listof (Fml VT)) 
+	      ([id id*] [ty ty*])
+	      (Fml id ty)))
+
+  (: map-Bnd ((Listof Uvar) (Listof VT) (Listof Typed-Form)
+	      . -> . 
+	      (Listof (Bnd Typed-Form VT))))
+  (define (map-Bnd id* ty* rhs*)
+    (for/list : (Listof (Bnd Typed-Form VT))
+	      ([id id*] [ty ty*] [rhs rhs*])
+	      (Bnd id ty rhs)))
+
 ;;; Procedures that are used to throw errors
   ;; The error that occurs when a variable is not found. It is an internal
   ;; error because it is a syntax error to have an unbound variable.
-  (define (var-not-found-error src id site)
-    (th (pass-error pass
-                    "Var ~a:~a was not in env during lookup at ~a."
-                    (srcloc->string src) id site)))
-  
+  (define-syntax-rule (lookup-failed src id)
+    (lambda () (raise-variable-not-found src id)))
+ 
 ;;; The type rules for core forms that have interesting type rules
   ;; The type of a lambda that is annotated is the type of the annotation
   ;; as long as the annotation is consistent with the type of the
   ;; body
+  (: lambda-type-rule (srcloc (Listof VT) VT (Maybe VT) . -> . (Fn/a (Listof VT) VT)))
   (define (lambda-type-rule src ty* t-body t-ann)
     (cond
-      [(not t-ann) (Function ty* t-body)]
-      [(consistent? t-body t-ann) (Function ty* t-ann)]
-      [else  (lambda/inconsistent-types-error src t-body t-ann)]))
+     [(not t-ann) (Fn/a (length ty*) ty* t-body)]
+     [(consistent? t-body t-ann) (Fn/a (length ty*) ty* t-ann)]
+     [else  (raise-lambda-inconsistent src t-body t-ann)]))
   
   ;; The type of a annotated let binding is the type of the annotation
   ;; as long as it is consistent with the type of the expression.
+  (: let-binding-type-rule ((Maybe VT) VT Uvar srcloc . -> . VT))
   (define (let-binding-type-rule t-bnd t-exp id src)
     (cond
-      [(consistent? t-bnd t-exp) t-bnd]
-      [else (let-binding/inconsistent-type-error src id t-bnd t-exp)]))
+     [(not t-bnd) t-exp]
+     [(consistent? t-bnd t-exp) t-bnd]
+     [else (raise-binding-inconsistent src id t-bnd t-exp)]))
   
   ;; The type of a cast is the cast-type if the expression type and
   ;; the cast type are consistent.
-  (define (cast-type-rule ty-exp ty-cast src label)
+  (: ascription-type-rule (VT VT srcloc Label . -> . VT))
+  (define (ascription-type-rule ty-exp ty-cast src label)
     (if (not (consistent? ty-exp ty-cast))
-        (cast/inconsistent-types-error src label ty-exp ty-cast)
+        (raise-ascription-inconsistent src label ty-exp ty-cast)
         ty-cast))
 
   ;; The type of an if is the join of the consequence and alternative
   ;; types if the type of the branches are consistent and the test is
   ;; consistent with Bool.
+  (: if-type-rule (VT VT VT srcloc . -> . VT))
   (define (if-type-rule t-tst t-csq t-alt src)
     (cond
-      [(not (consistent? t-tst Bool-Type))
-       (if/inconsistent-test-error src t-tst)]
-      [(not (consistent? t-csq t-alt))
-       (if/inconsistent-branches-error src t-csq t-alt)]
-      [else (join t-csq t-alt)]))
+     [(not (consistent? t-tst Bool-Type))
+      (raise-if-inconsistent-test src t-tst)]
+     [(not (consistent? t-csq t-alt))
+      (raise-if-inconsistent-branches src t-csq t-alt)]
+     [else (join t-csq t-alt)]))
 
   ;; The type of literal constants are staticly known
+  (: const-type-rule (Literal . -> . (U Bool Int)))
   (define (const-type-rule c)
-    (cond
-      [(boolean? c) Bool-Type]
-      [(integer? c) Int-Type]
-      [else (cond-pass-error pass 'const-type-rule c)]))
+    (if (boolean? c)
+	Bool-Type
+	Int-Type))
 
   ;; The type of an application is the return type of the applied
   ;; procedure given that the arguments are consistent with the
   ;; arguments types of the proceedure.
+  (: application-type-rule (VT (Listof VT) srcloc . -> . VT))
   (define (application-type-rule t-rator t-rand* src)
     (match t-rator
-      [(Function t-arg* return)
-       (if (not (andmap/length= consistent? t-arg* t-rand*))
-           (app-inconsistent-error src t-rator t-rand*)
-           return)]
+      [(Fn/a arr t-fml* t-ret)
+       (if (and (= arr (length t-rand*))
+		(andmap consistent? t-fml* t-rand*))
+	   t-ret
+	   (raise-app-inconsistent src t-rator t-rand*))]
       [(Dyn) Dyn-Type]
-      [otherwise (app-non-function-error src t-rator)]))
-
+      [otherwise (raise-app-not-function src t-rator)]))
+  
 ;;; Procedures that destructure and restructure the ast
   ;; tyck-expr : (Struct Expr) * Env -> (values (Struct Expr) Type)
+  (: tyck-expr (Core-Form Env . -> . (values Typed-Form VT)))
   (define (tyck-expr exp env)
+    (: recur (Core-Form . -> . (values Typed-Form VT)))
     (define (recur e) (tyck-expr e env))
     (match exp
-      [(c:Lambda src (list (or (Fml:Ty id* ty*)
-                                     (and (Fml id*)
-                                          (app (lambda (f) Dyn-Type) ty*))) ...)
-                 t-ann body)
-       (let-values (((body t-body) (tyck-expr body (env-extend* env id* ty*))))
-         (let ([ty-lambda (lambda-type-rule src ty* t-body t-ann)])
-           (values (tc:Lambda src ty-lambda (map Fml:Ty id* ty*) body) ty-lambda)))]
-      ;; Let is unconditionally typed at the type of its body
-      [(c:Let src (list (app (tyck-let-binding (c:Expr-src exp) recur)
-                             id* ty* rhs*) ...)
-              body)
-       (let-values ([(body t-body) (tyck-expr body (env-extend* env id* ty*))])
-         (values (tc:Let src t-body (map Bnd:Ty id* rhs* ty*) body) t-body))]
+      [(Lambda fmls ty-ret body src) 
+       (tyck-lambda fmls ty-ret body src env)] 
+      ;; let and letrec are very similar the only difference are restrictions
+      ;; of not using type inference and the environment used to check the bindings
+      [(Letrec bnd body src) (tyck-letrec bnd body src env)]
+      [(Let bnd body src) (tyck-let bnd body src env recur)]
+
+      ))
+  
+  
+#|
       ;; Variables are typed at the type associated with it in environment
       ;; If it isn't found then there must be a mistake in the
       ;; compiler because all unbound variable should be caught during parsing.
-      [(c:Var src id)
-       (let ((ty (env-lookup env id (var-not-found-error src id 'tyck-expr-var))))
-         (values (tc:Var src ty id) ty))]
-      [(c:Cast src (app recur exp t-exp) t-cast label)
-       (let ((ty-casted (cast-type-rule t-exp t-cast src label)))
-         (values (tc:Cast src ty-casted exp t-exp label) ty-casted))]
-      [(c:If src (app recur tst t-tst) (app recur csq t-csq) (app recur alt t-alt))
-       (let ((t-if (if-type-rule t-tst t-csq t-alt src)))
-         (values (tc:If src t-if tst csq alt) t-if))]
-      [(c:Const src (and const (app const-type-rule t-const)))
-       (values (tc:Const src t-const const) t-const)]
-      [(c:App src (app recur exp t-exp) (list (app recur exp* t-exp*) ...))
-       (let ((t-app (application-type-rule t-exp t-exp* src)))
-         (values (tc:App src t-app exp exp*) t-app))]
-      [(c:Prim src pexp) (tyck-prim pexp src recur)]
-      [e (match-pass-error pass 'tyck-expr e)]))
-
-  ;; Type checks a primitive expression with the given environment 
-  (define (tyck-prim p src tyck-arg)
-    (match p
-        [(Rel:IntxInt (app tyck-arg fst t-fst)
-                      (app tyck-arg snd t-snd))
-         (values (tc:Prim src Bool-Type (mk-rel:int-int p fst snd))
-                 (application-type-rule IntxInt->Bool `(,t-fst ,t-snd) src))]
-        [(Op:IntxInt (app tyck-arg fst t-fst)
-                     (app tyck-arg snd t-snd))
-         (values (tc:Prim src Int-Type  (mk-op:int-int p fst snd))
-                 (application-type-rule IntxInt->Int `(,t-fst ,t-snd) src))]
-        [otherwise (match-pass-error pass 'tyck-prim otherwise)]))
-
-  ;; Type checks the rhs to be consistent with type annotation if
-  ;; provided the resulting type is the type of the annotation.
-  (define (tyck-let-binding src tyck-exp)
-    (lambda (bnd)
-      (match bnd
-        [(Bnd:Ty id (app tyck-exp exp t-exp) t-bnd)
-         (values id (let-binding-type-rule t-bnd t-exp id src) exp)]
-        [(Bnd id (app tyck-exp exp t-exp)) (values id t-exp exp)]
-        [otherwise (match-pass-error pass 'tyck-binding otherwise)])))
+      [(Var id src)
+       (let* ([ty (hash-ref env id (lookup-failed src id))]
+	      [ann (cons src ty)])
+         (values (Var id ann) ty))]
+      [(Ascribe (app recur exp ty-exp) ty-ann label src)
+       (let* ([ty (ascription-type-rule ty-exp ty-ann src label)]
+	      [ann (cons src ty)])
+         (values (Ascribe exp ty-exp label ann) ty))]
+      [(If tst csq alt src)
+       (let*-values ([(tst ty-tst) (recur tst)]
+		     [(csq ty-csq) (recur csq)]
+		     [(alt ty-alt) (recur alt)]
+		     [(ty) (if-type-rule ty-tst ty-csq ty-alt src)]
+		     [(ann) (cons src ty)])
+         (values (If tst csq alt ann) ty))]
+      [(Quote lit src)
+       (let* ([ty (const-type-rule lit)]
+	      [ann (cons src ty)])
+	 (values (Quote lit ann) ty))]
+      [(App rator rand* src)
+       (let*-values ([(rator ty-rator) (recur rator)]
+		     [(rand* ty-rand*) (map recur rand*)]
+		     [(ty) (application-type-rule ty-rator ty-rand* src)]
+		     [(ann) (cons src ty)])
+         (values (App rator rand* ann) ty))]
+      [(Op prim rand* src) 
+       (let*-values ([(ty-prim) (prim->type prim)]
+		     [(rand* ty-rand*) (map recur rand*)]
+		     [(ty) (application-type-rule ty-prim ty-rand* src)]
+		     [(ann) (cons src ty)])
+	 (values (Op prim rand* ann) ty))]))
+|#
+  (: tyck-lambda (-> (Listof (Fml Core-Type))
+		     (Maybe Core-Type)
+		     Core-Form
+		     srcloc
+		     Env
+		     (values Typed-Form VT)))
   
-  ;; This is the body of the type-check
-  (match prgm
-    [(c:Prog n c e)
-     (let-values (((e t) (tyck-expr e (empty-env))))
-       (tc:Prog n c t e))]
-    [otherwise (match-pass-error pass pass prgm)]))
+  (: unzip-formals ((Listof (Fml Core-Type)) . -> . 
+		    (values (Listof Uvar) (Listof Core-Type))))
+  (define (unzip-formals f*)
+      (for/lists ([i* : (Listof Uvar)] [t* : (Listof Core-Type)])
+	  ([f f*])
+	(values (Fml-identifier f) (Fml-type f))))
+
+  (define (tyck-lambda fmls ty-ret body src env)
+    (let*-values ([(id* ty*) (unzip-formals fmls)]
+		  [(ty*) (map (check-type src) ty*)]
+		  [(ty-ret) ((check-maybe-type src) ty-ret)]
+		  [(body ty-body) (tyck-expr body (env-extend* env id* ty*))]
+		  [(ty-lambda) (lambda-type-rule src ty* ty-body ty-ret)]
+		  [(ty-ret) (Fn/a-ret ty-lambda)]
+		  [(fml*) (map-Fml id* ty*)]
+		  [(ann) (cons src ty-lambda)]) 
+      (values (Lambda fml* ty-ret body ann) ty-lambda)))
+  
+  (: tyck-letrec (-> (Listof (Bnd Core-Form (Maybe Core-Type)))
+		     Core-Form
+		     srcloc Env
+		     (values Typed-Form VT)))
+  (define (tyck-letrec bnd body src env)
+    (let*-values 
+	([(id* ty* rhs*) (check-letrec-bindings src bnd)]
+	 [(env) (env-extend* env id* ty*)]
+	 [(recur/env) (lambda ([e : Core-Form]) 
+			(tyck-expr e env))]
+	 [(id* ty* rhs*) (tyck-bindings src recur/env id* ty* rhs*)] 
+	 [(body ty-body) (tyck-expr body env)]
+	 [(bnd*) (map-Bnd id* ty* rhs*)]
+	 [(ann) (cons src ty-body)])
+      (values (Letrec bnd* body ann) ty-body)))
+  
+  (: check-letrec-bindings (-> srcloc
+			       (Listof (Bnd Core-Form 
+					    (Maybe Core-Type)))
+			       (values (Listof Uvar)
+				       (Listof Valid-Type)
+				       (Listof Core-Form))))
+  (define (check-letrec-bindings src bnd*)
+    (define check (check-type src))
+    (for/lists ([u* : (Listof Uvar)]
+		[t* : (Listof VT)]
+		[r* : (Listof Core-Form)])
+	([b bnd*])
+      (let ([u (Bnd-identifier b)]
+	    [t (Bnd-type b)]
+	    [r (Bnd-expression b)])
+	(if (and t (Lambda? r)) 
+	    (values u (check t) r)
+	    (if (Lambda? r)
+		(let ([ret (Lambda-return-type r)]
+		      [args : (Listof Core-Type) 
+			    (map (inst Fml-type Core-Type) 
+				 (Lambda-formals r))])
+		  (if ret
+		      (values u 
+			      (Fn/a (length args) 
+				    (map check args) 
+				    (check ret)) 
+			      r)
+		      (raise-letrec-restrict src)))
+		(raise-letrec-restrict src))))))
+
+  (: tyck-let (-> (Listof (Bnd Core-Form (Maybe Core-Type)))
+		  Core-Form
+		  srcloc
+		  Env
+		  (values Typed-Form Valid-Type)))
+  (define (tyck-let bnd* body src env tyck-exp)
+    (let*-values 
+	([(id* ty* rhs*) (check-let-bindings src bnd*)]
+	 [(id* ty* rhs*) (tyck-bindings src tyck-exp id* ty* rhs*)] 
+	 [(body ty-body) (tyck-expr body (env-extend* env id* ty*))]
+	 [(bnd*) (map-Bnd id* ty* rhs*)]
+	 [(ann) (cons src ty-body)])
+      (values (Let bnd* body ann) ty-body)))
+  
+  (: check-let-bindings (-> srcloc
+			    (Listof (Bnd Core-Form 
+					 (Maybe Core-Type)))
+			    (values (Listof Uvar)
+				    (Listof Valid-Type)
+				    (Listof Core-Form))))
+  (define (check-let-bindings src bnd*)
+    (: check ((Maybe Core-Type) . -> . (Maybe VT)))
+    (define check (let ([ck (check-type src)])
+		    (lambda ([t : (Maybe Core-Type)])
+		      (and t (ck t)))))
+    (for/lists ([u* : (Listof Uvar)]
+		[t* : (Listof VT)]
+		[r* : (Listof Core-Form)])
+	([b bnd*])
+      (let ([u (Bnd-identifier b)]
+	    [t (Bnd-type b)]
+	    [r (Bnd-expression b)])
+	(values u (check t) b))))
+  
+  (: check-type (srcloc . -> . (Core-Type . -> . Valid-Type)))
+    
+  (define (check-type src)
+    (letrec ([recur :  (Core-Type . -> . Valid-Type)
+	      (lambda (t) 
+		(if (or (Int? t) (Bool? t) (Dyn? t))
+		    t
+		    (let* ((ret (Fn-fml t))
+			   (arg (Fn-ret t))
+			   (ary (length arg)))
+		      (cond
+		       [(= ary 1) (raise-only-single-arity-fns src)]
+		       [(= 1 (length ret)) (raise-only-single-arity-ret src)]
+		       [else (Fn/a ary (map recur arg) (recur (car ret)))]))))])
+      recur))
+  
+
+      ;; Type information about check-letrec-bindings
+  
+      
+      ;; Type checks the rhs to be consistent with type annotation if
+      ;; provided the resulting type is the type of the annotation.
+      (: tyck-bindings (-> srcloc (Core-Form . -> . (Values Typed-Form VT))
+			   (Listof Uvar) (Listof VT) (Listof Core-Form)
+			   (values (Listof Uvar) 
+				   (Listof VT) 
+				   (Listof Typed-Form))))
+      (define (tyck-bindings src tyck-exp uvar* type* rhs*)
+	(for/lists ([u* : (Listof Uvar)]
+		    [t* : (Listof VT)]
+		    [r* : (Listof Typed-Form)])
+	    ([u uvar*][t type*][r rhs*])
+	  (let*-values ([(r t^) (tyck-exp r)]
+			[(t) (let-binding-type-rule t t^ u src)])
+	    (values u t r))))
+
+      ;; This is the body of the type-check
+      (match-let ([(Core-Prog n c e) prgm])
+	(let-values (((e t) (tyck-expr e (hasheq))))
+	  (Typed-Prog n c e t))))
 

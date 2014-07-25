@@ -1,9 +1,12 @@
 #lang typed/racket
 
+(require/typed racket/base
+	       [srcloc->string (srcloc . -> . (U False String))])
 (provide (all-defined-out))
 
 (struct exn:schml exn ())
 (struct exn:schml:pass exn:schml ())
+
 
 ;; This is a generic error handler that is usefull for
 ;; quick testing it should not be used for actuall errors
@@ -28,88 +31,166 @@
 	  (format file-name-fmt (path->string p))
 	  (current-continuation-marks))))
 
-#| Errors thrown in the parse pass 
-(struct: exn:schml:Syntax exn:schml ())
-(struct: exn:schml:Syntax:unbound exn:schml:Syntax ())
-(struct: exn:schml:Syntax:not-supported exn:schml:Syntax ())
 
-(define: (bad-syntax [s : srcloc] [d : Any] [e : E)
-  (configure-for-external-error)
-  (raise (exn:schml:Syntax 
-          (format "~a: Invalid Syntax ~a in ~a" 
-                  (srcloc->string src) datum exp)
-          (current-continuation-marks)
-          src exp)))
+#| 
+   Exceptions thrown during parse 
+   Note: exceptions are defined as macros so that the 
+   stacktraces are more accurate.
+|#
+(struct exn:schml:parse exn ())
 
-(define (unbound src var exp)
-  (configure-for-external-error)
-  (raise (exn:schml:Syntax:unbound 
-          (format "~a: Unbound Identifier ~a in ~a" 
-                  (srcloc->string src) var exp)
-          (current-continuation-marks)
-          src exp)))
+(define-syntax-rule (raise-parse-exn l fmt args ...)
+  (raise (exn:schml:parse
+	  (format "Exception in parse:~a: ~a" 
+		  (srcloc->str l) 
+		  (format fmt args ...))
+	  (current-continuation-marks))))
+	    
 
-(define (stx-not-supported msg src exp)
-  (configure-for-external-error)
-  (raise (exn:schml:Syntax:not-supported 
-          (format "~a: Syntax not supported ~a in ~a" 
-                  (srcloc->string src) msg exp)
-          (current-continuation-marks)
-          src exp)))
+(define-syntax-rule (raise-unbound-variable-exn s l)
+  (raise-parse-exn l "Unbound variable ~a" s))
 
-(struct exn:schml:Type exn:schml ())
-(struct exn:schml:Type:Static exn:schml:Type ())
-(struct exn:schml:Type:Dynamic exn:schml:Type ())
+(define-syntax-rule (raise-file-empty-exn f)
+  (raise-parse-exn (file->srcloc f) "The file is empty"))
+
+(define-syntax-rule (raise-<1-exp-exn f)
+  (raise-parse-exn (file->srcloc f) 
+		   "The file contains more than one expression"))
+
+(define-syntax-rule (raise-unsupported-stx-exn stx src)
+  (raise-parse-exn src 
+		   "unsupported syntax in expression ~a" 
+		   (syntax->datum stx)))
+
+(define-syntax-rule (bad-syntax-application stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "bad syntax in application ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-unsupported-syntax-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "Unsupported syntax in ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-blame-label-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "Expected a string for a blame label got ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-type-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "Expected a type for got ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-duplicate-binding sym src)
+  (raise-parse-exn src "duplicate bindings for ~a" sym))
+
+(define-syntax-rule (raise-reservered-sym sym src)
+  (raise-parse-exn src "attemp to bind reserved symbol ~a" sym))
+
+(define-syntax-rule (raise-fml-exn stx)
+  (raise-parse-exn (syntax->srcloc stx)
+		   "bad syntax in formal(s) ~a"
+		   (syntax->datum stx)))
+
+(define-syntax-rule (raise-bnd-exn stx)
+  (raise-parse-exn (syntax->srcloc stx) 
+		   "bad syntax in bnd(s) ~a" 
+		   (syntax->datum stx)))
+
+(define-syntax-rule (rebuild-stx* s s*)
+  (cons s (map syntax->datum s*)))
+
+(define-syntax-rule (raise-lambda-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'lambda stx*)))
+
+(define-syntax-rule (raise-let-exn form stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'form stx*)))
+
+(define-syntax-rule (raise-if-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'if stx*)))
+
+(define-syntax-rule (raise-ascribe-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* ': stx*)))
 
 
-(define (lambda/inconsistent-types-error src tb ta)
-  (configure-for-external-error)
-  (raise (exn:schml:Type:Static
-          (format "~a: Lambda annotated return type ~a is inconsistent with actual return type ~a"
-                  (srcloc->string src) ta tb)
-          (current-continuation-marks))))
+(struct exn:schml:type exn:schml ())
+(struct exn:schml:type:static exn:schml:type ())
+(struct exn:schml:type:dynamic exn:schml:type ())
 
-(define (let-binding/inconsistent-type-error src id t-bnd t-exp)
-  (configure-for-external-error)
-  (raise (exn:schml:Type:Static
-          (format "~a: ~a binding in let annotated by ~a is inconsistent with actual type ~a"
-                  (srcloc->string src) id t-bnd t-exp)
-          (current-continuation-marks))))
+(define-syntax-rule (raise-static-type-exn src fmt args ...)
+  (raise (exn:schml:type:static
+	  (format "Error in Type-Check:~a: ~a"
+		  (srcloc->string src)
+		  (format fmt args ...))
+	  (current-continuation-marks))))
 
-(define (cast/inconsistent-types-error src label t-exp t-cast)
-  (configure-for-external-error)
-  (let ((msg (or label (format "~a: Cast between inconsistent types ~a and ~a"
-                               (srcloc->string src) t-exp t-cast))))
-    (raise (exn:schml:Type:Static msg (current-continuation-marks)))))
+(define-syntax-rule (raise-variable-not-found src id)
+  (raise-static-type-exn 
+   src
+   "ERROR internal to compiler uvar ~a not found in env" id))
 
-(define (if/inconsistent-branches-error src t-csq t-alt)
-  (configure-for-external-error)
-  (raise (exn:schml:Type:Static
-          (format "~a: If branches have inconsistent types ~a and ~a"
-                  (srcloc->string src) t-csq t-alt)
-          (current-continuation-marks))))
+(define-syntax-rule (raise-lambda-inconsistent src tb ta)
+  (raise-static-type-exn 
+   src 
+   "Lambda annotated return type ~a is inconsistent with actual return type ~a"
+   ta tb))
 
-(define (if/inconsistent-test-error src tst)
-  (configure-for-external-error)
-  (raise (exn:schml:Type:Static
-          (format "~a: If test is of type which is not consistent with Bool"
-                  (srcloc->string src))
-          (current-continuation-marks))))
+(define-syntax-rule (raise-binding-inconsistent src id t-bnd t-exp)
+  (raise-static-type-exn
+   src
+   "~a binding in let annotated by ~a is inconsistent with actual type ~a"
+   id t-bnd t-exp))
 
-(define (app-inconsistent-error src rator rand*)
-  (configure-for-external-error)
-  (let ((line1 (format "~a: Application of function with type ~a\n"
-                       (srcloc->string src) rator))
-        (line2 (format "to arguments of inconsistent types ~a" rand*)))
-    (raise (exn:schml:Type:Static (string-append line1 line2) (current-continuation-marks)))))
 
-(define (app-non-function-error src t-rator)
-  (configure-for-external-error)
-  (raise (exn:schml:Type:Static
-          (format "~a: Application of non function type ~a"
-                  (srcloc->string src) t-rator)
-          (current-continuation-marks))))
+(define-syntax-rule (raise-ascription-inconsistent src label t-exp t-cast)
+  (raise-static-type-exn
+   src
+   (or label 
+       (format "Ascription of type ~a is inconsistent with ~a" t-exp t-cast))))
 
+
+(define-syntax-rule (raise-if-inconsistent-branches src t-csq t-alt)
+  (raise-static-type-exn
+   src
+   "If branches have inconsistent types ~a and ~a"
+    t-csq t-alt))
+
+(define-syntax-rule (raise-if-inconsistent-test src tst)
+  (raise-static-type-exn
+   src
+   "If test is of type ~a which is not consistent with Bool"
+   tst))
+
+
+(define-syntax-rule (raise-app-inconsistent src rator rand*)
+  (raise-static-type-exn
+   src
+   "Inconsistent types in application of type ~a to arguments of type(s) ~a"
+   rator rand*))
+
+(define-syntax-rule (raise-app-not-function src t-rator)
+  (raise-static-type-exn
+   src
+   "Application of non function type ~a"
+   t-rator))
+
+(define-syntax-rule (raise-letrec-restrict src)
+  (raise-static-type-exn
+   src
+   "Letrecs may only bind well annotated lambda's"))
+
+(define-syntax-rule (raise-only-single-arity-fns src)
+  (raise-static-type-exn
+   src
+   "For the time being all function must be of arity 1"))
+
+(define-syntax-rule (raise-only-single-arity-ret src)
+  (raise-static-type-exn
+   src
+   "For the time being all returns must be of arity 1"))
+
+#|
 (define raise-dynamic-type-error
   (case-lambda
     [(blame-label)

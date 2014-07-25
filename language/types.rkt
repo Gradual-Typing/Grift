@@ -56,6 +56,43 @@
 	([const : T]
 	 [annotation : U]))
 
+#| I am making a more primitive match because current patern
+   matching seems to erase types |#
+
+#| The type of allowed literals |#
+
+(define-type Literal 
+  (U Integer Boolean))
+
+(define-predicate Literal? 
+  Literal)
+
+(: literal->type (Literal -> (U Bool Int)))
+(define (literal->type x)
+  (if (boolean? x)
+      Bool-Type
+      Int-Type))
+
+(define (int64? x)
+  (and (integer? x)
+       (>= x 0)
+       (<= x (expt 2 64))))
+
+#| The type of Primitives |#
+
+(define-type Prim
+  (U IntxInt->Int IntxInt->Bool))
+
+(define-type IntxInt->Int
+  (U '* '+ '- 'binary-and 'binary-or '<< '>>))
+
+(define-type IntxInt->Bool
+  (U '< '<= '= '> '>=))
+
+(define-predicate IntxInt->Bool? IntxInt->Bool)
+(define-predicate IntxInt->Int? IntxInt->Int)
+(define-predicate Prim? Prim)
+
 
 
 #| Bindings and Formals |#
@@ -68,14 +105,23 @@
 (struct Int ())
 (struct Bool ())
 (struct Dyn ())
-(struct (T U) Fn ([from : T]
-                  [to : U]))
-
+(struct (T U) Fn ([fml : T] [ret : U]))
+(struct (T U) Fn/a ([arity : Fixnum][fml : T] [ret : U]))
 (define Int-Type (Int))
 (define Bool-Type (Bool))
 (define Dyn-Type (Dyn))
 
 
+
+
+(define (shallow-consistent? t g)
+  (or (Dyn? t)
+      (Dyn? g)
+      (and (Int? t) (Int? g))
+      (and (Bool? t) (Bool? g))
+      (and (Fn/a? t) (Fn/a? g))))
+
+#| Unique Variables |#
 (struct Uvar
   ([prefix : String]
    [suffix : Natural])
@@ -84,5 +130,10 @@
 (define (uvar=? [u : Uvar] [v : Uvar])
   (= (Uvar-suffix u) (Uvar-suffix v)))
 
+#| Maybe type |#
 
-        
+(define-type (Maybe T) (U T False)) 
+
+#| Labels |#
+(define-type Label String)
+
