@@ -47,6 +47,12 @@
 	 [annotation : W])
         #:transparent)
 
+(struct (T U V W) Cast
+	([expression : T]
+	 [exp-type : U]
+	 [cast-type : V]
+	 [label : W])
+
 (struct (U) Var
         ([ident : Uvar]
 	 [annotation : U])

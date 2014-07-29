@@ -99,7 +99,7 @@
   ;; error because it is a syntax error to have an unbound variable.
   (define-syntax-rule (lookup-failed src id)
     (lambda () (raise-variable-not-found src id)))
- 
+  
 ;;; The type rules for core forms that have interesting type rules
   ;; The type of a lambda that is annotated is the type of the annotation
   ;; as long as the annotation is consistent with the type of the
@@ -122,7 +122,7 @@
   
   ;; The type of a cast is the cast-type if the expression type and
   ;; the cast type are consistent.
-  (: ascription-type-rule (VT VT srcloc Label . -> . VT))
+  (: ascription-type-rule (VT VT srcloc (Maybe Label) . -> . VT))
   (define (ascription-type-rule ty-exp ty-cast src label)
     (if (not (consistent? ty-exp ty-cast))
         (raise-ascription-inconsistent src label ty-exp ty-cast)
@@ -166,54 +166,62 @@
   (: tyck-expr (Core-Form Env . -> . (values Typed-Form VT)))
   (define (tyck-expr exp env)
     (: recur (Core-Form . -> . (values Typed-Form VT)))
-    (define (recur e) (tyck-expr e env))
-    (match exp
-      [(Lambda fmls ty-ret body src) 
-       (tyck-lambda fmls ty-ret body src env)] 
-      ;; let and letrec are very similar the only difference are restrictions
-      ;; of not using type inference and the environment used to check the bindings
-      [(Letrec bnd body src) (tyck-letrec bnd body src env)]
-      [(Let bnd body src) (tyck-let bnd body src env recur)]
-
-      ))
+    (define (recur e) : (values Typed-Form VT)
+      (define-syntax-rule (map-recur exp*)
+	(for/lists ([e* : (Listof Typed-Form)]
+		    [t* : (Listof VT)])
+	    ([e exp*])
+	  (recur e)))
+      (match e
+	[(Lambda fmls ty-ret body src) 
+	 (tyck-lambda fmls ty-ret body src env)] 
+	;; let and letrec are very similar the only difference are restrictions
+	;; of not using type inference and the environment used to check the bindings
+	[(Letrec bnd body src) (tyck-letrec bnd body src env)]
+	[(Let bnd body src) (tyck-let bnd body src env recur)]
+	[(Var id src)
+	 (let* ([ty (hash-ref env id (lookup-failed src id))]
+		[ann (cons src ty)])
+	   (values (Var id ann) ty))]
+	[(Ascribe (app recur exp ty-exp) ty-ann label src)
+	 (let* ([ty-ann ((check-type src) ty-ann)]
+		[ty (ascription-type-rule ty-exp ty-ann src label)]
+		[ann (cons src ty)])
+	   (values (Ascribe exp ty-exp label ann) ty))]
+	[(If tst csq alt src)
+	 (let*-values ([(tst ty-tst) (recur tst)]
+		       [(csq ty-csq) (recur csq)]
+		       [(alt ty-alt) (recur alt)]
+		       [(ty) (if-type-rule ty-tst ty-csq ty-alt src)]
+		       [(ann) (cons src ty)])
+	   (values (If tst csq alt ann) ty))]
+	[(Quote lit src)
+	 (let* ([ty (const-type-rule lit)]
+		[ann (cons src ty)])
+	   (values (Quote lit ann) ty))]
+	[(App rator rand* src)
+	 (let*-values ([(rator ty-rator) (recur rator)]
+		       [(rand* ty-rand*) (map-recur rand*)]
+		       [(ty) (application-type-rule ty-rator ty-rand* src)]
+		       [(ann) (cons src ty)])
+	   (values (App rator rand* ann) ty))]
+	[(Op prim rand* src) 
+	 (let*-values ([(ty-prim) (prim->type prim)]
+		       [(rand* ty-rand*) (map-recur rand*)]
+		       [(ty) (application-type-rule ty-prim ty-rand* src)]
+		       [(ann) (cons src ty)])
+	   (values (Op prim rand* ann) ty))]))
+    (recur exp))
   
   
-#|
-      ;; Variables are typed at the type associated with it in environment
-      ;; If it isn't found then there must be a mistake in the
-      ;; compiler because all unbound variable should be caught during parsing.
-      [(Var id src)
-       (let* ([ty (hash-ref env id (lookup-failed src id))]
-	      [ann (cons src ty)])
-         (values (Var id ann) ty))]
-      [(Ascribe (app recur exp ty-exp) ty-ann label src)
-       (let* ([ty (ascription-type-rule ty-exp ty-ann src label)]
-	      [ann (cons src ty)])
-         (values (Ascribe exp ty-exp label ann) ty))]
-      [(If tst csq alt src)
-       (let*-values ([(tst ty-tst) (recur tst)]
-		     [(csq ty-csq) (recur csq)]
-		     [(alt ty-alt) (recur alt)]
-		     [(ty) (if-type-rule ty-tst ty-csq ty-alt src)]
-		     [(ann) (cons src ty)])
-         (values (If tst csq alt ann) ty))]
-      [(Quote lit src)
-       (let* ([ty (const-type-rule lit)]
-	      [ann (cons src ty)])
-	 (values (Quote lit ann) ty))]
-      [(App rator rand* src)
-       (let*-values ([(rator ty-rator) (recur rator)]
-		     [(rand* ty-rand*) (map recur rand*)]
-		     [(ty) (application-type-rule ty-rator ty-rand* src)]
-		     [(ann) (cons src ty)])
-         (values (App rator rand* ann) ty))]
-      [(Op prim rand* src) 
-       (let*-values ([(ty-prim) (prim->type prim)]
-		     [(rand* ty-rand*) (map recur rand*)]
-		     [(ty) (application-type-rule ty-prim ty-rand* src)]
-		     [(ann) (cons src ty)])
-	 (values (Op prim rand* ann) ty))]))
-|#
+  #|
+  ;; Variables are typed at the type associated with it in environment
+  ;; If it isn't found then there must be a mistake in the
+  ;; compiler because all unbound variable should be caught during parsing.
+  
+  
+  ))
+  |#
   (: tyck-lambda (-> (Listof (Fml Core-Type))
 		     (Maybe Core-Type)
 		     Core-Form
@@ -224,9 +232,9 @@
   (: unzip-formals ((Listof (Fml Core-Type)) . -> . 
 		    (values (Listof Uvar) (Listof Core-Type))))
   (define (unzip-formals f*)
-      (for/lists ([i* : (Listof Uvar)] [t* : (Listof Core-Type)])
-	  ([f f*])
-	(values (Fml-identifier f) (Fml-type f))))
+    (for/lists ([i* : (Listof Uvar)] [t* : (Listof Core-Type)])
+	([f f*])
+      (values (Fml-identifier f) (Fml-type f))))
 
   (define (tyck-lambda fmls ty-ret body src env)
     (let*-values ([(id* ty*) (unzip-formals fmls)]
@@ -290,11 +298,12 @@
 		  Core-Form
 		  srcloc
 		  Env
+		  (Core-Form . -> . (values Typed-Form VT))
 		  (values Typed-Form Valid-Type)))
-  (define (tyck-let bnd* body src env tyck-exp)
+  (define (tyck-let bnd* body src env recur)
     (let*-values 
 	([(id* ty* rhs*) (check-let-bindings src bnd*)]
-	 [(id* ty* rhs*) (tyck-bindings src tyck-exp id* ty* rhs*)] 
+	 [(id* ty* rhs*) (tyck-bindings src recur id* ty* rhs*)] 
 	 [(body ty-body) (tyck-expr body (env-extend* env id* ty*))]
 	 [(bnd*) (map-Bnd id* ty* rhs*)]
 	 [(ann) (cons src ty-body)])
@@ -304,60 +313,64 @@
 			    (Listof (Bnd Core-Form 
 					 (Maybe Core-Type)))
 			    (values (Listof Uvar)
-				    (Listof Valid-Type)
+				    (Listof (Maybe VT))
 				    (Listof Core-Form))))
   (define (check-let-bindings src bnd*)
-    (: check ((Maybe Core-Type) . -> . (Maybe VT)))
-    (define check (let ([ck (check-type src)])
-		    (lambda ([t : (Maybe Core-Type)])
-		      (and t (ck t)))))
-    (for/lists ([u* : (Listof Uvar)]
-		[t* : (Listof VT)]
-		[r* : (Listof Core-Form)])
-	([b bnd*])
-      (let ([u (Bnd-identifier b)]
-	    [t (Bnd-type b)]
-	    [r (Bnd-expression b)])
-	(values u (check t) b))))
+    (let ([check (check-maybe-type src)])
+      (for/lists ([u* : (Listof Uvar)]
+		  [t* : (Listof (Maybe VT))]
+		  [r* : (Listof Core-Form)])
+	  ([b bnd*])
+	(let ([u (Bnd-identifier b)]
+	      [t (Bnd-type b)]
+	      [r (Bnd-expression b)])
+	  (values u (check t) r)))))
   
+
   (: check-type (srcloc . -> . (Core-Type . -> . Valid-Type)))
-    
+  
   (define (check-type src)
     (letrec ([recur :  (Core-Type . -> . Valid-Type)
-	      (lambda (t) 
-		(if (or (Int? t) (Bool? t) (Dyn? t))
-		    t
-		    (let* ((ret (Fn-fml t))
-			   (arg (Fn-ret t))
-			   (ary (length arg)))
-		      (cond
-		       [(= ary 1) (raise-only-single-arity-fns src)]
-		       [(= 1 (length ret)) (raise-only-single-arity-ret src)]
-		       [else (Fn/a ary (map recur arg) (recur (car ret)))]))))])
+		    (lambda (t) 
+		      (if (or (Int? t) (Bool? t) (Dyn? t))
+			  t
+			  (let* ((ret (Fn-fml t))
+				 (arg (Fn-ret t))
+				 (ary (length arg)))
+			    (cond
+			     [(= ary 1) (raise-only-single-arity-fns src)]
+			     [(= 1 (length ret)) (raise-only-single-arity-ret src)]
+			     [else (Fn/a ary (map recur arg) (recur (car ret)))]))))])
       recur))
   
-
-      ;; Type information about check-letrec-bindings
+  (: check-maybe-type 
+     (srcloc . -> . ((Maybe Core-Type) . -> . (Maybe Valid-Type))))
   
-      
-      ;; Type checks the rhs to be consistent with type annotation if
-      ;; provided the resulting type is the type of the annotation.
-      (: tyck-bindings (-> srcloc (Core-Form . -> . (Values Typed-Form VT))
-			   (Listof Uvar) (Listof VT) (Listof Core-Form)
-			   (values (Listof Uvar) 
-				   (Listof VT) 
-				   (Listof Typed-Form))))
-      (define (tyck-bindings src tyck-exp uvar* type* rhs*)
-	(for/lists ([u* : (Listof Uvar)]
-		    [t* : (Listof VT)]
-		    [r* : (Listof Typed-Form)])
-	    ([u uvar*][t type*][r rhs*])
-	  (let*-values ([(r t^) (tyck-exp r)]
-			[(t) (let-binding-type-rule t t^ u src)])
-	    (values u t r))))
+  (define (check-maybe-type src)
+    (let ((check (check-type src)))
+      (lambda ([t : (Maybe Core-Type)]) (and t (check t)))))
 
-      ;; This is the body of the type-check
-      (match-let ([(Core-Prog n c e) prgm])
-	(let-values (((e t) (tyck-expr e (hasheq))))
-	  (Typed-Prog n c e t))))
+  ;; Type information about check-letrec-bindings
+  
+  
+  ;; Type checks the rhs to be consistent with type annotation if
+  ;; provided the resulting type is the type of the annotation.
+  (: tyck-bindings (-> srcloc (Core-Form . -> . (Values Typed-Form VT))
+		       (Listof Uvar) (Listof (Maybe VT)) (Listof Core-Form)
+		       (values (Listof Uvar) 
+			       (Listof VT) 
+			       (Listof Typed-Form))))
+  (define (tyck-bindings src tyck-exp uvar* type* rhs*)
+    (for/lists ([u* : (Listof Uvar)]
+		[t* : (Listof VT)]
+		[r* : (Listof Typed-Form)])
+	([u uvar*][t type*][r rhs*])
+      (let*-values ([(r t^) (tyck-exp r)]
+		    [(t) (let-binding-type-rule t t^ u src)])
+	(values u t r))))
+
+  ;; This is the body of the type-check
+  (match-let ([(Core-Prog n c e) prgm])
+    (let-values (((e t) (tyck-expr e (hasheq))))
+      (Typed-Prog n c e t))))
 

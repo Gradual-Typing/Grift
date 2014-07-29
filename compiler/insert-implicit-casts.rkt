@@ -1,6 +1,6 @@
-#lang racket
+#lang typed/racket
 #|------------------------------------------------------------------------------+
-|Pass: compiler/casts/insert-implicit-casts                                     |
+|Pass: compiler/insert-implicit-casts                                           |
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
@@ -48,21 +48,27 @@
 ;; The constuctors of the core language
 (require Schml/language/shared
          (prefix-in tc: Schml/language/typed-core)
-         (prefix-in sc: Schml/language/sourceless-core))
+         (prefix-in sc: Schml/language/cast-core))
+
 ;; Only the pass is provided by this module
 (provide insert-implicit-casts)
 
-(define-pass (insert-implicit-casts prgm comp-config)
+(: insert-implicit-casts 
+   (Typed-Prog Config . -> . Cast-Prog))
+(define (insert-implicit-casts prgm comp-config)
+  (: mk-cast ((-> Label) Cast-Form Type Type . -> . CF-Cast)) 
   (define (mk-cast l-th e t1 t2)
     (if (equal? t1 t2) e (sc:Cast t2 e t1 (l-th))))
-  (define (mk-label pos src)
-    (string->label
-     (format "Implicit cast in ~a on expression at ~a"
-             pos (srcloc->string src))))
-  (define (mk-app-label exp arg)
+  (define-syntax-rule (mk-label pos src)
+    (lambda ()
+      (string->label
+       (format "Implicit cast in ~a on expression at ~a"
+	       pos (srcloc->string src)))))
+  (define-syntax-rule (mk-app-label exp arg)
+    (lambda ()
       (string->label
        (format "Implicit cast of argument at ~a in expression ~a"
-               (srcloc->string arg) (srcloc->string exp))))
+	       (srcloc->string arg) (srcloc->string exp)))))
   (define (iic-expr exp)
     (match exp
       [(tc:Lambda src (and (Function from-ty* to-ty) ty)
