@@ -1,4 +1,4 @@
-#lang racket
+#lang typed/racket
 #|------------------------------------------------------------------------------+
 |Pass: compiler/closures/introduce-closure-primitives                           |
 +-------------------------------------------------------------------------------+
@@ -11,132 +11,157 @@
 ;; The define-pass syntax
 (require Schml/framework/build-compiler
          Schml/framework/helpers
-         Schml/framework/errors)
+         Schml/framework/errors
+	 Schml/compiler/language)
 
-(require Schml/language/shared
-         (prefix-in s: Schml/language/closure-il3)
-         (prefix-in t: Schml/language/closure-il4))
 ;; Only the pass is provided by this module
 (provide introduce-closure-primitives)
 
-(define-pass (introduce-closure-primitives prgm comp-config)
-  ;; A holder for now of a check that we must perform if we
-  ;; are going to optimize direct calls
-  (define uvar->field-name uvar->string)
-  (define s:Code-Label? (lambda (a) #f))
-  (define code-field-name "code")
-  (define (icp-binding lbl ty fml* free* exp)
-    (let* ((env (mk-env (car free*) (cdr free*)))
-           (exp ((icp-expr env) exp))
-           (lam (t:Lambda ty fml* exp)))
-      (Bnd:Ty lbl lam ty)))
-  (define (fml->type.field f)
-    `(,(Fml:Ty-type f) . ,(uvar->field-name (Fml-id f))))
-  (define (icp-closures var lbl free* ty)
-    (let* ((field-decl (cons `(,Code-Label-Type . "code") (map fml->type.field free*)))
-           (pexp (t:Prim ty (Closure-field:Build field-decl))))
-      (Bnd:Ty var pexp ty)))
-  (define (cset-fold env)
-    ;; cset* is an accumulator that is used with foldr in icp-let-proc 
-    ;; in order to append the sublist together 
-    (lambda (clos-var clos-ty clos-code-lbl free-fml* clos-set-exp*) 
-      ;; Build the first cset by hand because it it made from a label
-      (let* ((lhs-exp (t:Var clos-ty clos-var))
-             (rhs-exp (t:Label Code-Label-Type clos-code-lbl))
-             (cset (Closure-field:Set! lhs-exp code-field-name rhs-exp))
-             (pexp (t:Prim Void-Type cset)))
-        (cons pexp
-              (for/fold ([cset* clos-set-exp*]) 
-                  ([free-fml (in-list free-fml*)])
-                (let ((free-var (Fml-id free-fml))
-                      (free-var-ty (Fml:Ty-type free-fml)))
-                  (cons (mk-cset lhs-exp free-var free-var free-var-ty env) 
-                        cset*)))))))
-  (define (mk-cset clos field-var free-var free-var-ty env)
-    (let ((rhs-exp (lookup free-var free-var-ty env))
-          (field-name (uvar->field-name field-var)))
-      (t:Prim Void-Type (Closure-field:Set! clos field-name rhs-exp)))) 
-  (define (lookup var var-ty env)
-    (env-lookup env var (th (t:Var var-ty var))))
-  (define (extend clos)
-    (let ((clos-var (t:Var (Fml:Ty-type clos) (Fml-id clos))))
-      (lambda (free env)
-        (let* ((free-uvar (Fml-id free))
-               (free-ty   (Fml:Ty-type free))
-               (clos-prim (Closure-field:Ref clos-var (uvar->field-name free-uvar)))
-               (prim-exp (t:Prim free-ty clos-prim)))
-          (env-extend env free-uvar prim-exp)))))
-  (define (mk-env clos free*)
-    (foldr (extend clos) (empty-env) free*))
-  ;; A destructuring of let-proc view
-  (define (destruct-let-proc o)
-    (values (s:Expr-ty o) (s:Let-Proc-bindings o) 
-            (s:Let-Proc-closures o) (s:Let-Proc-exp o)))
-  (define (destruct-bnd:ty o) (values (Bnd-id o) (Bnd-exp o) (Bnd:Ty-type o)))
-  (define (destruct-lambda o)
-    (values (s:Lambda-ty o) (s:Lambda-fmls o) (s:Lambda-free o) (s:Lambda-exp o)))
-  (define (destruct-close-over o)
-    (values (s:Close-Over-code o) (s:Close-Over-vars o)))
-  (define (rebuild-let-proc ty bindings closures closure-inits body)
-    (t:Let-Proc ty bindings 
-                (t:Let ty closures 
-                       (t:Begin ty closure-inits body))))
-  (define (icp-let-proc icp-expr/env env exp)
-    ;; I could do better than this by restructuring instead the three step process
-    ;; The catamorphism of let-proc
-    ;; Destructure the let-proc form a little complicated
-    (let*-values ([(lp-ty lp-bnd-lam* lp-bnd-clos* exp) 
-                   (destruct-let-proc exp)]
-                  [(lam-lbl* lam* lam-ty*) 
-                   (map/values destruct-bnd:ty ('() '() '()) lp-bnd-lam*)]
-                  [(clos-var* clos* clos-ty*) 
-                   (map/values destruct-bnd:ty ('() '() '()) lp-bnd-clos*)]
-                  [(lam-ty* lam-fml** lam-free** lam-exp*)
-                   (map/values destruct-lambda ('() '() '() '()) lam*)]
-                  [(clos-lbl* clos-free**) 
-                   (map/values destruct-close-over ('() '()) clos*)]
-                  ;; rebuild and process the components
-                  [(body) (icp-expr/env exp)]
-                  [(bindings)
-                   (map icp-binding lam-lbl* lam-ty* lam-fml** lam-free** lam-exp*)]
-                  [(closures)
-                   (map icp-closures clos-var* clos-lbl* clos-free** clos-ty*)]
-                  [(closure-inits)
-                   (foldr (cset-fold env) '() clos-var* clos-ty* clos-lbl* clos-free**)])
-      (rebuild-let-proc lp-ty bindings closures closure-inits body)))
-  (define (icp-expr env)
-    (define (recur exp)
-      (match exp
-        [(? s:Let-Proc? lp) (icp-let-proc recur env lp)]
-        [(s:Var t i) (lookup i t env)]
-        [(s:App ty exp (list (app recur exp*) ...))
-         (let* ((exp (recur exp))
-                (exp-ty (t:Expr-ty exp))
-                (prim (Closure-field:Ref exp code-field-name))
-                (pexp (t:Prim exp-ty prim)))
-           (t:App ty pexp exp*))
-         ;; (if (s:Code-Label? exp)
-         ;;    (t:App ty exp exp*))
-         ] 
-        [(? s:Code-Label? cl) cl]
-        [(s:Let ty (list (Bnd:Ty i* (app recur e*) t*) ...) exp)
-         (t:Let ty (map Bnd:Ty i* e* t*) (recur exp))]
-        [(s:Cast ty-cast (app recur exp) ty-exp label)
-         (t:Cast ty-cast exp ty-exp label)]
-        [(s:If ty tst csq alt)
-         (t:If ty (recur tst) (recur csq) (recur alt))]
-        [(s:Prim ty pexp) (icp-prim recur ty pexp)]
-        [(s:Const t k) (t:Const t k)]
-        [e (match-pass-error pass 'icp-expr e)]))
-    recur)
-  (define (icp-prim icp-expr ty pexp)
-    (match pexp
-      [(Op:IntxInt (app icp-expr fst) (app icp-expr snd))
-       (t:Prim ty (mk-op:int-int pexp fst snd))]
-      [(Rel:IntxInt (app icp-expr fst) (app icp-expr snd))
-       (t:Prim ty (mk-rel:int-int pexp fst snd))] 
-      [otherwise (match-pass-error pass 'iic-prim otherwise)]))
-  (match prgm
-    [(s:Prog n u t e)
-     (t:Prog n u t ((icp-expr (empty-env)) e))]
-    [otherwise (match-pass-error pass 'body prgm)]))
+(define-type Env (HashTable Uvar L4-Expr))
+(define-syntax (env-extend e k v) (hash-set e k v))
+(define-syntax (env-lookup e k)
+  (hash-ref 
+   e k 
+   (lambda () 
+     (raise-pass-exn 
+      'introduce-closure-primitives
+      "Var ~a not bound in ~a" k e))))
+
+(: introduce-closure-primitives 
+   (Lambda3 Config . -> . Lambda4))
+(define (introduce-closure-primitives prgm comp-config)
+  (match-let ([(Prog (List n c t) e) prgm])
+    (Prog (List n c t) ((icp-expr (env)) e))))
+
+(: icp-expr (Env . -> . (L3-Expr . -> . L4-Expr)) 
+(define (icp-expr env)
+  (: recur* ((Listof L3-Expr) . -> . (Listof L4-Expr)))
+  (define (recur* e*) (map recur e*))
+  (: recur (L3-Expr . -> . L4-Expr))
+  (define (recur exp)
+    (match exp
+      [(LetProc p* (Letclos c* e) t) (icp-let-proc p* c* e t env)]
+      [(Let b* e t) 
+       (let*-values ([(b* env) (icp-bnd-data b* env)])
+	 (Let b* ((icp-expr env) e) t))]
+      [(App (cons (app recur e)  (app recur e^)) (app recur* e*) t)
+       (if (Label? e)
+	   (App e (cons e^ e*) t)
+	   (let ([e (Op Clos:code (List e) t)])
+	     (App e (cons e^ e*) t)))]
+      [(Op p (App recur* e*) t) (Op p e* t)]
+      [(If (app recur t) (app recur c) (app recur a) ty)
+       (If t c a ty)]
+      [(When/blame l (app recur t) (app recur c) ty)
+       (When/blame l t c ty)]
+      [(Var i t) (env-lookup env i)]
+      [(Quote k t) exp]))
+  recur)
+
+(define-type L3BndP (Bnd L3-Procedure L3-Type))
+(define-type L3BndC (Bnd L3-Closure L3-Type))
+(define-type L3BndD (Bnd L3-Expr L3-Type))
+
+(: icp-let-proc (-> (Listof L3BndP) (Listof L3BndC) L3-Expr L3-Type Env 
+		    L4-Expr))
+(define (icp-let-proc p* c* e t env)
+  (let*-values ([(p* env) (icp-bndp* p* env)]
+		[(c* s* env) (icp-bndc* c* env)])
+    (Letproc p* (Let c* (Begin s* ((icp-expr env) e) t) t) t)))
+
+(: icp-bndp* ((Listof L3BndP) Env . -> . (values (Listof L4BndP) Env)))
+(define (icp-bndp* b* env)
+  ((Listof L3BndP) (Listof L4BndP) Env . -> . (values (Listof L4BndP) Env))
+  (define (loop b3* b4* env)
+    (if (null? b3*)
+	(values b4* e)
+	(match-let ([(Bnd l t (Procedure cp fml fr e t^)) (car b3*)])
+	  (let ([p (icp-procedure cp fml fr e t^)])
+	    (icp-bndp* (cdr b3*) 
+		       (cons (Bnd l t p) b4*) 
+		       (env-extend env l (Label l t)))))))
+    (loop b* '() env))
+
+(: icp-bndc* (-> (Listof L3BndC) Env 
+		 (values (Listof L4BndC) (Listof L4-Expr) Env)))
+(define (icp-bndc* b3* env)
+  ;; Step 1 collect the fields into list and extend the environment
+  (: collect-clos (-> (Listof L3BndC) (Listof Uvar) (Listof L4-Type)
+		      (Listof L3-Closure) Env
+		      (values (Listof L4BndC) (Listof L4-Expr) Env)))
+  (define (collect-clos b* u* t* cd* env)
+    (if (null? b*)
+	(fold-clos u* t* cd* env) ;;goto step 2
+	(match-let ([(Bnd u t cd) (car b*)])
+	  (collect-clos (cdr b*) (cons u u*) (cons t t*) (cons cd cd*)
+			(extend/env env u (var u t))))))
+  
+  ;; step 2 iterate the values creating allocation and setters
+  (: fold-clos (-> (Listof Uvar) (Listof L3-Type) (Listof L3-Closure)
+		   (Listof L4BndC) (Listof L4-Expr) Env
+		   (values (Listof L4BndC) (Listof L4-Expr) Env)))
+  (define (fold-clos uvar* type* clos-data* clos-exp* set* env)
+    (cond            
+     [(null? uvar*) (values closure-exp* set* env)];;done
+     [(or (null? t*) (null? cd*));; This shouldn't be possible 
+      (raise-pass-exn "icp-bndc*" "dependent types would be nice here")]
+     [else
+      (match-let ([(Closure-data label free) (car clos-data*)])
+	(let-values ([(c* s*) (make-prims 0 (car u*) (car t*) (car cd*) c* s* env)])
+	  (fold (cdr u*) (cdr t*) (cdr cd*) c* s*))])))  
+  ;; step 2.5 create a single allocation and all the setters for it
+  (: make-prims 
+     (Natural Uvar L3-Type Uvar (Listof Uvar) (Listof L4BndC) (Listof L4-Expr)
+	      . -> . (values (Listof L4BndC) (Listof L4-Expr))))
+  (define (make-prims n u t l f* c* s* env)
+    (if (null? f*)
+	(let ([op   (Op 'Clos (List (Quote (add1 n))) t)]
+	      [set  (Op 'Clos:code-set 
+			(List (Var u t) (Label l t)) VOID)])
+	  (values (cons (Bnd u t op) c) (cons set s*)))
+	(let* ([var (Var u t)]
+	       [index (Quote n INT-TYPE)]
+	       [val (env-lookup env (car f*))])
+	  (make-prims (add1 n) u t l (cdr f*) c*
+		      (cons (Op 'Clos:set (List var index val) VOID) s*)))))
+  (collect-clos bnd* '() '() '() env))
+
+(: icp-procedure (-> Uvar (List (Fml L3-Type)) (List Uvar) L3-Expr L3-Type
+		     L4-Code))
+(define (icp-procedure cp fml* fr* body ty)
+  ;; build-env has two parts first the refs are generated
+  (: build-new-env (Uvar (List (Fml L3-Type)) (List Uvar) . -> . Env))
+  (define (build-env env cp-var n fml* fr*)
+    (if (null? u*)
+	(build-step2 env fml*)
+	(let* ([uvar (car fr*)]
+	       [index (Quote n INT-TYPE)]
+	       [op (Op 'Clos:ref (list cp-var index))])
+	(build-env (env-extend env uvar op) (add1 n) fml* (cdr fr*)))))
+   ;; as the contiuation build-step2 then generates the regular vars
+  (: build-step2 (Env (Listof (Fml L3-Type)) . -> . Env))
+  (define (build-step2 env fml*)
+     (if (null? fml*)
+	 env
+	 (match-let ([(Fml i t) (car fml*)])
+	   (build-step2 (extend-env env i (Var i t)) (cdr f*)))))
+   ;; Procedures are now flat ish code that may be lifted
+   (let* ([params (cons (Fml cp t^) fml*)]
+	  [env    (build-env (Var cp ty) fml* fr*)]
+	  [body   ((icp-expr env) e)])
+     (code params body ty)))
+
+(define (icp-bnd-data b* env)
+  (let ([icp-expr (icp-expr env)]) 
+    (define (loop b3* b4* env)
+      (if (null? b3*)
+	  (values b4* env)
+	  (match-let ([(Bnd u t e) (car b3*)])
+	    (let ([e (icp-expr e)])
+	      (loop (cdr b3*) 
+		    (cons (Bnd u t e) b4*)
+		    (env-extend env u (Var u t)))))))
+    (loop b* '() env)))
+
+  
+

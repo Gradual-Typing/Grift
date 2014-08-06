@@ -1,2 +1,2 @@
-(let ((f (lambda ((a : Int)) (%+ a a))))
+(let ((f (lambda ((a : Int)) (+ a a))))
   ((: f (Bool -> Bool) "Pass") #t))

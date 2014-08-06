@@ -1,10 +1,10 @@
-#lang racket
+#lang typed/racket
 #|------------------------------------------------------------------------------+
 |Pass: compiler/closures/convert-closures                                           |
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-| Description: 
+| Description: This pass sets up the structure of closures 
 +-------------------------------------------------------------------------------+
 | Grammer:
 +------------------------------------------------------------------------------|#
@@ -12,76 +12,109 @@
 (require Schml/framework/build-compiler
          Schml/framework/helpers
          Schml/framework/errors
-         racket/set)
+         Schml/compiler/language)
 
-(require Schml/language/shared
-         (prefix-in s: Schml/language/closure-il2)
-         (prefix-in t: Schml/language/closure-il3))
-;; Only the pass is provided by this module
 (provide convert-closures)
 
-(define-pass (convert-closures prgm comp-config)
-  (define (cc-expr mk-uvar)
-    (define (uvar->code-label i)
-      (clabel (uvar-prefix i) (uvar-suffix i)))
-    (define (mk-cp-var i)
-      (mk-uvar (string-append "cp_" (uvar-prefix i))))
-    (define (cc-prim cc-expr ty pexp)
-      (match pexp
-        [(Op:IntxInt (app recur fst) (app recur snd))
-         (t:Prim ty (mk-op:int-int pexp fst snd))]
-        [(Rel:IntxInt (app recur fst) (app recur snd))
-         (t:Prim ty (mk-rel:int-int pexp fst snd))] 
-        [otherwise (match-pass-error pass 'iic-prim otherwise)]))
-    (define (recur exp)
-      (match exp
-        ;; This ugly line makes two new labels for each lambda
-        ;; and creates a temporary binding for the soon to be
-        ;; closure
-        [(s:Let-Proc ty
-                   (list (Bnd:Ty (and i*
-                                      (app uvar->code-label cl*)
-                                      (app mk-cp-var cp*))
-                                 (s:Lambda tl* fl** fr** (app recur e*))
-                                 lt*) ...)
-                   (app recur exp))
-       (t:Let-Proc ty
-                   (map
-                    (lambda (cl cp tl fl fr e lt)
-                      (let ((f (Fml:Ty cp lt)))
-                        (Bnd:Ty
-                         cl
-                         (t:Lambda tl (cons f fl) (cons f fr) e)
-                         lt)))
-                    cl* cp* tl* fl** fr** e* lt*)
-                   (map
-                    (lambda (i cl fr* lt)
-                      (Bnd:Ty i (t:Close-Over cl fr*) lt))
-                    i* cl* fr** lt*)
-                   exp)]
-      [(s:Let ty (list (Bnd:Ty i* (app recur e*) t*) ...) (app recur exp))
-       (t:Let ty (map Bnd:Ty i* e* t*) exp)]
-      [(s:Cast ty-cast (app recur exp) ty-exp label)
-       (t:Cast ty-cast exp ty-exp label)]
-      [(s:If ty (app recur tst) (app recur csq) (app recur alt))
-       (t:If ty tst csq alt)]
-      [(s:App ty (app recur exp) (list (app recur exp*) ...))
-       (if (t:Var? exp)
-           (t:App ty exp `(,exp . ,exp*))
-           (let* ((tmp (mk-uvar "tmp_clos"))
-                  (tmp-ty (t:Expr-ty exp))
-                  (tmp-expr (t:Var tmp-ty tmp)))
-             (t:Let ty `(,(Bnd:Ty tmp exp tmp-ty))
-                    (t:App ty tmp-expr `(,tmp-expr . ,exp*)))))] 
-      [(s:Prim ty pexp) (cc-prim recur ty pexp)]
-      [(s:Var t i) (t:Var t i)]
-      [(s:Const t k) (t:Const t k)]
-      [e (match-pass-error pass 'recur e)]))
-    recur)
-  
-  (match prgm
-    [(s:Prog n u t e) (let* ((mk-uvar (get-uvar-maker u))
-                             (e ((cc-expr mk-uvar) e)))
-                        (t:Prog n (mk-uvar) t e))]
-    [otherwise (match-pass-error pass 'body prgm)]))
+(: convert-closures (L2-Prog Config . -> . Lambda3))
+(define (convert-closures prgm conf)
+  (match-let ([(L2-Prog n c e t) prgm])
+    (let-values ([(e _ c) (cc-expr e c)])
+      (Prog (list n c t) e))))
+
+(: cc-expr (-> L2-Form Natural 
+	       (values L3-Expr L3-Type Natural)))
+(define (cc-expr exp next)
+  (match exp
+    [(Letrec b* e t)
+     (let*-values ([(bp* bd* n) (cc-bnd-lambda* b* next)]
+		   [(e _ n) (cc-expr e n)])
+       (values (Letproc bp* (Letclos bd* e) t) t n))] 
+    [(Let b* e t)
+     (let*-values ([(b* n) (cc-bnd-data* b* next)]
+		   [(e _ n) (cc-expr e n)])
+       (values (Let b* e t) t n))]
+    [(If t c a ty)
+     (let*-values ([(t _ n) (cc-expr t next)]
+		   [(c _ n) (cc-expr c n)]
+		   [(a _ n) (cc-expr a n)])
+       (values (If t c a ty) ty n))]
+    [(When/blame l t c ty)
+     (let*-values ([(t _ n) (cc-expr t next)]
+		   [(c _ n) (cc-expr c n)])
+       (values (When/blame l t c ty) ty n))]
+    [(App e e* t)
+     (let*-values ([(e e-ty n) (cc-expr e next)]
+		   [(e* n) (cc-expr* e* n)])
+       (if (Var? e)
+           (values (App (cons e e) e* t) t n)
+           (let* ([tmp-u (Uvar "tmp_clos" n)]
+		  [tmp-v (Var tmp-u e-ty)])
+             (values (Let (list (Bnd tmp-u e-ty e))
+			  (App (cons tmp-v tmp-v) e* t)
+			  t)
+		     t 
+		     (add1 n)))))]
+      [(Op p e* t) 
+       (let-values ([(e* n) (cc-expr* e* next)])
+	 (values (Op p e* t) t n))]
+      [(Var u t) (values (Var u t) t next)]
+      [(Quote k t) (values (Quote k t) t next)]))
+
+(: cc-expr* (-> (Listof L2-Form) Natural
+		(values (Listof L3-Expr) Natural)))
+(define (cc-expr* exp* n)
+  (if (null? exp*)
+      (values '() n)
+      (let*-values ([(e* n) (cc-expr* (cdr exp*) n)]
+		    [(e _ n) (cc-expr (car exp*) n)])
+	(values (cons e e*) n))))
+
+(define-type L2BndP (Bnd L2-Lambda L2-Type))
+(define-type L3BndP (Bnd L3-Procedure L3-Type))
+(define-type L3BndC (Bnd L3-Closure L3-Type))
+(define-type L2BndD (Bnd L2-Form L2-Type))
+(define-type L3BndD (Bnd L3-Expr L3-Type))
+
+
+(: cc-bnd-lambda* (-> (Listof L2BndP) Natural
+		      (values (Listof L3BndP) 
+			      (Listof L3BndC) 
+			      Natural)))
+(define (cc-bnd-lambda* b* n)
+  (if (null? b*)
+      (values '() '() n)
+      (let-values ([(p* c* n) (cc-bnd-lambda* (cdr b*) n)])
+	(match-let ([(Bnd ext-cp-var t 
+			  (Lambda fml* r (Free fv* e) t^)) (car b*)])
+	  (let*-values ([(e _ n) (cc-expr e n)]
+			[(int-cp-var n) (mk-clos-ptr-uvar ext-cp-var n)]
+			[(code-var n) (mk-code-ptr-uvar ext-cp-var n)])
+	    (let* ([proc (Procedure int-cp-var fml* fv* e t^)]
+		   [bndp (Bnd code-var t proc)]
+		   [clos (Closure-data code-var fv*)]
+		   [bndc (Bnd ext-cp-var t clos)])
+	      (values (cons bndp p*) (cons bndc c*) n)))))))
+
+(: cc-bnd-data* (-> (Listof L2BndD) Natural
+		    (values (Listof L3BndD) Natural)))
+
+(define (cc-bnd-data* bnd* n)
+  (if (null? bnd*)
+      (values '() n)
+      (let*-values ([(b* n) (cc-bnd-data* (cdr bnd*) n)])
+	(match-let ([(Bnd u t e) (car bnd*)])
+	  (let*-values ([(e _ n) (cc-expr e n)])
+	    (values (cons (Bnd u t e) b*) n))))))
+
+(: mk-uvar (Uvar String Natural . -> . (values Uvar Natural)))
+(define (mk-uvar u s n)
+  (values (Uvar (string-append (Uvar-prefix u) s) n)
+	  (add1 n)))
+
+(: mk-code-ptr-uvar (Uvar Natural . -> . (values Uvar Natural)))
+(define (mk-code-ptr-uvar u n) (mk-uvar u "_code" n))
+(: mk-clos-ptr-uvar (Uvar Natural . -> . (values Uvar Natural)))
+(define (mk-clos-ptr-uvar u n) (mk-uvar u "_clos" n))
+
 

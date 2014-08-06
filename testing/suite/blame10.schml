@@ -2,6 +2,6 @@
 ;; There is an implicit cast:
 ;; (: (: f Dyn "Fail") (Bool Bool -> Dyn) msg2)
 ;; with a result Blame: msg2 because the cast fails 
-(let ((f (lambda ((a : Int)) (%+ a a))))
+(let ((f (lambda ((a : Int)) (+ a a))))
   ((: f Dyn "Fail") #t #f))
 

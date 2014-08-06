@@ -4,24 +4,24 @@
 
 #| Environments are persistent hash tables |#
 
-(begin-for-syntax
- (define (null-list n)
-   (if (= 0 n)
-       '()
-       (cons ''() (null-list (sub1 n))))))
+#| Source locations always return a string even if it is empty |# 
+(require/typed racket/base
+	       [(srcloc->string src->str) 
+		(srcloc . -> . (U False String))])
+(: srcloc->string (srcloc . -> . String))
+(define (srcloc->string x) (or (src->str x) ""))
 
-(define-syntax (map/values stx)
-  (syntax-case stx (:)
-    [(_  p (T ...) exp ...)
-     (with-syntax ([(step ...) (generate-temporaries #'(exp ...))]
-		   [(acc ...) (generate-temporaries #'(T ...))]
-		   [(ls ...) (generate-temporaries #'(exp ...))])
-	 #'(let ([proc p] 
-		 [ls exp] ...)
-	     (for/lists : (values (Listof T) ...)
-	       ([acc : (Listof T)] ...) 
-	       ([step (in-list ls)] ...)
-	       (proc step ...))))]))
+(: syntax->srcloc ((Syntaxof Any) . -> . srcloc))
+(define (syntax->srcloc x)
+  (srcloc (syntax-source x) 
+	  (syntax-line x)
+          (syntax-column x) 
+	  (syntax-position x) 
+	  (syntax-span x)))
+
+(: file->srcloc (String . -> . srcloc))
+(define (file->srcloc n)
+  (srcloc n #f #f #f #f))
 
 #|
 (require (for-syntax  racket/list))

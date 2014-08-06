@@ -1,7 +1,6 @@
 #lang typed/racket
 
-(require/typed racket/base
-	       [srcloc->string (srcloc . -> . (U False String))])
+(require Schml/framework/helpers)
 (provide (all-defined-out))
 
 (struct exn:schml exn ())
@@ -21,7 +20,7 @@
     (current-continuation-marks))))
 
 #| Errors thrown in the read pass |#
-(struct: exn:schml:read exn:schml ())
+(struct exn:schml:read exn:schml ())
 
 (define file-name-fmt
   "Error in read: unable to extract file name from the path ~a")
@@ -37,15 +36,14 @@
    Note: exceptions are defined as macros so that the 
    stacktraces are more accurate.
 |#
-(struct exn:schml:parse exn ())
+(struct exn:schml:parse exn:schml ())
 
 (define-syntax-rule (raise-parse-exn l fmt args ...)
   (raise (exn:schml:parse
 	  (format "Exception in parse:~a: ~a" 
-		  (srcloc->str l) 
+		  (srcloc->string l) 
 		  (format fmt args ...))
 	  (current-continuation-marks))))
-	    
 
 (define-syntax-rule (raise-unbound-variable-exn s l)
   (raise-parse-exn l "Unbound variable ~a" s))
@@ -125,6 +123,9 @@
 		  (format fmt args ...))
 	  (current-continuation-marks))))
 
+(define-syntax-rule (raise-blame-label l)
+  (raise (exn:schml:type:static l (current-continuation-marks))))
+
 (define-syntax-rule (raise-variable-not-found src id)
   (raise-static-type-exn 
    src
@@ -143,11 +144,10 @@
    id t-bnd t-exp))
 
 
-(define-syntax-rule (raise-ascription-inconsistent src label t-exp t-cast)
+(define-syntax-rule (raise-ascription-inconsistent src t-exp t-cast)
   (raise-static-type-exn
    src
-   (or label 
-       (format "Ascription of type ~a is inconsistent with ~a" t-exp t-cast))))
+   (format "Ascription of type ~a is inconsistent with ~a" t-exp t-cast)))
 
 
 (define-syntax-rule (raise-if-inconsistent-branches src t-csq t-alt)
@@ -190,14 +190,13 @@
    src
    "For the time being all returns must be of arity 1"))
 
-#|
-(define raise-dynamic-type-error
-  (case-lambda
-    [(blame-label)
-     (configure-for-external-error)
-     (raise (exn:schml:Type:Dynamic blame-label (current-continuation-marks)))]
-    [(down up)
-     (configure-for-external-error)
-     (let ((msg (format "Blame ~a and ~a" down up)))
-       (raise (exn:schml:Type:Dynamic msg (current-continuation-marks))))]))
-|#
+(define-syntax raise-dynamic-type-error
+  (syntax-rules ()
+    [(_ lbl) (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))]))
+
+(struct exn:schml:cast exn:schml ())
+(define-syntax-rule (raise-limited-types-exn t)
+  (raise (exn:schml:cast
+	  (format "Error in cast compilation: Couldn't create a runtime representation of ~a"
+		  t)
+	  (current-continuation-marks))))

@@ -52,7 +52,8 @@
 	 [exp-type : U]
 	 [cast-type : V]
 	 [label : W])
-
+	#:transparent)
+	
 (struct (U) Var
         ([ident : Uvar]
 	 [annotation : U])
@@ -60,7 +61,8 @@
 
 (struct (T U) Quote
 	([const : T]
-	 [annotation : U]))
+	 [annotation : U])
+	#:transparent)
 
 #| I am making a more primitive match because current patern
    matching seems to erase types |#
@@ -102,17 +104,24 @@
 
 
 #| Bindings and Formals |#
-(struct (T) Fml ([identifier : Uvar] [type : T]))
+(struct (T) Fml ([identifier : Uvar] [type : T])
+	#:transparent)
 (struct (T U) Bnd ([identifier : Uvar]
                    [type : U]
-                   [expression : T]))
+                   [expression : T])
+	#:transparent)
 
 #| Types |#
-(struct Int ())
-(struct Bool ())
-(struct Dyn ())
-(struct (T U) Fn ([fml : T] [ret : U]))
-(struct (T U) Fn/a ([arity : Fixnum][fml : T] [ret : U]))
+(struct Int ()
+	#:transparent)
+(struct Bool ()
+	#:transparent)
+(struct Dyn ()
+	#:transparent)
+(struct (T U) Fn ([fmls : T] [ret : U])
+	#:transparent)
+(struct (T U) Fn/a ([arity : Fixnum][fmls : T] [ret : U])
+	#:transparent)
 (define Int-Type (Int))
 (define Bool-Type (Bool))
 (define Dyn-Type (Dyn))

@@ -4,21 +4,25 @@
 	 Schml/language/typed-forms)
 
 (provide (all-defined-out)
-	 (rename-out [Valid-Type Type])) 
+	 Valid-Type) 
+
+(define-type VT Valid-Type)
+(define-type CF Cast-Form)
 
 (define-type Cast-Form
-  (Rec CF (U (Lambda (Fml Valid-Type) Valid-Type CF Type)
-	     (Letrec (Bnd CF Valid-Type) CF Type)
-	     (Let (Bnd CF Valid-Type) CF Type)
-	     (App CF Type)
-	     (Op Prim CF Type)
-	     (If CF Type)
-	     (Cast CF Type Type Label)
-	     (Var Type)
-	     (Quote Literal Type))))
+  (Rec CF (U (Lambda (Fml IP) IP CF IP)
+	     (Letrec (Bnd CF IP) CF IP)
+	     (Let (Bnd CF IP) CF IP)
+	     (App CF IP)
+	     (Op Prim CF IP)
+	     (If CF IP)
+	     (Var IP)
+	     (Cast CF VT VT Label)
+	     (Quote RT-Literal IP))))
 
 (struct Cast-Prog ([name : String]
 		   [next-uvar : Natural]
-		   [expression : Typed-Form]
-		   [type : Valid-Type]))
+		   [expression : Cast-Form]
+		   [type : IP])
+	#:transparent)
 

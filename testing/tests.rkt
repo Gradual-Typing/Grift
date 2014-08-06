@@ -1,175 +1,129 @@
 #lang racket
-(require rackunit rackunit/text-ui
-         Schml/framework/paths
+;; The testing framework is untyped because rackunit
+;; is not working in typed racket
+(require rackunit 
+	 rackunit/text-ui
          Schml/framework/build-compiler
-         Schml/framework/errors)
-
+         Schml/framework/errors
+	 Schml/testing/values)
 (provide (all-defined-out))
 
-(define config 
-  (make-parameter (compiler-config 'lazy-d '())))
+;; sets up a variable with the path to the test suite
+(require pkg/lib)
+(define schml-path (pkg-directory "Schml"))
+(define testing-path (build-path schml-path "testing"))
+(define test-suite-path (build-path testing-path "suite"))
 
-(define (test-compiler path config expected)
-  (local-require Schml/compiler/read
-                 Schml/compiler/parse
-                 Schml/compiler/type-check
-                 Schml/compiler/casts/make-casts-explicit
-                 (prefix-in iic: Schml/testing/ast-interps/insert-implicit-casts)
-                 Schml/compiler/closures/make-closures-explicit
-                 )
-  
-  (compose-compiler (path config)
-                    read parse type-check
-                    make-casts-explicit
-                    (ast-> ast (check-equal? (iic:interp ast config) expected))
-                    make-closures-explicit))
 
-(define-syntax test-compile
+(define compiler-config 
+  (make-parameter
+   (Config 'Lazy-D)))
+
+(struct success ())
+(struct failed (obj))
+
+(define (compile path expected)
+  ;; The micro compilers
+  (local-require Schml/compiler/schml/reduce-to-cast-calculus
+		 Schml/compiler/casts/interpret-casts
+		 Schml/compiler/closures/make-closures-explicit)
+  ;; The intermediary interpreters
+  (local-require Schml/testing/ast-interps/cast-forms-interp
+		 Schml/testing/ast-interps/lambda-forms-interp)
+  (let ((config (compiler-config)))
+    (with-handlers ([exn:schml:type:static? 
+		     (lambda (e) 
+		       (begin 
+			 (check value=? (blame #t (exn-message e)) expected)
+			 (success)))])
+      (let* ([cp  (path->cast-calculus path config)]
+	     [_   (check value=? (cast-forms-interp cp config) expected)]
+	     [lp  (interpret-casts cp config)]
+	     [_   (check value=? (lambda-forms-interp lp config) expected)]
+	     [fop (make-closures-explicit lp config)])
+	(success)))))
+
+(define-syntax compile-test
   (syntax-rules ()
     ((_ p ... n e)
-     (test-case n
-       (test-compiler (simplify-path (build-path test-suite-path p ... n))
-                      (config) e)))))
+     (test-pred
+      n
+      success?
+      (compile 
+	 (simplify-path (build-path test-suite-path p ... n))
+	 e)))))
 
-(define-syntax test-type-checker
-  (syntax-rules ()
-    ((_ p ... n [(exn hndlr) ...])
-     (test-not-exn n
-       (lambda ()
-         (with-handlers [(exn hndlr) ...]
-           (begin
-             (test-compiler
-              (simplify-path (build-path test-suite-path p ... n))
-              (config) "Error expected but not thrown during type-checking"))))))))
-
-(define-syntax test-type-exn
-  (syntax-rules (static dynamic custom dynamic-pass dynamic-not-fail)
-    ((_ static p ... n)
-     (test-type-checker p ... n ([Schml:Type:Static? (lambda (e) #t)])))
-    ((_ dynamic p ... n)
-     (test-type-checker p ... n ([Schml:Type:Dynamic? (lambda (e) #t)])))
-    ((_ custom p? path ... n)
-     (test-type-checker path ... n ([exn? p?])))
-    ((_ dynamic-not-fail p ... n)
-     (test-type-exn custom not-fail-blame-label? p ... n))
-    ((_ dynamic-pass p ... n)
-     (test-type-exn custom pass-blame-label? p ... n))
-    ((_ p ... n)
-     (test-type-checker p ... n ([Schml:Type? (lambda (e) #t)])))))
-
-(define (blame-label=? bl)
-  (lambda (e)
-    (unless (equal? (exn-message e) bl) 
-      (raise e))))
-
-(define not-fail-blame-label?
-  (lambda (e)
-    (unless (not (equal? (exn-message e) "Fail"))
-      (raise e))))
-
-(define pass-blame-label? (blame-label=? "Pass"))
-
-
-
-
-(define ld-tests
-  (test-suite "lazy downcast"
-    (test-suite "valid"
-      (test-compile "const-false.schml" #f)
-      (test-compile "const-true.schml" #t)
-      (test-compile "const-one.schml" 1)
-      (test-compile "const-ninetynine.schml" 99)
-      (test-compile "const-larg-int.schml" 123456)
-      (test-compile "prim-minus.schml" 80)
-      (test-compile "prim-lt.schml" #f)
-      (test-compile "prim-gt.schml" #t)
-      (test-compile "prim-plus.schml" 120)
-      (test-compile "prim-times.schml" 2000)
-      (test-compile "lambda1.schml" 'procedure)
-      (test-compile "lambda2.schml" 'procedure)
-      (test-compile "lambda3.schml" 'procedure)
-      (test-compile "lambda4.schml" 'procedure)
-      (test-compile "lambda5.schml" 'procedure)
-      (test-compile "lambda6.schml" 'procedure)
-      (test-compile "lambda7.schml" 'procedure)
-      (test-compile "lambda8.schml" 'procedure)
-      (test-compile "let0.schml" #t)
-      (test-compile "let1.schml" 2)
-      (test-compile "let2.schml" #f)
-      (test-compile "let3.schml" 1)
-      (test-compile "let4.schml" 2)
-      (test-compile "let5.schml" 4)
-      (test-compile "let6.schml" 0)
-      (test-compile "let7.schml" 'dynamic)
-      (test-compile "let8.schml" 0)
-      (test-compile "let9.schml" 100)
-      (test-compile "let10.schml" 'dynamic)
-      (test-compile "let11.schml" #f)
-      (test-compile "let12.schml" 'dynamic)
-      (test-compile "let13.schml" 'dynamic)
-      (test-compile "let14.schml" 5)
-      (test-compile "let15.schml" 'procedure)
-      (test-compile "let16.schml" 7)
-      (test-compile "let17.schml" #f)
-      (test-compile "let18.schml" #f)
-      (test-compile "let19.schml" #f)
-      (test-compile "let20.schml" #t)
-      (test-compile "if0.schml" 0)
-      (test-compile "if1.schml" 0)
-      (test-compile "if2.schml" 1)
-      (test-compile "if3.schml" 4)
-      (test-compile "fact5.schml" 120)
-      (test-compile "blame1.schml" 2)
-      (test-type-exn static "blame2.schml")
-      (test-type-exn dynamic "blame3.schml")
-      (test-type-exn static "blame4.schml")
-      (test-type-exn dynamic-not-fail "blame5.schml")
-      (test-type-exn dynamic-not-fail "blame6.schml")
-      (test-compile "blame7.schml" 2)
-      (test-type-exn static "blame8.schml")
-      (test-type-exn dynamic-pass "blame9.schml")
-      (test-type-exn dynamic-not-fail "blame10.schml")
-      (test-type-exn dynamic-not-fail "blame11.schml")
-      (test-type-exn dynamic-pass "blame12.schml")
-      (test-type-exn dynamic-pass "blame13.schml")
-      ;; pretty printer doesn't like this currently
-      ;; and it isn not yet type safe
+(define test-data-base
+  (test-suite 
+   "all tests"
+   (compile-test "const-false.schml" (boole #f))
+   (compile-test "const-true.schml" (boole #t))
+   (compile-test "const-one.schml" (integ 1))
+   (compile-test "const-ninetynine.schml" (integ 99))
+   (compile-test "const-larg-int.schml" (integ 123456))
+   (compile-test "prim-minus.schml" (integ 80))
+   (compile-test "prim-lt.schml" (boole #f))
+   (compile-test "prim-gt.schml" (boole #t))
+   (compile-test "prim-plus.schml" (integ 120))
+   (compile-test "prim-times.schml" (integ 2000))
+   (compile-test "lambda1.schml" (function))
+   (compile-test "lambda2.schml" (function))
+   (compile-test "lambda3.schml" (function))
+   (compile-test "lambda4.schml" (function))
+   (compile-test "lambda5.schml" (function))
+   (compile-test "lambda6.schml" (function))
+   (compile-test "lambda7.schml" (function))
+   (compile-test "lambda8.schml" (function))
+   (compile-test "let0.schml" (boole #t))
+   (compile-test "let1.schml" (integ 2))
+   (compile-test "let2.schml" (boole #f))
+   (compile-test "let3.schml" (integ 1))
+   (compile-test "let4.schml" (integ 2))
+   (compile-test "let5.schml" (integ 4))
+   (compile-test "let6.schml" (integ 0))
+   (compile-test "let7.schml" (dynamic))
+   (compile-test "let8.schml" (integ 0))
+   (compile-test "let9.schml" (integ 100))
+   (compile-test "let10.schml" (dynamic))
+   (compile-test "let11.schml" (boole #f))
+   ;;(compile-test "let12.schml" (dynamic))
+   (compile-test "let13.schml" (dynamic))
+   (compile-test "let14.schml" (integ 5))
+   ;;(compile-test "let15.schml" (function))
+   (compile-test "let16.schml" (integ 7))
+   (compile-test "let17.schml" (boole #f))
+   (compile-test "let18.schml" (boole #f))
+   (compile-test "let19.schml" (boole #f))
+   (compile-test "let20.schml" (boole #t))
+   (compile-test "if0.schml" (integ 0))
+   (compile-test "if1.schml" (integ 0))
+   (compile-test "if2.schml" (integ 1))
+   (compile-test "if3.schml" (integ 4))
+   ;;(compile-test "fact5.schml" (integ 120))
+   (compile-test "blame1.schml" (integ 2))
+   (compile-test "blame2.schml" (blame #t "Right"))
+   (compile-test "blame3.schml" (blame #f "Correct"))
+   (compile-test "blame4.schml" (blame #t #f))
+   (compile-test "blame5.schml" (blame #f (not-lbl "Fail")))
+   (compile-test "blame6.schml" (blame #f (not-lbl "Fail")))
+   (compile-test "blame7.schml" (integ 2))
+   (compile-test "blame8.schml" (blame #t #f))
+   (compile-test "blame9.schml" (blame #t "Pass"))
+   ;; Multi  arg function
+   ;;(compile-test "blame10.schml" (blame #f (not-lbl "Fail")))
+   (compile-test "blame11.schml" (blame #f (not-lbl "Fail")))
+   (compile-test "blame12.schml" (blame #f "Pass"))
+   (compile-test "blame13.schml" (blame #f "Pass"))
+   ))
       ;;(test-file compiler "compiler" "simple-map.schml" 3)
-      )))
-
-(define all-tests
-  (test-suite "All" ld-tests))
-
+      
 (module+ main
-  (pretty-print-depth #f)
-  (let ((trace (make-parameter 'none))
-        (check (make-parameter 'none))
-        (cast-strictness (make-parameter 'lazy))
-        (cast-blame (make-parameter 'downcast))
-        (get-ls (lambda (p) (let ((p (p))) (if (pair? p) p '())))))
-    (command-line #:program "Schml-compiler-tests"
-                  #:once-any
-                  [("-v" "--trace-all") 
-                   "Print the input and output to passes"
-                   (trace 'all)]
-                  #:multi
-                  [("-t" "--trace-pass") str-pass
-                   "Same but only turns on tracing for a pass"
-                   (trace (cons (string->symbol str-pass) (get-ls trace)))]
-                  #:once-any
-                  [("-s" "--check-all") 
-                   "Run type checks for data between passes"
-                   (check 'all)]
-                  #:multi
-                  [("-c" "--check-pass") str-pass
-                   "Same but only turns on checking for a specific pass"
-                   (check (cons (string->symbol str-pass) (get-ls check)))]
-                  #:args ()
-                  (parameterize 
-                   ([config (compiler-config (cast-strictness)
-                                             (cast-blame)
-                                             (trace)
-                                             (check))])
-                   (run-tests all-tests 'verbose)))))
+  (let ((cast-semantics (make-parameter 'Lazy-D))
+	(get-ls (lambda (p) (let ((p (p))) (if (pair? p) p '())))))
+    (command-line 
+     #:program "Schml-compiler-tests"
+     #:args ()
+     (parameterize 
+	 ([compiler-config (Config (cast-semantics))])
+       (run-tests test-data-base 'verbose)))))
 
-     

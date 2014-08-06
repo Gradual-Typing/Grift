@@ -11,15 +11,16 @@
   (Rec AT (U Int Bool Dyn (Fn/a (Listof AT) AT))))
 
 (define-type Typed-Form
-  (Rec TF (U (Lambda (Fml Valid-Type) Valid-Type TF ST)
-	     (Letrec (Bnd TF Valid-Type) TF ST)
-	     (Let (Bnd TF Valid-Type) TF ST)
-	     (App TF ST)
-	     (Op Prim TF ST)
-	     (If TF ST)
-	     (Ascribe TF Valid-Type (Maybe Label) ST)
-	     (Var ST)
-	     (Quote Literal ST))))
+  (Rec TF 
+       (U (Lambda (Fml Valid-Type) Valid-Type TF ST)
+	  (Letrec (Bnd TF Valid-Type) TF ST)
+	  (Let (Bnd TF Valid-Type) TF ST)
+	  (App TF ST)
+	  (Op (Pair Prim (Listof Valid-Type)) TF ST)
+	  (If TF ST)
+	  (Ascribe TF Valid-Type (Maybe Label) ST)
+	  (Var ST)
+	  (Quote Literal ST))))
 
 (struct Typed-Prog ([name : String]
 		    [next-uvar : Natural]
@@ -49,7 +50,7 @@
 (define (function-consistent? t g)
   (and (Fn/a? t) (Fn/a? g)
        (= (Fn/a-arity t) (Fn/a-arity g))
-       (andmap consistent? (Fn/a-fml t) (Fn/a-fml g))
+       (andmap consistent? (Fn/a-fmls t) (Fn/a-fmls g))
        (consistent? (Fn/a-ret t) (Fn/a-ret g))))
 
 ;; Join :: type X type -> type
@@ -77,7 +78,7 @@
     [(and (Fn/a? t) (Fn/a? g) 
 	  (= (Fn/a-arity t) (Fn/a-arity g)))
      (Fn/a (Fn/a-arity t)
-	   (map join (Fn/a-fml t) (Fn/a-fml g))
+	   (map join (Fn/a-fmls t) (Fn/a-fmls g))
 	   (join (Fn/a-ret t) (Fn/a-ret g)))]
     [else (error 'join "Types are not consistent")]))
 
