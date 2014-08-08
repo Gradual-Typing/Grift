@@ -1,7 +1,7 @@
 #lang typed/racket
 
 (require Schml/framework/build-compiler)
-	   
+
 (provide (all-defined-out))
 
 (define-type Result (U error success))

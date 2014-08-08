@@ -37,6 +37,7 @@ Function: read-syntax-from-file
 This helper function called by read collects all syntax in a file and returns
 it as a list.
 |#
+(: read-syntax-from-file (Path String . -> . (Listof Stx)))
 (define (read-syntax-from-file [path : Path] [name : String]) : (Listof Stx)
   (call-with-input-file path
     (lambda ([p : Input-Port])
@@ -54,7 +55,8 @@ it as a list.
 Pass: read
 Collects the syntax from a file and returns it a Stx-Prog ast.
 |#
-(define (read [path : Path] [config : Config]): Stx-Prog
+(: read (Path Config . -> . Syntax-Lang))
+(define (read path config)
   (parameterize
       ;; The following parameters change what the reader is willing
       ;; to accept as input.
@@ -72,7 +74,7 @@ Collects the syntax from a file and returns it a Stx-Prog ast.
        [read-accept-reader #f]
        [read-accept-lang #f])
     (let ([name : String (get-name-of-file path)])
-      (Stx-Prog name (read-syntax-from-file path name)))))
+      (Prog name (read-syntax-from-file path name)))))
 
 
 
