@@ -195,6 +195,11 @@
     [(_ lbl) (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))]))
 
 (struct exn:schml:cast exn:schml ())
+(define-syntax-rule (raise-lambda-without-fn-type type)
+  (raise (exn:schml:cast
+	  (format "Error in cast compilation: lambda without a function type: ~a" type)
+	  (current-continuation-marks))))
+
 (define-syntax-rule (raise-limited-types-exn t)
   (raise (exn:schml:cast
 	  (format "Error in cast compilation: Couldn't create a runtime representation of ~a"

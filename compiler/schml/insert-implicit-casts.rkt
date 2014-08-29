@@ -4,7 +4,10 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-|Discription:
+|Discription: This pass converts differences in type equality via a inserted
+|cast. After this pass all types should be explicit and the program should be 
+|roughly equivalent to the cast-calculus mentioned in papers on the gradually
+|typed lambda calculus.
 +-------------------------------------------------------------------------------+
 |Input Grammar 
 +------------------------------------------------------------------------------|#
@@ -16,147 +19,92 @@
 ;; Only the pass is provided by this module
 (provide insert-implicit-casts)
 
-;; Some Type shorthands that I will use for just this pass
-(define-type TT Typed-Type)
-(define-type TT* (Listof TT))
-(define-type TL Typed-Literal)
-(define-type TP Typed-Prim)
-(define-type TF Typed-Form)
-(define-type ST Src.Type)
-(define-type TFml (Fml TT))
-(define-type TBnd (Bnd TF TT))
-(define-type TP.TT (Pair TP TT*))
-(define-type CF Cast-Form)
-(define-type CT Cast-Type)
-(define-type CL Cast-Literal)
-(define-type CBnd (Bnd CF CT))
-(define-type CFml (Fml CT))
-(define-type CP Cast-Prim)
-
-(: insert-implicit-casts 
-   (Typed-Prog Config . -> . Cast-Prog))
+(: insert-implicit-casts (Schml1-Lang Config . -> . Cast0-Lang))
 (define (insert-implicit-casts prgm comp-config)
-  (match-let ([(Typed-Prog n c e t) prgm])
-    (Cast-Prog n c (iic-expr e) t)))
+  (match-let ([(Prog (list name next-uid type) exp) prgm])
+    (Prog (list name next-uid type) (iic-expr exp))))
 
-(: mk-cast ((-> Label) CF TT TT . -> . CF))
+(: mk-cast ((-> String) C0-Expr Schml-Type Schml-Type . -> . C0-Expr))
 (define (mk-cast l-th e t1 t2)
-  (if (equal? t1 t2) 
-      e 
-      (Cast e t1 t2 (l-th))))
+  (if (equal? t1 t2) e (Cast e t1 t2 (l-th));(Ann  t2)
+      ))
 
-(: iic-expr (TF . -> . CF))
-(define (iic-expr [exp : TF])
-  (match exp
-    [(Lambda fmls ret-ty body ann)
-     (iic-lambda fmls ret-ty body (cdr ann))]
-    [(Let bnds body ann) 
-     (Let (iic-bnds bnds) (iic-expr body) (cdr ann))]
-    [(Letrec bnds body ann) 
-     (Letrec (iic-bnds bnds) (iic-expr body) (cdr ann))]
-    [(App rator rand* ann)
-     (iic-application rator rand* (car ann) (cdr ann))]
-    [(Op prim.ty rand* ann)
-     (let* ([prim (car prim.ty)]
-	    [rand-ty* (cdr prim.ty)]
-	    [ret-ty (cdr ann)]
-	    [src (car ann)])
-       (Op prim (iic-operands/cast rand* rand-ty* src) ret-ty))]
-    [(Ascribe exp ty lbl? ann)
-     (let ([lbl (if lbl? 
-		    (lambda () lbl?)
-		    (mk-label "ascription" (car ann)))])
-       (mk-cast lbl (iic-expr exp) ty (cdr ann)))]
-    [(If tst csq alt ann) (iic-if tst csq alt (cdr ann))]
-    [(Var id ann) (Var id (cdr ann))]
-    [(Quote lit ann) (Quote lit (cdr ann))]
-    ))
+(: iic-expr (S1-Expr . -> . C0-Expr))
+(define (iic-expr exp^)
+  (match-let ([(Ann exp (cons src type)) exp^])
+    (match exp
+       [(Lambda fml* ret-type (and (Ann _ (cons body-src body-type)) 
+				 (app iic-expr body)))
+	(let* ([lbl-th (mk-label "lambda" body-src)]
+	       [body (mk-cast lbl-th body body-type ret-type)])
+	  ;(Ann  type)
+	  (Lambda fml* ret-type body))]
+       [(Let bnd* (and (Ann _ (cons src type^)) body))
+	(Let (map iic-bnd bnd*) (mk-cast (mk-label "let" src) (iic-expr body) type^ type))]
+       [(Letrec bnd* (and (Ann _ (cons src type^)) body))
+	(Letrec (map iic-bnd bnd*) (mk-cast (mk-label "letrec" src) (iic-expr body) type^ type))]
+       [(App rator rand*) (iic-application rator rand* src type)]
+       [(Op (Ann prim rand-ty*) rand*)
+	;;(Ann  type)
+	(Op prim (map (iic-operand/cast src) rand* rand-ty*))]
+       [(Ascribe exp t1 lbl?)
+	(let ([lbl (if lbl? (th lbl?) (mk-label "ascription" src))])
+	  (mk-cast lbl (iic-expr exp) t1 type))]
+       [(If (and (Ann _ (cons tst-src tst-ty)) (app iic-expr tst))
+	    (and (Ann _ (cons csq-src csq-ty)) (app iic-expr csq))
+	    (and (Ann _ (cons alt-src alt-ty)) (app iic-expr alt))) 
+	;(Ann type)
+	(If (mk-cast (mk-label "if" tst-src) tst tst-ty BOOL-TYPE) 
+	    (mk-cast (mk-label "if" csq-src) csq csq-ty type)
+	    (mk-cast (mk-label "if" alt-src) alt alt-ty type))]
+       [(Var id) ;;(Ann  type)
+	(Var id)]
+       [(Quote lit) ;;(Ann  type)
+	(Quote lit)
+	])))
 
-(: iic-lambda ((Listof TFml) TT TF TT . -> . CF))
-(define (iic-lambda fmls ret-ty body lam-ty)
-  (let* ([body-ann (get-annotation body)]
-	 [body-src (car body-ann)]
-	 [body-ty (cdr body-ann)] 
-	 [body (iic-expr body)])
-    (Lambda fmls ret-ty 
-	    (mk-cast (mk-label "lambda" body-src) body body-ty ret-ty) 
-	    lam-ty)))
+(: iic-bnd (S1-Bnd . -> . C0-Bnd))
+  (define (iic-bnd b)
+    (match-let ([(Bnd i t (and rhs (Ann _ (cons rhs-src rhs-type)))) b])
+      (Bnd i t (mk-cast (mk-label "binding" rhs-src) (iic-expr rhs) rhs-type t))))
 
-(: iic-bnds ((Listof TBnd) . -> . (Listof CBnd)))
-(define (iic-bnds bnd*)
-  (for/list 
-      ;; : (Listof CF-Bnd) 
-      ([b : TBnd bnd*])
-    (let* ([id (Bnd-identifier b)]
-	   [bnd-ty (Bnd-type b)]
-	   [rhs (Bnd-expression b)]
-	   [rhs-ann (get-annotation rhs)]
-	   [rhs-ty (cdr rhs-ann)]
-	   [rhs-src (car rhs-ann)]
-	   [rhs (iic-expr rhs)]
-	   [lbl-th (mk-label "Binding" rhs-src)])
-      (Bnd id bnd-ty (mk-cast lbl-th rhs rhs-ty bnd-ty)))))
-
-(: iic-application (TF (Listof TF) Src TT . -> . CF))
-(define (iic-application rator rand* src ty)
-  (let* ([rator-ann (get-annotation rator)]
-	 [rator-ty (cdr rator-ann)]
-	 [rator-src (car rator-ann)])
+(: iic-application (S1-Expr (Listof S1-Expr) Src Schml-Type . -> . C0-Expr))
+(define (iic-application rator rand* src type)
+  (match-let ([(Ann _ (cons rator-src rator-type)) rator])
     (cond
-     [(Dyn? rator-ty)
-      (let-values ([(rand* ty*) (iic-operands rand*)])
-	(App (mk-cast (mk-label "Application" src rator-src)
-		      (iic-expr rator)
-		      rator-ty 
-		      (Fn/a (length ty*) ty* ty))
-	     rand* ty))]
-     [(Fn/a? rator-ty)
+     [(Dyn? rator-type)
+      (let*-values ([(rand* rand-type*) (iic-operands rand*)]
+		    [(lbl-th) (mk-label "Application" src rator-src)]
+		    [(needed-type) (Fn (length rand-type*) rand-type* type)])
+	;(Ann type)
+	(App (mk-cast lbl-th (iic-expr rator) rator-type needed-type) rand*))]
+     [(Fn? rator-type)
+      ;(Ann type)
       (App (iic-expr rator) 
-	   (iic-operands/cast rand* (Fn/a-fmls rator-ty) src)
-	   ty)]
+		(map (iic-operand/cast src) rand* (Fn-fmls rator-type)))]
      [else (raise-pass-exn "insert-implicit-casts" 
 			   "error in iic-application's implimentation")])))
 
 (: iic-operands 
-   (-> (Listof TF) 
-       (values (Listof CF) (Listof TT))))
+   (-> (Listof S1-Expr) 
+       (values (Listof C0-Expr) (Listof Schml-Type))))
 (define (iic-operands rand*) 
-  (for/lists ([cf* : (Listof CF)]
-	      [ty* : (Listof TT)])
-      ([rand : TF rand*])
-    (let ([ann (get-annotation rand)])
-      (values (iic-expr rand) (cdr ann)))))
+  (for/lists ([cf* : (Listof C0-Expr)]
+	      [ty* : Schml-Type*])
+      ([rand : S1-Expr rand*])
+    (match-let ([(Ann _ (cons _ type)) rand])
+      (values (iic-expr rand) type))))
 
-(: iic-operands/cast 
-   (-> (Listof TF) (Listof TT) Src
-       (Listof CF)))
-(define (iic-operands/cast rand* ty* src1)
-  (for/list ([rand rand*] [ty2 ty*])
-    (let* ([ann (get-annotation rand)]
-	   [ty1 (cdr ann)]
-	   [src2 (car ann)])
-      (mk-cast (mk-label "application" src1 src2)
+(: iic-operand/cast (-> Src (-> S1-Expr Schml-Type C0-Expr)))
+(define (iic-operand/cast app-src)
+  (lambda (rand arg-type)
+    (match-let ([(Ann _ (cons rand-src rand-type)) rand])
+      (mk-cast (mk-label "application" app-src rand-src)
 	       (iic-expr rand)
-	       ty1 ty2))))
+	       rand-type arg-type))))
 
-
-
-(: iic-if (TF TF TF TT . -> . CF))
-(define (iic-if tst csq alt ty)
-  (let* ([tst-ann (get-annotation tst)]
-	 [csq-ann (get-annotation csq)]
-	 [alt-ann (get-annotation alt)]
-	 [tst-ty  (cdr tst-ann)]
-	 [csq-ty  (cdr csq-ann)]
-	 [alt-ty  (cdr alt-ann)]
-	 [tst-src (car tst-ann)]
-	 [csq-src (car csq-ann)]
-	 [alt-src (car alt-ann)])
-    (If (mk-cast (mk-label "if" tst-src) (iic-expr tst) tst-ty BOOL-TYPE) 
-	(mk-cast (mk-label "if" csq-src) (iic-expr csq) csq-ty ty)
-	(mk-cast (mk-label "if" alt-src) (iic-expr alt) alt-ty ty)
-	ty)))
-
+(define-syntax-rule (th o ...)
+  (lambda () o ...))
 
 (define-syntax mk-label
   (syntax-rules ()
@@ -167,16 +115,3 @@
     [(_ pos sup-src sub-src)
      (mk-label (format "~a at ~a" pos (srcloc->string sup-src))
 	       sub-src)]))
-
-(: get-annotation (TF . -> . ST))
-(define (get-annotation x)
-  (cond
-   [(Lambda? x) (Lambda-annotation x)]
-   [(Let? x) (Let-annotation x)]
-   [(Letrec? x) (Letrec-annotation x)]
-   [(App? x) (App-annotation x)]
-   [(Op? x) (Op-annotation x)]
-   [(Ascribe? x) (Ascribe-annotation x)]
-   [(If? x) (If-annotation x)]
-   [(Var? x) (Var-annotation x)]
-   [else (Quote-annotation x)]))

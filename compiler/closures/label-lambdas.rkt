@@ -16,88 +16,89 @@
 	 Schml/compiler/language)
 ;; Only the pass is provided by this module
 (provide label-lambdas)
-(define-type LF Lambda-Form)
-(define-type LT Lambda-Type)
-(define-type LBnd (Bnd LF Lambda-Type))
-(define-type L1F L1-Form)
-(define-type Bnd-P (Bnd L1-Lambda L1-Type))
-(define-type Bnd-D (Bnd L1-Form L1-Type))
-(define-type Nat Natural)
 
-(: label-lambdas (Lambda-Prog Config . -> . L1-Prog))
+(: label-lambdas (Lambda0-Lang Config . -> . Lambda1-Lang))
 (define (label-lambdas prgm comp-config)
-  (match-let ([(Lambda-Prog n c e t) prgm])
-    (let-values ([(e c) (ll-expr e c)])
-      (L1-Prog n c e t))))
+  (match-let ([(Prog (list name count type) exp) prgm])
+    (let-values ([(exp count) (ll-expr exp count)])
+      (Prog (list name count type) exp))))
 
-(: ll-expr (LF Nat . -> . (values L1F Nat)))
+(: ll-expr (-> L0-Expr Natural
+	       (values L1-Expr Natural)))
 (define (ll-expr exp next)
-  (: recur* ((Listof LF) Nat . -> . (values (Listof L1F) Nat)))
+  (: recur* (-> (Listof L0-Expr) Natural (values (Listof L1-Expr) Natural)))
   (define (recur* e* n)
     (if (null? e*)
 	(values '() n)
-	(let*-values ([(e* n) (recur* (cdr e*) n)]
-		      [(e n) (ll-expr (car e*) n)])
-	  (values (cons e e*) n))))
+	(let ([a (car e*)]
+	      [d (cdr e*)])
+	  (let*-values ([(e* n) (recur* d n)]
+			[(e n)  (ll-expr a n)])
+	    (values (cons e e*) n)))))
   (match exp
     ;; This line should only be reached if the lambda
     ;; is not being bound by a let or a letrec
-    [(Lambda f* ret-t e t)
-     (let*-values ([(name) (Uvar "annon" next)]
-		   [(e n) (ll-expr e (add1 next))])
+    [(Lambda f* ret-t (Castable ctr exp))
+     (let*-values ([(name next) (next-uid "annon" next)]
+		   [(exp next) (ll-expr exp next)])
        (values
-	(Letrec (list (Bnd name t (Lambda f* ret-t e t)))
-		(Var name t) t)
-	n))]
+	(Letrec (list (cons name (Lambda f* ret-t (Castable ctr exp))))
+		(Var name))
+	next))]
     ;; This is okay because of the absence of side effects are pure?
-    [(Letrec b* e t) (ll-let b* e t next)]
-    [(Let b* e t) (ll-let b* e t next)]
-    [(If t c a ty)
-     (let*-values ([(t n) (ll-expr t next)]
-		   [(c n) (ll-expr c n)]
-		   [(a n) (ll-expr a n)])
-       (values (If t c a ty) n))]
-    [(When/blame l t c ty)
-     (let*-values ([(t n) (ll-expr t next)]
-		   [(c n) (ll-expr c n)])
-       (values (When/blame l t c ty) n))]
-    [(App e e* t)
-     (let*-values ([(e n) (ll-expr e next)]
-		   [(e* n) (recur* e* n)])
-       (values (App e e* t) n))]
-    [(Op p e* t)
-     (let-values ([(e* n) (recur* e* next)])
-       (values (Op p e* t) n))]
-    [(Var i t) (values (Var i t) next)]
-    [(Quote k t) (values (Quote k t) next)]))
+    [(Letrec b* e) (ll-let b* e next)]
+    [(Let b* e) (ll-let b* e next)]
+    [(If tst csq alt)
+     (let*-values ([(tst next) (ll-expr tst next)]
+		   [(csq next) (ll-expr csq next)]
+		   [(alt next) (ll-expr alt next)])
+       (values (If tst csq alt) next))]
+    [(App exp exp*)
+     (let*-values ([(exp next) (ll-expr exp next)]
+		   [(exp* next) (recur* exp* next)])
+       (values (App exp exp*) next))]
+    [(Op p exp*)
+     (let-values ([(exp* next) (recur* exp* next)])
+       (values (Op p exp*) next))]
+    [(Var i) (values (Var i) next)]
+    [(Quote k) (values (Quote k) next)]))
   
 ;; ll-let takes the fields of from core and pulls all
 ;; bound procedures out into the let-proc form. Placing
 ;; the rest of the let as the body of the let-proc
-(: ll-let ((Listof LBnd) LF LT Nat . -> . (values L1F Nat)))
-(define (ll-let b* e t n)
+(: ll-let (-> L0-Bnd* L0-Expr Natural (values L1-Expr Natural)))
+(define (ll-let b* e n)
   ;; split-bound-procedures actually performs the filtering
-  (: split-bnds ((Listof LBnd) Nat . -> .
-		 (values (Listof Bnd-P) (Listof Bnd-D) Nat)))
+  (: split-bnds (-> L0-Bnd* Natural 
+		    (values L1-Bnd-Lambda* L1-Bnd-Data* Natural)))
   (define (split-bnds b* n)
-    (for/fold ([bp* : (Listof Bnd-P) '()] 
-	       [bd* : (Listof Bnd-D)'()] 
-	       [n   : Nat n])
-	([b : LBnd b*])
+    (for/fold ([bp* :  L1-Bnd-Lambda* '()] 
+	       [bd* : L1-Bnd-Data* '()] 
+	       [n   : Natural n])
+	([b : L0-Bnd b*])
       (match b
-	[(Bnd i t (Lambda f* r e a))
+	[(cons i (Lambda f* r (Castable b e)))
 	 (let-values ([(e n) (ll-expr e n)])
-	   (values (cons (Bnd i t (Lambda f* r e a)) bp*) bd* n))]
-	[(Bnd i t e)
+	   (let ([bnd (inst cons Uid L1-Lambda)])
+	     (values (cons (bnd i (Lambda f* r (Castable b e))) bp*) bd* n)))]
+	[(cons i e)
 	 (let-values ([(e n) (ll-expr e n)])
-	   (values bp* (cons (Bnd i t e) bd*) n))])))
+	   (let ([bnd (inst cons Uid L1-Expr)])
+	     (values bp* (cons (bnd i e) bd*) n)))])))
   (let*-values ([(bp* bd* n) (split-bnds b* n)]
 		[(e n) (ll-expr e n)])
+    (: bp* L1-Bnd-Lambda*)
+    (: bd* L1-Bnd-Data*)
+    (: n Natural)
     ;; if both are null then we may remove an empty let
     ;; This transformation is only valid because bindings
     ;; being unique otherwise we might be changing
     ;; the scope on the rhs
-    (cond 
-     [(null? bd*) (values (if (null? bp*) e (Letrec bp* e t)) n)]
-     [(null? bp*) (values (Let bd* e t) n)] 
-     [else (values (Let bd* (Letrec bp* e t) t) n)])))
+    (if (null? bp*)
+	 (if (null? bd*) 
+	     (values e n)
+	     (values (Let bd* e) n))
+	 (let ([lr : L1-Expr (Letrec bp* e)])
+	   (if (null? bd*)
+	       (values lr n)
+	       (values (Let bd* lr) n))))))

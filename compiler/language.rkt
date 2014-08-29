@@ -1,19 +1,6 @@
 #lang typed/racket
+(require Schml/framework/helpers)
 (provide (all-defined-out))
-#| 
-A language form ends up just being a polymorphic record.
-This allows me to make very desciptive grammars via types later on.
-|#
-
-(define-syntax (define-forms stx)
-  (syntax-case stx ()
-    [(_ (name fields ...) f* ...)
-     (with-syntax ([(types ...) (generate-temporaries #'(fields ...))])
-       #'(begin 
-	   (struct (types ...) name ([fields : types] ...) #:transparent)
-	   (define-forms f* ...)))]
-    [(_) #'(void)]))
-
 #|
 Commonly used and recognize language forms 
 In general I try to switch structs as the meaning of forms
@@ -35,17 +22,24 @@ be usefull for optimizations or keeping state.
   (If test then else)
   (Ascribe expression type label)
   (Quote literal)
+  (Begin effects value)
+  (Nop)
   (Fml identifier type)
   (Bnd identifier type expression)
   (Cast expression type-exp type-cast label)
   (When/blame who test then)
   (LetP bindings body)
   (LetC bindings body)
+  (Labels bindings body)
+  (Castable caster body)
   (Bound closure variables body)
+  (Procedure this params caster bound-vars body)
   (Code-Label value)
   (Code variables body)
-  (Free variables body)
-  (Closure-data code variables))
+  (Free caster variables body)
+  (Closure-Data code caster variables))
+
+(define NO-OP (Nop))
 
 #| Types throughout the languages |#
 
@@ -58,8 +52,8 @@ be usefull for optimizations or keeping state.
   (String-Ptr) 
   (Any-Value)
   (Any-Type)
-  (Void)
-  (Bottom))
+  (Void-Type)
+  (Bottom-Type))
 
 ;;Constants for the types
 (define INT-TYPE (Int))
@@ -68,8 +62,8 @@ be usefull for optimizations or keeping state.
 (define ANY-TYPE (Any-Type))
 (define STRING-PTR (String-Ptr))
 (define ANY-VALUE (Any-Value))
-(define BOTTOM-TYPE (Bottom))
-(define VOID-TYPE (Void))
+(define BOTTOM-TYPE (Bottom-Type))
+(define VOID-TYPE (Void-Type))
 (define INTxINT-TYPE (list INT-TYPE INT-TYPE))
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
@@ -83,6 +77,7 @@ be usefull for optimizations or keeping state.
 
 #| Unique Identifier |#
 (struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
+(define-type Uid* (Listof Uid))
 
 (define (uid=? [u : Uid] [v : Uid])
   (= (Uid-suffix u) (Uid-suffix v)))
@@ -100,6 +95,7 @@ be usefull for optimizations or keeping state.
        (let-uid* next ([name* prefix*] ...)
 		 body ...))]))
 
+(define FIRST-UID-SUFFIX 0)
 
 #| Maybe type |#
 (define-type Src srcloc)
@@ -113,28 +109,8 @@ be usefull for optimizations or keeping state.
 (define-type Stx (Syntaxof Any))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml
+| Types shared by the Schml language family
 +-----------------------------------------------------------------------------|#
-(define-type Schml0-Lang (Prog (List String Natural) S0-Expr))
-
-(define-type S0-Expr
-  (Rec E (Ann (U (Lambda S0-Fml* (Option Schml-Type) E)
-		  (Letrec S0-Bnd* E)
-		  (Let S0-Bnd* E)
-		  (App E (Listof E))
-		  (Op Schml-Prim (Listof E))
-		  (If E E E)
-		  (Ascribe E Schml-Type (Option String))
-		  (Var Uid)
-		  (Quote Schml-Literal))
-	       Src)))
-
-(define-type S0-Fml (Fml Uid Schml-Type))
-(define-type S0-Fml* (Listof S0-Fml))
-(define-type S0-Bnd (Bnd Uid (Option Schml-Type) S0-Expr))
-(define-type S0-Bnd* (Listof S0-Bnd))
-
-;; primitives of the Schml languages
 (define-type Schml-Prim 
   (U IntxInt->Int-Primitives IntxInt->Bool-Primitives))
 
@@ -154,7 +130,7 @@ be usefull for optimizations or keeping state.
 (define-type Schml-Literal
   (U Integer Boolean))
 
-(define (Schml-Literal? x)
+(define (schml-literal? x)
   (or (and (integer? x) (>= x 0) (<= x (expt 2 64)))
       (boolean? x)))
 	   
@@ -165,17 +141,22 @@ be usefull for optimizations or keeping state.
       INT-TYPE))
 
 ;; Types in the schml languages
-(define-type Schml-Type
-  (Rec CT (U Int Bool Dyn (Fn Natural (Listof Schml-Type) Schml-Type))))
+(define-type+ Schml-Type ([Schml-Type* Listof]
+			  [Schml-Type? Option])
+  (Rec CT (U Int Bool Dyn (Fn Index (Listof Schml-Type) Schml-Type))))
+
+(define-predicate schml-type? Schml-Type)
+
+(define-type+ Schml-Fml ([Schml-Fml* Listof])
+  (Fml Uid Schml-Type))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml1
+| Language/Schml0
 +-----------------------------------------------------------------------------|#
-(define-type Schml1-Lang
-  (Prog (List String Natural Schml-Type) S1-Expr))
+(define-type Schml0-Lang (Prog (List String Natural) S0-Expr))
 
-(define-type S1-Expr
-  (Rec E (Ann (U (Lambda S0-Fml* (Option Schml-Type) E)
+(define-type S0-Expr
+  (Rec E (Ann (U (Lambda Schml-Fml* (Option Schml-Type) E)
 		 (Letrec S0-Bnd* E)
 		 (Let S0-Bnd* E)
 		 (App E (Listof E))
@@ -184,15 +165,35 @@ be usefull for optimizations or keeping state.
 		 (Ascribe E Schml-Type (Option String))
 		 (Var Uid)
 		 (Quote Schml-Literal))
+	      Src)))
+
+
+(define-type S0-Bnd (Bnd Uid Schml-Type? S0-Expr))
+(define-type S0-Bnd* (Listof S0-Bnd))
+
+#|-----------------------------------------------------------------------------+
+| Language/Schml1
++-----------------------------------------------------------------------------|#
+(define-type Schml1-Lang
+  (Prog (List String Natural Schml-Type) S1-Expr))
+
+(define-type S1-Expr
+  (Rec E (Ann (U (Lambda Schml-Fml* Schml-Type E)
+		 (Letrec S1-Bnd* E)
+		 (Let S1-Bnd* E)
+		 (App E (Listof E))
+		 (Op (Ann Schml-Prim Schml-Type*) (Listof E))
+		 (If E E E)
+		 (Ascribe E Schml-Type (Option String))
+		 (Var Uid)
+		 (Quote Schml-Literal))
 	      (Pair Src Schml-Type))))
 
-(define-type S1-Fml S0-Fml)
-(define-type S1-Fml* S0-Fml*)
 (define-type S1-Bnd (Bnd Uid Schml-Type S1-Expr))
-(define-type S1-Bnding (Listof S1-Bnd))
+(define-type S1-Bnd* (Listof S1-Bnd))
 
 (: schml-prim->type 
-   (-> Schml-Prim (Fn Natural (Listof (U Int Bool)) (U Int Bool))))
+   (-> Schml-Prim (Fn Index (Listof (U Int Bool)) (U Int Bool))))
 (define (schml-prim->type p)
   (cond
    [(IntxInt->Bool-Prim? p) INTxINT->BOOL-TYPE]
@@ -226,66 +227,107 @@ be usefull for optimizations or keeping state.
 (: join (Schml-Type Schml-Type . -> . Schml-Type))
 (define (join t g)
   (cond
-    [(Dyn? t) g]
-    [(Dyn? g) t]
-    [(and (Int? t) (Int? g)) INT-TYPE]
-    [(and (Bool? t) (Bool? g)) BOOL-TYPE]
-    [(and (Fn? t) (Fn? g) (= (Fn-arity t) (Fn-arity g)))
-     (Fn (Fn-arity t) 
-	 (map join (Fn-fmls t) (Fn-fmls g)) 
-	 (join (Fn-ret t) (Fn-ret g)))]
-    [else (error 'join "Types are not consistent")]))
+   [(Dyn? t) g]
+   [(Dyn? g) t]
+   [(and (Int? t) (Int? g)) INT-TYPE]
+   [(and (Bool? t) (Bool? g)) BOOL-TYPE]
+   [(and (Fn? t) (Fn? g) (= (Fn-arity t) (Fn-arity g)))
+    (Fn (Fn-arity t) 
+	(map join (Fn-fmls t) (Fn-fmls g)) 
+	(join (Fn-ret t) (Fn-ret g)))]
+   [else (error 'join "Types are not consistent")]))
 
 #|-----------------------------------------------------------------------------+
-| The Lambda Language Family Types, Primitives, Literals, and Terminals        |
+| The Cast Language Family Types, Primitives, Literals, and Terminals        |
 +-----------------------------------------------------------------------------|#
 (define-type Cast-Literal 
   (U Schml-Literal String Schml-Type))
 
 
 (define-type Cast-Prim 
-  (U Schml-Prim Type-Primitives Dyn-Primitives))
+  (U Schml-Prim Type-Primitives Dyn-Primitives 'Fn-cast))
 
 (define-type Type-Primitives
   (U 'Type:Int?
-     'Type:Dyn? 'Type:Bool? 
-     'Type:Fn? 'Type:Fn-arg 'Type:Fn-ret 'Type:Fn))
+     'Type:Dyn? 
+     'Type:Bool? 
+     'Type:Fn? 'Type:Fn-arity 'Type:Fn-return 'Type:Fn-make 'Type:Fn-arg-ref
+     'Blame))
 
 (define-type Dyn-Primitives
-  (U 'Dyn:Int?  'Dyn:Bool? 'Dyn:Fn? 'Dyn:Fn! 
-     'Dyn:Int!  'Dyn:Bool! 'Dyn:Fn  
-     'Dyn:Int   'Dyn:Bool  'Dyn:FnT))
+  (U 'Dyn:Int? 'Dyn:Int-make 'Dyn:Int-value  
+     'Dyn:Bool? 'Dyn:Bool-make 'Dyn:Bool-value 
+     'Dyn:Fn?  'Dyn:Fn-make 'Dyn:Fn-value 'Dyn:Fn-type))
 
 (define-type Cast-Type
-  (Rec LT (U Schml-Type Any-Type Any-Value String-Ptr Bottom Void 
-	     (Fn Natural (Listof LT) LT))))
+  (Rec CT (U Dyn 
+	     Int 
+	     Bool 
+	     Any-Type 
+	     Any-Value 
+	     String-Ptr 
+	     Bottom-Type 
+	     Void-Type 
+	     (Fn Index (Listof CT) CT))))
 
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Cast-Type))
+
 #|-----------------------------------------------------------------------------+
-| Language/Cast1 created by insert-implicit-casts                              |
+| Language/Cast0 created by insert-implicit-casts                              |
++-----------------------------------------------------------------------------
+| Description: At the begining of this section of the compiler all cast in the |
+| ast are performed on known schml language types. But as the compiler imposes |
+| the semantics of cast there become situations where a type is dependant on   |
+| contents of a variable. At this point casts are no longer able to be         |
+| completely compiled into primitives. These casts require a sort of cast      |
+| interpreter which is built later.                                            |
+| In general this compiler tries to move as mainy casts into the primitive     |
+| operations. Whatever casts are left at the end are then convert to           |
+| applications of the cast interpreter function.
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast0-Lang (Prog (List String Natural Schml-Type) C0-Expr))
 
 (define-type C0-Expr
-  (Rec E (Ann (U
-	       ;; Non-Terminals
-	       (Lambda Cast-Fml* Cast-Type E)
-	       (Letrec C0-Bnd* E)
-	       (Let C0-Bnd* E)
-	       (App E (Listof E))
-	       (Op Cast-Prim (Listof E))
-	       (If E E E)
-	       (Cast E Schml-Type Schml-Type String)
-	       ;; Terminals 
-	       (Var Uid) 
-	       (Quote Cast-Literal))
-	      Cast-Type)))
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Cast-Fml* Cast-Type E)
+	  (Letrec C0-Bnd* E)
+	  (Let C0-Bnd* E)
+	  (App E (Listof E))
+	  (Op Cast-Prim (Listof E))
+	  (If E E E)
+	  (Cast E Schml-Type Schml-Type String)
+	  ;; Terminals 
+	  (Var Uid) 
+	  (Quote Cast-Literal))))
 
+(define-type C0-Expr* (Listof C0-Expr))
 (define-type C0-Bnd (Bnd Uid Cast-Type C0-Expr))
 (define-type C0-Bnd* (Listof C0-Bnd))
 
+#|-----------------------------------------------------------------------------+
+| Language/Cast1 created by introduce-castable-functions                       |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast1-Lang (Prog (List String Natural Schml-Type) C1-Expr))
+
+(define-type C1-Expr
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Cast-Fml* Cast-Type (Castable (Option Uid) E))
+	  (Letrec C1-Bnd* E)
+	  (Let C1-Bnd* E)
+	  (App E (Listof E))
+	  (Op Cast-Prim (Listof E))
+	  (If E E E)
+	  (Cast E E E E)
+	  ;; Terminals 
+	  (Var Uid) 
+	  (Quote Cast-Literal))))
+
+(define-type C1-Expr* (Listof C1-Expr))
+(define-type C1-Bnd (Bnd Uid Cast-Type C1-Expr))
+(define-type C1-Bnd* (Listof C1-Bnd))
 
 #|-----------------------------------------------------------------------------+
 | The Lambda Language Family Types, Primitives, Literals, and Terminals        |
@@ -294,15 +336,14 @@ be usefull for optimizations or keeping state.
   (U Cast-Prim Closure-Primitives))
 
 (define-type Closure-Primitives
-  (U 'Clos 'Clos:set 'Clos:ref 'Clos:code))
+  (U 'Clos:make 'Clos:ref))
+
+(define-type Lambda-Prim!
+  (U 'Clos:set!))
 
 (define-type Lambda-Literal Cast-Literal)
 
 (define-type Lambda-Type Cast-Type)
-
-(define-type Lambda-Fml (Fml Uid Lambda-Type))
-
-(define-type Lambda-Fml* (Listof Lambda-Fml))
 
 #|-----------------------------------------------------------------------------+
 | Language/Lambda0 created by interpret-casts                                  |
@@ -312,46 +353,43 @@ be usefull for optimizations or keeping state.
   (Prog (List String Natural Schml-Type) L0-Expr))
 
 (define-type L0-Expr
-  (Rec E (Ann (U (Lambda Lambda-Fml* Lambda-Type E)
-		 (Letrec L0-Bnd* E)
-		 (Let L0-Bnd* E)
-		 (App E (Listof E))
-		 (Op Lambda-Prim (Listof E))
-		 (If E E E)
-		 ;; Terminals
-		 (Var Uid) 
-		 (Quote Lambda-Literal))
-	      Lambda-Type)))
+  (Rec E (U (Lambda Uid* False (Castable (Option Uid) E))
+	    (Letrec L0-Bnd* E)
+	    (Let L0-Bnd* E)
+	    (App E (Listof E))
+	    (Op Lambda-Prim (Listof E))
+	    (If E E E)
+	    ;; Terminals
+	    (Var Uid) 
+	    (Quote Lambda-Literal))))
 
-(define-type L0-Bnd (Bnd Uid Lambda-Type L0-Expr))
+(define-type L0-Bnd (Pair Uid L0-Expr))
 (define-type L0-Bnd* (Listof L0-Bnd))
 
 #|-----------------------------------------------------------------------------+
 | Language/Lambda1 created                                                     |
 +-----------------------------------------------------------------------------|#
 
-(define-type Lambda1-lang (Prog (List String Natural Schml-Type) L1-Expr))
+(define-type Lambda1-Lang (Prog (List String Natural Schml-Type) L1-Expr))
 
 (define-type L1-Expr
-  (Rec E (Ann 
-	  (U  ;; Non terminals 
-	   (Letrec L1-Bnd-Lambda* E)
-	   (Let L1-Bnd-Data* E)
-	   (App E (Listof E))
-	   (Op Lambda-Prim E)
-	   (If E E E)
-	   ;; Terminals 
-	   (Var Uid)
-	   (Quote Lambda-Literal))
-	  Lambda-Type)))
+  (Rec E (U  ;; Non terminals 
+	  (Letrec L1-Bnd-Lambda* E)
+	  (Let L1-Bnd-Data* E)
+	  (App E (Listof E))
+	  (Op Lambda-Prim (Listof E))
+	  (If E E E)
+	  ;; Terminals 
+	  (Var Uid)
+	  (Quote Lambda-Literal))))
 
 (define-type L1-Bnd-Lambda* (Listof L1-Bnd-Lambda))
-(define-type L1-Bnd-Lambda  (Bnd Uid Lambda-Type L1-Lambda))
+(define-type L1-Bnd-Lambda  (Pairof Uid L1-Lambda))
 (define-type L1-Bnd-Data* (Listof L1-Bnd-Data))
-(define-type L1-Bnd-Data  (Bnd Uid Lambda-Type L1-Expr))
+(define-type L1-Bnd-Data  (Pairof Uid L1-Expr))
 
 (define-type L1-Lambda
-  (Lambda Lambda-Fml* Lambda-Type L1-Expr))
+  (Lambda Uid* False (Castable (Option Uid) L1-Expr)))
 
 
 #|-----------------------------------------------------------------------------+
@@ -360,24 +398,22 @@ be usefull for optimizations or keeping state.
 (define-type Lambda2-Lang (Prog (List String Natural Schml-Type) L2-Expr))
 
 (define-type L2-Expr
-  (Rec E (Ann 
-	  (U ;; Non-Terminal 
-	   (Letrec L2-Bnd-Lambda* E)
-	   (Let L2-Bnd-Data* E)
-	   (App E (Listof E))
-	   (Op Lambda-Prim (Listof E))
-	   (If E E E)
-	   (Var Uid)
-	   (Quote Lambda-Literal))
-	  Lambda-Type)))
+  (Rec E (U ;; Non-Terminal 
+	  (Letrec L2-Bnd-Lambda* E)
+	  (Let L2-Bnd-Data* E)
+	  (App E (Listof E))
+	  (Op Lambda-Prim (Listof E))
+	  (If E E E)
+	  (Var Uid)
+	  (Quote Lambda-Literal))))
 
 (define-type L2-Bnd-Lambda* (Listof L2-Bnd-Lambda))
-(define-type L2-Bnd-Lambda (Bnd Uid Lambda-Type L2-Lambda))
+(define-type L2-Bnd-Lambda (Pairof Uid L2-Lambda))
 (define-type L2-Bnd-Data* (Listof L2-Bnd-Data))
-(define-type L2-Bnd-Data (Bnd Uid Lambda-Type L2-Expr))
+(define-type L2-Bnd-Data (Pairof Uid L2-Expr))
 
-(define-type L2-Lambda 
-  (Lambda Lambda-Fml* Lambda-Type (Free (Listof Uid) L2-Expr)))
+(define-type L2-Lambda
+  (Lambda Uid* False (Free (Option Uid) (Listof Uid) L2-Expr)))
 
 
 #|-----------------------------------------------------------------------------+
@@ -390,30 +426,25 @@ be usefull for optimizations or keeping state.
   (Prog (List String Natural Lambda-Type) L3-Expr))
 
 (define-type L3-Expr
-  (Rec E
-       (Ann 
-	(U ;; Non Terminals 
-	 (LetP L3-Bnd-Lambda* (LetC L3-Bnd-Closure* E))
+  (Rec E (U ;; Non Terminals 
+	 (LetP L3-Bnd-Procedure* (LetC L3-Bnd-Closure* E))
 	 (Let L3-Bnd-Data* E)
 	 (App (Pair (Var Uid) (Var Uid)) (Listof E))
 	 (Op Lambda-Prim (Listof E))
 	 (If E E E)
 	 ;; Terminals
 	 (Var Uid)
-	 (Quote Lambda-Literal))
-	Lambda-Type)))
+	 (Quote Lambda-Literal))))
 
-(define-type L3-Lambda
-  (Lambda Lambda-Fml* (Bound Uid (Listof Uid) L3-Expr)))
-
-(define-type L3-Closure (Closure-data Uid (Listof Uid)))
-
-(define-type L3-Bnd-Lambda* (Listof L3-Bnd-Lambda))
-(define-type L3-Bnd-Lambda (Bnd L3-Lambda Lambda-Type))
+(define-type L3-Procedure
+  (Procedure Uid Uid* (Option Uid) Uid* L3-Expr))
+(define-type L3-Closure (Closure-Data Uid (Option Uid) (Listof Uid)))
+(define-type L3-Bnd-Procedure (Pairof Uid L3-Procedure))
+(define-type L3-Bnd-Procedure* (Listof L3-Bnd-Procedure))
+(define-type L3-Bnd-Closure (Pairof Uid L3-Closure))
 (define-type L3-Bnd-Closure* (Listof L3-Bnd-Closure))
-(define-type L3-Bnd-Closure (Bnd Uid Lambda-Type L3-Closure))
+(define-type L3-Bnd-Data (Pairof Uid L3-Expr))
 (define-type L3-Bnd-Data* (Listof L3-Bnd-Data))
-(define-type L3-Bnd-Data (Bnd Uid Lambda-Type L3-Expr))
 
 ;; procedures are now just routines that have an explicit
 ;; layout for parameters
@@ -422,60 +453,66 @@ be usefull for optimizations or keeping state.
 
 
 (define-type L4-Expr
-  (Rec E
-       (Ann
-	(U ;; Non-Terminals 
-	 (LetC L4-Bnd-Code* E)
-	 (Let L4-Bnd-Data* E)
-	 (App E (Listof E))
-	 (Op Lambda-Prim (Listof E))
-	 (If E E E)
-	 ;; Terminals
-	 (Var Uid)
-	 (Quote Lambda-Literal))
-	Lambda-Type)))
+  (Rec E 
+       (U (Labels L4-Bnd-Code* (Let L4-Bnd-Data* (Begin L4-Effect* E)))
+	  (Let L4-Bnd-Data* E)
+	  (App E (Listof E))
+	  (Op Lambda-Prim (Listof E))
+	  (If E E E)
+	  ;; Terminals
+	  (Code-Label Uid)
+	  (Var Uid)
+	  (Quote Lambda-Literal))))
+
+(define-type L4-Expr* (Listof L4-Expr))
+(define-type L4-Effect 
+  (U Nop
+     (Op Lambda-Prim! L4-Expr*)))
+(define-type L4-Effect* (Listof L4-Effect))
 
 (define-type L4-Bnd-Code* (Listof L4-Bnd-Code))
-(define-type L4-Bnd-Code (Bnd Uid Lambda-Type L4-Code))
-(define-type L4-Code (Code Lambda-Fml* L4-Expr))
+(define-type L4-Bnd-Code (Pairof Uid L4-Code))
+(define-type L4-Code (Code Uid* L4-Expr))
 (define-type L4-Bnd-Data* (Listof L4-Bnd-Data))
-(define-type L4-Bnd-Data  (Bnd Uid Lambda-Type L4-Expr))
+(define-type L4-Bnd-Data  (Pairof Uid L4-Expr))
 #|-----------------------------------------------------------------------------+
 | The Data Language Family Types, Primitives, Literals, and Terminals        |
 +-----------------------------------------------------------------------------|#
-(define-type Data-Prim
-  (U Lambda-Prim))
+(define-type Data-Prim 
+  (U Schml-Prim Closure-Primitives Type-Primitives Dyn-Primitives))
+
+(define-type Data-Prim! (U Lambda-Prim!))
 
 (define-type Data-Literal Lambda-Literal)
 
 (define-type Data-Type Lambda-Type)
 
 #|-----------------------------------------------------------------------------+
-| Language/Lambda1 created by make-closures-explicit                           |
+| Data1-Language created by make-closures-explicit                           |
 +-----------------------------------------------------------------------------|#
 
 (define-type Data0-Lang
   (Prog (List String Natural Data-Type) 
-	(LetC D0-Bnd-Code*
-	      D0-Expr)))
+	(Labels D0-Bnd-Code*
+		D0-Expr)))
 
-(define-type D0-Bnd-Code* (Listof (Bnd Uid Data-Type D0-Code)))
-
-(define-type D0-Code
-  (Code D0-Fml* D0-Expr))
-
-(define-type D0-Fml* (Listof D0-Fml))
-(define-type D0-Fml  (Fml Uid Data-Type))
+(define-type D0-Bnd-Code* (Listof D0-Bnd-Code))
+(define-type D0-Bnd-Code (Pairof Uid D0-Code))
+(define-type D0-Code (Code Uid* D0-Expr))
 
 (define-type D0-Expr
-  (Rec E (Ann (U (Let D0-Bnd* E)
-		 (App E (Listof E))
-		 (Op Data-Prim (Listof E))
-		 (If E E E)
-		 (Var Uid)
-		 (Code-Label Uid)
-		 (Quote Data-Literal))
-	      Data-Type)))
+  (Rec E (U (Let D0-Bnd* E)
+	    (App E (Listof E))
+	    (Op Data-Prim (Listof E))
+	    (If E E E)
+	    (Begin D0-Effect* E)
+	    (Var Uid)
+	    (Code-Label Uid)
+	    (Quote Data-Literal))))
+(define-type D0-Expr* (Listof D0-Expr))
+
+(define-type D0-Effect (Op Data-Prim! D0-Expr*))
+(define-type D0-Effect* (Listof D0-Effect))
 
 (define-type D0-Bnd* (Listof D0-Bnd))
-(define-type D0-Bnd  (Bnd Uid Data-Type D0-Expr))
+(define-type D0-Bnd  (Pairof Uid D0-Expr))

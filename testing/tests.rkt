@@ -25,22 +25,26 @@
 (define (compile path expected)
   ;; The micro compilers
   (local-require Schml/compiler/schml/reduce-to-cast-calculus
-		 Schml/compiler/casts/interpret-casts
-		 Schml/compiler/closures/make-closures-explicit)
+		 Schml/compiler/casts/impose-cast-semantics
+		 Schml/compiler/closures/make-closures-explicit
+		 )
   ;; The intermediary interpreters
-  (local-require Schml/testing/ast-interps/cast-forms-interp
-		 Schml/testing/ast-interps/lambda-forms-interp)
+  (local-require Schml/testing/ast-interps/cast-lang-interp
+		 Schml/testing/ast-interps/lambda-lang-interp
+		 Schml/testing/ast-interps/data-lang-interp
+		 )
   (let ((config (compiler-config)))
     (with-handlers ([exn:schml:type:static? 
 		     (lambda (e) 
 		       (begin 
 			 (check value=? (blame #t (exn-message e)) expected)
 			 (success)))])
-      (let* ([cp  (path->cast-calculus path config)]
-	     [_   (check value=? (cast-forms-interp cp config) expected)]
-	     [lp  (interpret-casts cp config)]
-	     [_   (check value=? (lambda-forms-interp lp config) expected)]
-	     [fop (make-closures-explicit lp config)])
+      (let* ([c0  (reduce-to-cast-calculus path config)]
+	     [_   (check value=? (cast-lang-interp c0 config) expected)]
+	     [l0  (impose-cast-semantics c0 config)]
+	     [_   (check value=? (lambda-lang-interp l0 config) expected)]
+	     [d0  (make-closures-explicit l0 config)]
+	     [_   (check value=? (data-lang-interp d0 config) expected)])
 	(success)))))
 
 (define-syntax compile-test
@@ -86,10 +90,10 @@
    (compile-test "let9.schml" (integ 100))
    (compile-test "let10.schml" (dynamic))
    (compile-test "let11.schml" (boole #f))
-   ;;(compile-test "let12.schml" (dynamic))
+   (compile-test "let12.schml" (dynamic))
    (compile-test "let13.schml" (dynamic))
    (compile-test "let14.schml" (integ 5))
-   ;;(compile-test "let15.schml" (function))
+   (compile-test "let15.schml" (function))
    (compile-test "let16.schml" (integ 7))
    (compile-test "let17.schml" (boole #f))
    (compile-test "let18.schml" (boole #f))
@@ -99,7 +103,7 @@
    (compile-test "if1.schml" (integ 0))
    (compile-test "if2.schml" (integ 1))
    (compile-test "if3.schml" (integ 4))
-   ;;(compile-test "fact5.schml" (integ 120))
+   (compile-test "fact5.schml" (integ 120))
    (compile-test "blame1.schml" (integ 2))
    (compile-test "blame2.schml" (blame #t "Right"))
    (compile-test "blame3.schml" (blame #f "Correct"))
@@ -110,7 +114,7 @@
    (compile-test "blame8.schml" (blame #t #f))
    (compile-test "blame9.schml" (blame #t "Pass"))
    ;; Multi  arg function
-   ;;(compile-test "blame10.schml" (blame #f (not-lbl "Fail")))
+   (compile-test "blame10.schml" (blame #f (not-lbl "Fail")))
    (compile-test "blame11.schml" (blame #f (not-lbl "Fail")))
    (compile-test "blame12.schml" (blame #f "Pass"))
    (compile-test "blame13.schml" (blame #f "Pass"))

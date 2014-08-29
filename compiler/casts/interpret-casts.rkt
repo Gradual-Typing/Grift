@@ -37,177 +37,276 @@
 ;; Only the pass is provided by this module
 (provide interpret-casts)
 
-(define NUMBER-OF-NEW-UVARS 10)
 (define INTERP-TYPE
   (Fn 4 (list ANY-VALUE ANY-TYPE ANY-TYPE STRING-PTR) ANY-VALUE))
 
-(: interpret-casts (Cast0-Lang Config . -> . Lambda0-Lang))
+(: interpret-casts (Cast1-Lang Config . -> . Lambda0-Lang))
 (define (interpret-casts prgm config)
   (match-let ([(Prog (list name next type) exp) prgm])
-    ;; I am not following the usual pattern with next and uvars
-    ;; becuase there is a fixed number being created in this pass.
-    (Prog (list "" 1 INT-TYPE) 
-	  (Ann (Quote 1) INT-TYPE))
-    ;;(Prog (list name (+ next NUMBER-OF-NEW-UVARS) type) 
-    ;; (mk-cast-interp next exp type)
-    ))
+    (let*-values ([(exp next) (mk-cast-interp exp type next)])
+      (Prog (list name next type) exp))))
 
-;; (: mk-cast-interp (Natural C0-Expr Cast-Type . -> . L0-Expr))
-;; (define (mk-cast-interp next exp type)
-;;   (let*-values ([(interp-uid next) (next-uid "interp_cast" next)]
-;; 		[(interp-var) (Ann (Var interp-uid) INTERP-TYPE)])
-;;     (Ann (Letrec (list (Bnd interp-uid 
-;; 			    INTERP-TYPE 
-;; 			    (finalize-interp-code interp-var next))) 
-;; 		 (convert-casts exp interp-var))
-;; 	 type)))
+(: mk-cast-interp (C1-Expr Cast-Type Natural . -> . (values L0-Expr Natural)))
+(define (mk-cast-interp exp type next)
+  (let*-values ([(interp-uid next) (next-uid "interp_cast" next)]
+		[(interp-var) (Var interp-uid)]
+		[(interp-fn next) (finalize-interp-code interp-var next)]
+		[(exp next) ((ic-expr (specialize-cast (interp-cast interp-var))) 
+			     exp next)])
+    (values (Letrec (list (cons interp-uid interp-fn)) exp) next)))
 
-;; (: finalize-interp-code (L0-Expr Natural . -> . L0-Expr))
-;; (define (finalize-interp-code interp-var next)
-;;   ;;The code that follows is rather strange but remember
-;;   ;;that utimately the return type is a Lambda-Form.
-;;   ;;First I create all the variables that are needed for
-;;   ;;the code. Next I define a series of macros that allow
-;;   ;;me to program in the Lambda Language. This is an aim to
-;;   ;;simplify and reduce errors in constructing the ast.
-;;   (let*-values ([(v next)  (next-uid "val" next)]     
-;; 		[(v2 next) (next-uid "val" next)]     
-;; 		[(t1 next) (next-uid "type1" next)]   
-;; 		[(t11 next)(next-uid "type11" next)] 
-;; 		[(t12 next) (next-uid "type12" next)] 
-;; 		[(t2 next) (next-uid "type1" next)]   
-;; 		[(t21 next) (next-uid "type11" next)] 
-;; 		[(t22 next) (next-uid "type12" next)] 
-;; 		[(l next) (next-uid "label" next)])    
-;;     (let ([v-var   (Ann (Var v) ANY-VALUE)]
-;; 	  [v2-var  (Ann (Var v2) ANY-VALUE)]  
-;; 	  [t1-var  (Ann (Var t1) ANY-TYPE)]  
-;; 	  [t11-var (Ann (Var t11) ANY-TYPE)]
-;; 	  [t12-var (Ann (Var t12) ANY-TYPE)]
-;; 	  [t2-var  (Ann (Var t2) ANY-TYPE)]  
-;; 	  [t21-var (Ann (Var t21) ANY-TYPE)]
-;; 	  [t22-var (Ann (Var t22) ANY-TYPE)]
-;; 	  [l-var   (Ann (Var l) STRING-PTR)])
-;;       (define-syntax-rule (lambda ((x t) ...) b)
-;; 	(Ann (Lambda (list (Fml x t) ...) ANY-VALUE b ) INTERP-TYPE))
-;;       (define-syntax-rule (let ((v e) ...) b)
-;; 	(Ann (Let (list (Bnd v ANY-TYPE e) ...) b) ANY-VALUE))
-;;       (define-syntax-rule (? p a ...)
-;; 	(Ann (Op 'p (list a ...)) BOOL-TYPE))
-;;       (define-syntax-rule (V p a ...)
-;; 	(Ann (Op 'p (list a ...)) ANY-VALUE))
-;;       (define-syntax-rule (T p a ...)
-;; 	(Ann (Op 'p (list a ...)) ANY-TYPE))
-;;       ;; cond is barely usable but it makes the code more compact
-;;       (define-syntax-rule (if t c a)
-;; 	(Ann (If t c a) ANY-VALUE))
-;;     (define-syntax-rule (when t v)
-;;       (Ann (If t v (Ann 'Blame (list l-var) BOTTOM-TYPE)) ANY-VALUE))
-;;     (define-syntax cond
-;;       (syntax-rules (else)
-;; 	[(_ (else p e)) (when p e)]
-;; 	[(_ (p r) c ...) (if p r (cond c ...))]))
-;;     (define-syntax-rule (recur v t1 t2 l)
-;;       (Ann (App (Var interp-var INTERP-TYPE) (list v t1 t2 l)) ANY-VALUE))
-;;     (define-syntax-rule (app p a ...)
-;;       (Ann (App p (list a ...)) ANY-VALUE))
-;;     (define-syntax-rule (type t)
-;;       (Ann (Quote (t)) ANY-TYPE))
-;;     ;; Building the components
-;;     (let* ([cast-int 
-;; 	    : LF 
-;; 	    (cond
-;; 	     [(? Type:Int? t2-var) v-var]
-;; 	     [else (? Type:Dyn? t2-var) 
-;; 		   (V Dyn:Int v-var)])]
-;; 	   [cast-bool 
-;; 	    : LF
-;; 	    (cond
-;; 	     [(? Type:Bool? t2-var) v-var]
-;; 	     [else (? Type:Dyn? t2-var) 
-;; 		   (V Dyn:Bool v-var)])]
-;; 	   [cast-dyn 
-;; 	    : LF
-;; 	    (cond
-;; 	     [(? Type:Dyn? t2-var) v-var]
-;; 	     [(? Dyn:Int? v-var) 
-;; 	      (recur (V Dyn:Int! v-var) (type Int) t2-var l-var)]
-;; 	     [(? Dyn:Bool? v-var)
-;; 	      (recur (V Dyn:Bool! v-var) (type Bool) t2-var l-var)]
-;; 	     [else (? Dyn:Fn? v-var)
-;; 		   (recur (V Dyn:Fn! v-var) (T Dyn:Fn-type v-var) t2-var l-var)])]
-;; 	   [cast-fn  
-;; 	    : LF
-;; 	    (cond
-;; 	     [(? Type:Dyn? t2-var) (V Dyn:Fn v-var t1-var)]
-;; 	     [else 
-;; 	      (? Type:Fn? t2-var)
-;; 	      (let ([t11 (T Type:Fn-arg t1-var)]
-;; 		    [t12 (T Type:Fn-ret t1-var)]
-;; 		    [t21 (T Type:Fn-arg t2-var)]
-;; 		    [t22 (T Type:Fn-ret t2-var)])
-;; 		(lambda ((v2 ANY-VALUE))
-;; 		  (recur (app v-var (recur v2-var t21-var t11-var l-var))
-;; 			 t12-var t22-var l-var)))])])
-;;       (lambda ((v ANY-VALUE) (t1 ANY-TYPE) (t2 ANY-TYPE) (l STRING-PTR))
-;; 	(cond
-;; 	 [(? Type:Int? t1-var) cast-int]
-;; 	 [(? Type:Bool? t1-var) cast-bool]
-;; 	 [(? Type:Dyn? t1-var) cast-dyn]
-;; 	 [else (? Type:Fn? t1-var) cast-fn]))))))
 
-;; (: convert-casts (C0-Expr L0-Expr . -> . L0-Expr))
-;; (define (convert-casts exp cast-interp-var)
-;; (: cc-cast (L0-Expr Schml-Type Schml-Type String . -> . L0-Expr))
-;;   (define (cc-cast e t1 t2 l)
-;;     (let* ([t1 ;(type->expr t1)
-;; 	    : L0-Expr (Ann (Quote DYN-TYPE ANY-TYPE))]
-;; 	   [t2 ;(type->expr t2)
-;; 	    : L0-Expr (Ann (Quote DYN-TYPE ANY-TYPE))]
-;; 	   [lbl : L0-Expr (Ann (Quote l) STRING-PTR)]
-;; 	   [args : (Listof L0-Expr) (list e t1 t2 l)]
-;; 	   [rator : L0-Expr (Ann (Var (Uid "Do not use" 5)) INT-TYPE)])
-;;       (Ann (App rator args) t2))
-;;      ;; (Ann 
-;;      ;; (App (Ann (Var (Uid "Do not use" 1) INT-TYPE)) ;; cast-interp-var 
-;;      ;; 	  (list e (type->expr t1) (type->expr t2) (Ann (Quote l) STRING-PTR)))
-;;      ;;t2
-;;     )
-  ;; This is kinda important because it is were types are converted
-  ;; Values
-  (: type->expr (Schml-Type . -> . L0-Expr))
-  (define (type->expr t)
-    (Ann (Quote t) ANY-TYPE))
-(: recur (C0-Expr . -> . L0-Expr))
-(define (recur exp)
-  (let ((type (Ann-data exp)))
-    (Ann 
-     (match (Ann-value exp)
-       [(Lambda f* t b) (Lambda f* t (recur b))]
-       [(Letrec b* e) (Letrec (cata-bnd* b*) (recur e))]
-       [(Let b* e) (Let (cata-bnd* b*) (recur e))]
-       [(App e e*) (App (recur e) (recur* e*))]
-       [(Op p e*) (Op p (recur* e*))]
-       ;; [(Cast e t1 t2 l)		;(cc-cast (recur e) t1 t2 l)
-  	;;(Ann (Quote "foof") INT-TYPE)
-        ;;
-       [(If t e1 e2) (If (recur t) (recur e1) (recur e2))]
-       [(Var i) (Var i)]
-       [(Quote k) (Quote k)])
-     type)))
-  
-(: recur* ((Listof C0-Expr) . -> . (Listof L0-Expr)))
-(define (recur* e*) (for/list ([e e*]) (recur e)))
-(: cata-bnd* (C0-Bnd* . -> . L0-Bnd*))
-(define (cata-bnd* b*) 
-  (if (null? b*)
-      '()
-      (let ([b (car b*)])
-	(cons (Bnd (Bnd-identifier b)
-		   (Bnd-type b)
-		   (recur (Bnd-expression b)))
-	      (cata-bnd* (cdr b*))))))
-;;   (recur exp))
+(: finalize-interp-code (L0-Expr Natural . -> . (values L0-Expr Natural)))
+(define (finalize-interp-code interp-var next)
+  (let*-values ([(v next)  (next-uid "val" next)]     
+		[(v2 next) (next-uid "val" next)]     
+		[(t1 next) (next-uid "type1" next)]   
+		[(t2 next) (next-uid "type1" next)]   
+		[(l next) (next-uid "label" next)]) 
+    (let ([v-var   (Var v)]
+	  [v2-var  (Var v2)]  
+	  [t1-var  (Var t1)]  
+	  [t2-var  (Var t2)]  
+	  [l-var   (Var l)]
+	  [recur   (interp-cast interp-var)])
+      ;; I was trying to get the full decision tree without the
+      ;; recursion but I think this piece of code will diverge
+      ;; this might be fixible by putting a condition similar to
+      ;; the cast-specializer
+      ;; (letrec ([cast : Cast-Rule 
+      ;; 	   (lambda (v t1 t2 l n)
+      ;; 	    ((cast-Any-Type->Any-Type recur) v t1 t2 l n))]))
+      
+      ;; This cast purposfully builds the entire decision tree
+      ;; with the exception that dyn -> Fn causes a recursive
+      ;; call to occur
+      (let-values ([(body next) 
+		    (cast-Any-Type->Any-Type v-var t1-var t2-var l-var next)])
+	(values (Lambda (list v t1 t2 l) #f (Castable #f body)) next)))))
+
+;; A Cast rule is part of the decision tree for allowed versus
+;; not allowed casts. They use a few macros that keep invariants
+;; managable and allow literals to prune the tree to only possible
+;; needed branches
+(define-type Cast-Rule (-> L0-Expr L0-Expr L0-Expr L0-Expr Natural
+			   (values L0-Expr Natural)))
+
+;; Meta Cast Rules are Parameterized by another cast
+;; rule to control their behavior.
+(define-type Meta-Cast-Rule (-> Cast-Rule Cast-Rule))
+
+;; I don't actually use this type anywhere but variables
+;; and literals are what I consider terminal.
+(define-type Terminal (U (Quote Cast-Literal) (Var Uid)))
+
+;; This macro allows any literals to affect the shape
+;; of the decision tree perhaps a smater way of doing this
+;; in the future may be to keep an environment of variables
+;; around which would let us to specialize some of the dynamic
+;; checks and more of the checks where a type variable is known
+;; It would also be able to unfold to quanitize the amount of
+;; folding that we allow to happen.
+
+(define-syntax-rule (dont-specialize next op? v c a)
+  (let*-values ([(exp-c next) c]
+		[(exp-a next) a])
+    (values (If (Op op? (list v)) exp-c exp-a) next)))
+
+(define-syntax-rule (specialize next p? op? v c a)
+  (if (Quote? v) 
+      (if (p? (Quote-literal v)) c a)
+      (dont-specialize next op? v c a)))
+
+(define-syntax if/spec
+  (syntax-rules (Type:Int? Type:Bool? Type:Fn? Type:Dyn?)
+    [(_ next (Type:Int? v) c a) (specialize next Int? 'Type:Int? v c a)]
+    [(_ next (Type:Bool? v) c a) (specialize next Bool? 'Type:Bool? v c a)]
+    [(_ next (Type:Dyn? v) c a) (specialize next Dyn? 'Type:Dyn? v c a)]
+    [(_ next (Type:Fn? v) c a) (specialize next Fn? 'Type:Fn? v c a)]
+    [(_ next (op? v) c a) (dont-specialize next 'op? v c a)]))
+
+;; This ensures that cast primitives are only performed on terminals
+;; this is a fairly mindless way of ensuring that we are not recomputing
+;; values and empty lets will be folded away in a few passes
+(define-syntax-rule (bind-non-terminal v b* next)
+  (if (or (Quote? v) (Var? v)) 
+      (values b* v next)
+      (let-values ([(uid next) (next-uid "cast_tmp" next)])
+	(values (cons (cons uid v) b*) (Var uid) next))))
+(define-syntax-rule (with-terminals-only (v t1 t2 lbl next) body) 
+  (let*-values ([(b* v next) (bind-non-terminal v '() next)]
+		[(b* t1 next) (bind-non-terminal t1 b* next)]
+		[(b* t2 next) (bind-non-terminal t2 b* next)]
+		[(b* lbl next) (bind-non-terminal lbl b* next)])
+    (if (null? b*)
+	body
+	(let-values ([(tmp next) body])
+	  (values (Let b* tmp) next)))))
+
+
+
+
+;; The following are the two meta cast rules that are used
+(: cast-Any-Type->Any-Type Cast-Rule)
+(define (cast-Any-Type->Any-Type v t1 t2 l next)
+  (with-terminals-only
+   (v t1 t2 l next)
+   (if/spec next (Type:Int? t1)
+      (cast-Int->Any-Type v t1 t2 l next)
+      (if/spec next (Type:Bool? t1)
+	 (cast-Bool->Any-Type v t1 t2 l next)
+	 (if/spec next (Type:Dyn? t1)
+	    (cast-Dyn->Any-Type v t1 t2 l next)
+	    (if/spec next (Type:Fn? t1)
+	       (cast-Fn->Any-Type v t1 t2 l next)
+	       (values (Op 'Blame (list l)) next)))))))
+
+(: cast-Dyn->Any-Type Cast-Rule)
+(define (cast-Dyn->Any-Type v t1 t2 lbl next)
+  (with-terminals-only
+     (v t1 t2 lbl next)
+     (if/spec next (Type:Dyn? t2)
+	 (values v next)
+	 (let ([blame-lbl (Op 'Blame (list lbl))])
+	   (if/spec next (Type:Int? t2)
+	      (if/spec next (Dyn:Int? v)
+		 (values (Op 'Dyn:Int-value (list v)) next)
+		 (values blame-lbl next))
+	      (if/spec next (Type:Bool? t2)
+	         (if/spec next (Dyn:Bool? v)
+		    (values (Op 'Dyn:Bool-value (list v)) next)
+		    (values blame-lbl next))
+		 (if/spec next (Type:Fn? t2)
+		    (if/spec next (Dyn:Fn? v)
+		       (cast-Fn->Any-Type (Op 'Dyn:Fn-value (list v)) 
+					  (Op 'Dyn:Fn-type (list v)) 
+					  t2 lbl next)
+		       (values blame-lbl next))
+		    (values blame-lbl next))))))))
+
+;; Really this only decides weather or not to make a specialized cast
+(: specialize-cast (-> Cast-Rule Cast-Rule))
+(define (specialize-cast interp-cast)
+  (: specialize-cast-closure Cast-Rule)
+  (define (specialize-cast-closure v t1 t2 l next)
+    (with-terminals-only
+     (v t1 t2 l next)
+     (if (or (Quote? t1) (Quote? t2)) 
+	 ;; Some of the code may be specialized away
+	 (cast-Any-Type->Any-Type v t1 t2 l next)
+	 ;; Then we would end up with a full cast tree if it didn't call
+	 ;; the cast interpreter
+	 (interp-cast v t1 t2 l next))))
+  specialize-cast-closure)
+
+;; These are all the Cast Rules
+(: interp-cast (-> L0-Expr Cast-Rule))
+(define (interp-cast interp-var)
+  (: help Cast-Rule)
+  (define (help v t1 t2 l next)
+    (values (App interp-var (list v t1 t2 l)) next))
+  help)
+
+(: cast-Int->Dyn Cast-Rule)
+(define (cast-Int->Dyn v t1 t2 l next)
+  (values (Op 'Dyn:Int-make (list v)) next))
+
+(: cast-Bool->Dyn Cast-Rule)
+(define (cast-Bool->Dyn v t1 t2 l next) 
+  (values (Op 'Dyn:Bool-make (list v)) next))
+
+(: cast-Fn->Dyn Cast-Rule)
+(define (cast-Fn->Dyn v t1 t2 l next)
+  (values (Op 'Dyn:Fn-make (list v t1)) next))
+
+
+(: cast-Int->Any-Type Cast-Rule)
+(define (cast-Int->Any-Type v t1 t2 l next)
+  (with-terminals-only 
+   (v t1 t2 l next)
+   (if/spec next (Type:Int? t2)
+	    (values v next)
+	    (if/spec next (Type:Dyn? t2)
+		     (cast-Int->Dyn v t1 t2 l next)
+		     (values (Op 'Blame (list l)) next)))))
+
+(: cast-Bool->Any-Type Cast-Rule)
+(define (cast-Bool->Any-Type v t1 t2 lbl next)
+  (with-terminals-only
+   (v t1 t2 lbl next)
+   (if/spec next (Type:Bool? t2)
+	    (values v next)
+	    (if/spec next (Type:Dyn? t2)
+		     (cast-Bool->Dyn v t1 t2 lbl next)
+		     (values (Op 'Blame (list lbl)) next)))))
+
+(: cast-Fn->Any-Type Cast-Rule)
+(define (cast-Fn->Any-Type v t1 t2 lbl next)
+  (with-terminals-only
+   (v t1 t2 lbl next)
+   (if/spec next (Type:Dyn? t2)
+	    (cast-Fn->Dyn v t1 t2 lbl next)
+	    (if/spec next (Type:Fn? t2)
+		     (values (App (Op 'Fn-cast (list v)) (list v t1 t2 lbl))
+			     next)
+		     (values (Op 'Blame (list lbl)) next)))))
+
+;; This is the catamorphism over expression and with the removal
+;; of annotations formal and Binding structs
+
+(: ic-expr (-> Cast-Rule (-> C1-Expr Natural (values L0-Expr Natural))))
+(define (ic-expr cast)
+  (: recur (-> C1-Expr Natural (values L0-Expr Natural)))
+  (define (recur exp next)
+    (: recur/next (-> C1-Expr (values L0-Expr Natural)))
+    (define (recur/next exp) (recur exp next))
+    (match exp 
+      [(Lambda f* t (Castable ctr (app recur/next exp next))) 
+       (values 
+	(Lambda (map (inst Fml-identifier Uid Cast-Type) f*)
+		#f
+		(Castable ctr exp))
+	next)]
+      [(Letrec b* (app recur/next exp next)) 
+       (let-values ([(b* next) (cata-bnd* b* next)])
+	 (values (Letrec b* exp) next))]
+      [(Let b* (app recur/next exp next))
+       (let-values ([(b* next) (cata-bnd* b* next)])
+	 (values (Let b* exp) next))]
+      [(App (app recur/next exp next) exp*) 
+       (let-values ([(exp* next) (recur* exp* next)])
+	 (values (App exp exp*) next))]
+      [(Op p exp*) 
+       (let-values ([(exp* next) (recur* exp* next)])
+	 (values (Op p exp*) next))]
+      [(Cast (app recur/next e next) t1 t2 l)
+       (let*-values ([(t1 next) (recur t1 next)]
+		     [(t2 next) (recur t2 next)]
+		     [(l next) (recur l next)])
+	 (cast e t1 t2 l next))] 
+      [(If (app recur/next tst next) csq alt)
+       (let*-values ([(csq next) (recur csq next)]
+		     [(alt next) (recur alt next)])
+	 (values (If tst csq alt) next))]
+      [(Var i) (values (Var i) next)]
+      [(Quote k) (values (Quote k) next)]))
+  (: recur* (-> (Listof C1-Expr) Natural (values (Listof L0-Expr) Natural)))
+  (define (recur* e* n) 
+    (if (null? e*)
+	(values '() n)
+	(let*-values ([(e) (car e*)]
+		      [(e* n) (recur* (cdr e*) n)]
+		      [(e n) (recur e n)])
+	  (values (cons e e*) n))))
+  (: cata-bnd* (-> C1-Bnd* Natural (values L0-Bnd* Natural)))
+  (define (cata-bnd* b* n) 
+    (if (null? b*)
+	(values '() n)
+	(match-let ([(Bnd i t r) (car b*)])
+	  (let*-values ([(b* n) (cata-bnd* (cdr b*) n)]
+			[(r n) (recur r n)])
+	    (values (cons (cons i r) b*) n)))))
+  recur)
 
 
 

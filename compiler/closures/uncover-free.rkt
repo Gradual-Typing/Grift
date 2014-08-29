@@ -18,71 +18,72 @@
 ;; Only the pass is provided by this module
 (provide uncover-free)
 
-(: uncover-free (L1-Prog Config . -> . L2-Prog))
+(: uncover-free (Lambda1-Lang Config . -> . Lambda2-Lang))
 (define (uncover-free prgm comp-config)
-  (match-let ([(L1-Prog n u e t) prgm])
-    (let-values ([(e f*) (uf-expr e)])
-      (if (set-empty? f*)
-	  (L2-Prog n u e t)
-	  (raise-pass-exn "closure/uncover-free"
-			  "Free variables detect ~a" f*)))))
+  (match-let ([(Prog (list name count type) exp) prgm])
+    (let-values ([(exp free*) (uf-expr exp)])
+      (if (set-empty? free*)
+	  (Prog (list name count type) exp)
+	  (raise-pass-exn 'uncover-free "Free variables detect ~a" free*)))))
 
-(: uf-expr (L1-Form . -> . (Values L2-Form (Setof Uvar))))
+(: uf-expr (-> L1-Expr (Values L2-Expr (Setof Uid))))
 (define (uf-expr exp)
   (match exp
-    [(Letrec b* e t) 
+    [(Letrec b* e) 
      (let-values ([(b-vars b* b-fvars) (uf-bnd* uf-lambda b*)]
 		  [(e  e-fvars) (uf-expr e)])
-       (values (Letrec b* e t) 
+       (values (Letrec b* e) 
 	       (set-subtract (set-union e-fvars b-fvars) b-vars)))]
-    [(Let b* e t)
+    [(Let b* e)
      (let-values ([(b-vars b* b-fvars) (uf-bnd* uf-expr b*)]
-		  [(e  e-fvars) (uf-expr e)])
-       (values (Let b* e t) 
+		  [(e e-fvars) (uf-expr e)])
+       (values (Let b* e) 
 	       (set-subtract (set-union e-fvars b-fvars) b-vars)))]
     [(If (app uf-expr t t-fvars)
 	 (app uf-expr c c-fvars)
-	 (app uf-expr a a-fvars) ty)
-     (values (If t c a ty) (set-union t-fvars c-fvars a-fvars))]
-    [(When/blame l (app uf-expr t t-fvars) (app uf-expr c c-fvars) ty)
-     (values (When/blame l t c ty) (set-union t-fvars c-fvars))]
-    [(App (app uf-expr e e-fvars) (app uf-expr* e* e*-fvars) ty)
-     (values (App e e* ty) (set-union e-fvars e*-fvars))]
-    [(Op p (app uf-expr* e* e*-fvars) ty) (values (Op p e* ty) e*-fvars)]
-    [(Var u t) (values (Var u t) (set u))]
-    [(Quote k t) (values (Quote k t) (set))]))
+	 (app uf-expr a a-fvars))
+     (values (If t c a) (set-union t-fvars c-fvars a-fvars))]
+    [(App (app uf-expr e e-fvars) (app uf-expr* e* e*-fvars))
+     (values (App e e*) (set-union e-fvars e*-fvars))]
+    [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
+    [(Var u) (values (Var u) (set u))]
+    [(Quote k) (values (Quote k) (set))]))
 
-(: uf-expr* (-> (Listof L1-Form)
-		(values (Listof L2-Form) (Setof Uvar))))
+(: uf-expr* (-> (Listof L1-Expr)
+		(values (Listof L2-Expr) (Setof Uid))))
 (define (uf-expr* e*)
   (if (null? e*)
       (values '() (set))
-      (let-values ([(e e-fvars) (uf-expr (car e*))]
-		   [(e* e*-fvars) (uf-expr* (cdr e*))])
-	(values (cons e e*) (set-union e*-fvars e-fvars)))))
+      (let ([a (car e*)]
+	    [d (cdr e*)])
+	(let-values ([(e* e*-fvars) (uf-expr* d)]
+		     [(e e-fvars) (uf-expr a)])
+	  (values (cons e e*) (set-union e*-fvars e-fvars))))))
 
-(: uf-lambda (L1-Lambda . -> . (values L2-Lambda (Setof Uvar)))) 
+(: uf-lambda (L1-Lambda . -> . (values L2-Lambda (Setof Uid)))) 
 (define (uf-lambda lam)
-  (: id-subtract (-> (Fml L1-Type) (Setof Uvar) (Setof Uvar)))
-  (define (id-subtract f s)
-    (set-remove s (Fml-identifier f)))
-  (match-let ([(Lambda f* r (app uf-expr e fvars) t) lam])
-    (let ([fvars (foldl id-subtract fvars f*)])
-      (values (Lambda f* r (Free (set->list fvars) e) t) fvars))))
+  (: id-subtract (-> Uid (Setof Uid) (Setof Uid)))
+  ;; id-subtract is set remove with the arguments in reverse
+  (define (id-subtract f s) (set-remove s f))
+  (match-let ([(Lambda f* r (Castable ctr? (app uf-expr e fvars))) lam])
+    (let* ([fvars (foldl id-subtract fvars f*)]
+	   [fvars (if ctr? (set-add fvars ctr?) fvars)])
+      (values (Lambda f* r (Free ctr? (set->list fvars) e)) fvars))))
 
 (: uf-bnd* (All (T U) 
-	     (-> (-> T (values U (Setof Uvar))) 
-		 (Listof (Bnd T L1-Type))
-		 (values (Setof Uvar) 
-			 (Listof (Bnd U L2-Type)) 
-			 (Setof Uvar)))))
+	     (-> (-> T (values U (Setof Uid))) 
+		 (Listof (Pairof Uid T))
+		 (values (Setof Uid) ;; Newly Uids of this binding 
+			 (Listof (Pairof Uid U)) ;; new binds
+			 (Setof Uid))))) ;; all free vars
 (define (uf-bnd* p b*)
   (if (null? b*)
       (values (set) '() (set))
-      (match-let ([(Bnd u t (app p rhs rhs-f*)) (car b*)])
-	(let-values ([(u* b* f*) (uf-bnd* p (cdr b*))])
-	  (values (set-add u* u) 
-		  (cons (Bnd u t rhs) b*) 
-		  (set-union f* rhs-f*))))))
+      (let ([a (car b*)] [d (cdr b*)]) ;; free the list
+	(let-values ([(u* b* f*) (uf-bnd* p d)])
+	  (match-let ([(cons u (app p rhs rhs-f*)) a])
+	    (values (set-add u* u) 
+		    (cons (cons u rhs) b*) 
+		    (set-union f* rhs-f*)))))))
 
   

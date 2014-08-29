@@ -8,13 +8,14 @@ of the cast calculus.
 (require Schml/framework/build-compiler)
 (provide (all-defined-out))
 (require Schml/compiler/language)
-(: path->cast-calculus (Path Config . -> . Cast-Prog))
-(define (path->cast-calculus path config)
+
+(: reduce-to-cast-calculus (Path Config . -> . Cast0-Lang))
+(define (reduce-to-cast-calculus path config)
   (local-require Schml/compiler/schml/read
 		 Schml/compiler/schml/parse
 		 Schml/compiler/schml/type-check
 		 Schml/compiler/schml/insert-implicit-casts)
-  (let* ((stx-tree (read path config))
-	 (core-forms (parse stx-tree config))
-	 (well-typed (type-check core-forms config)))
-    (insert-implicit-casts well-typed config)))
+  (let* ((stx-lang (read path config))
+	 (s0 (parse stx-lang config))
+	 (s1 (type-check s0 config)))
+    (insert-implicit-casts s1 config)))

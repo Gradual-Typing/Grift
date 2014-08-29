@@ -10,7 +10,8 @@
 (define-predicate Any? Any)
 
 (provide (struct-out Config))
-(define compiler-config : (Parameter Config)
+(: compiler-config (Parameter Config))
+(define compiler-config 
   (make-parameter
    (Config 'Lazy-D)))
 
@@ -19,22 +20,30 @@
 (: compile/conf (Path Config . -> . Result))
 (define (compile/conf path config)
   (local-require Schml/compiler/schml/reduce-to-cast-calculus
-		 Schml/compiler/casts/interpret-casts
-		 Schml/compiler/closures/make-closures-explicit)
+		 Schml/compiler/casts/impose-cast-semantics
+		 Schml/compiler/closures/make-closures-explicit
+		 )
   (call-with-exception-handler 
    error
    (lambda ()
-     (let* ([prgm/casts  (path->cast-calculus path config)]
-	    [prgm/lambda (interpret-casts prgm/casts config)]
-	    [prgm/data   (make-closures-explicit prgm/lambda config)])
-  
+     (let* ([c0  (reduce-to-cast-calculus path config)]
+	    [_  (begin (print c0) (newline))]
+	    [l0  (impose-cast-semantics c0 config)]
+	    [_  (begin (print l0) (newline))]
+	    [d0  (make-closures-explicit l0 config)])
+       (print d0)
+       (newline)
        (success)))))
 
-(: compile ((U Path String) . -> . Result))
+(: compile (Any . -> . Result))
 (define (compile path) 
   (let ((config (compiler-config))) 
-    (if (string? path)
-	(compile/conf (string->path path) config)
-	(compile/conf path config))))
+    (cond
+     [(string? path) (compile/conf (string->path path) config)]
+     [(path? path) (compile/conf path config)]
+     [else (error 'compile)])))
 
-
+(module+ main
+  (command-line 
+     #:program "Schml-compiler-tests"
+     #:args (str) (compile str)))

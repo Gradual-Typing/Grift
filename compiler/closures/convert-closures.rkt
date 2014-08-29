@@ -16,105 +16,91 @@
 
 (provide convert-closures)
 
-(: convert-closures (L2-Prog Config . -> . Lambda3))
+(: convert-closures (Lambda2-Lang Config . -> . Lambda3-Lang))
 (define (convert-closures prgm conf)
-  (match-let ([(L2-Prog n c e t) prgm])
-    (let-values ([(e _ c) (cc-expr e c)])
-      (Prog (list n c t) e))))
+  (match-let ([(Prog (list name count type) exp) prgm])
+    (let-values ([(exp count) (cc-expr exp count)])
+      (Prog (list name count type) exp))))
 
-(: cc-expr (-> L2-Form Natural 
-	       (values L3-Expr L3-Type Natural)))
+(: cc-expr (-> L2-Expr Natural (values L3-Expr Natural)))
 (define (cc-expr exp next)
   (match exp
-    [(Letrec b* e t)
-     (let*-values ([(bp* bd* n) (cc-bnd-lambda* b* next)]
-		   [(e _ n) (cc-expr e n)])
-       (values (Letproc bp* (Letclos bd* e) t) t n))] 
-    [(Let b* e t)
-     (let*-values ([(b* n) (cc-bnd-data* b* next)]
-		   [(e _ n) (cc-expr e n)])
-       (values (Let b* e t) t n))]
-    [(If t c a ty)
-     (let*-values ([(t _ n) (cc-expr t next)]
-		   [(c _ n) (cc-expr c n)]
-		   [(a _ n) (cc-expr a n)])
-       (values (If t c a ty) ty n))]
-    [(When/blame l t c ty)
-     (let*-values ([(t _ n) (cc-expr t next)]
-		   [(c _ n) (cc-expr c n)])
-       (values (When/blame l t c ty) ty n))]
-    [(App e e* t)
-     (let*-values ([(e e-ty n) (cc-expr e next)]
-		   [(e* n) (cc-expr* e* n)])
-       (if (Var? e)
-           (values (App (cons e e) e* t) t n)
-           (let* ([tmp-u (Uvar "tmp_clos" n)]
-		  [tmp-v (Var tmp-u e-ty)])
-             (values (Let (list (Bnd tmp-u e-ty e))
-			  (App (cons tmp-v tmp-v) e* t)
-			  t)
-		     t 
-		     (add1 n)))))]
-      [(Op p e* t) 
-       (let-values ([(e* n) (cc-expr* e* next)])
-	 (values (Op p e* t) t n))]
-      [(Var u t) (values (Var u t) t next)]
-      [(Quote k t) (values (Quote k t) t next)]))
+    [(Letrec b* exp)
+     (let*-values ([(bp* bd* next) (cc-bnd-lambda* b* next)]
+		   [(exp next) (cc-expr exp next)])
+       (values (LetP bp* (LetC bd* exp)) next))] 
+    [(Let b* exp)
+     (let*-values ([(b* next) (cc-bnd-data* b* next)]
+		   [(exp next) (cc-expr exp next)])
+       (values (Let b* exp) next))]
+    [(If t c a)
+     (let*-values ([(t next) (cc-expr t next)]
+		   [(c next) (cc-expr c next)]
+		   [(a next) (cc-expr a next)])
+       (values (If t c a) next))]
+    [(App exp exp*)
+     (let*-values ([(exp next) (cc-expr exp next)]
+		   [(exp* next) (cc-expr* exp* next)])
+       (if (Var? exp)
+           (values (App (cons exp exp) exp*) next)
+           (let*-values ([(tmp-u next) (next-uid "tmp_clos" next)]
+			 [(tmp-v) (Var tmp-u)])
+             (values (Let (list (cons tmp-u exp))
+			  (App (cons tmp-v tmp-v) exp*))
+		     next))))]
+      [(Op p exp*) 
+       (let-values ([(exp* next) (cc-expr* exp* next)])
+	 (values (Op p exp*) next))]
+      [(Var u) (values (Var u) next)]
+      [(Quote k) (values (Quote k) next)]))
 
-(: cc-expr* (-> (Listof L2-Form) Natural
-		(values (Listof L3-Expr) Natural)))
-(define (cc-expr* exp* n)
+(: cc-expr* (-> (Listof L2-Expr) Natural (values (Listof L3-Expr) Natural)))
+(define (cc-expr* exp* next)
   (if (null? exp*)
-      (values '() n)
-      (let*-values ([(e* n) (cc-expr* (cdr exp*) n)]
-		    [(e _ n) (cc-expr (car exp*) n)])
-	(values (cons e e*) n))))
+      (values '() next)
+      (let ([exp (car exp*)] [exp* (cdr exp*)])
+	(let*-values ([(exp* next) (cc-expr* exp* next)]
+		      [(exp next) (cc-expr exp next)])
+	  (values (cons exp exp*) next)))))
 
-(define-type L2BndP (Bnd L2-Lambda L2-Type))
-(define-type L3BndP (Bnd L3-Procedure L3-Type))
-(define-type L3BndC (Bnd L3-Closure L3-Type))
-(define-type L2BndD (Bnd L2-Form L2-Type))
-(define-type L3BndD (Bnd L3-Expr L3-Type))
-
-
-(: cc-bnd-lambda* (-> (Listof L2BndP) Natural
-		      (values (Listof L3BndP) 
-			      (Listof L3BndC) 
-			      Natural)))
-(define (cc-bnd-lambda* b* n)
-  (if (null? b*)
-      (values '() '() n)
-      (let-values ([(p* c* n) (cc-bnd-lambda* (cdr b*) n)])
-	(match-let ([(Bnd ext-cp-var t 
-			  (Lambda fml* r (Free fv* e) t^)) (car b*)])
-	  (let*-values ([(e _ n) (cc-expr e n)]
-			[(int-cp-var n) (mk-clos-ptr-uvar ext-cp-var n)]
-			[(code-var n) (mk-code-ptr-uvar ext-cp-var n)])
-	    (let* ([proc (Procedure int-cp-var fml* fv* e t^)]
-		   [bndp (Bnd code-var t proc)]
-		   [clos (Closure-data code-var fv*)]
-		   [bndc (Bnd ext-cp-var t clos)])
-	      (values (cons bndp p*) (cons bndc c*) n)))))))
-
-(: cc-bnd-data* (-> (Listof L2BndD) Natural
-		    (values (Listof L3BndD) Natural)))
-
-(define (cc-bnd-data* bnd* n)
+(: cc-bnd-lambda* (-> L2-Bnd-Lambda* Natural 
+		      (values L3-Bnd-Procedure* L3-Bnd-Closure* Natural)))
+(define (cc-bnd-lambda* bnd* next)
   (if (null? bnd*)
-      (values '() n)
-      (let*-values ([(b* n) (cc-bnd-data* (cdr bnd*) n)])
-	(match-let ([(Bnd u t e) (car bnd*)])
-	  (let*-values ([(e _ n) (cc-expr e n)])
-	    (values (cons (Bnd u t e) b*) n))))))
+      (values '() '() next)
+      (let ([bnd (car bnd*)] [bnd* (cdr bnd*)])
+	(let-values ([(bndp* bndc* next) (cc-bnd-lambda* bnd* next)])
+	  (match-let* ([(cons u1 lam) bnd]
+		       [(Lambda fml* _ (Free ctr? fv* exp)) lam])
+	   (let*-values ([(exp next)  (cc-expr exp next)]
+			 [(u2 next) (mk-clos-ptr-uid u1 next)]
+			 [(u3 next) (mk-code-ptr-uid u1 next)])
+	    (let* ([proc (Procedure u2 fml* ctr? fv* exp)]
+		   [bndp (cons u3 proc)]
+		   [clos (Closure-Data u3 ctr? fv*)]
+		   [bndc (cons u1 clos)])
+	      (values (cons bndp bndp*) (cons bndc bndc*) next))))))))
 
-(: mk-uvar (Uvar String Natural . -> . (values Uvar Natural)))
-(define (mk-uvar u s n)
-  (values (Uvar (string-append (Uvar-prefix u) s) n)
-	  (add1 n)))
+(: cc-bnd-data* (-> L2-Bnd-Data* Natural
+		    (values L3-Bnd-Data* Natural)))
+(define (cc-bnd-data* bnd* next)
+  (let ((Bnd* (inst cons L3-Bnd-Data L3-Bnd-Data*)))
+    (if (null? bnd*)
+      (values '() next)
+      (let ([bnd (car bnd*)] [bnd* (cdr bnd*)])
+	(let*-values ([(bnd* next) (cc-bnd-data* bnd* next)])
+	  (match-let ([(cons uid exp) bnd])
+	    (let*-values ([(exp next) (cc-expr exp next)]
+			  [(bnd) (cons uid exp)])
+	      (values (Bnd* bnd bnd*) next))))))))
 
-(: mk-code-ptr-uvar (Uvar Natural . -> . (values Uvar Natural)))
-(define (mk-code-ptr-uvar u n) (mk-uvar u "_code" n))
-(: mk-clos-ptr-uvar (Uvar Natural . -> . (values Uvar Natural)))
-(define (mk-clos-ptr-uvar u n) (mk-uvar u "_clos" n))
+
+(define-syntax-rule (mk-uid/uid u s next)
+  (next-uid (string-append (Uid-prefix u) s) next))
+
+(: mk-code-ptr-uid (Uid Natural . -> . (values Uid Natural)))
+(define (mk-code-ptr-uid u next) (mk-uid/uid u "_code" next))
+(: mk-clos-ptr-uid (Uid Natural . -> . (values Uid Natural)))
+(define (mk-clos-ptr-uid u next) (mk-uid/uid u "_clos" next))
 
 

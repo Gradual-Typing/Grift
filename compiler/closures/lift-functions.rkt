@@ -1,4 +1,4 @@
-#lang racket
+#lang typed/racket
 #|------------------------------------------------------------------------------+
 |Pass: compiler/closures/lift-functions                           |
 +-------------------------------------------------------------------------------+
@@ -12,80 +12,77 @@
 ;; The define-pass syntax
 (require Schml/framework/build-compiler
          Schml/framework/helpers
-         Schml/framework/errors)
+         Schml/framework/errors
+	 Schml/compiler/language)
 
-(require Schml/language/shared
-         (prefix-in s: Schml/language/closure-il4)
-         (prefix-in t: Schml/language/closure-il5))
+
 ;; Only the pass is provided by this module
 (provide lift-functions)
 
-(define-pass  (lift-functions prgm comp-config)
-  ;; purposely backwards
-  (define (lf-lambda lbl lam ty fn-bnd*)
-    (match lam
-      [(s:Lambda ty-lam fmls exp)
-       (let-values ([(exp fn-bnd*) (lf-expr exp fn-bnd*)])
-         (cons (Bnd:Ty lbl (t:Lambda ty-lam fmls exp) ty) fn-bnd*))]))
-  
-  (define (lf-expr* e* f*) 
+(: lift-functions (-> Lambda4-Lang Config Data0-Lang))
+(define (lift-functions prgm comp-config)
+  (match-let ([(Prog (list name count type) (app lf-expr exp bndc*)) prgm])
+    (Prog (list name count type) (Labels bndc* exp))))
+
+;; This can and will be much more efficient than appending everywhere
+(: lf-expr (-> L4-Expr (values D0-Expr D0-Bnd-Code*)))
+(define (lf-expr exp)
+  (match exp
+    [(Labels (app lf-bnd-code* bndc*) 
+	     (Let (app lf-bnd* bnd* b*-bndc*) 
+		  (Begin (app lf-effect* e* e*-bndc*) 
+			 (app lf-expr e e-bndc*))))
+     (values (Let bnd* (Begin e* e)) (append b*-bndc* bndc* e*-bndc* e-bndc*))]
+    [(Let (app lf-bnd* bnd* bndc*) (app lf-expr e e-bndc*))
+     (values (Let bnd* e) (append bndc* e-bndc*))]
+    [(If (app lf-expr tst t-b*) (app lf-expr csq c-b*) (app lf-expr alt a-b*))
+     (values (If tst csq alt) (append t-b* c-b* a-b*))]
+    [(App  (app lf-expr exp exp-bndc*) (app lf-expr* exp* exp*-bndc*))
+     (values (App exp exp*) (append exp-bndc* exp*-bndc*))]
+    [(Op p (app lf-expr* exp* exp*-bnd*)) 
+     (values (Op (if (eq? p 'Fn-cast) 
+		     (error 'type) 
+		     p) 
+		 exp*) exp*-bnd*)]
+    [(Var i) (values (Var i) '())]
+    [(Code-Label i) (values (Code-Label i) '())]
+    [(Quote l) (values (Quote l) '())]))
+
+(: lf-bnd-code* (-> L4-Bnd-Code* D0-Bnd-Code*))
+(define (lf-bnd-code* b*)
+    (if (null? b*)
+	'()
+	(match-let ([(cons (cons uid (Code params* (app lf-expr exp bndc^*))) 
+			   (app lf-bnd-code* bndc*)) 
+		     b*])
+	  (let ([bnd (cons uid (Code params* exp))]
+		[bnd* (append bndc^* bndc*)])
+	    (cons bnd bnd*)))))
+
+(: lf-bnd* (-> L4-Bnd-Data* (values D0-Bnd* D0-Bnd-Code*)))
+(define (lf-bnd* b*)
+  (if (null? b*)
+      (values '() '())
+      (match-let ([(cons (cons uid (app lf-expr exp bndc^*)) 
+			 (app lf-bnd* bndd* bndc*)) 
+		   b*])
+	(let ([bndd (cons uid exp)])
+	  (values (cons bndd bndd*) (append bndc^* bndc*))))))
+
+(: lf-expr* (-> L4-Expr* (values D0-Expr* D0-Bnd-Code*)))
+(define (lf-expr* e*) 
     (if (null? e*)
-        (values '() f*)
-        (let*-values ([(e f*) (lf-expr (car e*) f*)]
-                      [(e* f*) (lf-expr* (cdr e*) f*)])
-          (values (cons e e*) f*))))
-  (define (lf-expr exp fn-bnd*)
-    (match exp
-      [(s:Let-Proc ty (list (Bnd:Ty lbl* lam* ty*) ...) exp)
-       (let-values ([(exp fn-bnd*) (lf-expr exp fn-bnd*)])
-         (values exp (foldr lf-lambda fn-bnd* lbl* lam* ty*)))]
-      [(s:Let ty (list (Bnd:Ty i* e* t*) ...) exp)
-       (let*-values ([(exp fn-bnd*) (lf-expr exp fn-bnd*)]
-                     [(e* fn-bnd*) (lf-expr* e* fn-bnd*)])
-         (values (t:Let ty (map Bnd:Ty i* e* t*) exp) fn-bnd*))]
-      [(s:Cast ty-cast exp ty-exp label)
-       (let-values ([(exp fn-bnd*) (lf-expr exp fn-bnd*)])
-         (values (t:Cast ty-cast exp ty-exp label) fn-bnd*))]
-      [(s:If ty tst csq alt)
-       (let*-values ([(tst fn-bnd*) (lf-expr tst fn-bnd*)]
-                     [(csq fn-bnd*) (lf-expr csq fn-bnd*)]
-                     [(alt fn-bnd*) (lf-expr alt fn-bnd*)])
-         (values (t:If ty tst csq alt) fn-bnd*))]
-      [(s:App ty exp exp*)
-       (let*-values ([(exp fn-bnd*) (lf-expr exp fn-bnd*)]
-                     [(exp* fn-bnd*) (lf-expr* exp* fn-bnd*)])
-         (values (t:App ty exp exp*) fn-bnd*))]
-      [(s:Begin ty exp* exp)
-       (let*-values ([(exp fn-bnd*) (lf-expr exp fn-bnd*)]
-                     [(exp* fn-bnd*) (lf-expr* exp* fn-bnd*)])
-         (values (t:Begin ty exp* exp) fn-bnd*))]
-      [(s:Prim ty pexp) (lf-prim ty pexp fn-bnd*)]
-      [(s:Var t i) (values (t:Var t i) fn-bnd*)]
-      [(s:Label t l) (values (t:Label t l) fn-bnd*)]
-      [(s:Const t k) (values (t:Const t k) fn-bnd*)]
-      [e (match-pass-error pass 'lf-expr e)]))
-  (define (lf-prim ty pexp fn-bnd*)
-    (match pexp
-      [(Closure-field:Ref clos field) 
-       (let-values ([(exp fn-bnd*) (lf-expr clos fn-bnd*)])
-         (values (t:Prim ty (Closure-field:Ref exp field)) fn-bnd*))]
-      [(Closure-field:Set! clos-exp field exp)
-       (let*-values ([(clos-exp fn-bnd*) (lf-expr clos-exp fn-bnd*)]
-                     [(exp fn-bnd*) (lf-expr exp fn-bnd*)])
-         (values (t:Prim ty (Closure-field:Set! clos-exp field exp)) fn-bnd*))]
-      [(Closure-field:Build fields)
-       (values (t:Prim ty pexp) fn-bnd*)]
-      [(Op:IntxInt fst snd)
-       (let*-values ([(fst fn-bnd*) (lf-expr fst fn-bnd*)]
-                     [(snd fn-bnd*) (lf-expr snd fn-bnd*)])
-         (values (t:Prim ty (mk-op:int-int pexp fst snd)) fn-bnd*))]
-      [(Rel:IntxInt fst snd)
-       (let*-values ([(fst fn-bnd*) (lf-expr fst fn-bnd*)]
-                     [(snd fn-bnd*) (lf-expr snd fn-bnd*)])
-         (values (t:Prim ty (mk-rel:int-int pexp fst snd)) fn-bnd*))] 
-      [otherwise (match-pass-error pass 'iic-prim otherwise)]))
-  (match prgm
-    [(s:Prog name unique type exp)
-     (let-values ([(exp fns) (lf-expr exp '())])
-       (t:Prog name unique type fns exp))]
-    [otherwise (match-pass-error pass 'body prgm)]))
+        (values '() '())
+	(match-let ([(cons (app lf-expr e e-bnd*)
+			   (app lf-expr* e* e*-bnd*)) 
+		     e*])
+	  (values (cons e e*) (append e-bnd* e*-bnd*)))))
+
+(: lf-effect* (-> L4-Effect* (values D0-Effect* D0-Bnd-Code*)))
+(define (lf-effect* e*)
+  (if (null? e*)
+      (values '() '())
+      (match-let ([(cons (Op p (app lf-expr* e* e*-bnd*)) 
+			 (app lf-effect* eff* bnd*)) 
+		   e*])
+	(values (cons (Op p e*) eff*) (append e*-bnd* bnd*)))))

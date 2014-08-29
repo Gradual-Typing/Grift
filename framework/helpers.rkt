@@ -23,6 +23,40 @@
 (define (file->srcloc n)
   (srcloc n #f #f #f #f))
 
+#| 
+A language form ends up just being a polymorphic record.
+This allows me to make very desciptive grammars via types later on.
+|#
+
+(define-syntax (define-forms stx)
+  (syntax-case stx ()
+    [(_ (name fields ...) f* ...)
+     (with-syntax ([(types ...) (generate-temporaries #'(fields ...))])
+       #'(begin 
+	   (struct (types ...) name ([fields : types] ...) #:transparent)
+	   (define-forms f* ...)))]
+    [(_) #'(void)]))
+
+(define-syntax-rule (define-type+ id ([id* c*] ...) t)
+  (begin (define-type id t)
+	 (define-type id* (c* id)) ...))
+
+#| In order to simulate the ability to pass the wrong
+   number of arguments to a function I need a fold-right
+   that takes the shorter of two lists
+|#
+
+(: fold-2-left 
+   (All (a b c) 
+	(-> (-> a b c c) c (Listof a) (Listof b) c)))
+(define (fold-2-left p acc l0 l1)
+  (if (or (null? l0) (null? l1))
+      acc
+      (fold-2-left p
+		   (p (car l0) (car l1) acc)
+		   (cdr l0)
+		   (cdr l1))))
+
 #|
 (require (for-syntax  racket/list))
 

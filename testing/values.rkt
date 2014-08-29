@@ -2,7 +2,7 @@
 
 (provide (all-defined-out))
 
-(define-type Value (U blame boole integ dynamic function))
+(define-type Test-Value (U blame boole integ dynamic function))
 
 (struct not-lbl ([value : String])
 	#:transparent)
@@ -18,7 +18,7 @@
 (struct function ()
 	#:transparent)
 
-(: value=? (Value Value . -> . Boolean))
+(: value=? (Test-Value Test-Value . -> . Boolean))
 (define (value=? x y)
   (or (and (blame? x) (blame? y) (blame=? x y))
       (and (boole? x) (boole? y) (boole=? x y))

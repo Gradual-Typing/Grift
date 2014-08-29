@@ -66,49 +66,17 @@
 
 ;; Only the pass is provided by this module
 (provide type-check)
-#| Some type shorthand to keep types reasonable |#
-(define-type TT Typed-Type)
-(define-type TT* (Listof TT))
-(define-type TL Typed-Literal)
-(define-type TP Typed-Prim)
-(define-type TF Typed-Form)
-(define-type ST Src.Type)
-(define-type TFml (Fml TT))
-(define-type TBnd (Bnd TF TT))
-(define-type TP.TT (Pair TP TT*))
-(define-type CF Core-Form)
-(define-type CT Core-Type)
-(define-type CL Core-Literal)
-(define-type CBnd (Bnd CF (Maybe CT)))
-(define-type CFml (Fml Core-Type))
-(define-type CP Core-Prim)
 
-(define-type Env (HashTable Uvar TT))
+(: type-check (Schml0-Lang Config . -> . Schml1-Lang)) 
+(define (type-check prgm config)
+  (match-let ([(Prog (list name next-uid) exp) prgm])
+    (let-values ([(exp type) (tc-expr exp (hash))])
+      (Prog (list name next-uid type) exp))))
+
+(define-type Env (HashTable Uid Schml-Type))
 (define-syntax-rule (env-extend* e x* v*)
   (for/fold ([t : Env e]) ([x x*] [v v*])
     (hash-set t x v)))
-
-
-
-(: type-check (Core-Prog Config . -> . Typed-Prog)) 
-(define (type-check prgm comp-config)
-  (match-let ([(Core-Prog n c e) prgm])
-    (let-values (((e t) (tyck-expr e (hasheq))))
-      (Typed-Prog n c e t))))
-
-(: map-Fml ((Listof Uvar) (Listof TT) . -> . (Listof TFml)))
-(define (map-Fml id* ty*)
-  (for/list : (Listof TFml) 
-	    ([id id*] [ty ty*])
-	    (Fml id ty)))
-
-(: map-Bnd ((Listof Uvar) (Listof TT) (Listof TF)
-	    . -> . 
-	    (Listof (Bnd TF TT))))
-(define (map-Bnd id* ty* rhs*)
-  (for/list : (Listof (Bnd TF TT))
-	    ([id id*] [ty ty*] [rhs rhs*])
-	    (Bnd id ty rhs)))
 
 ;;; Procedures that are used to throw errors
 ;; The error that occurs when a variable is not found. It is an internal
@@ -120,16 +88,17 @@
 ;; The type of a lambda that is annotated is the type of the annotation
 ;; as long as the annotation is consistent with the type of the
 ;; body
-(: lambda-type-rule (Src (Listof TT) TT (Maybe TT) . -> . (Fn/a (Listof TT) TT)))
+(: lambda-type-rule (-> Src Schml-Type* Schml-Type Schml-Type? 
+			(Fn Index Schml-Type* Schml-Type)))
 (define (lambda-type-rule src ty* t-body t-ann)
   (cond
-   [(not t-ann) (Fn/a (length ty*) ty* t-body)]
-   [(consistent? t-body t-ann) (Fn/a (length ty*) ty* t-ann)]
+   [(not t-ann) (Fn (length ty*) ty* t-body)]
+   [(consistent? t-body t-ann) (Fn (length ty*) ty* t-ann)]
    [else  (raise-lambda-inconsistent src t-body t-ann)]))
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
-(: let-binding-type-rule ((Maybe TT) TT Uvar Src . -> . TT))
+(: let-binding-type-rule (-> Schml-Type? Schml-Type Uid Src Schml-Type))
 (define (let-binding-type-rule t-bnd t-exp id src)
   (cond
    [(not t-bnd) t-exp]
@@ -138,7 +107,8 @@
 
 ;; The type of a cast is the cast-type if the expression type and
 ;; the cast type are consistent.
-(: ascription-type-rule (TT TT Src (Maybe Label) . -> . TT))
+(: ascription-type-rule (-> Schml-Type Schml-Type Src (Option String) 
+			    Schml-Type))
 (define (ascription-type-rule ty-exp ty-cast src label)
   (if (not (consistent? ty-exp ty-cast))
       (if label
@@ -149,7 +119,8 @@
 ;; The type of an if is the join of the consequence and alternative
 ;; types if the type of the branches are consistent and the test is
 ;; consistent with Bool.
-(: if-type-rule (TT TT TT Src . -> . TT))
+(: if-type-rule (-> Schml-Type Schml-Type Schml-Type Src
+		    Schml-Type))
 (define (if-type-rule t-tst t-csq t-alt src)
   (cond
    [(not (consistent? t-tst BOOL-TYPE))
@@ -159,7 +130,7 @@
    [else (join t-csq t-alt)]))
 
 ;; The type of literal constants are staticly known
-(: const-type-rule (Core-Literal . -> . (U Bool Int)))
+(: const-type-rule (Schml-Literal . -> . (U Bool Int)))
 (define (const-type-rule c)
   (if (boolean? c)
       BOOL-TYPE
@@ -168,10 +139,11 @@
 ;; The type of an application is the return type of the applied
 ;; procedure given that the arguments are consistent with the
 ;; arguments types of the proceedure.
-(: application-type-rule (TT (Listof TT) Src . -> . TT))
+(: application-type-rule (-> Schml-Type Schml-Type* Src
+			     Schml-Type))
 (define (application-type-rule t-rator t-rand* src)
   (match t-rator
-    [(Fn/a arr t-fml* t-ret)
+    [(Fn arr t-fml* t-ret)
      (if (and (= arr (length t-rand*))
 	      (andmap consistent? t-fml* t-rand*))
 	 t-ret
@@ -180,200 +152,108 @@
     [otherwise (raise-app-not-function src t-rator)]))
 
 ;;; Procedures that destructure and restructure the ast
-;; tyck-expr : (Struct Expr) * Env -> (values (Struct Expr) Type)
-(: tyck-expr (Core-Form Env . -> . (values TF TT)))
-(define (tyck-expr exp env)
-  (: recur (Core-Form . -> . (values TF TT)))
-  (define (recur e) : (values TF TT)
-    (define-syntax-rule (map-recur exp*)
-      (for/lists ([e* : (Listof TF)]
-		  [t* : (Listof TT)])
-	  ([e exp*])
-	(recur e)))
-    (match e
-      [(Lambda fmls ty-ret body src) 
-       (tyck-lambda fmls ty-ret body src env)] 
-      ;; let and letrec are very similar the only difference are restrictions
-      ;; of not using type inference and the environment used to check the bindings
-      [(Letrec bnd body src) (tyck-letrec bnd body src env)]
-      [(Let bnd body src) (tyck-let bnd body src env recur)]
-      [(Var id src)
-       (let* ([ty (hash-ref env id (lookup-failed src id))]
-	      [ann (cons src ty)])
-	 (values (Var id ann) ty))]
-      [(Ascribe (app recur exp ty-exp) ty-ann label src)
-       (let* ([ty-ann ((check-type src) ty-ann)]
-	      [ty (ascription-type-rule ty-exp ty-ann src label)]
-	      [ann (cons src ty)])
-	 (values (Ascribe exp ty-exp label ann) ty))]
-      [(If tst csq alt src)
-       (let*-values ([(tst ty-tst) (recur tst)]
-		     [(csq ty-csq) (recur csq)]
-		     [(alt ty-alt) (recur alt)]
-		     [(ty) (if-type-rule ty-tst ty-csq ty-alt src)]
-		     [(ann) (cons src ty)])
-	 (values (If tst csq alt ann) ty))]
-      [(Quote lit src)
-       (let* ([ty (const-type-rule lit)]
-	      [ann (cons src ty)])
-	 (values (Quote lit ann) ty))]
-      [(App rator rand* src)
-       (let*-values ([(rator ty-rator) (recur rator)]
-		     [(rand* ty-rand*) (map-recur rand*)]
-		     [(ty) (application-type-rule ty-rator ty-rand* src)]
-		     [(ann) (cons src ty)])
-	 (values (App rator rand* ann) ty))]
-      [(Op prim rand* src) 
-       (let*-values ([(ty-prim) (typed-prim->typed-type prim)]
-		     [(rand* ty-rand*) (map-recur rand*)]
-		     [(ty) (application-type-rule ty-prim ty-rand* src)]
-		     [(ann) (cons src ty)])
-	 ;; The instance is ugly but needed in order to 
-	 ;; get Op to typecheck.
-	 (values (Op ((inst cons TP (Listof TT))
-		      prim (Fn/a-fmls ty-prim)) 
-		     rand* ann) ty))]))
+;; tc-expr : (Struct Expr) * Env -> (values (Struct Expr) Type)
+(: tc-expr (-> S0-Expr Env (values S1-Expr Schml-Type)))
+(define (tc-expr exp env)
+  (define-syntax-rule (map-recur exp*)
+    (for/lists ([e* : (Listof S1-Expr)] [t* : (Listof Schml-Type)])
+	([e exp*]) (recur e)))
+  (: recur (-> S0-Expr (values S1-Expr Schml-Type)))
+  (define (recur e)
+    (let ((src (Ann-data e)))
+      (match (Ann-value e)
+	[(Lambda fmls ty-ret body) 
+	 (tc-lambda fmls ty-ret body src env)] 
+	[(Letrec bnd body) (tc-letrec bnd body src env)]
+	[(Let bnd body) (tc-let bnd body src env recur)]
+	[(App rator rand*)
+	 (let*-values ([(rator ty-rator) (recur rator)]
+		       [(rand* ty-rand*) (map-recur rand*)]
+		       [(ty) (application-type-rule ty-rator ty-rand* src)])
+	   (values (Ann (App rator rand*) (cons src ty)) ty))]
+	[(Op prim rand*)
+	 (let*-values ([(ty-prim) (schml-prim->type prim)]
+		       [(rand* ty-rand*) (map-recur rand*)]
+		       [(ty) (application-type-rule ty-prim ty-rand* src)])
+	   (values (Ann (Op (Ann prim (Fn-fmls ty-prim)) rand*)
+			(cons src ty))
+		   ty))]
+	[(Ascribe (app recur exp ty-exp) ty-ann label)
+	 (let* ([ty (ascription-type-rule ty-exp ty-ann src label)]
+		[ann (cons src ty)])
+	   (values (Ann (Ascribe exp ty-exp label) (cons src ty)) ty))]
+	[(If tst csq alt)
+	 (let*-values ([(tst ty-tst) (recur tst)]
+		       [(csq ty-csq) (recur csq)]
+		       [(alt ty-alt) (recur alt)]
+		       [(ty) (if-type-rule ty-tst ty-csq ty-alt src)])
+	   (values (Ann (If tst csq alt) (cons src ty)) ty))]
+	[(Var id) (let ([ty (hash-ref env id (lookup-failed src id))])
+		    (values (Ann (Var id) (cons src ty)) ty))]
+	[(Quote lit) (let* ([ty (const-type-rule lit)])
+		       (values (Ann (Quote lit) (cons src ty)) ty))])))
   (recur exp))
 
 
-#|
-;; Variables are typed at the type associated with it in environment
-;; If it isn't found then there must be a mistake in the
-;; compiler because all unbound variable should be caught during parsing.
+(: tc-lambda (-> Schml-Fml* Schml-Type? S0-Expr Src Env
+		 (values S1-Expr Schml-Type)))
+(define (tc-lambda fml* ty-ret body src env)
+  (let*-values ([(id* ty*) (unzip-formals fml*)]
+		[(body ty-body) (tc-expr body (env-extend* env id* ty*))]
+		[(ty-lambda) (lambda-type-rule src ty* ty-body ty-ret)]) 
+    (values (Ann (Lambda fml* (Fn-ret ty-lambda) body)
+		 (cons src ty-lambda))
+	    ty-lambda)))
 
-
-))
-|#
-(: tyck-lambda 
-   (-> (Listof CFml) (Maybe CT) CF Src Env (values TF TT)))
-
-(: unzip-formals 
-   (-> (Listof CFml) 
-       (values (Listof Uvar) (Listof CT))))
+(: unzip-formals (-> Schml-Fml* (values (Listof Uid) Schml-Type*)))
 (define (unzip-formals f*)
-  (for/lists ([i* : (Listof Uvar)] [t* : (Listof Core-Type)])
+  (for/lists ([i* : (Listof Uid)] [t* : Schml-Type*])
       ([f f*])
     (values (Fml-identifier f) (Fml-type f))))
 
-(define (tyck-lambda fmls ty-ret body src env)
-  (let*-values ([(id* ty*) (unzip-formals fmls)]
-		[(ty*) (map (check-type src) ty*)]
-		[(ty-ret) ((check-maybe-type src) ty-ret)]
-		[(body ty-body) (tyck-expr body (env-extend* env id* ty*))]
-		[(ty-lambda) (lambda-type-rule src ty* ty-body ty-ret)]
-		[(ty-ret) (Fn/a-ret ty-lambda)]
-		[(fml*) (map-Fml id* ty*)]
-		[(ann) (cons src ty-lambda)]) 
-    (values (Lambda fml* ty-ret body ann) ty-lambda)))
 
-(: tyck-letrec 
-   (-> (Listof CBnd) CF Src Env (values TF TT)))
-(define (tyck-letrec bnd body src env)
+(: tc-letrec (-> S0-Bnd* S0-Expr Src Env 
+		 (values S1-Expr Schml-Type)))
+(define (tc-letrec bnd* body src env)
+    (: env-extend/bnd (S0-Bnd Env . -> . Env))
+  (define (env-extend/bnd b env)
+    (match b
+      [(Bnd i t (Ann (Lambda f* t^ b) src))
+       (if t
+	   (hash-set env i t)
+	   (let ([args (map (inst Fml-type Uid Schml-Type) f*)])
+	     (if t^
+		 (hash-set env i (Fn (length args) args t^))
+		 (hash-set env i (Fn (length args) args DYN-TYPE)))))]
+      [else (raise-letrec-restrict src)]))
   (let*-values 
-      ([(id* ty* rhs*) (check-letrec-bindings src bnd)]
-       [(env) (env-extend* env id* ty*)]
-       [(recur/env) (lambda ([e : Core-Form]) 
-		      (tyck-expr e env))]
-       [(id* ty* rhs*) (tyck-bindings src recur/env id* ty* rhs*)] 
-       [(body ty-body) (tyck-expr body env)]
-       [(bnd*) (map-Bnd id* ty* rhs*)]
-       [(ann) (cons src ty-body)])
-    (values (Letrec bnd* body ann) ty-body)))
+      ([(env) (foldl env-extend/bnd env bnd*)] 
+       [(recur/env) (lambda ([e : S0-Expr]) (tc-expr e env))]
+       [(bnd*) (map (mk-tc-binding src recur/env) bnd*)] 
+       [(body ty-body) (tc-expr body env)])
+    (values (Ann (Letrec bnd* body) (cons src ty-body)) ty-body)))
 
-(: check-letrec-bindings 
-   (-> Src (Listof CBnd)
-       (values (Listof Uvar) (Listof TT) (Listof CF))))
-(define (check-letrec-bindings src bnd*)
-  (define check (check-type src))
-  (for/lists ([u* : (Listof Uvar)]
-	      [t* : (Listof TT)]
-	      [r* : (Listof CF)])
-      ([b bnd*])
-    (let ([u (Bnd-identifier b)]
-	  [t (Bnd-type b)]
-	  [r (Bnd-expression b)])
-      (if (and t (Lambda? r)) 
-	  (values u (check t) r)
-	  (if (Lambda? r)
-	      (let ([ret (Lambda-return-type r)]
-		    [args : (Listof CT) 
-			  (map (inst Fml-type CT) 
-			       (Lambda-formals r))])
-		(if ret
-		    (values u 
-			    (Fn/a (length args) 
-				  (map check args) 
-				  (check ret)) 
-			    r)
-		    (raise-letrec-restrict src)))
-	      (raise-letrec-restrict src))))))
-
-(: tyck-let 
-   (-> (Listof CBnd) CF Src Env (-> CF (values TF TT))
-       (values TF TT)))
-(define (tyck-let bnd* body src env recur)
-  (let*-values 
-      ([(id* ty* rhs*) (check-let-bindings src bnd*)]
-       [(id* ty* rhs*) (tyck-bindings src recur id* ty* rhs*)] 
-       [(body ty-body) (tyck-expr body (env-extend* env id* ty*))]
-       [(bnd*) (map-Bnd id* ty* rhs*)]
-       [(ann) (cons src ty-body)])
-    (values (Let bnd* body ann) ty-body)))
-
-(: check-let-bindings 
-   (-> Src (Listof CBnd)
-       (values (Listof Uvar) (Listof (Maybe TT)) (Listof CF))))
-(define (check-let-bindings src bnd*)
-  (let ([check (check-maybe-type src)])
-    (for/lists ([u* : (Listof Uvar)]
-		[t* : (Listof (Maybe TT))]
-		[r* : (Listof CF)])
-	([b bnd*])
-      (let ([u (Bnd-identifier b)]
-	    [t (Bnd-type b)]
-	    [r (Bnd-expression b)])
-	(values u (check t) r)))))
-
-
-(: check-type (-> Src (-> CT TT)))
-
-(define (check-type src)
-  (letrec ([recur :  (CT . -> . TT)
-		  (lambda (t) 
-		    (if (or (Int? t) (Bool? t) (Dyn? t))
-			t
-			(let* ((ret (Fn-ret t))
-			       (arg (Fn-fmls t))
-			       (ary (length arg)))
-			  (cond
-			   [(not (= ary 1)) (raise-only-single-arity-fns src)]
-			   [(not (= 1 (length ret))) (raise-only-single-arity-ret src)]
-			   [else (Fn/a ary (map recur arg) (recur (car ret)))]))))])
-    recur))
-
-(: check-maybe-type 
-   (Src . -> . ((Maybe Core-Type) . -> . (Maybe TT))))
-
-(define (check-maybe-type src)
-  (let ((check (check-type src)))
-    (lambda ([t : (Maybe Core-Type)]) (and t (check t)))))
-
-;; Type information about check-letrec-bindings
+(: tc-let (-> S0-Bnd* S0-Expr Src Env (-> S0-Expr (values S1-Expr Schml-Type)) 
+	      (values S1-Expr Schml-Type)))
+(define (tc-let bnd* body src env recur)
+  (: env-extend/bnd (S1-Bnd Env . -> . Env))
+  (define (env-extend/bnd b env)
+    (match-let ([(Bnd i t _) b]) (hash-set env i t)))
+  (let*-values
+      ([(bnd*) (map (mk-tc-binding src recur) bnd*)]
+       [(body ty-body) (tc-expr body (foldl env-extend/bnd env bnd*))])
+    (values (Ann (Let bnd* body) (cons src ty-body)) ty-body)))
 
 
 ;; Type checks the rhs to be consistent with type annotation if
 ;; provided the resulting type is the type of the annotation.
-(: tyck-bindings (-> Src (Core-Form . -> . (Values TF TT))
-		     (Listof Uvar) (Listof (Maybe TT)) (Listof Core-Form)
-		     (values (Listof Uvar) 
-			     (Listof TT) 
-			     (Listof TF))))
-(define (tyck-bindings src tyck-exp uvar* type* rhs*)
-  (for/lists ([u* : (Listof Uvar)]
-	      [t* : (Listof TT)]
-	      [r* : (Listof TF)])
-      ([u uvar*][t type*][r rhs*])
-    (let*-values ([(r t^) (tyck-exp r)]
-		  [(t) (let-binding-type-rule t t^ u src)])
-      (values u t r))))
+(: mk-tc-binding (-> Src (-> S0-Expr (values S1-Expr Schml-Type)) 
+		     (-> S0-Bnd S1-Bnd)))
+(define (mk-tc-binding src tc-expr)
+  (lambda ([bnd : S0-Bnd]) : S1-Bnd
+    (match-let ([(Bnd id type rhs) bnd])
+      (let-values ([(rhs type-rhs) (tc-expr rhs)])
+	(Bnd id 
+	     (let-binding-type-rule type type-rhs id src)
+	     rhs)))))
 
