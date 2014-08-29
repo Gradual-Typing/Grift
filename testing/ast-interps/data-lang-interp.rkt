@@ -32,7 +32,7 @@
 (: data-lang-interp (-> Data0-Lang Config Test-Value))
 (define (data-lang-interp prgm comp-config)
   (let ([observe observe-lazy])
-    (print prgm) (newline) (newline)
+    ;;(print prgm) (newline) (newline)
     (match-let ([(Prog (list n c t) (Labels l* e)) prgm])
       (observe (dl-expr dl-fn-apply (init-global-env l*)) e (hash)))))
 
@@ -44,7 +44,7 @@
   (define (recur exp local-env)
     (: recur/env (-> D0-Expr DL-Value))
     (define (recur/env e) (recur e local-env))
-    (print exp) (newline) (newline)
+    ;; (print exp) (newline) (newline)
     (match exp
       [(Let b* body) 
        (recur body (env-extend* local-env 
@@ -186,7 +186,7 @@
 (: env-lookup (-> Env Uid DL-Value))
 (define (env-lookup env uid)
   (let ((v (hash-ref env uid (lambda () (error 'dfi "Unbound id ~a" uid)))))
-    (printf "~a -> ~a\n\n" uid v)
+    ;(printf "~a -> ~a\n\n" uid v)
     v))
 
 (: env-extend (-> Uid DL-Value Env Env))
