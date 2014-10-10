@@ -26,12 +26,12 @@
   ;; The micro compilers
   (local-require Schml/compiler/schml/reduce-to-cast-calculus
 		 Schml/compiler/casts/impose-cast-semantics
-		 Schml/compiler/closures/make-closures-explicit
+		 ;Schml/compiler/closures/make-closures-explicit
 		 )
   ;; The intermediary interpreters
   (local-require Schml/testing/ast-interps/cast-lang-interp
 		 Schml/testing/ast-interps/lambda-lang-interp
-		 Schml/testing/ast-interps/data-lang-interp
+		 ;Schml/testing/ast-interps/data-lang-interp
 		 )
   (let ((config (compiler-config)))
     (with-handlers ([exn:schml:type:static? 
@@ -43,8 +43,9 @@
 	     [_   (check value=? (cast-lang-interp c0 config) expected)]
 	     [l0  (impose-cast-semantics c0 config)]
 	     [_   (check value=? (lambda-lang-interp l0 config) expected)]
-	     [d0  (make-closures-explicit l0 config)]
-	     [_   (check value=? (data-lang-interp d0 config) expected)])
+	     ;[d0  (make-closures-explicit l0 config)]
+	     ;[_   (check value=? (data-lang-interp d0 config) expected)]
+             )
 	(success)))))
 
 (define-syntax compile-test

@@ -19,3 +19,7 @@ raco pkg install
 
 ### For more information:
 - compiler/README.md : information about how the compiler is constructed
+
+### Known errors
+
+Test let13 and let14 change observations after cast compilation.

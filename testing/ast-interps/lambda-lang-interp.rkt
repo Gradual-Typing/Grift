@@ -7,50 +7,27 @@
 |Discription:                                                                   |
 |                                                                               |
 +-------------------------------------------------------------------------------+
-|Input Grammar "Explicitly-Typed-Core-Forms" found in Schml/languages/core.rkt  |
-|Prog   = (Prog File-Name {TExpr} Type)                                         |
-|TExpr  = {Expr}                                                                |
-|Expr   = (Lambda {uvar}* {Type} {Expr} {Src})                                  |
-|       | (Var {Uvar} {Type} {Src})                                             |
-|       | (App {Expr} {Expr}* {Type} {Src})                                     |
-|       | (Op Prim {Expr}* {Type} {Src})                                        |
-|       | (Cast {Expr} {Type} {Type} {Blame})                                   |
-|       | (If {Expr} {Expr} {Expr} {Type} {Src})                                |
-|       | (Let {BndSet} {Expr} {Type} {Src})                                    |
-|       | (Const {Imdt} {Type})                                                 |
-|BndSet = ({Uvar} {Expr})                                                       |
-|Fml    = {Uvar} | ({Uvar} {Type})                                              |
-|Src    = (Src File Line Col Span)                                              |
-|Blame  = {Src} | {String}                                                      |
-|Uvar   = A Symbol with the format 'original$uniqueness                         |
-|Imdt   = Fixnums and Booleans                                                  |
-|Prim   = op:fix:* | op:fix:+ | op:fix:- | op:fix:and | op:fix:or | op:fix:>>   |
-|       | op:fix:<< | relop:fix:< | relop:fix:<= | relop:fix:=  | relop:fix:>=  |
-|       | relop:fix:>                                                           |
-|Type   = Fix | Bool | Dyn | ({Type}* -> {Type})                                |
 +------------------------------------------------------------------------------|#
 
 (require Schml/framework/build-compiler
          Schml/framework/helpers
          Schml/framework/errors
 	 Schml/testing/values
-	 Schml/compiler/language)
+	 Schml/compiler/language
+         Racket/fixnum)
 
 (provide lambda-lang-interp)
 
-(define-type LL-Value (U LL-Dyn LL-Fn Integer Boolean Schml-Type String))
-(struct LL-Dyn ([value : LL-Value]
-	     [type : Schml-Type]))
+
+(define-type LL-Value (U LL-Fn Integer Boolean String))
 (struct LL-Fn ([value : (-> (Listof LL-Value) LL-Value)]))
-(struct LL-Castable-Fn LL-Fn 
-	([caster : LL-Value]))
+(struct LL-Castable-Fn LL-Fn ([caster : LL-Value]))
 
 (: ll-fn-apply (-> LL-Value (Listof LL-Value) LL-Value))
 (define (ll-fn-apply fn arg*)
   (if (LL-Fn? fn)
       ((LL-Fn-value fn) arg*)
       (error 'apply "fn : ~a" fn)))
-
 
 (: env-lookup (-> Env Uid LL-Value))
 (define (env-lookup e u)
@@ -77,128 +54,195 @@
 (define-syntax-rule (empty-env)
   (hash))
 
+(define-type Heap (HashTable Integer (Vectorof LL-Value)))
+
 
 (: lambda-lang-interp (-> Lambda0-Lang Config Test-Value))
 (define (lambda-lang-interp prgm comp-config)
   (let ([observe observe-lazy])
-    (match-let ([(Prog (list n c t) e) prgm])
-      (observe (ll-expr ll-fn-apply) e (hash)))))
+    (match-let ([(Prog (list n c t) exp) prgm])
+      (let* ([fst : LL-Value #b1000] 
+             [aptr : (Pair Integer (Vectorof LL-Value)) (cons 0 (vector fst))]
+             [seed : (Listof (Pair Integer (Vectorof LL-Value))) (list aptr)]
+             [heap : Heap (make-hasheq seed)])
+        (observe (lambda () (ll-expr ll-fn-apply heap exp (hasheq))))))))
 
-(: ll-expr (-> (-> LL-Value (Listof LL-Value) LL-Value)
-	       (-> L0-Expr Env LL-Value)))
-(define (ll-expr apply)
-  (: recur (-> L0-Expr Env LL-Value))
-  (define (recur exp env)
-    (: recur/env (-> L0-Expr LL-Value))
-    (define (recur/env e) (recur e env))
-    (match exp
-      [(Lambda id* _  (Castable ctr? body))
-       (let ((clos (lambda ([arg* : (Listof LL-Value)]) 
-		     (recur body (env-extend* env id* arg*)))))
-	 (if ctr?
-	     (LL-Castable-Fn clos (env-lookup env ctr?))
+(: ll-expr (-> (-> LL-Value (Listof LL-Value) LL-Value) 
+               Heap L0-Expr Env
+               LL-Value))
+(define (ll-expr apply heap exp env)
+  ((inst call/cc LL-Value LL-Value)
+   (lambda ([exit : (-> LL-Value Nothing)])
+     (: recur (-> L0-Expr Env LL-Value))
+     (define (recur exp env)
+       (: recur/env (-> L0-Expr LL-Value))
+       (define (recur/env e) (recur e env))
+       (match exp
+         [(Lambda id* _  (Castable ctr? body))
+          (let ((clos (lambda ([arg* : (Listof LL-Value)]) 
+                        (recur body (env-extend* env id* arg*)))))
+            (if ctr?
+                (LL-Castable-Fn clos (env-lookup env ctr?))
 	     (LL-Fn clos)))]
-      [(Letrec b* body) 
-       (letrec ([rec-env : Env 
-		 (foldr (lambda ([uid : Uid] [rhs : L0-Expr] [env : Env])
-			  : Env
-			  (hash-set env uid (box (lambda () : LL-Value (recur rhs rec-env)))))
-			env 			    
-			(map (inst car Uid L0-Expr) b*) 
-			(map (inst cdr Uid L0-Expr) b*))])
-	 (recur body rec-env))]
-      [(Let b* body) 
-       (recur body (env-extend* env 
-				(map (inst car Uid L0-Expr)  b*) 
-				(map (lambda ([b : L0-Bnd]) : LL-Value
-				       (recur/env (cdr b))) b*)))]
+         [(Fn-Caster (app recur/env e)) 
+          (if (LL-Castable-Fn? e) 
+              (LL-Castable-Fn-caster e)
+              (error 'Fn-Caster "Tried to extract caster from non-castble"))]
+         [(Letrec b* body) 
+          (letrec ([rec-env : Env 
+                            (foldr (lambda ([uid : Uid] [rhs : L0-Expr] [env : Env])
+                                     : Env
+                                     (hash-set env uid (box (lambda () : LL-Value (recur rhs rec-env)))))
+                                   env 			    
+                                   (map (inst car Uid L0-Expr) b*) 
+                                   (map (inst cdr Uid L0-Expr) b*))])
+            (recur body rec-env))]
+         [(Let b* body) 
+          (recur body (env-extend* env 
+                                   (map (inst car Uid L0-Expr)  b*) 
+                                   (map (lambda ([b : L0-Bnd]) : LL-Value
+                                                (recur/env (cdr b))) b*)))]
       [(If (app recur/env tst) csq alt)
-       (if tst (recur/env csq) (recur/env alt))]
+       (cond
+        [(eq? TRUE-IMDT tst) (recur/env csq)]
+        [(eq? FALSE-IMDT tst) (recur/env alt)]
+        [else (error 'If "test value is unexpected: ~a" tst)])]
+      [(Begin s* e) (begin (ll-stmt* s* recur/env heap) (recur/env e))]
       [(App e e*) (apply (recur/env e) (map recur/env e*))]
-      ;; Special case were the Op needs env informations
-      [(Op p e*) (delta p (map recur/env e*))]
+      [(Op p e*) (delta p heap (map recur/env e*))]
+      [(Halt) (exit 0)]
       [(Var id) (env-lookup env id)]
-      [(Quote k) k]
+      [(Quote k)  k]
       [e (error 'll "Umatched expression ~a" e)]))
-  recur)
+     (recur exp env))))
 
-(: delta (-> Symbol (Listof LL-Value) LL-Value))
-(define (delta p v*)
+(: ll-stmt* (-> (Listof L0-Stmt) (-> L0-Expr LL-Value) Heap Void))
+(define (ll-stmt* s* ll-expr heap)
+  (if (null? s*)
+      (void)
+      (match-let ([(Op p e*) (car s*)])
+        (delta! p heap (map ll-expr e*))
+        (ll-stmt* (cdr s*) ll-expr heap))))
+
+(: delta (-> Symbol Heap (Listof LL-Value) LL-Value))
+(define (delta p heap v*)
   (define-syntax (app* stx)
     (syntax-case stx ()
       [(_ p t? ...)
        (with-syntax ([(tmp ...) (generate-temporaries #'(t? ...))])
-	 #'(match-let ([(list tmp ...) v*])
-	     (if (and (t? tmp) ...)
+	 #'(match v* 
+             [(list tmp ...)
+              (if (and (t? tmp) ...)
 		 (p tmp ...)
-		 (error 'delta "call ~a\nargs ~a" '(app* p t? ...) v*))))]))
+		 (error 'delta "call ~a\nargs ~a" '(app* p t? ...) v*))]
+             [otherwise (error 'delta "call ~a\nargs ~a" '(app* p t? ...) v*)]))]))
   (define-syntax-rule (IxI p) (app* p integer? integer?))
-  (define-syntax-rule (dyn-make v* t? t)
-    (match-let ([(list v) v*])
-      (if (t? v) (LL-Dyn v t) (error 'delta "dyn-make"))))
-  (define-syntax-rule (dyn? v* t?)
-    (match-let ([(list (LL-Dyn v t)) v*])
-      (t? t)))
-  (define-syntax-rule (dyn-value v* t?)
-    (match-let ([(list (LL-Dyn v t)) v*])
-      (if (t? t) v (error 'delta "dyn-value"))))
-  (define-syntax-rule (app1 p)
-    (match-let ([(list v) v*]) (p v)))
+  (define-syntax-rule (FxF p) (app* p fixnum? fixnum?))
+  (define-syntax-rule (IxI>B p) (IxI (lambda (n m) (if (p n m) TRUE-IMDT FALSE-IMDT))))
   (case p
     [(+) (IxI +)] 
     [(-) (IxI -)] 
     [(*) (IxI *)]
-    [(=) (IxI =)] 
-    [(<) (IxI <)] 
-    [(>) (IxI >)] 
-    [(>=) (IxI >=)] 
-    [(<=) (IxI <=)]
-    [(Dyn:Int-make) (dyn-make v* integer? INT-TYPE)]   
-    [(Dyn:Int-value) (dyn-value v* Int?)]
-    [(Dyn:Int?) (dyn? v* Int?)]
-    [(Dyn:Bool-make) (dyn-make v* boolean? BOOL-TYPE)] 
-    [(Dyn:Bool?) (dyn? v* Bool?)]
-    [(Dyn:Bool-value) (dyn-value v* Bool?)]
-    [(Dyn:Fn-make) (match-let ([(list f t) v*]) 
-		     (if (and (LL-Fn? f) (Fn? t)) (LL-Dyn f t) (error 'delta "Fn-make")))]
-    [(Dyn:Fn-value) (match-let ([(list (LL-Dyn f t)) v*]) f)]
-    [(Dyn:Fn-type) (match-let ([(list (LL-Dyn f t)) v*]) t)]
-    [(Dyn:Fn?)     (match-let ([(list (LL-Dyn f t)) v*]) (Fn? t))]
-    [(Type:Int?)  (app1 Int?)]
-    [(Type:Bool?) (app1 Bool?)]
-    [(Type:Dyn?)  (app1 Dyn?)]
-    [(Type:Fn?)   (app1 Fn?)]
-    [(Type:Fn-arg-ref) 
-     (app* (lambda ([t : (Fn Index (Listof Schml-Type) Schml-Type)] [n : Index]) 
-	     (list-ref (Fn-fmls t) n))
-	   Fn? index?)]
-    [(Type:Fn-return)  
-     (app* (lambda ([t : (Fn Index (Listof Schml-Type) Schml-Type)])
-	     (Fn-ret t))
-	   Fn?)]
-    [(Type:Fn-arity) 
-     (app* (lambda ([t : (Fn Index (Listof Schml-Type) Schml-Type)])
-	     (Fn-arity t))
-	   Fn?)]
-    [(Fn-cast) (app* LL-Castable-Fn-caster LL-Castable-Fn?)]
-    [(Blame) 
-     (match-let ([(list l) v*])
-       (if (string? l)
-	   (raise (exn:schml:type:dynamic l (current-continuation-marks)))
-	   (error 'delta "recieve non string label")))]
-    [else (error 'delta "~a" p)]))
+    [(=) (IxI>B =)] 
+    [(<) (IxI>B <)] 
+    [(>) (IxI>B >)] 
+    [(>=) (IxI>B >=)] 
+    [(<=) (IxI>B <=)]
+    [(<<) (FxF fxlshift)]
+    [(>>) (FxF fxrshift)]
+    [(binary-and) (FxF fxand)]
+    [(binary-or) (FxF fxior)]
+    [(Alloc)      (delta-alloc heap v*)]
+    [(Array-ref)  (delta-ref heap v*)]
+    [else (error 'delta "~a" (cons p v*))]))
+
+(: delta! (-> Symbol Heap (Listof LL-Value) Void))
+(define (delta! p heap v*)
+  (case p
+    [(Array-set!) (delta-set! heap v*)]
+    [(Printf)     (delta-printf heap v*)]
+    [(Print)      (delta-print heap v*)]))
+    
+(define-type delta-rule (-> Heap (Listof LL-Value) LL-Value))
+(define-type delta!-rule (-> Heap (Listof LL-Value) Void))
+
+(: delta-alloc delta-rule)
+(define (delta-alloc h v*)
+  (let* ((hpv (hash-ref h 0))
+         (hp  (vector-ref hpv 0))
+         (new (if (integer? hp) hp (error 'delta-alloc "Heap: ~a" h)))
+         (size (car v*)))
+    (vector-set! hpv 0 (+ new #b1000))
+    (if (integer? size)
+        (let ([mem : (Vectorof LL-Value) (make-vector size)])
+          (hash-set! h new mem)
+          new)
+        
+        (error 'delta-alloc "~a" (cons 'alloc v*)))))
+
+(: delta-ref delta-rule)
+(define (delta-ref h v*)
+  (match v*
+    [(list ptr index)
+     (if (and (integer? ptr) (index? index))
+         (vector-ref (hash-ref h ptr) index)
+         (error 'delta-alloc "~a" (cons 'array-ref v*)))]
+    [otherwise (error 'delta-alloc "~a" (cons 'array-ref v*))]))
+
+(: delta-set! delta!-rule)
+(define (delta-set! h v*)
+  (match v*
+    [(list ptr index value)
+     (if (and (integer? ptr) (index? index))
+         (vector-set! (hash-ref h ptr) index value)
+         (error 'delta-alloc "~a" (cons 'array-ref v*)))]
+    [otherwise (error 'delta-alloc "~a" (cons 'array-ref v*))]))
+
+(: delta-printf delta!-rule)
+(define (delta-printf h v*)
+  (: loop (-> String Integer (Listof LL-Value) Boolean Void))
+  (define (loop s i a e?)
+    (cond
+     [(or (>= i (string-length s)) (not (index? i)))  (void)]
+     [e?
+      (case (string-ref s i)
+        [(#\d) (display (car a))]
+        [else  (print '<?>)])
+      (loop s (add1 i) (cdr a) #f)]
+     [else 
+      (let ((c (string-ref s i)))
+        (case c
+          [(#\%) (loop s (add1 i) a #t)]
+          [else (display c) (loop s (add1 i) a #f)]))]))
+  (let ((fmt (car v*)))
+    (if (string? fmt)
+        (loop fmt 0 (cdr v*) #f)
+        (error 'delta-printf "~a" (cons 'printf v*)))))
 
 
-(: observe-lazy (-> (-> L0-Expr Env LL-Value) L0-Expr Env Test-Value))
-(define (observe-lazy interp exp env)
-  (with-handlers ([exn:schml:type:dynamic? 
-		   (lambda ([e : exn:schml:type:dynamic]) 
-		     (blame #f (exn-message e)))])
-    (let ([v (interp exp env)])
-      (cond 
-       [(integer? v) (integ v)]
-       [(boolean? v) (boole v)]
-       [(LL-Fn? v) (function)]
-       [(LL-Dyn? v) (dynamic)]
-       [else  (error 'observe)]))))
+(: delta-print delta!-rule)
+(define (delta-print h v*)
+  (match v*
+    [(list s)
+     (if (string? s)
+         (display s)
+         (error 'delta-print "~a" (cons 'print v*)))]
+    [otherwise (error 'delta-print "~a" (cons 'print v*))]))
+
+(: observe-lazy (-> (-> LL-Value) Test-Value))
+(define (observe-lazy th)
+  (let ([o (open-output-string)])
+      (parameterize ([current-output-port o])
+        (th)
+        (let ([s (get-output-string o)])
+          (cond
+           [(regexp-match #rx".*Int : ([0-9]+)" s) => 
+            (lambda (r)
+              (integ (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+           [(regexp-match #rx".*Bool : #(t|f)" s) =>
+            (lambda (r)
+              (boole (not (equal? "f" (cadr (cast r (Listof String)))))))]
+           [(regexp-match #rx".*Function : \\?" s) (function)]
+           [(regexp-match #rx".*Dynamic : \\?" s) (dynamic)]
+           [else (blame #f s)])))))
 

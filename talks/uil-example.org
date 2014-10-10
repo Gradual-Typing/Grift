@@ -1,0 +1,121 @@
+* For brevity imagine that the source language only has integers and functions
+* Closures Language which is very close to schme
+  (letrec 
+   ([interp_cast 
+     (lambda (v t1 t2 l);; value type_of_value type_of_cast blame_lable (all 64bit values)
+      (castable #f
+       (if (type-int? t1)
+           (if (type-int? t2)
+	       v
+	       (if (type-dyn? t2)
+	           (make-dyn-int v)
+		   (blame l)))
+	   (if (type-dyn? t1)
+	       (if (type-dyn? t2)
+	           v
+	           (if (dyn-int? v)
+		       (interp_cast (dyn-imediate v) Int t2 l) ;; The compiler doesn't recur
+		       (interp_cast (dyn-fn-value v) (dyn-fn-type v) t2 l))) ;; again
+	       ((fn-cast v) v t1 t2 l))))] 
+* (: 1 Int Dyn "Foo")
+** closure_lang
+   (letrec ([interp_cast (lambda (v t1 t2 l) ...)])
+     (make-dyn-int v))
+** UIL C_like 
+   (labels ([interp_cast_code (code (v t1 t2 l) ...)]) ;; constant overhead
+     (let ([interp_cast (alloc 2)])               ;; could be eliminate by closure optimization
+      (begin (array-set! interp_cast 0 interp_cast_code) ;; optimize well-known
+             (array-set! interp_cast 2 interp_cast)      ;; optimize self-reference
+             (<< v 3))
+* (: (lambda ([a : Dyn]) a) (Dyn -> Dyn) (Int -> Int))
+** closure_lang lazy-d
+   (letrec ([interp_cast (lambda (v t1 t2 l) ...)])
+    (letrec ([caster1     (lambda (v t1 t2 l)
+                           (castable #f ;; this closure should never be casted
+			    (if (= (type-fn-arity t1)
+			           (type-fn-arity t2))
+				(lambda (a)
+				 (castable caster1;;this closure is castable by function caster1
+				   (interp-cast 
+				     (v (interp-cast t2 
+				                     (type-fn-arg-ref t2 0)
+						     (type-fn-arg-ref t1 0)
+						     l))
+			             (type-fn-return t1)
+				     (type-fn-return t2)))
+				 (blame l)
+				     (lambda () 
+                                  (castable caster1
+				   ))))))])
+      (let ([tmp (lambda (a) 
+                  (castable caster1 
+                    a))])
+		    ((fn-cast tmp) v (Fn 1 '(Dyn) Dyn) (Fn 1 '(Int) Int)))))
+** UIL
+   (labels ([interp_cast_code (code (cp v t1 t2 l) ...)] ;; omited for brevity
+            [caster1_code (code (cp v t1 t2 l)
+                            (if (= (array-ref t1 0)
+			           (array-ref t2 0))
+				(let ([alambda1 (alloc 5)])
+				  (begin
+				    (array-set! alambda1 0 alambda1_code1)
+				    (array-set! alambda1 1 (array-ref cp 1))
+				    (array-set! alambda1 2 v)
+				    (array-set! alambda1 3 t1)
+				    (array-set! alambda1 4 t2)
+				    (array-set! alambda1 5 l)
+				    alambda1))
+				 (let ([alambda2 (alloc 2)])
+				   (begin
+				    (array-set! alambda2 0 alambda1_code2)
+				    (array-set! alambda2 1 (array-ref cp 1))
+				    (array-set! alambda2 2 l)
+				    alambda2))))]
+	    [alambda_code1 (code (cp a) ...)]
+	    [alambda_code2 (code (cp) 
+	                    (begin 
+	                     (print (array-ref cp 2 l))
+			     (exit)))])
+   
+    ;; build the cast interpreter closure 
+    (let ([interp_cast (alloc 2)])
+      (begin 
+       (array-set! interp_cast 0 interp_cast_code)
+       (array-set! interp_cast 2 interp_cast);; notice that we skip 1
+       
+       ;; build the caster closure
+       (let ([caster1  (alloc 3)]) 
+         (begin
+          (array-set! caster1 0 caster1_code)
+	  (array-set! caster1 1 caster1)
+	  (array-set! caster1 2 interp_cast)
+    
+	  ;; build the original (lambda (a) a) closure
+	  (let ([tmp (alloc 2)])
+	   (array-set! tmp 0 tmp_code)
+	   (array-set! tmp 1 caster1_code)
+
+	   ;; begin cast
+	   ;; extract caster from orignal closure
+	   (let ([ctr-ptr (array-ref tmp 1)]) ;; extract castor from function to 
+	    
+            ;; extract code pointer from caster
+            (let ([code-ptr (array-ref ctr-ptr 0)])
+	    
+	    ;; call caster code with arguments
+	     (code-ptr ctr-ptr  ;;; closure of the caster
+	               tmp      ;;; closure to be caster
+		       (let ([t (alloc 3)]) ;; the type (Dyn -> Dyn)
+		         (begin
+			  (array-set! t 0 1)
+			  (array-set! t 1 7)
+			  (array-set! t 2 7)
+			  t))
+			(let ([t (alloc 3)]) ;; the type (Int -> Int)
+		         (begin
+			  (array-set! t 0 1)
+			  (array-set! t 1 15)
+			  (array-set! t 2 15)
+			  t)))))))))))
+			  
+			  
