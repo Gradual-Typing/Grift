@@ -21,7 +21,7 @@
 (define (compile/conf path config)
   (local-require Schml/compiler/schml/reduce-to-cast-calculus
 		 Schml/compiler/casts/impose-cast-semantics
-		;; Schml/compiler/closures/make-closures-explicit
+		 Schml/compiler/closures/make-closures-explicit
 		 )
   (call-with-exception-handler 
    error
@@ -30,9 +30,8 @@
 	    ;;[_  (begin (print c0) (newline))]
 	    [l0  (impose-cast-semantics c0 config)]
 	    ;;[_  (begin (print l0) (newline))]
-	    ;;[d0  (make-closures-explicit l0 config)]
-            )
-       (success l0)))))
+	    [uil  (make-closures-explicit l0 config)])
+       (success uil)))))
 
 (: compile (Any . -> . (Result Any)))
 (define (compile path) 

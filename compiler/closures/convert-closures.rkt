@@ -38,6 +38,10 @@
 		   [(c next) (cc-expr c next)]
 		   [(a next) (cc-expr a next)])
        (values (If t c a) next))]
+    [(Begin stm* exp)
+     (let*-values ([(stm* next) (cc-stmt* stm* next)]
+                   [(exp next) (cc-expr exp next)])
+       (values (Begin stm* exp) next))]
     [(App exp exp*)
      (let*-values ([(exp next) (cc-expr exp next)]
 		   [(exp* next) (cc-expr* exp* next)])
@@ -51,6 +55,10 @@
       [(Op p exp*) 
        (let-values ([(exp* next) (cc-expr* exp* next)])
 	 (values (Op p exp*) next))]
+      [(Fn-Caster exp)
+       (let-values ([(exp next) (cc-expr exp next)])
+         (values (Fn-Caster exp) next))]
+      [(Halt) (values (Halt) next)]
       [(Var u) (values (Var u) next)]
       [(Quote k) (values (Quote k) next)]))
 
@@ -103,4 +111,18 @@
 (: mk-clos-ptr-uid (Uid Natural . -> . (values Uid Natural)))
 (define (mk-clos-ptr-uid u next) (mk-uid/uid u "_clos" next))
 
+(: cc-stmt* (-> L2-Stmt* Natural (values L3-Stmt* Natural)))
+(define (cc-stmt* stm* next)
+  (if (null? stm*)
+      (values '() next)
+      (let*-values ([(stm next) (cc-stmt (car stm*) next)]
+                    [(stm* next) (cc-stmt* (cdr stm*) next)])
+	  (values (cons stm stm*) next))))
 
+(: cc-stmt (-> L2-Stmt Natural (values L3-Stmt Natural)))
+(define (cc-stmt stm next)
+  (match stm
+    [(Op p e*)
+     (let-values ([(e* next) (cc-expr* e* next)])
+       (values (Op p e*) next))]
+    [otherwise (error 'cc-stmt "Unmatched statement ~a" stm)]))

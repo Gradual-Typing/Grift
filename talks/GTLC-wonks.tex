@@ -1,0 +1,223 @@
+\documentclass{beamer}
+
+% \usepackage{beamerthemesplit} // Activate for custom appearance
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{ amssymb }
+
+\title{Compilation of the Gradually-Typed Lambda Calculus}
+\author{Andre Kuhlenschmidt}
+\date{\today}
+
+\newcommand{\If}[3]{\mathit{if} \, #1 \, \mathit{then} \, #2 \, \mathit{else} \, #3}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\frame
+{
+  \frametitle{What is the GTLC?}
+}
+
+\frame
+{
+  	\frametitle{What is the GTLC?}
+	\begin{figure}[h]
+	\centering
+	\[
+	\begin{array}{lrcl}
+		\text{Terms:} & t & ::= & x \mid \lambda x{:}T.t \mid t \, t \\
+					  %&   &     & \If{t}{t}{t} \\
+		\text{Types:} & T & ::= & T \rightarrow T \\
+		\text{Value:} & v & ::= & \lambda x{:}T.t \\%\mid true \mid false \\
+		\\
+		\text{Typing:} & \frac{x:T \in \Gamma}{\Gamma \vdash x : T}
+					   & \frac{\Gamma,x:T_1 \vdash e : T_2}
+					         {\Gamma \vdash \lambda x:T_1.e : T_1 \to T_2} 
+					   & \frac{\Gamma \vdash t_1 : T_1 \rightarrow T_2 \quad 
+					           \Gamma \vdash t_2 : T_1}
+					          {\Gamma \vdash t_1 \, t_2 : T_2}\\
+		\\	
+		\text{Eval:} & \frac{t_1 \rightarrow t_{1}^{\prime}}
+					        {t_1 \, t_2 \rightarrow t_{2}^{\prime} \, t_2}
+					 & \frac{t_2 \rightarrow t_{2}^{\prime}}
+						    {v_1 \, t_2 \rightarrow v_1 \, t_{2}^{\prime}}
+		             & \left( \lambda x {:} T_1 . t_12 \right) \, v_2 	  
+		               \rightarrow \left[ x \mapsto v2 \right] t_12
+		\\
+	\end{array}
+	\]
+	\caption{TAPL definition of the STLC}
+	\end{figure}
+}
+
+\frame
+{
+  	\frametitle{What is the GTLC?}
+	\begin{figure}[h]
+	\centering
+	\[
+	\begin{array}{lrcl}
+		\text{Terms:} & t & ::= & x \mid \lambda x{:}T.t \mid t \, t \\
+					  %&   &     & \If{t}{t}{t} \\
+		\text{Types:} & T & ::= & ? \mid T \rightarrow T \\			 
+	\end{array}
+	\]
+	\caption{STLC Types extended with the Dynamic Type}
+	\end{figure}
+}
+
+\frame
+{
+  	\frametitle{What is the GTLC?}
+	\begin{figure}[h]
+	\centering
+	\[
+	\begin{array}{lrcl}
+		\text{Terms:} & t & ::= & x \mid \lambda x{:}T.t \mid t \, t \\
+					  %&   &     & \If{t}{t}{t} \\
+		\text{Types:} & T & ::= & ? \mid T \rightarrow T \\			 
+		\text{Uncasted Values:} & u & ::= & \lambda x{:}T.t \\
+		\text{Values:} & v & ::= & u \mid \left(u, T \right) \mid \, error \\
+	\end{array}
+	\]
+	\caption{STLC Types extended with the Dynamic Type}
+	\end{figure}
+}
+
+\frame
+{
+  	\frametitle{What is the GTLC?}
+	\begin{figure}[h]
+	\centering
+	\[
+	\begin{array}{lrcl}
+		\text{Terms:} & t & ::= & x \mid \lambda x{:}T.t \mid t \, t \\
+					  %&   &     & \If{t}{t}{t} \\
+		\text{Types:} & T & ::= & ? \mid T \rightarrow T \\
+		\\			 
+		\text{Typing:} & \frac{x:T \in \Gamma}{\Gamma \vdash x : T}
+					   & \frac{\Gamma,x:T_1 \vdash e : T_2}
+					          {\Gamma \vdash \lambda x:T_1.e : T_1 \to T_2} 
+					   & \frac{\Gamma \vdash t_1 : T_1 \rightarrow T_3 \quad 
+					           \Gamma \vdash t_2 : T_2 \quad
+					           T_2 \sim T_3}
+					          {\Gamma \vdash t_1 \, t_2 : T_3}\\\\
+					  & & & \frac{\Gamma \vdash t_1 : ?}
+					          {\Gamma \vdash t_1 \, t_2 : ?}\\
+		\\
+	    \text{Consistency:} & \frac{T_1 = T_2}{T_1 \sim T_2}
+	      					& T \sim ? & ? \sim T\\
+		\\
+		&& \frac{T_1 \sim T_3 \quad T_2 \sim T_4}
+		        {T_1 \rightarrow T_2 \, \sim \, T_3 \rightarrow T_4}
+	\end{array}
+	\]
+	\caption{Static Type Checking rules for the GTLC}
+	\end{figure}
+}
+
+\frame{
+  \frametitle{Compilation from the GTLC to the Cast-Caculus}
+  \begin{figure}[h]
+	\centering
+	\begin{gather*}
+	   \frac{x : T \in \Gamma}
+	       	{\Gamma \vdash x \rightsquigarrow x : T} 
+	   \quad
+	   \frac{\Gamma x : T_1 \vdash t \rightsquigarrow t^{\prime} : T_2}
+	        {\Gamma \vdash \lambda x {:} T_1 . t \rightsquigarrow 
+	                       \lambda x {:} T_1 . t^{\prime} : T_1 \rightarrow T_2}\\\\
+	   \frac{\Gamma \vdash t_1 \rightsquigarrow 
+	                       t_1^{\prime} : T_1 \rightarrow T_3 \quad 
+			 \Gamma \vdash t_2 \rightsquigarrow t_{2}^{\prime} : T_2 \quad
+			  T_1 \sim T_2}
+			{\Gamma \vdash t_1 \, t_2 \rightsquigarrow
+			               t_1^{\prime} \, (t_2^{\prime} : T_2 \Rightarrow 
+			               	                               T_1) : T_3}\\\\
+	   \frac{\Gamma \vdash t_1 \rightsquigarrow 
+	                       t_1^{\prime} : ? \quad 
+			 \Gamma \vdash t_2 \rightsquigarrow t_{2}^{\prime} : T_2 \quad}
+			{\Gamma \vdash t_1 \, t_2 \rightsquigarrow
+			               (t_1^{\prime} : ? \Rightarrow T_2) t_2^{\prime} : ?}\\\\
+	\end{gather*}
+	\caption{Rules for Compilation}
+	\end{figure}
+}
+
+\frame{
+  \frametitle{Introducing an Implementation of Casts}
+  \begin{figure}[h]
+	\centering
+	\begin{gather*}
+	   (v \, T \Rightarrow T) \longrightarrow v
+	   \\\\
+	   (u \, T \Rightarrow ?) \longrightarrow (u,\, T)
+	   \\\\
+	   ((u, \, T_1) \, ? \Rightarrow T_2) \longrightarrow 
+	      (u \, T_1 \Rightarrow T_2) 
+	   \\\\
+	   (v \, T_1 \rightarrow T_2 \Rightarrow T_3 \rightarrow T_4) \longrightarrow
+	      \lambda x:T3. ((v \, (x \, T_3 \Rightarrow T_4) \, T_2 \Rightarrow T_4)
+	   \\\\
+	   \frac{ (T_1 {\nsim} T_2)}
+	        {(v \, T_1 \Rightarrow T_2) \longrightarrow \, error}
+	\end{gather*}
+	\caption{Rules for Compilation}
+	\end{figure}
+}
+
+\frame{
+	\frametitle{Why Are There Other Implementations of Casts}
+}
+
+\frame
+{
+  \frametitle{Goals for the behavior of GTLC?}
+  \begin{itemize}
+  \item A GTLC program with no occurrences of the dynamic type, aka fully typed, 			should behave the same as a program of the Simply-Typed Lambda Calculus
+  \item Erasing types by adding the dynamic type should not change the observable 
+        behavior of a fully typed program that type checks.
+  \item Loftier Goals ...
+ 	\begin{itemize}
+	\item Static Programs should be fast (What is fast?)
+	\item Programs have simple performance models
+	\end{itemize}
+  \end{itemize}
+}
+
+
+\frame{
+	\frametitle{The Schml Compiler}
+	\begin{itemize}
+	\item From S-Expression version of the Gradually-Typed Lambda Calcucus
+	\item Written in Typed Racket
+	\item Targeting C
+	\end{itemize}
+}
+
+\frame{
+	\frametitle{Goals for the Schml Compiler}
+	\begin{itemize}
+	\item Clear and Concise Implementation of Various Semantics
+	\item Measure Performance
+	\item Find Optimizations 
+	\end{itemize}
+}
+
+\frame{
+	\frametitle{State of the Schml Compiler}
+	\begin{itemize}
+	\item Not a Compiler Yet (Fancy Interpreter)
+	\item Implementation of One of the Semantics
+	\item Doesn't Yet Measure Performance
+	\item Found a Few Optimizations
+	\end{itemize}
+}
+
+\frame{
+	\frametitle{Thank You}
+}
+
+\end{document}

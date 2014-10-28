@@ -1,0 +1,16 @@
+
+* Introduction to the Gradually Typed Lambda Calculus
+** Dynamic Type
+** Consistency Relationship
+** The Type Latices join versus meet
+* Notion of Static Type Checking
+** Points in the design space
+*** If branches join versus meet
+*** literals typed at dynamic or specific
+* Notion of Dynamic Type Checking
+* The Schml Compiler
+** Messure the inherint efficiency of various dynamic semantics
+** Give a feasible implementation technique for various dynamic semantics
+** Look for optimizations that are not apparent
+*** Static type equality can be reduced to pointer equality even for stuctural types
+*** Type Strucures 

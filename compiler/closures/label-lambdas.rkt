@@ -26,15 +26,6 @@
 (: ll-expr (-> L0-Expr Natural
 	       (values L1-Expr Natural)))
 (define (ll-expr exp next)
-  (: recur* (-> (Listof L0-Expr) Natural (values (Listof L1-Expr) Natural)))
-  (define (recur* e* n)
-    (if (null? e*)
-	(values '() n)
-	(let ([a (car e*)]
-	      [d (cdr e*)])
-	  (let*-values ([(e* n) (recur* d n)]
-			[(e n)  (ll-expr a n)])
-	    (values (cons e e*) n)))))
   (match exp
     ;; This line should only be reached if the lambda
     ;; is not being bound by a let or a letrec
@@ -53,16 +44,34 @@
 		   [(csq next) (ll-expr csq next)]
 		   [(alt next) (ll-expr alt next)])
        (values (If tst csq alt) next))]
+    [(Begin s* e)
+     (let*-values ([(s* next) (ll-stmt* s* next)]
+                   [(e next) (ll-expr e next)])
+       (values (Begin s* e) next))]
     [(App exp exp*)
      (let*-values ([(exp next) (ll-expr exp next)]
-		   [(exp* next) (recur* exp* next)])
+		   [(exp* next) (ll-expr* exp* next)])
        (values (App exp exp*) next))]
     [(Op p exp*)
-     (let-values ([(exp* next) (recur* exp* next)])
+     (let-values ([(exp* next) (ll-expr* exp* next)])
        (values (Op p exp*) next))]
+    [(Fn-Caster e)
+     (let-values ([(e next) (ll-expr e next)])
+       (values (Fn-Caster e) next))]
+    [(Halt) (values (Halt) next)]
     [(Var i) (values (Var i) next)]
     [(Quote k) (values (Quote k) next)]))
-  
+
+(: ll-expr* (-> (Listof L0-Expr) Natural (values (Listof L1-Expr) Natural)))
+  (define (ll-expr* e* n)
+    (if (null? e*)
+	(values '() n)
+	(let ([a (car e*)]
+	      [d (cdr e*)])
+	  (let*-values ([(e* n) (ll-expr* d n)]
+			[(e n)  (ll-expr a n)])
+	    (values (cons e e*) n)))))
+
 ;; ll-let takes the fields of from core and pulls all
 ;; bound procedures out into the let-proc form. Placing
 ;; the rest of the let as the body of the let-proc
@@ -102,3 +111,19 @@
 	   (if (null? bd*)
 	       (values lr n)
 	       (values (Let bd* lr) n))))))
+
+(: ll-stmt* (-> L0-Stmt* Natural (values L1-Stmt* Natural)))
+(define (ll-stmt* st* next)
+  (if (null? st*)
+      (values '() next)
+      (let*-values ([(st next)  (ll-stmt (car st*) next)]
+                    [(st* next) (ll-stmt* (cdr st*) next)])
+        (values (cons st st*) next))))
+
+(: ll-stmt (-> L0-Stmt Natural (values L1-Stmt Natural)))
+(define (ll-stmt st next)
+  (match st
+    [(Op p e*) 
+     (let-values ([(e* next) (ll-expr* e* next)])
+       (values (Op p e*) next))]
+    [otherwise (error 'll-stmt "unmatched statement ~a" st)]))

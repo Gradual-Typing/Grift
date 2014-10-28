@@ -43,9 +43,15 @@
 	 (app uf-expr c c-fvars)
 	 (app uf-expr a a-fvars))
      (values (If t c a) (set-union t-fvars c-fvars a-fvars))]
+    [(Begin (app uf-stmt* s* s*-fvars) 
+            (app uf-expr e e-fvars))
+     (values (Begin s* e) (set-union s*-fvars e-fvars))]
     [(App (app uf-expr e e-fvars) (app uf-expr* e* e*-fvars))
      (values (App e e*) (set-union e-fvars e*-fvars))]
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
+    [(Fn-Caster (app uf-expr e e-fvars))
+     (values (Fn-Caster e) e-fvars)]
+    [(Halt) (values (Halt) (set))]
     [(Var u) (values (Var u) (set u))]
     [(Quote k) (values (Quote k) (set))]))
 
@@ -86,4 +92,17 @@
 		    (cons (cons u rhs) b*) 
 		    (set-union f* rhs-f*)))))))
 
-  
+(: uf-stmt* (-> L1-Stmt* (values L2-Stmt* (Setof Uid))))
+(define (uf-stmt* s*)
+  (if (null? s*)
+      (values '() (set))
+      (let-values ([(s s-fvars) (uf-stmt (car s*))]
+                   [(s* s*-fvars) (uf-stmt* (cdr s*))])
+        (values (cons s s*) (set-union s*-fvars s-fvars)))))
+
+(: uf-stmt (-> L1-Stmt (values L2-Stmt (Setof Uid))))
+(define (uf-stmt stm)
+  (match stm
+    [(Op p (app uf-expr* e* e*-fvars)) 
+     (values (Op p e*) e*-fvars)]
+    [otherwise (error 'uf-stmt "Unmatched statement ~a" stm)]))

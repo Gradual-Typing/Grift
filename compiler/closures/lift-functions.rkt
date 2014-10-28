@@ -30,7 +30,7 @@
   (match exp
     [(Labels (app lf-bnd-code* bndc*) 
 	     (Let (app lf-bnd* bnd* b*-bndc*) 
-		  (Begin (app lf-effect* e* e*-bndc*) 
+		  (Begin (app lf-stmt* e* e*-bndc*) 
 			 (app lf-expr e e-bndc*))))
      (values (Let bnd* (Begin e* e)) (append b*-bndc* bndc* e*-bndc* e-bndc*))]
     [(Let (app lf-bnd* bnd* bndc*) (app lf-expr e e-bndc*))
@@ -44,6 +44,9 @@
 		     (error 'type) 
 		     p) 
 		 exp*) exp*-bnd*)]
+    [(Begin (app lf-stmt* stm* stm*-bnd) (app lf-expr exp exp-bnd))
+     (values (Begin stm* exp) (append stm*-bnd exp-bnd))]
+    [(Halt) (values (Halt) '())]
     [(Var i) (values (Var i) '())]
     [(Code-Label i) (values (Code-Label i) '())]
     [(Quote l) (values (Quote l) '())]))
@@ -78,11 +81,17 @@
 		     e*])
 	  (values (cons e e*) (append e-bnd* e*-bnd*)))))
 
-(: lf-effect* (-> L4-Effect* (values D0-Effect* D0-Bnd-Code*)))
-(define (lf-effect* e*)
+(: lf-stmt* (-> L4-Stmt* (values D0-Stmt* D0-Bnd-Code*)))
+(define (lf-stmt* e*)
   (if (null? e*)
       (values '() '())
-      (match-let ([(cons (Op p (app lf-expr* e* e*-bnd*)) 
-			 (app lf-effect* eff* bnd*)) 
-		   e*])
-	(values (cons (Op p e*) eff*) (append e*-bnd* bnd*)))))
+      (let*-values ([(s s-bnd) (lf-stmt (car e*))]
+                    [(s* s*-bnd) (lf-stmt* (cdr e*))])
+	(values (cons s s*) (append s-bnd s*-bnd)))))
+
+(: lf-stmt (-> L4-Stmt (values D0-Stmt D0-Bnd-Code*)))
+(define (lf-stmt e)
+  (match e
+    [(Op p (app lf-expr* e* e*-bnd))
+     (values (Op p e*) e*-bnd)] 
+    [otherwise (error 'lf-stmt "unmatched statment ~a" e)]))

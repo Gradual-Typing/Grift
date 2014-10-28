@@ -64,7 +64,8 @@ be usefull for optimizations or keeping state.
   ;; represents a set of moves to initialize variables before 
   (Code variables body)
   (Closure-Data code caster variables)
-  (Halt))
+  (Halt)
+  (Assign lhs rhs))
 
 (define NO-OP (Nop))
 
@@ -431,7 +432,10 @@ We are going to UIL
 #|-----------------------------------------------------------------------------+
 | The Lambda Language Family Types, Primitives, Literals, and Terminals        |
 +-----------------------------------------------------------------------------|#
+
 (define-type Lambda-Literal (U Integer String))
+
+
 
 #|-----------------------------------------------------------------------------+
 | Language/Lambda0 produced by specify-cast-representation                     |
@@ -455,10 +459,11 @@ We are going to UIL
 	    (Quote Lambda-Literal))))
 
 (define-type L0-Stmt (UIL-Op! L0-Expr))
+(define-type L0-Stmt* (Listof L0-Stmt))
 (define-type L0-Bnd (Pair Uid L0-Expr))
 (define-type L0-Bnd* (Listof L0-Bnd))
-#|
-#|
+
+
 #|-----------------------------------------------------------------------------+
 | Language/Lambda1 created by label-lambdas                                    |
 +-----------------------------------------------------------------------------|#
@@ -479,6 +484,8 @@ We are going to UIL
 	  (Var Uid)
 	  (Quote Lambda-Literal))))
 
+(define-type L1-Stmt (UIL-Op! L1-Expr))
+(define-type L1-Stmt* (Listof L1-Stmt))
 (define-type L1-Bnd-Lambda* (Listof L1-Bnd-Lambda))
 (define-type L1-Bnd-Lambda  (Pairof Uid L1-Lambda))
 (define-type L1-Bnd-Data* (Listof L1-Bnd-Data))
@@ -500,7 +507,7 @@ We are going to UIL
 	  (App E (Listof E))
 	  (UIL-Op E)
 	  (If E E E)
-	  (Begin (Listof (UIL-Op! E)) E)
+	  (Begin L2-Stmt* E)
 	  (Fn-Caster E)
 	  Halt
 	  (Var Uid)
@@ -510,6 +517,8 @@ We are going to UIL
 (define-type L2-Bnd-Lambda (Pairof Uid L2-Lambda))
 (define-type L2-Bnd-Data* (Listof L2-Bnd-Data))
 (define-type L2-Bnd-Data (Pairof Uid L2-Expr))
+(define-type L2-Stmt (UIL-Op! L2-Expr))
+(define-type L2-Stmt* (Listof L2-Stmt))
 
 (define-type L2-Lambda
   (Lambda Uid* False (Free (Option Uid) (Listof Uid) L2-Expr)))
@@ -531,8 +540,8 @@ We are going to UIL
 	 (App (Pair (Var Uid) (Var Uid)) (Listof E))
 	 (UIL-Op E)
 	 (If E E E)
-	 (Begin (Listof (UIL-Op! E)) E)
-	 (Fn-cast E)
+	 (Begin L3-Stmt* E)
+	 (Fn-Caster E)
 	 ;; Terminals
 	 Halt
 	 (Var Uid)
@@ -547,9 +556,11 @@ We are going to UIL
 (define-type L3-Bnd-Closure* (Listof L3-Bnd-Closure))
 (define-type L3-Bnd-Data (Pairof Uid L3-Expr))
 (define-type L3-Bnd-Data* (Listof L3-Bnd-Data))
+(define-type L3-Stmt (UIL-Op! L3-Expr))
+(define-type L3-Stmt* (Listof L3-Stmt))
 
 #|-----------------------------------------------------------------------------+
-| Language/Lambda4 created by specify-closure-representation                   |
+| Language/Lambda4 created by specify-representation                           |
 +-----------------------------------------------------------------------------|#
 ;; procedures are now just routines that have an explicit
 ;; layout for parameters
@@ -564,9 +575,9 @@ We are going to UIL
 	  (App E (Listof E))
 	  (UIL-Op E)
 	  (If E E E)
-	  (Begin (Listof (UIL-Op! E)) E)
+	  (Begin L4-Stmt* E)
 	  ;; Terminals
-	  Halt
+          Halt
 	  (Code-Label Uid)
 	  (Var Uid)
 	  (Quote Lambda-Literal))))
@@ -578,6 +589,16 @@ We are going to UIL
 (define-type L4-Code (Code Uid* L4-Expr))
 (define-type L4-Bnd-Data* (Listof L4-Bnd-Data))
 (define-type L4-Bnd-Data  (Pairof Uid L4-Expr))
+(define-type L4-Stmt (UIL-Op! L4-Expr))
+(define-type L4-Stmt* (Listof L4-Stmt))
+
+
+;; The representation of closures is that they are arrays containing their
+;; free variables.
+
+(define CLOS-CODE-INDEX 0)
+(define CLOS-CSTR-INDEX 1)
+(define CLOS-FVAR-OFFSET 2)
 
 
 #|-----------------------------------------------------------------------------+
@@ -596,65 +617,54 @@ We are going to UIL
 (define-type D0-Expr
   (Rec E (U (Let D0-Bnd* E)
 	    (App E (Listof E))
-	    (Op D0-Prim (Listof E))
+	    (UIL-Op E)
 	    (If E E E)
-	    (Begin D0-Effect* E)
+	    (Begin D0-Stmt* E)
 	    Halt
 	    (Var Uid)
 	    (Code-Label Uid)
 	    (Quote D0-Literal))))
+
 (define-type D0-Expr* (Listof D0-Expr))
 
-(define-type D0-Effect (Op D0-Prim! D0-Expr*))
-(define-type D0-Effect* (Listof D0-Effect))
+(define-type D0-Stmt (UIL-Op! D0-Expr))
+(define-type D0-Stmt* (Listof D0-Stmt))
 
 (define-type D0-Bnd* (Listof D0-Bnd))
 (define-type D0-Bnd  (Pairof Uid D0-Expr))
 
-(define-type D0-Prim 
-  (U Schml-Prim Closure-Primitives Type-Primitives Dyn-Primitives))
-
-(define-type D0-Prim! (U Lambda-Prim!))
-
 (define-type D0-Literal Lambda-Literal)
-|#
+
 #|-----------------------------------------------------------------------------+
-|Data1-Language created by make-closures-explicit                           |
+| UIL0-Language created by remove-let                                          |
 +-----------------------------------------------------------------------------|#
-#|
 
-(define-type Data1-Lang
+(define-type UIL0-Lang
   (Prog (List String Natural Schml-Type) 
-	(Labels D1-Bnd-Code*
-		D1-Expr)))
+	(Labels U0-Bnd-Code*
+		U0-Expr)))
 
-(define-type D1-Bnd-Code* (Listof D1-Bnd-Code))
-(define-type D1-Bnd-Code (Pairof Uid D1-Code))
-(define-type D1-Code (Code Uid* D1-Expr))
+(define-type U0-Bnd-Code* (Listof U0-Bnd-Code))
+(define-type U0-Bnd-Code (Pairof Uid U0-Code))
+(define-type U0-Code (Code Uid* U0-Expr))
 
-(define-type D1-Expr
-  (Rec E (U (Let D1-Bnd* E)
-	    (App E (Listof E))
-	    (Op D1-Prim (Listof E))
+(define-type U0-Expr
+  (Rec E (U (App E (Listof E))
+	    (UIL-Op E)
 	    (If E E E)
-	    (Begin D1-Effect* E)
+	    (Begin U0-Stmt* E)
+	    Halt
 	    (Var Uid)
 	    (Code-Label Uid)
-	    (Quote D1-Literal))))
+	    (Quote U0-Literal))))
 
-(define-type D1-Expr* (Listof D1-Expr))
+(define-type U0-Expr* (Listof U0-Expr))
 
-(define-type D1-Effect (Op D1-Prim! D1-Expr*))
-(define-type D1-Effect* (Listof D1-Effect))
+(define-type U0-Stmt (U (UIL-Op! U0-Expr) (Assign Uid U0-Expr)))
+(define-type U0-Stmt* (Listof U0-Stmt))
 
-(define-type D1-Bnd* (Listof D1-Bnd))
-(define-type D1-Bnd  (Pairof Uid D1-Expr))
+(define-type U0-Bnd* (Listof U0-Bnd))
+(define-type U0-Bnd  (Pairof Uid U0-Expr))
 
-(define-type D1-Prim 
-  (U Schml-Prim Array-Primitives 'Blame))
+(define-type U0-Literal Lambda-Literal)
 
-(define-type D1-Prim! Array-Primitives!)
-
-(define-type D1-Literal (U Integer String))
-|#
-|#
