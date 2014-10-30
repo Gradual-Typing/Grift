@@ -1,6 +1,6 @@
 #lang typed/racket
 
-(require Schml/framework/helpers)
+(require schml/framework/helpers)
 (provide (all-defined-out))
 
 (struct exn:schml exn ())

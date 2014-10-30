@@ -13,10 +13,10 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 | Target Grammar : Lambda0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require Schml/framework/build-compiler
-         Schml/framework/helpers
-         Schml/framework/errors
-	 Schml/compiler/language)
+(require schml/framework/build-compiler
+         schml/framework/helpers
+         schml/framework/errors
+	 schml/compiler/language)
 ;; Only the pass is provided by this module
 (provide specify-representation)
 

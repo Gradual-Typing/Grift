@@ -1,5 +1,5 @@
 #lang typed/racket
-(require Schml/framework/helpers)
+(require schml/framework/helpers)
 (provide (all-defined-out))
 #|
 Commonly used and recognize language forms 

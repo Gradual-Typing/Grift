@@ -10,10 +10,10 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require Schml/framework/build-compiler
-	 Schml/compiler/language
-         Schml/framework/helpers
-         Schml/framework/errors)
+(require schml/framework/build-compiler
+	 schml/compiler/language
+         schml/framework/helpers
+         schml/framework/errors)
 
 ;; Only the pass is provided by this module
 (provide uncover-free)

@@ -9,10 +9,10 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require Schml/framework/build-compiler
-         Schml/framework/helpers
-         Schml/framework/errors
-         Schml/compiler/language)
+(require schml/framework/build-compiler
+         schml/framework/helpers
+         schml/framework/errors
+         schml/compiler/language)
 
 (provide convert-closures)
 

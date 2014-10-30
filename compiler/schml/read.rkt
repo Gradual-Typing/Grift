@@ -8,9 +8,9 @@
 |the function read-syntax so that the source locations may be lifted from the
 |syntax-objects as we convert them to core forms.
 +------------------------------------------------------------------------------|#
-(require Schml/compiler/language
-         Schml/framework/build-compiler
-	 Schml/framework/errors)
+(require schml/compiler/language
+         schml/framework/build-compiler
+	 schml/framework/errors)
 (provide read)
 
 #|

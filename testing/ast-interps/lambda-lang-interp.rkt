@@ -9,12 +9,12 @@
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
 
-(require Schml/framework/build-compiler
-         Schml/framework/helpers
-         Schml/framework/errors
-	 Schml/testing/values
-	 Schml/compiler/language
-         Racket/fixnum)
+(require schml/framework/build-compiler
+         schml/framework/helpers
+         schml/framework/errors
+	 schml/testing/values
+	 schml/compiler/language
+         racket/fixnum)
 
 (provide lambda-lang-interp)
 

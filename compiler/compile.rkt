@@ -1,6 +1,6 @@
 #lang typed/racket
 
-(require Schml/framework/build-compiler)
+(require schml/framework/build-compiler)
 
 (provide (all-defined-out))
 
@@ -19,10 +19,10 @@
 ;; compilers for successivly smaller langages. 
 (: compile/conf (Path Config . -> . (Result Any)))
 (define (compile/conf path config)
-  (local-require Schml/compiler/schml/reduce-to-cast-calculus
-		 Schml/compiler/casts/impose-cast-semantics
-		 Schml/compiler/closures/make-closures-explicit
-		 )
+  (local-require schml/compiler/schml/reduce-to-cast-calculus
+		 schml/compiler/casts/impose-cast-semantics
+		 schml/compiler/closures/make-closures-explicit
+		 schml/compiler/data/convert-representation)
   (call-with-exception-handler 
    error
    (lambda ()
@@ -30,7 +30,8 @@
 	    ;;[_  (begin (print c0) (newline))]
 	    [l0  (impose-cast-semantics c0 config)]
 	    ;;[_  (begin (print l0) (newline))]
-	    [uil  (make-closures-explicit l0 config)])
+	    [d0  (make-closures-explicit l0 config)]
+            [uil (conver-representation d0 config)])
        (success uil)))))
 
 (: compile (Any . -> . (Result Any)))

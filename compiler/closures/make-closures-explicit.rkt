@@ -1,12 +1,12 @@
 #lang typed/racket
 
-(require Schml/framework/build-compiler
-         Schml/compiler/language
-	 Schml/compiler/closures/label-lambdas
-         Schml/compiler/closures/uncover-free
-         Schml/compiler/closures/convert-closures
-         Schml/compiler/closures/specify-representation
-         Schml/compiler/closures/lift-functions)
+(require schml/framework/build-compiler
+         schml/compiler/language
+	 schml/compiler/closures/label-lambdas
+         schml/compiler/closures/uncover-free
+         schml/compiler/closures/convert-closures
+         schml/compiler/closures/specify-representation
+         schml/compiler/closures/lift-functions)
 
 (provide make-closures-explicit)
 

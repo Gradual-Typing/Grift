@@ -19,7 +19,7 @@
 |      and their sub-structures are consistent.                                 |
 |                                                                               |
 +-------------------------------------------------------------------------------+
-|Grammar for Core-Prog found in Schml/languages/core-forms                      |
+|Grammar for Core-Prog found in schml/languages/core-forms                      |
 |Core-Prog = (Core-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr})             |
 |Core-Expr = (Lambda {Formals}* {Type}? {Core-Expr} {Src})                      |
 |          | (Var {Uvar} {Src})                                                 |
@@ -40,7 +40,7 @@
 |Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
 |                                                                               |
 +-------------------------------------------------------------------------------+
-|Grammar for Typed-Prog found in Schml/languages/typed-forms                    |
+|Grammar for Typed-Prog found in schml/languages/typed-forms                    |
 |Typed-Prog = (Typed-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr} {Core-Type})
 |Typed-Expr = (Lambda {Formals}* {Type} {Typed-Expr} {Src} {Core-Type})         |
 |           | (Var {Uvar} {Src} {Core-Type})                                    |
@@ -59,10 +59,10 @@
 |Literal   = Integer |  Boolean                                                 |
 |Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
 +------------------------------------------------------------------------------|#
-(require Schml/framework/build-compiler
-         Schml/framework/errors
-	 Schml/framework/helpers
-	 Schml/compiler/language)
+(require schml/framework/build-compiler
+         schml/framework/errors
+	 schml/framework/helpers
+	 schml/compiler/language)
 
 ;; Only the pass is provided by this module
 (provide type-check)

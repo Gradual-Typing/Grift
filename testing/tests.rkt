@@ -3,14 +3,14 @@
 ;; is not working in typed racket
 (require rackunit 
 	 rackunit/text-ui
-         Schml/framework/build-compiler
-         Schml/framework/errors
-	 Schml/testing/values)
+         schml/framework/build-compiler
+         schml/framework/errors
+	 schml/testing/values)
 (provide (all-defined-out))
 
 ;; sets up a variable with the path to the test suite
 (require pkg/lib)
-(define schml-path (pkg-directory "Schml"))
+(define schml-path (pkg-directory "schml"))
 (define testing-path (build-path schml-path "testing"))
 (define test-suite-path (build-path testing-path "suite"))
 
@@ -24,14 +24,14 @@
 
 (define (compile path expected)
   ;; The micro compilers
-  (local-require Schml/compiler/schml/reduce-to-cast-calculus
-		 Schml/compiler/casts/impose-cast-semantics
-		 Schml/compiler/closures/make-closures-explicit
+  (local-require schml/compiler/schml/reduce-to-cast-calculus
+		 schml/compiler/casts/impose-cast-semantics
+		 schml/compiler/closures/make-closures-explicit
 		 )
   ;; The intermediary interpreters
-  (local-require Schml/testing/ast-interps/cast-lang-interp
-		 Schml/testing/ast-interps/lambda-lang-interp
-		 Schml/testing/ast-interps/data-lang-interp
+  (local-require schml/testing/ast-interps/cast-lang-interp
+		 schml/testing/ast-interps/lambda-lang-interp
+		 schml/testing/ast-interps/data-lang-interp
 		 )
   (let ((config (compiler-config)))
     (with-handlers ([exn:schml:type:static? 
@@ -126,7 +126,7 @@
   (let ((cast-semantics (make-parameter 'Lazy-D))
 	(get-ls (lambda (p) (let ((p (p))) (if (pair? p) p '())))))
     (command-line 
-     #:program "Schml-compiler-tests"
+     #:program "schml-compiler-tests"
      #:args ()
      (parameterize 
 	 ([compiler-config (Config (cast-semantics))])

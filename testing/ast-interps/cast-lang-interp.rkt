@@ -1,10 +1,10 @@
 #lang racket
 
-(require Schml/framework/build-compiler
-         Schml/framework/helpers
-         Schml/framework/errors
-	 Schml/testing/values
-	 Schml/compiler/language)
+(require schml/framework/build-compiler
+         schml/framework/helpers
+         schml/framework/errors
+	 schml/testing/values
+	 schml/compiler/language)
 
 (provide cast-lang-interp)
 
