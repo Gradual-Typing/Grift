@@ -2,6 +2,12 @@
 *.*~
 \#*.*\#
 
+# racket byte code
+*.dep
+*.zo
+compiled/
+**/compiled/
+
 # object files, archives, assembly, and out
 *.[oas]
 *.out
