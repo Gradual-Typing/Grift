@@ -42,6 +42,7 @@
        (Op 'Array-ref (list e (Quote CLOS-CSTR-INDEX)))]
       [(If (app recur t) (app recur c) (app recur a)) (If t c a)]
       [(Begin stm* (app recur exp)) (Begin (sr-stmt* stm* env) exp)]
+      [(Halt) (Halt)]
       [(Var i) (env-lookup env i)]
       [(Quote k) (Quote k)]))
   recur)
@@ -118,7 +119,8 @@
       (let* ([cvar (Var uid)]
              [setcode (Op 'Array-set! (list cvar (Quote CLOS-CODE-INDEX) (env-lookup env lbl)))]
              [cstr (if ctr? (env-lookup env ctr?) (Quote FALSE-IMDT))]
-             [setcstr (Op 'Array-set! (list cvar (Quote CLOS-CSTR-INDEX) cstr))])
+             [setcstr (Op 'Array-set! (list cvar (Quote CLOS-CSTR-INDEX) cstr))]
+             [set* (cons setcode (cons setcstr set*))]);; I added this line 
 	(loop cvar CLOS-FVAR-OFFSET free* set*)))) 
   (let*-values ([(env) (collect-clos b3* env)]
 		[(bnd* exp*) (fold-clos b3* env)])

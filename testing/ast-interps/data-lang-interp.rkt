@@ -18,52 +18,62 @@
 
 (provide data-lang-interp)
 
-(define-type DL-Value (U Symbol Integer Boolean String))
-(struct DL-Code ([value : (-> DL-Eval-Type (Listof DL-Value) DL-Value)]))
-(define-type DL-Eval-Type (-> D0-Expr Env DL-Value))
+(define-type DL-Value (U Uid Integer Boolean String))
+(define-type DL-Code (-> DL-Eval-Type (Listof DL-Value) DL-Value))
+(define-type DL-Eval-Type (-> D0-Expr Local-Env DL-Value))
 
 (define-type (Env A) (HashTable Uid A))
-(define-type Code-Env (Env DL-Code))
+(define-type Code-Env  (Env DL-Code))
 (define-type Local-Env (Env DL-Value))
-(define-syntax-rule (empty-env)
-  (hash))
-
-(define-type Heap (HashTable Integer (Vectorof DL-Value)))
+(define-type Heap-Env  (HashTable Integer (Vectorof DL-Value)))
 
 (: data-lang-interp (-> Data0-Lang Config Test-Value))
 (define (data-lang-interp prgm comp-config)
   (let ([observe observe-lazy])
-    (match-let ([(Prog (list n c t) (Labels l* e)) prgm])
-      (let* ([fst : DL-Value #b1000] 
-             [aptr : (Pair Integer (Vectorof DL-Value)) (cons 0 (vector fst))]
-             [seed : (Listof (Pair Integer (Vectorof DL-Value))) (list aptr)]
-             [heap : Heap (make-hasheq seed)]
-             [labels : Any (init-global-env l*)])
-        (observe (lambda () (dl-expr dl-fn-apply labels heap exp (hasheq))))))))
+    (match-let ([(Prog (list n c t) (Labels code-labels exp)) prgm])
+      (let* ([heap   : Heap-Env (heap-env)]
+             [code   : Code-Env (code-env code-labels)]
+             [locals : Local-Env (env)])
+        (log "prog: \n\n~a\n" n)
+        (log "labels: ~a\nmain: ~a\n" code-labels exp)
+        (observe (lambda () (dl-expr (dl-fn-apply code) heap exp locals)))))))
 
-(: dl-expr (-> (-> DL-Value (Listof DL-Value) DL-Value) 
-               DL-Labels Heap D0-Expr Env
+(: dl-expr (-> (-> DL-Eval-Type DL-Value (Listof DL-Value) DL-Value) 
+               Heap-Env D0-Expr Local-Env
                DL-Value))
+(: log (->* (String) #:rest Any Void))
+(define log 
+  (let ((l (open-output-file "log.txt" #:exists 'replace)))
+    (lambda (fmt . a)
+      (apply fprintf l fmt a))))
+
 (define (dl-expr apply heap exp env)
+  ;; This is the exit implementation for this interpreter
   ((inst call/cc DL-Value DL-Value)
    (lambda ([exit : (-> DL-Value Nothing)])
      (: recur DL-Eval-Type)
      (define (recur exp env)
        (: recur/env (-> D0-Expr DL-Value))
        (define (recur/env e) (recur e env))
+       (log "dl-expr: ~a\n" exp)
        (match exp
-         [(Let b* body) 
-          (recur body (env-extend* env  
-                                   (map (inst car Uid D0-Expr)  b*) 
-                                   (map (lambda ([b : D0-Bnd]) : DL-Value
-                                         (recur/env (cdr b))) b*)))]
+         [(Let b* body)
+          (let ([id*  (map (inst car Uid D0-Expr)  b*)]
+                [rhs* (map (lambda ([b : D0-Bnd]) : DL-Value
+                                   (recur/env (cdr b))) 
+                           b*)])
+            (recur body (env-extend* env id* rhs*)))]
          [(If (app recur/env tst) csq alt)
           (cond
            [(eq? TRUE-IMDT tst) (recur/env csq)]
            [(eq? FALSE-IMDT tst) (recur/env alt)]
            [else (error 'If "test value is unexpected: ~a" tst)])]
          [(Begin s* e) (begin (dl-stmt* s* recur/env heap) (recur/env e))]
-         [(App e e*) (apply recur (recur/env e) (map recur/env e*))]
+         [(App e e*) 
+          (let ([rator (recur/env e)] 
+                [rand (map recur/env e*)])
+            (log "Applying ~a\n" (cons rator rand))
+            (apply recur  rator rand))]
          [(Op p e*) (delta p heap (map recur/env e*))]
          [(Halt) (exit 0)]
          [(Var id) (env-lookup env id)]
@@ -72,15 +82,15 @@
          [e (error 'dl "Umatched expression ~a" e)]))
      (recur exp env))))
 
-(: dl-stmt* (-> (Listof D0-Stmt) (-> D0-Expr DL-Value) Heap Void))
+(: dl-stmt* (-> (Listof D0-Stmt) (-> D0-Expr DL-Value) Heap-Env Void))
 (define (dl-stmt* s* dl-expr heap)
-  (if (nudl? s*)
+  (if (null? s*)
       (void)
       (match-let ([(Op p e*) (car s*)])
         (delta! p heap (map dl-expr e*))
         (dl-stmt* (cdr s*) dl-expr heap))))
 
-(: delta (-> Symbol Heap (Listof DL-Value) DL-Value))
+(: delta (-> Symbol Heap-Env (Listof DL-Value) DL-Value))
 (define (delta p heap v*)
   (define-syntax (app* stx)
     (syntax-case stx ()
@@ -112,15 +122,15 @@
     [(Array-ref)  (delta-ref heap v*)]
     [else (error 'delta "~a" (cons p v*))]))
 
-(: delta! (-> Symbol Heap (Listof DL-Value) Void))
+(: delta! (-> Symbol Heap-Env (Listof DL-Value) Void))
 (define (delta! p heap v*)
   (case p
     [(Array-set!) (delta-set! heap v*)]
     [(Printf)     (delta-printf heap v*)]
     [(Print)      (delta-print heap v*)]))
 
-(define-type delta-rule (-> Heap (Listof DL-Value) DL-Value))
-(define-type delta!-rule (-> Heap (Listof DL-Value) Void))
+(define-type delta-rule (-> Heap-Env (Listof DL-Value) DL-Value))
+(define-type delta!-rule (-> Heap-Env (Listof DL-Value) Void))
 
 (: delta-alloc delta-rule)
 (define (delta-alloc h v*)
@@ -138,6 +148,7 @@
 
 (: delta-ref delta-rule)
 (define (delta-ref h v*)
+  (log "ref: ~a \n\t~a\n" v* h)
   (match v*
     [(list ptr index)
      (if (and (integer? ptr) (index? index))
@@ -208,48 +219,56 @@
   (define (help eval lbl arg*)
     (if (Uid? lbl)
         ((env-lookup env lbl) eval arg*)
-        (error 'apply "fn : ~a" (cons fn arg*))))
+        (error 'apply "~a" (cons lbl arg*))))
   help)
 
-(: env-lookup (-> Env Uid DL-Value))
-#|(define (env-lookup e u)
-  (let ((ref (hash-ref e u (lambda () 
-			     : (Boxof DL-Value) 
-			     (error 'cfi "Unbound var ~a" u)))))
-    (let ([val ((unbox ref))])
-      (set-box! ref (lambda () : DL-Value val))
-      val)))
-|#
+(: env-lookup (All (A) (-> (Env A) Uid A)))
 (define (env-lookup e u)
-  (hash-ref e u (lambda () (error 'data-lang-inter "Unbound local ~a" u))))
-
+  (hash-ref e u (lambda () (error 'data-lang-inter "Unbound ~a" u))))
 
 ;; Env-Extend* is purposfully permisive by not throwing an error
 ;; This allows us to pass to many or too few arguments depending
 ;; on the behavior we wish to allow.
 (: env-extend* (All (A) (-> (Env A) Uid* (Listof A) (Env A))))
 (define (env-extend* env u* v*)
-  (if (or (nudl? u*) (nudl? v*))
+  (if (or (null? u*) (null? v*))
       env
-      (env-extend* ((inst hash-set Uid DL-Value) env (car u*) (car v*)) 
+      (env-extend* (hash-set env (car u*) (car v*)) 
                    (cdr u*) 
                    (cdr v*))))
 
-(: env (All (A) (-> Uid* (Listof A) (Env A))))
-(define (env u* v*)
-  (env-extend* (empty-env) u* v))
+#|
+Type Checker: Could not infer types for applying polymorphic function `hasheq'
+  (: env (All (A) (-> Uid* (Listof A) (Env A))))
+  (define (env u* v*) (env-extend* (hasheq) u* v*))
+|#
+
+(define-syntax env
+  (syntax-rules ()
+    [(_ t u* v*) (let ([p : t (hasheq)]) (env-extend* p u* v*))]
+    [(_) (hasheq)]))
 
 (: local-env (-> (Listof Uid) (Listof DL-Value) Local-Env))
 (define (local-env u* v*)
-  (env u* v*))
+  (env Local-Env u* v*))
 
 
-(: init-global-env (-> D0-Bnd-Code* Global-Env))
-(define (global-env bnd*)
+;; Code-env folds over code-label bindings creating a code enviroment
+;; that maps a symbol to function.
+(: code-env (-> D0-Bnd-Code* Code-Env))
+(define (code-env bnd*)
   (: help (-> (Pairof Uid D0-Code) DL-Code))
   (define (help bnd)
-    (match-let ([(cons uid (Code uid* exp)) bnd])
-      (lambda ([valof : DL-Eval-Type] [val* : (Listof DL-Value)])
-	(valof e (local-env u* v*)))))
-  (env (map (inst car Uid D0-Code) bnd*) 
-       (map code->dl-code bnd*)))
+    (match-let ([(cons uid (Code u* e)) bnd])
+      (lambda ([eval : DL-Eval-Type] [v* : (Listof DL-Value)])
+	(eval e (env Local-Env u* v*)))))
+  (env Code-Env (map (inst car Uid D0-Code) bnd*) (map help bnd*)))
+
+;; Creates an empty heap
+(: heap-env (-> Heap-Env))
+(define (heap-env)
+  ;; The let* here is mostly to provide type annotations for typed racket
+  (let* ([fst : DL-Value #b1000] 
+         [aptr : (Pair Integer (Vectorof DL-Value)) (cons 0 (vector fst))]
+         [seed : (Listof (Pair Integer (Vectorof DL-Value))) (list aptr)])
+    (make-hasheq seed)))

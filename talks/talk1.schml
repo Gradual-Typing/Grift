@@ -1,0 +1,50 @@
+Source
+((: (lambda (a b) (+ a b)) (Int Int -> Int) "Foo") 1 2)
+
+Cast Calculus
+((cast 
+  (lambda ([a : Dyn] [b : Dyn]) : Int (+ a b)) 
+  (Dyn Dyn -> Int) 
+  (Int Int -> Int) "Foo") 1 2)
+
+Cast Calculus after creating castors 
+(letrec ((ctr2 (lambda (v t1 t2 l)
+                (Castable #f
+                 (lambda (a b)
+                  (Castable ctr2
+                   (cast (v (cast a (type-fn-arg t2 0) (type-fn-arg t1 0) l)
+		            (cast b (type-fn-arg t2 1) (type-fn-arg t1 1) l))
+			 (type-fn-ret t1)
+			 (type-fn-ret t2)
+			 l)))))))
+ ((let ((tmp (lambda (a b) (Castable ctr2 (+ a b)))))
+   ((cast-fn tmp) tmp (Dyn Dyn -> Int) (Int Int -> Int) "Foo"))
+  1
+  2)
+
+Lambda Language
+(letrec ((cast-interp (lambda (v t1 t2 l) ...)))
+ (letrec ((ctr2 (lambda (v t1 t2 l)
+                 (Castable #f
+                  (lambda (a b)
+                   (Castable ctr2
+                    (cast-interp (v (cast-interp a 
+ 		    		    		 (type-fn-arg t2 0) 
+						 (type-fn-arg t1 0) 
+						 l)
+		                     (cast-interp b 
+				     		  (type-fn-arg t2 1) 
+						  (type-fn-arg t1 1) 
+						  l))
+		 	         (type-fn-ret t1)
+			         (type-fn-ret t2)
+			         l)))))))
+ ((let ((tmp (lambda (a b) (castable ctr2 (+ a b)))))
+   ((cast-fn tmp) tmp (Dyn Dyn -> Int) (Int Int -> Int) "Foo"))
+  1
+  2)
+
+
+
+			    
+		    
