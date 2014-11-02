@@ -31,7 +31,7 @@
 	    [l0  (impose-cast-semantics c0 config)]
 	    ;;[_  (begin (print l0) (newline))]
 	    [d0  (make-closures-explicit l0 config)]
-            [uil (conver-representation d0 config)])
+            [uil (convert-representation d0 config)])
        (success uil)))))
 
 (: compile (Any . -> . (Result Any)))

@@ -65,7 +65,18 @@ be usefull for optimizations or keeping state.
   (Code variables body)
   (Closure-Data code caster variables)
   (Halt)
-  (Assign lhs rhs))
+  (Assign lhs rhs)
+  (Locals names body)
+  (Return value)
+  (Relop primitive expression1 expression2)
+  ;; Uil Memory Ops
+  (Malloc expression)
+  (Mref expression1 expression2)
+  (Mset expression1 expression2 expression3)
+  ;; Uil IO Primitives
+  (Printf format expressions)
+  (Print expression)
+  (BinOp primitive expression1 expression2))
 
 (define NO-OP (Nop))
 
@@ -148,8 +159,12 @@ be usefull for optimizations or keeping state.
 (define-type IntxInt->Int-Primitives
   (U '* '+ '- 'binary-and 'binary-or '<< '>>))
 
+(define-type IxI->I-Prim IntxInt->Int-Primitives)
+
 (define-type IntxInt->Bool-Primitives
   (U '< '<= '= '> '>=))
+
+(define-type IxI->B-Prim IntxInt->Bool-Primitives)
 
 (define-predicate IntxInt->Bool-Prim? IntxInt->Bool-Primitives)
 
@@ -605,6 +620,8 @@ We are going to UIL
 | Data0-Language created by make-closures-explicit                           |
 +-----------------------------------------------------------------------------|#
 
+
+
 (define-type Data0-Lang
   (Prog (List String Natural Schml-Type) 
 	(Labels D0-Bnd-Code*
@@ -636,35 +653,144 @@ We are going to UIL
 (define-type D0-Literal Lambda-Literal)
 
 #|-----------------------------------------------------------------------------+
-| UIL0-Language created by remove-let                                          |
+| Data1-Language created by normalize-context                                          |
 +-----------------------------------------------------------------------------|#
 
-(define-type UIL0-Lang
+(define-type Data1-Lang
   (Prog (List String Natural Schml-Type) 
-	(Labels U0-Bnd-Code*
-		U0-Expr)))
+	(Labels D1-Bnd-Code*
+		D1-Tail)))
 
-(define-type U0-Bnd-Code* (Listof U0-Bnd-Code))
-(define-type U0-Bnd-Code (Pairof Uid U0-Code))
-(define-type U0-Code (Code Uid* U0-Expr))
+(define-type D1-Bnd-Code* (Listof D1-Bnd-Code))
+(define-type D1-Bnd-Code (Pairof Uid D1-Code))
+(define-type D1-Code (Code Uid* D1-Tail))
 
-(define-type U0-Expr
-  (Rec E (U (App E (Listof E))
-	    (UIL-Op E)
-	    (If E E E)
-	    (Begin U0-Stmt* E)
-	    Halt
-	    (Var Uid)
-	    (Code-Label Uid)
-	    (Quote U0-Literal))))
+(define-type D1-Tail
+  (Rec T 
+   (U (Let D1-Bnd* T)
+      (If D1-Pred T T)
+      (Begin D1-Stmt* T)
+      (Return D1-Expr))))
 
-(define-type U0-Expr* (Listof U0-Expr))
+(define-type D1-Expr
+ (Rec E
+  (U (Let D1-Bnd* E)
+     (If D1-Pred E E) 
+     (Begin D1-Stmt* E)
+     (App E (Listof E))
+     (UIL-Op E)
+     Halt
+     (Var Uid)
+     (Code-Label Uid)
+     (Quote D1-Literal))))
 
-(define-type U0-Stmt (U (UIL-Op! U0-Expr) (Assign Uid U0-Expr)))
-(define-type U0-Stmt* (Listof U0-Stmt))
+(define-type D1-Expr* (Listof D1-Expr))
 
-(define-type U0-Bnd* (Listof U0-Bnd))
-(define-type U0-Bnd  (Pairof Uid U0-Expr))
+(define-type D1-Pred
+ (Rec P
+  (U (Let D1-Bnd* P)
+     (If D1-Pred P P) 
+     (Begin D1-Stmt* P)
+     (Relop IxI->B-Prim D1-Expr D1-Expr))))
 
-(define-type U0-Literal Lambda-Literal)
+(define-type D1-Stmt (UIL-OP! D1-Expr))
 
+(define-type D1-Stmt* (Listof D1-Stmt))
+
+(define-type D1-Bnd  (Pairof Uid D1-Expr))
+
+(define-type D1-Bnd* (Listof D1-Bnd))
+
+(define-type D1-Literal Lambda-Literal)
+
+#|-----------------------------------------------------------------------------+
+| Data2-Language created by remove-let                                          |
++-----------------------------------------------------------------------------|#
+
+(define-type Data2-Lang
+  (Prog (List String Natural Schml-Type) 
+	(Labels D2-Bnd-Code*
+		D2-Body)))
+
+(define-type D2-Bnd-Code* (Listof D2-Bnd-Code))
+(define-type D2-Bnd-Code (Pairof Uid D2-Code))
+(define-type D2-Code (Code Uid* D2-Body))
+
+(define-type D2-Body (Locals Uid* D2-Tail))
+
+(define-type D2-Tail
+  (Rec T 
+   (U (Begin D2-Stmt* T)
+      (If D2-Pred T T)
+      (Return D2-Expr))))
+
+(define-type D2-Expr
+ (Rec E
+  (U (If D2-Pred E E) 
+     (Begin D2-Stmt* E)
+     (App E (Listof E))
+     (UIL-Op E)
+     Halt
+     (Var Uid)
+     (Code-Label Uid)
+     (Quote D2-Literal))))
+
+(define-type D2-Pred
+ (Rec P
+  (U (If P P P) 
+     (Begin D2-Stmt* P)
+     (App D2-Expr (Listof D2-Expr))
+     (Relop IxI->B-Prim D2-Expr))))
+
+(define-type D2-Expr* (Listof D2-Expr))
+(define-type D2-Stmt (UIL-Op! D2-Expr))
+(define-type D2-Stmt* (Listof D2-Stmt))
+
+(define-type D2-Literal Lambda-Literal)
+
+#|-----------------------------------------------------------------------------+
+| Data3-Language created by purify-expression-context                                         |
++-----------------------------------------------------------------------------|#
+
+(define-type Data3-Lang
+  (Prog (List String Natural Schml-Type) 
+	(Labels D3-Bnd-Code*
+		D3-Body)))
+
+(define-type D3-Bnd-Code* (Listof D3-Bnd-Code))
+(define-type D3-Bnd-Code (Pairof Uid D3-Code))
+(define-type D3-Code (Code Uid* D3-Body))
+
+(define-type D3-Body (Locals Uid* D3-Tail))
+
+(define-type D3-Tail
+  (Rec T 
+   (U (Begin D3-Stmt* T)
+      (If D3-Pred T T)
+      (Return D3-Expr))))
+
+(define-type D3-Expr
+ (Rec E
+  (U (If D3-Pred E E) 
+     (App E (Listof E))
+     (UIL-Op E)
+     Halt
+     (Var Uid)
+     (Code-Label Uid)
+     (Quote D3-Literal))))
+
+(define-type D3-Pred
+ (Rec P
+  (U (App D3-Expr (Listof D3-Expr))
+     (Relop IxI->B-Prim D3-Expr))))
+
+(define-type D3-Expr* (Listof D3-Expr))
+(define-type D3-Stmt (UIL-Op! D3-Expr))
+(define-type D3-Stmt* (Listof D3-Stmt))
+(define-type D3-Literal Lambda-Literal)
+
+
+
+#|-----------------------------------------------------------------------------+
+| UIL0-Language created by remove-let                                          |
++-----------------------------------------------------------------------------|#
