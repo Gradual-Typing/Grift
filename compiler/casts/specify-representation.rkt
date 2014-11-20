@@ -89,7 +89,9 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
          (let-values ([(t next) (sr-expr t next)])
            (sr-dyn-box e t next))])]
       [(Blame (app recur e next))
-       (values (Begin (list (Op 'Print (list e))) (Halt)) next)]
+       (values (Begin (list (Op 'Print (list e))
+                            (Op 'Exit '()))
+                      (Quote UNDEF-IMDT)) next)]
       [(Observe (app recur e next) t) (sr-observe e t next)]
       [(Type t) (sr-type t next)]
       [(Tag t)

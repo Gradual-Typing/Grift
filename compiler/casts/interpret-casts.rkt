@@ -18,9 +18,8 @@
 |Output Grammar Cast2-Language                                                 |
 +-----------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/framework/build-compiler
-         schml/framework/helpers
-         schml/framework/errors
+(require schml/compiler/helpers
+         schml/compiler/errors
 	 schml/compiler/language)
 
 ;; Only the pass is provided by this module
@@ -191,116 +190,108 @@
 (define-syntax if$
   (lambda (stx)
     (syntax-case stx ()
-      [(_ t c a)
+      [(_ n t c a)
        (begin ;(print-syntax-width +inf.0) (print stx) (newline)
          #'(let-values  ([(tmp-t) t])
-           (if (Quote? tmp-t)
-               (if (Quote-literal tmp-t)
-                   c
-                   a)
-               (let*-values ([(tmp-c n) c]
-                             [(tmp-a n) a])
-                 (values (If tmp-t tmp-c tmp-a) n)))))])))
+             (if (Quote? tmp-t)
+                 (if (Quote-literal tmp-t)
+                     c
+                     a)
+                 (let*-values ([(tmp-c n) c]
+                               [(tmp-a n) a])
+                   (values (If tmp-t tmp-c tmp-a) n)))))])))
 
 (define-syntax cond$
   (syntax-rules (else)
-    [(_ (else c)) c]
-    [(_ (t c) (t* c*) ...)
-     (if$ t c (cond$ (t* c*) ...))]))
+    [(_ n (else c)) c]
+    [(_ n (t c) (t* c*) ...)
+     (if$ n t c (cond$ n (t* c*) ...))]))
 
 ;; make sure that t is a terminal expression
 ;; expects to be used in the store passing style expressions
 (define-syntax let$*
-  (syntax-rules (bind)
-    [(_ () (bind (n) b)) b]
-    [(_ ([t v] [t* v*] ...) (bind (n) b))
+  (syntax-rules ()
+    [(_ n () b) b]
+    [(_ n ([t v] [t* v*] ...) b)
      (let ((tmp : C2-Expr v))
        (if (or (Quote? tmp) (Tag? tmp) (Type? tmp) (Var? tmp))
            ;;if the expression is a terminal then just update the binding 
-           (let ((t : C2-Expr tmp)) (let$* ([t* v*] ...) (bind (n) b)))
+           (let ((t : C2-Expr tmp)) (let$* n ([t* v*] ...) b))
            ;;if the expression is non terminal bind a var and bind the
            ;;expression to the var
            (let-values ([(uid n) (next-uid (~a 't) n)])
              (let ([t : C2-Expr (Var uid)])
-               (let-values ([(body n) (let$* ([t* v*] ...) (bind (n) b))])
+               (let-values ([(body n) (let$* n ([t* v*] ...) b)])
                  (values (Let (list (cons uid tmp)) body) n))))))]))
 
 (: cast-Any-Type->Any-Type Cast-Rule)
 (define (cast-Any-Type->Any-Type v t1 t2 lbl next)
-  (let$* ([val v] 
-          [type1 t1])
-   (bind (next)
-    (if$   (op=? type1 (Type DYN-TYPE))
-           (cast-Dyn->Any-Type val type1 t2 lbl next)
-           (cast-Ground-Type->Any-Type val type1 t2 lbl next)))))
+  (let$* next ([val v] 
+               [type1 t1])
+     (if$ next (op=? type1 (Type DYN-TYPE))
+          (cast-Dyn->Any-Type val type1 t2 lbl next)
+          (cast-Ground-Type->Any-Type val type1 t2 lbl next))))
 
 
 (: cast-Ground-Type->Any-Type Cast-Rule)
 (define (cast-Ground-Type->Any-Type v t1 t2 lbl next)
-  (let$* ([type1 t1] 
-          [tag1 (type-tag type1)])
-    (bind (next)
-     (cond$ 
+  (let$* next ([type1 t1] 
+               [tag1 (type-tag type1)])
+     (cond$ next
       [(op=? (Tag 'Fn) tag1) (cast-Fn->Any-Type v type1 t2 lbl next)]
       [(op=? type1 (Type INT-TYPE)) (cast-Int->Any-Type v type1 t2 lbl next)]
       [(op=? type1 (Type BOOL-TYPE)) (cast-Bool->Any-Type v type1 t2 lbl next)]
-      [else (values (Blame lbl) next)]))))
+      [else (values (Blame lbl) next)])))
 
 (: cast-Dyn->Any-Type Cast-Rule)
 (define (cast-Dyn->Any-Type v t1 t2 lbl next)
-  (let$* ([val v]
-          [type2 t2])
-   (bind (next)
-    (if$ (op=? (Type DYN-TYPE) type2)
+  (let$* next ([val v]
+               [type2 t2])
+   
+    (if$ next (op=? (Type DYN-TYPE) type2)
          (values v next)
-         (let$* ([val v]
-                 [dyn-tag (Dyn-tag val)])
-           (bind (next)
-            (cond$
-             [(op=? (Tag 'Int) dyn-tag)
-               (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type INT-TYPE) type2 lbl next)]
-              [(op=? (Tag 'Bool) dyn-tag)
-               (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type BOOL-TYPE) type2 lbl next)]
-              [(op=? (Tag 'Boxed) dyn-tag)
-               (cast-Ground-Type->Any-Type (Dyn-ref val 'value) 
-                                           (Dyn-ref val 'type) 
-                                           type2 lbl next)]
-              [else (values (Blame lbl) next)])))))))
+         (let$* next ([val v]
+                      [tag (Dyn-tag val)])
+          (cond$ next
+             [(op=? (Tag 'Int) tag)
+              (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type INT-TYPE) type2 lbl next)]
+             [(op=? (Tag 'Bool) tag)
+              (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type BOOL-TYPE) type2 lbl next)]
+             [(op=? (Tag 'Boxed) tag)
+              (cast-Ground-Type->Any-Type (Dyn-ref val 'value) 
+                                          (Dyn-ref val 'type) 
+                                          type2 lbl next)]
+             [else (values (Blame lbl) next)])))))
 
 
 (: cast-Int->Any-Type Cast-Rule)
 (define (cast-Int->Any-Type v t1 t2 lbl next)
-  (let$* ([type2 t2])
-    (bind (next)
-     (cond$ 
-      [(op=? (Type INT-TYPE) type2) (values v next)]
-      [(op=? (Type DYN-TYPE) type2) (values (Dyn-make v (Type INT-TYPE)) next)]
-      [else (values (Blame lbl) next)]))))
+  (let$* next ([type2 t2])
+    (cond$ next
+     [(op=? (Type INT-TYPE) type2) (values v next)]
+     [(op=? (Type DYN-TYPE) type2) (values (Dyn-make v (Type INT-TYPE)) next)]
+     [else (values (Blame lbl) next)])))
 
 (: cast-Bool->Any-Type Cast-Rule)
 (define (cast-Bool->Any-Type v t1 t2 lbl next)
-  (let$* ([type2 t2])
-    (bind (next)
-      (cond$ 
-       [(op=? (Type BOOL-TYPE) type2) (values v next)]
-       [(op=? (Type DYN-TYPE) type2) (values (Dyn-make v (Type BOOL-TYPE)) next)]
-       [else (values (Blame lbl) next)]))))
+  (let$* next ([type2 t2])
+    (cond$ next
+     [(op=? (Type BOOL-TYPE) type2) (values v next)]
+     [(op=? (Type DYN-TYPE) type2) (values (Dyn-make v (Type BOOL-TYPE)) next)]
+     [else (values (Blame lbl) next)])))
 
 (: cast-Fn->Any-Type Cast-Rule)
 (define (cast-Fn->Any-Type v t1 t2 lbl next)
-  (let$* ([type2 t2])
-    (bind (next)
-      (if$   (op=? (Type DYN-TYPE) type2)
-             (values (Dyn-make v t1) next)
-             (cast-Fn->Fn v t1 type2 lbl next)))))
+  (let$* next ([type2 t2])
+    (if$ next (op=? (Type DYN-TYPE) type2)
+         (values (Dyn-make v t1) next)
+         (cast-Fn->Fn v t1 type2 lbl next))))
 
 (: cast-Fn->Fn Cast-Rule)
 (define (cast-Fn->Fn v t1 t2 lbl next)
-  (let$* ([type2 t2]
-          [tag2 (type-tag type2)])
-   (bind (next)
-   (if$   (op=? tag2 (Tag 'Fn))
-           (let$* ([value v])
-            (bind (next)
-               (values (App (Fn-Caster value) (list value t1 type2 lbl)) next)))
-           (values (Blame lbl) next)))))
+  (let$* next ([type2 t2]
+               [tag2 (type-tag type2)])
+         (if$ next (op=? tag2 (Tag 'Fn)) 
+              (let$* next ([value v])
+                (values (App (Fn-Caster value) (list value t1 type2 lbl)) next))
+              (values (Blame lbl) next))))

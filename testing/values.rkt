@@ -1,4 +1,7 @@
-#lang typed/racket
+#lang typed/racket/base
+
+(require racket/port
+         schml/compiler/helpers)
 
 (provide (all-defined-out))
 
@@ -18,7 +21,8 @@
 (struct function ()
 	#:transparent)
 
-(: value=? (Test-Value Test-Value . -> . Boolean))
+
+(: value=? (Any Any . -> . Boolean))
 (define (value=? x y)
   (or (and (blame? x) (blame? y) (blame=? x y))
       (and (boole? x) (boole? y) (boole=? x y))
@@ -36,7 +40,12 @@
       [(not-lbl? x) (not (equal? (not-lbl-value x) y))]
       [(not-lbl? y) (not (equal? (not-lbl-value y) x))]
       [(or (not x) (not y)) #t]
-      [else (equal? x y)]))))
+      [else
+       (and (string? x) (string? y)
+            (cond
+             [(equal? x y)]
+             [(regexp-match y x) #t]
+             [else #f]))]))))
       
 
 (: boole=? (boole boole . -> . Boolean))
@@ -47,3 +56,20 @@
 (define (integ=? x y)
   (equal? (integ-value x) (integ-value y)))
 
+#| capture the output of exp on current-output-port and match
+   as if it were returning a value from one of our compiled
+   programs.
+|#
+(define-syntax-rule (observe exp)
+  (let ([s (with-output-to-string (lambda () exp))])
+    (when (trace? 'Out 'All 'Vomit) (logf "program output:\n ~a\n" s))
+    (cond
+     [(regexp-match #rx".*Int : ([0-9]+)" s) => 
+      (lambda (r)
+        (integ (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+     [(regexp-match #rx".*Bool : #(t|f)" s) =>
+      (lambda (r)
+        (boole (not (equal? "f" (cadr (cast r (Listof String)))))))]
+     [(regexp-match #rx".*Function : \\?" s) (function)]
+     [(regexp-match #rx".*Dynamic : \\?" s) (dynamic)]
+     [else (blame #f s)])))

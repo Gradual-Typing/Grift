@@ -68,7 +68,7 @@
            [(eq? TRUE-IMDT tst) (recur/env csq)]
            [(eq? FALSE-IMDT tst) (recur/env alt)]
            [else (error 'If "test value is unexpected: ~a" tst)])]
-         [(Begin s* e) (begin (dl-stmt* s* recur/env heap) (recur/env e))]
+         [(Begin s* e) (begin (dl-stmt* s* recur/env heap exit) (recur/env e))]
          [(App e e*) 
           (let ([rator (recur/env e)] 
                 [rand (map recur/env e*)])
@@ -82,13 +82,13 @@
          [e (error 'dl "Umatched expression ~a" e)]))
      (recur exp env))))
 
-(: dl-stmt* (-> (Listof D0-Stmt) (-> D0-Expr DL-Value) Heap-Env Void))
-(define (dl-stmt* s* dl-expr heap)
+(: dl-stmt* (-> (Listof D0-Stmt) (-> D0-Expr DL-Value) Heap-Env (-> DL-Value Nothing) Void))
+(define (dl-stmt* s* dl-expr heap exit)
   (if (null? s*)
       (void)
       (match-let ([(Op p e*) (car s*)])
-        (delta! p heap (map dl-expr e*))
-        (dl-stmt* (cdr s*) dl-expr heap))))
+        (delta! p heap (map dl-expr e*) exit)
+        (dl-stmt* (cdr s*) dl-expr heap exit))))
 
 (: delta (-> Symbol Heap-Env (Listof DL-Value) DL-Value))
 (define (delta p heap v*)
@@ -122,12 +122,13 @@
     [(Array-ref)  (delta-ref heap v*)]
     [else (error 'delta "~a" (cons p v*))]))
 
-(: delta! (-> Symbol Heap-Env (Listof DL-Value) Void))
-(define (delta! p heap v*)
+(: delta! (-> Symbol Heap-Env (Listof DL-Value) (-> DL-Value Nothing) Void))
+(define (delta! p heap v* exit)
   (case p
     [(Array-set!) (delta-set! heap v*)]
     [(Printf)     (delta-printf heap v*)]
-    [(Print)      (delta-print heap v*)]))
+    [(Print)      (delta-print heap v*)]
+    [(Exit)       (exit -1)]))
 
 (define-type delta-rule (-> Heap-Env (Listof DL-Value) DL-Value))
 (define-type delta!-rule (-> Heap-Env (Listof DL-Value) Void))

@@ -1,50 +1,62 @@
 #lang typed/racket
 
-(require schml/framework/build-compiler)
+(require schml/compiler/language
+         schml/compiler/helpers)
+(require schml/compiler/schml/reduce-to-cast-calculus
+         schml/compiler/casts/impose-cast-semantics
+         schml/compiler/closures/make-closures-explicit
+         schml/compiler/data/convert-representation
+         schml/compiler/backend-c/code-generator)
 
 (provide (all-defined-out))
-
-(define-type (Result A)  (U error (success A)))
-(struct error ([value : Any]))
-(struct (A) success ([value : A]))
-(define-predicate Any? Any)
-
 (provide (struct-out Config))
-(: compiler-config (Parameter Config))
-(define compiler-config 
-  (make-parameter
-   (Config 'Lazy-D)))
 
 ;; This is the main compiler it is composed of several micro
-;; compilers for successivly smaller langages. 
-(: compile/conf (Path Config . -> . (Result Any)))
+;; compilers for successivly lower level languages. 
+(: compile/conf (Path Config . -> . Boolean))
 (define (compile/conf path config)
-  (local-require schml/compiler/schml/reduce-to-cast-calculus
-		 schml/compiler/casts/impose-cast-semantics
-		 schml/compiler/closures/make-closures-explicit
-		 schml/compiler/data/convert-representation)
-  (call-with-exception-handler 
-   error
-   (lambda ()
-     (let* ([c0  (reduce-to-cast-calculus path config)]
-	    ;;[_  (begin (print c0) (newline))]
-	    [l0  (impose-cast-semantics c0 config)]
-	    ;;[_  (begin (print l0) (newline))]
-	    [d0  (make-closures-explicit l0 config)]
-            [uil (convert-representation d0 config)])
-       (success uil)))))
+  (let* (;; read(lex), parse, typecheck, insert casts
+         [c0  : Cast0-Lang (reduce-to-cast-calculus path config)]
+         [_   (when (trace? 'Cast0 'All 'Vomit) (logf "Cast0:\n~a\n\n" c0))]
 
-(: compile (Any . -> . (Result Any)))
-(define (compile path) 
-  (let ((config (compiler-config))) 
-    (cond
-     [(string? path) (compile/conf (string->path path) config)]
-     [(path? path) (compile/conf path config)]
-     [else (error 'compile)])))
+         ;; lower casts into a weakly typed language with lexical closures
+         [l0  : Lambda0-Lang (impose-cast-semantics c0 config)]
+         [_   (when (trace? 'Lambda0 'All 'Vomit) (logf "Lambda0:\n~a\n\n" l0))]
 
-#|
+         ;; convert lambdas to flat functions and closure data structures
+         [d0  : Data0-Lang (make-closures-explicit l0 config)]
+         [_   (when (trace? 'Data0 'All 'Vomit) (logf "Data0:\n~a\n\n" d0))]
+
+         ;; change how the language is representated in order to make the conversion to c easy
+         [uil : Data2-Lang (convert-representation d0 config)]
+         [_   (when (trace? 'UIL0 'All 'Vomit) (logf "UIL0:\n~a\n\n" uil))])
+    (c-backend-generate-code uil config)))
+
+;; compile file at path
+;; exec-path = path/name of final executable
+(: compile (->* ((U String Path))
+                (#:exec-path Path #:c-path Path #:semantics Semantics #:log-path (Option Path))
+                Boolean))
+(define (compile path
+     #:exec-path [exec-path (string->path "a.out")]
+     #:c-path    [c-path    (string->path "a.c")]
+     #:log-path  [log-path  #f]
+     #:semantics [semantics 'Lazy-D])
+  (let* ([path  (simple-form-path (if (string? path) (string->path path) path))])
+    (let ([th (lambda () (compile/conf path (Config semantics exec-path c-path)))])
+      (if log-path
+          (call-with-output-file
+              log-path #:exists 'replace #:mode 'text
+              (lambda ([log : Output-Port])
+                (parameterize ([current-log-port log])
+                  (th))))
+          (th)))))
+
+
 (module+ main
-  (command-line 
-     #:program "Schml-compiler-tests"
-     #:args (str) (compile str)))
-|#
+  (let ([args (current-command-line-arguments)])
+    (cond
+     [(= 0 (vector-length args)) (display "please specify what file to run!\n")]
+     [(< 1 (vector-length args)) (display "please only specify one file to run!\n")]
+     [(compile (vector-ref args 0)) (display "success :)\n")]
+     [else (display "success :)\n")])))

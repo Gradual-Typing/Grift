@@ -58,7 +58,8 @@
       [(Fn-Caster exp)
        (let-values ([(exp next) (cc-expr exp next)])
          (values (Fn-Caster exp) next))]
-      [(Halt) (values (Halt) next)]
+      ;; Remove this next time you see it: ak
+      ;;[(Halt) (values (Halt) next)]
       [(Var u) (values (Var u) next)]
       [(Quote k) (values (Quote k) next)]))
 

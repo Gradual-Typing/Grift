@@ -42,7 +42,7 @@
        (Op 'Array-ref (list e (Quote CLOS-CSTR-INDEX)))]
       [(If (app recur t) (app recur c) (app recur a)) (If t c a)]
       [(Begin stm* (app recur exp)) (Begin (sr-stmt* stm* env) exp)]
-      [(Halt) (Halt)]
+;;      [(Halt) (Halt)]
       [(Var i) (env-lookup env i)]
       [(Quote k) (Quote k)]))
   recur)

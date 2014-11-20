@@ -1,6 +1,15 @@
 #lang typed/racket
-(require schml/framework/helpers)
+(require schml/compiler/helpers)
+
 (provide (all-defined-out))
+
+(define-type Semantics (U 'Lazy-D))
+
+(struct Config ([semantics : Semantics]
+                [exec-path : Path]
+                [c-path : Path]))
+
+
 #|
 Commonly used and recognize language forms 
 In general I try to switch structs as the meaning of forms
@@ -118,6 +127,11 @@ be usefull for optimizations or keeping state.
 #| Unique Identifier |#
 (struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
 (define-type Uid* (Listof Uid))
+
+
+(: uid->string (-> Uid String))
+(define (uid->string u)
+  (string-append (Uid-prefix u) (number->string (Uid-suffix u))))
 
 (define (uid=? [u : Uid] [v : Uid])
   (= (Uid-suffix u) (Uid-suffix v)))
@@ -287,12 +301,15 @@ be usefull for optimizations or keeping state.
 We are going to UIL
 -----------------------------------------------------------------------------|#
 
-(define-type UIL-Prim  (U Schml-Prim UIL-Primitive))
-(define-type UIL-Prim! (U UIL-Primitive!))
+(define-type UIL-Prim  (U Schml-Prim Array-Prim))
+(define-type UIL-Prim! (U Array-Prim! Print-Prim! Runtime-Prim!))
 
+(define-type UIL-Expr-Prim (U Array-Prim IxI->I-Prim))
 
-(define-type UIL-Primitive (U 'Alloc 'Array-ref))
-(define-type UIL-Primitive! (U 'Print 'Printf 'Array-set!))
+(define-type Array-Prim (U 'Alloc 'Array-ref))
+(define-type Array-Prim! 'Array-set!)
+(define-type Print-Prim! (U 'Printf 'Print))
+(define-type Runtime-Prim! (U 'Exit))
 
 (define-type (UIL-Op E) (Op UIL-Prim (Listof E)))
 (define-type (UIL-Op! E) (Op UIL-Prim! (Listof E)))
@@ -443,6 +460,8 @@ We are going to UIL
 ;; Immediates
 (define FALSE-IMDT #b000)
 (define TRUE-IMDT #b001)
+;; Unreachable Value
+(define UNDEF-IMDT 0)
 
 #|-----------------------------------------------------------------------------+
 | The Lambda Language Family Types, Primitives, Literals, and Terminals        |
@@ -469,7 +488,6 @@ We are going to UIL
 	    (Begin (Listof L0-Stmt) E)
 	    (Fn-Caster E)
 	    ;; Terminals 
-            Halt
 	    (Var Uid) 
 	    (Quote Lambda-Literal))))
 
@@ -678,7 +696,7 @@ We are going to UIL
      (If D1-Pred E E) 
      (Begin D1-Stmt* E)
      (App E (Listof E))
-     (UIL-Op E)
+     (Op (U IxI->I-Prim Array-Prim) (Listof E))
      Halt
      (Var Uid)
      (Code-Label Uid)
@@ -693,7 +711,7 @@ We are going to UIL
      (Begin D1-Stmt* P)
      (Relop IxI->B-Prim D1-Expr D1-Expr))))
 
-(define-type D1-Stmt (UIL-OP! D1-Expr))
+(define-type D1-Stmt (UIL-Op! D1-Expr))
 
 (define-type D1-Stmt* (Listof D1-Stmt))
 
@@ -729,21 +747,25 @@ We are going to UIL
   (U (If D2-Pred E E) 
      (Begin D2-Stmt* E)
      (App E (Listof E))
-     (UIL-Op E)
+     (Op (U IxI->I-Prim Array-Prim) (Listof E))
      Halt
      (Var Uid)
      (Code-Label Uid)
      (Quote D2-Literal))))
+
+(define-type D2-Expr* (Listof D2-Expr))
 
 (define-type D2-Pred
  (Rec P
   (U (If P P P) 
      (Begin D2-Stmt* P)
      (App D2-Expr (Listof D2-Expr))
-     (Relop IxI->B-Prim D2-Expr))))
+     (Relop IxI->B-Prim D2-Expr D2-Expr))))
 
-(define-type D2-Expr* (Listof D2-Expr))
-(define-type D2-Stmt (UIL-Op! D2-Expr))
+(define-type D2-Stmt 
+  (U (UIL-Op! D2-Expr)
+     (Assign Uid D2-Expr)))
+
 (define-type D2-Stmt* (Listof D2-Stmt))
 
 (define-type D2-Literal Lambda-Literal)
@@ -782,7 +804,7 @@ We are going to UIL
 (define-type D3-Pred
  (Rec P
   (U (App D3-Expr (Listof D3-Expr))
-     (Relop IxI->B-Prim D3-Expr))))
+     (Relop IxI->B-Prim D3-Expr D3-Expr))))
 
 (define-type D3-Expr* (Listof D3-Expr))
 (define-type D3-Stmt (UIL-Op! D3-Expr))

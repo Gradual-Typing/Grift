@@ -46,7 +46,7 @@
 		 exp*) exp*-bnd*)]
     [(Begin (app lf-stmt* stm* stm*-bnd) (app lf-expr exp exp-bnd))
      (values (Begin stm* exp) (append stm*-bnd exp-bnd))]
-    [(Halt) (values (Halt) '())]
+    ;;[(Halt) (values (Halt) '())]
     [(Var i) (values (Var i) '())]
     [(Code-Label i) (values (Code-Label i) '())]
     [(Quote l) (values (Quote l) '())]))

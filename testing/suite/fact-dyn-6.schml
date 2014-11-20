@@ -1,0 +1,5 @@
+(let ((f (lambda (f n)
+            (if (= n 0)
+                1
+                (* n (f f (- n 1)))))))
+  (: (f f 6) Int))

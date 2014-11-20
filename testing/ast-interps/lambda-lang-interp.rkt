@@ -107,7 +107,7 @@
         [(eq? TRUE-IMDT tst) (recur/env csq)]
         [(eq? FALSE-IMDT tst) (recur/env alt)]
         [else (error 'If "test value is unexpected: ~a" tst)])]
-      [(Begin s* e) (begin (ll-stmt* s* recur/env heap) (recur/env e))]
+      [(Begin s* e) (begin (ll-stmt* s* recur/env heap exit) (recur/env e))]
       [(App e e*) (apply (recur/env e) (map recur/env e*))]
       [(Op p e*) (delta p heap (map recur/env e*))]
       [(Halt) (exit 0)]
@@ -116,13 +116,14 @@
       [e (error 'll "Umatched expression ~a" e)]))
      (recur exp env))))
 
-(: ll-stmt* (-> (Listof L0-Stmt) (-> L0-Expr LL-Value) Heap Void))
-(define (ll-stmt* s* ll-expr heap)
+
+(: ll-stmt* (-> (Listof L0-Stmt) (-> L0-Expr LL-Value) Heap (-> LL-Value Nothing) Void))
+(define (ll-stmt* s* ll-expr heap exit)
   (if (null? s*)
       (void)
       (match-let ([(Op p e*) (car s*)])
-        (delta! p heap (map ll-expr e*))
-        (ll-stmt* (cdr s*) ll-expr heap))))
+        (delta! p heap (map ll-expr e*) exit)
+        (ll-stmt* (cdr s*) ll-expr heap exit))))
 
 (: delta (-> Symbol Heap (Listof LL-Value) LL-Value))
 (define (delta p heap v*)
@@ -156,12 +157,13 @@
     [(Array-ref)  (delta-ref heap v*)]
     [else (error 'delta "~a" (cons p v*))]))
 
-(: delta! (-> Symbol Heap (Listof LL-Value) Void))
-(define (delta! p heap v*)
+(: delta! (-> Symbol Heap (Listof LL-Value) (-> LL-Value Nothing) Void))
+(define (delta! p heap v* exit)
   (case p
     [(Array-set!) (delta-set! heap v*)]
     [(Printf)     (delta-printf heap v*)]
-    [(Print)      (delta-print heap v*)]))
+    [(Print)      (delta-print heap v*)]
+    [(Exit)       (exit -1)]))
     
 (define-type delta-rule (-> Heap (Listof LL-Value) LL-Value))
 (define-type delta!-rule (-> Heap (Listof LL-Value) Void))

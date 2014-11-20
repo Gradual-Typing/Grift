@@ -51,7 +51,7 @@
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
     [(Fn-Caster (app uf-expr e e-fvars))
      (values (Fn-Caster e) e-fvars)]
-    [(Halt) (values (Halt) (set))]
+    ;;[(Halt) (values (Halt) (set))]
     [(Var u) (values (Var u) (set u))]
     [(Quote k) (values (Quote k) (set))]))
 

@@ -59,9 +59,8 @@
 |Literal   = Integer |  Boolean                                                 |
 |Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
 +------------------------------------------------------------------------------|#
-(require schml/framework/build-compiler
-         schml/framework/errors
-	 schml/framework/helpers
+(require schml/compiler/errors
+	 schml/compiler/helpers
 	 schml/compiler/language)
 
 ;; Only the pass is provided by this module

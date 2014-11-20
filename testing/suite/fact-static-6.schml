@@ -1,0 +1,5 @@
+(letrec ((f (lambda ([n : Int]) : Int
+              (if (= n 0) 
+                  1
+                  (* n (f (- n 1)))))))
+  (f 6))

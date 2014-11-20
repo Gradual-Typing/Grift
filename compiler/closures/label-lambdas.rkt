@@ -58,7 +58,8 @@
     [(Fn-Caster e)
      (let-values ([(e next) (ll-expr e next)])
        (values (Fn-Caster e) next))]
-    [(Halt) (values (Halt) next)]
+    ;;It may be possible to remove this: ak
+    ;;[(Halt) (values (Halt) next)]
     [(Var i) (values (Var i) next)]
     [(Quote k) (values (Quote k) next)]))
 

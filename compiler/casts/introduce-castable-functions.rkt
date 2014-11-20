@@ -125,7 +125,7 @@
 ;; create a untyped binding for a casting function
 (: mk-caster-bnd (-> Index Natural (values C1-Bnd Natural)))
 (define (mk-caster-bnd ary next)
-  (let*-values ([(uid next) (next-uid (format "cast-fn~a" ary) next)]
+  (let*-values ([(uid next) (next-uid (format "cast_fn~a" ary) next)]
 		[(rhs next) (mk-caster-fn ary next uid)])
     (values (cons uid rhs) next)))
 
