@@ -1,8 +1,7 @@
 #lang typed/racket
 
-(require schml/framework/build-compiler
-         schml/framework/helpers
-         schml/framework/errors
+(require schml/compiler/helpers
+         schml/compiler/errors
 	 schml/testing/values
 	 schml/compiler/language)
 
@@ -87,8 +86,10 @@
     (define (map-curry-recur [exp* : C0-Expr*])
       (define (curry-recur [exp : C0-Expr]): (-> (Env CL-Value) CL-Value)
         (lambda ([env : (Env CL-Value)]): CL-Value
-          (recur exp env)))
-      (map curry-recur exp*))    
+                (recur exp env)))
+      (map curry-recur exp*))
+    (when (trace? 'Vomit)
+      (logf "cl-expr:\n~v\n\n" exp))
     (match exp
       [(Lambda fml*  _  body)
        (let ([id* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
@@ -116,6 +117,8 @@
 
 (: delta (-> Symbol CL-Value* CL-Value))
 (define (delta p v*)
+  (when (trace? 'Vomit)
+    (logf "cl-delta:\n~v\n\n" p))
   (case p
     [(+) (tc IxI->I + v*)]
     [(-) (tc IxI->I - v*)]
@@ -150,7 +153,7 @@
 	  (match v1
 	    [(CL-Dyn l2 v2 t3 t1)
 	     (apply-cast-ld l1 v2 t3 t2)]
-	    [o (error 'interp "Unexpected value in apply-cast-ld match ~a" o)])
+	    [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])
 	  (mk-cast l1 v1 t1 t2))
       (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
 

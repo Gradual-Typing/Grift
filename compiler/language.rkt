@@ -89,6 +89,63 @@ be usefull for optimizations or keeping state.
 
 (define NO-OP (Nop))
 
+(: spaces (-> Integer Void))
+(define (spaces i)
+  (when (< 0 i)
+    (display #\space)
+    (spaces (- i 1))))
+
+(: format-ast (Any . -> . String))
+(define (format-ast x)
+  (with-output-to-string (lambda () (format-form x 0 0))))
+
+(: format-form (Any Integer Integer . -> . Void))
+(define (format-form a s i)
+  (spaces s)
+  (match a
+    [(list a ...) (let* ([i (+ i 1)]
+                         [f (lambda (a)
+                              (format-form a i i) (newline))])
+                    (display "(")
+                    (when (pair? a)
+                      (format-form (car a) 0 i)
+                      (for-each f (cdr a)))
+                    (display ")"))]
+    [(cons a b) (display "[") (let ([i (add1 i)])
+                                (format-form a 0 i) (newline)
+                                (format-form a i i) (display "]"))]
+    [(Bnd a t b) (display "[") (let ([i (add1 i)])
+                                 (format-form a 0 i) (display " : ")
+                                 (format-form t 0 (+ i 5)) (newline)
+                                 (format-form a i i) (display "]"))]
+    [(App e e*) (format-form (cons 'App (cons e e*)) 0 i)]
+    [(Lambda f t e) (display "(lambda ") (format-form f 0 i) (newline)
+     (let ([i (+ 2 i)])
+       (format-form e i i) (newline)
+       (format-form e i i))]
+    [(Prog a e) (printf "Prog: ~a\n" a) (format-form e i i)]
+    [(Let b e) (display "(let ") (format-form b 0 (+ i 5)) (newline)
+                 (format-form e (+ i 2) (+ i 2)) (display ")")]
+    [(Letrec b e) (display "(letrec ") (format-form b 0 (+ i 8)) (newline)
+     (format-form e (+ i 2) (+ i 2)) (display ")")]
+    [(If t c a) (display "(if ") (format-form t 0 (+ i 4)) (newline)
+     (format-form c (+ i 4) (+ i 4))
+     (format-form a (+ i 4) (+ i 4)) (display ")")]
+    [(Var u) (format-form u 0 0)]
+    [(Uid s n) (display s) (display "_") (display n)]
+    [(Int) (display "Int")]
+    [(Dyn) (display "Dyn")]
+    [(Bool) (display "Bool")]
+    [(Fn a (? list? p) r) (let ([f (lambda (a)
+                              (format-form a 0 0)
+                              (display " "))])
+                  (display "(")
+                  (for-each f p)
+                  (display "-> ")
+                  (format-form r 0 0)
+                  (display ")"))]
+    [otherwise (print a)]))
+
 #| Types throughout the languages |#
 
 ;; Schml types

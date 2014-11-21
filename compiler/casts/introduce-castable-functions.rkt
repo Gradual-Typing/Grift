@@ -157,7 +157,7 @@
 	  (let ([val : C1-Expr (Var (car uid*))]
 		[t1 : C1-Expr (Type-Fn-ref t1 index)]
 		[t2 : C1-Expr (Type-Fn-ref t2 index)])
-	    (cons (Runtime-Cast val t1 t2 lbl)
+	    (cons (Runtime-Cast val t2 t1 lbl)        ;; contravarient argument cast
 		  (loop (cdr uid*) (cast (add1 index) Index))))))
     (loop uid* 0))
   ;; create the uids for the casting function

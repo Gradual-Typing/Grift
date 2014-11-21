@@ -161,17 +161,12 @@
 ;; performs compile time folding of prim = on literals
 (: op=? (-> C2-Expr C2-Expr C2-Expr))
 (define (op=? o x)
-  (if (or (and (Quote? o) (Quote? x)
-               (eq? (Quote-literal o)
-                    (Quote-literal x)))
-          (and (Tag? o) (Tag? x)
-               (eq? (Tag-bits o) 
-                    (Tag-bits x)))
-          (and (Type? o) (Type? x)
-               (equal? (Type-type o) 
-                       (Type-type x))))
-      (Quote #t)
-      (Op '= (list o x))))
+  (cond
+   [(and (Quote? o) (Quote? x) (Quote (eq? (Quote-literal o)
+                                           (Quote-literal x))))]
+   [(and (Tag? o) (Tag? x)) (Quote (eq? (Tag-bits o) (Tag-bits x)))]
+   [(and (Type? o) (Type? x)) (Quote (equal? (Type-type o) (Type-type x)))]
+   [else (Op '= (list o x))]))
 
 ;; construct new type literals based on the fn-ref operation 
 (: fn-ref (-> C2-Expr (U Index 'return 'arity) C2-Expr))

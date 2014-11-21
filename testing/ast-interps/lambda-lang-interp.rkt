@@ -9,9 +9,8 @@
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
 
-(require schml/framework/build-compiler
-         schml/framework/helpers
-         schml/framework/errors
+(require schml/compiler/helpers
+         schml/compiler/errors
 	 schml/testing/values
 	 schml/compiler/language
          racket/fixnum)
@@ -77,6 +76,8 @@
      (define (recur exp env)
        (: recur/env (-> L0-Expr LL-Value))
        (define (recur/env e) (recur e env))
+       (when (trace? 'Vomit)
+         (logf "ll-expr:\n~v\n\n" exp))
        (match exp
          [(Lambda id* _  (Castable ctr? body))
           (let ((clos (lambda ([arg* : (Listof LL-Value)]) 
@@ -140,6 +141,8 @@
   (define-syntax-rule (IxI p) (app* p integer? integer?))
   (define-syntax-rule (FxF p) (app* p fixnum? fixnum?))
   (define-syntax-rule (IxI>B p) (IxI (lambda (n m) (if (p n m) TRUE-IMDT FALSE-IMDT))))
+  (when (trace? 'vomit)
+    (logf "ll-delta ~v" (cons p v*)))
   (case p
     [(+) (IxI +)] 
     [(-) (IxI -)] 
@@ -159,6 +162,8 @@
 
 (: delta! (-> Symbol Heap (Listof LL-Value) (-> LL-Value Nothing) Void))
 (define (delta! p heap v* exit)
+  (when (trace? 'Vomit)
+    (logf "ll-delta!\n~v\nwith heap ~v\n\n" (cons p v*) heap))
   (case p
     [(Array-set!) (delta-set! heap v*)]
     [(Printf)     (delta-printf heap v*)]

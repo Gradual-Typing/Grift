@@ -15,9 +15,11 @@
 ;; compilers for successivly lower level languages. 
 (: compile/conf (Path Config . -> . Boolean))
 (define (compile/conf path config)
+  (when (trace? 'Source 'All 'Vomit)
+    (logf "Source:\n~a\n\n" (file->string path #:mode 'text)))
   (let* (;; read(lex), parse, typecheck, insert casts
          [c0  : Cast0-Lang (reduce-to-cast-calculus path config)]
-         [_   (when (trace? 'Cast0 'All 'Vomit) (logf "Cast0:\n~a\n\n" c0))]
+         [_   (when (trace? 'Cast0 'All 'Vomit) (logf "Cast0:\n~v\n\n" c0))]
 
          ;; lower casts into a weakly typed language with lexical closures
          [l0  : Lambda0-Lang (impose-cast-semantics c0 config)]
@@ -25,11 +27,11 @@
 
          ;; convert lambdas to flat functions and closure data structures
          [d0  : Data0-Lang (make-closures-explicit l0 config)]
-         [_   (when (trace? 'Data0 'All 'Vomit) (logf "Data0:\n~a\n\n" d0))]
+         [_   (when (trace? 'Data0 'All 'Vomit) (logf "Data0:\n~v\n\n" d0))]
 
          ;; change how the language is representated in order to make the conversion to c easy
          [uil : Data2-Lang (convert-representation d0 config)]
-         [_   (when (trace? 'UIL0 'All 'Vomit) (logf "UIL0:\n~a\n\n" uil))])
+         [_   (when (trace? 'UIL0 'All 'Vomit) (logf "UIL0:\n~v\n\n" uil))])
     (c-backend-generate-code uil config)))
 
 ;; compile file at path
@@ -48,7 +50,10 @@
           (call-with-output-file
               log-path #:exists 'replace #:mode 'text
               (lambda ([log : Output-Port])
-                (parameterize ([current-log-port log])
+                (parameterize ([current-log-port log]
+                               [print-as-expression #t]
+                               [print-graph #t]
+                               [print-struct #t])
                   (th))))
           (th)))))
 

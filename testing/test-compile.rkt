@@ -42,8 +42,7 @@
              [_   (ann-ck "cast lang semantics"
                           value=? (cast-lang-interp c0 config) expected)]
 	     [l0  : Lambda0-Lang (impose-cast-semantics c0 config)]
-            
-;;             [_   (ann-ck "lambda lang semantics" value=? (lambda-lang-interp l0 config) expected)]
+             [_ (ann-ck "lambda lang semantics" value=? (lambda-lang-interp l0 config) expected)]
 	     [d0  : Data0-Lang (make-closures-explicit l0 config)]
              [_   (ann-ck "data lang semantics"
                           value=? (data-lang-interp d0 config) expected)]

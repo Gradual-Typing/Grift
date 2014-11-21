@@ -1,0 +1,1 @@
+(letrec ([a : (-> Dyn) (lambda () 1)]) (a))

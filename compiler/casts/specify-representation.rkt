@@ -94,14 +94,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
                       (Quote UNDEF-IMDT)) next)]
       [(Observe (app recur e next) t) (sr-observe e t next)]
       [(Type t) (sr-type t next)]
-      [(Tag t)
-       (values (case t
-                 [(Int)    (Quote DYN-INT-TAG)] 
-                 [(Bool)   (Quote DYN-BOOL-TAG)] 
-                 [(Atomic) (Quote TYPE-ATOMIC-TAG)] 
-                 [(Fn)     (Quote DYN-BOXED-TAG)] 
-                 [(Boxed)  (Quote TYPE-FN-TAG)])
-               next)]))
+      [(Tag t) (values (sr-tag t) next)]))
   (recur exp))
 
 (: sr-expr* (-> (Listof C2-Expr) Natural (values (Listof L0-Expr) Natural)))
@@ -193,3 +186,12 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
    [(Dyn? t)
     (Begin (list (Op 'Print (list (Quote "Dynamic : ?\n")))) (Quote 0))])
    next))
+
+(: sr-tag (Tag-Symbol . -> . (Quote Integer)))
+(define (sr-tag t)
+  (case t
+    [(Int)    (Quote DYN-INT-TAG)] 
+    [(Bool)   (Quote DYN-BOOL-TAG)] 
+    [(Atomic) (Quote TYPE-ATOMIC-TAG)] 
+    [(Fn)     (Quote DYN-BOXED-TAG)] 
+    [(Boxed)  (Quote TYPE-FN-TAG)]))

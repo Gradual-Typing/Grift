@@ -81,6 +81,7 @@ This allows me to make very desciptive grammars via types later on.
 (define-syntax-rule (logf fmt a ...)
   (fprintf (current-log-port) fmt a ...))
 
+
 #|
 (require (for-syntax  racket/list))
 

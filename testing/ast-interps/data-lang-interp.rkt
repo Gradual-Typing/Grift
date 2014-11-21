@@ -9,9 +9,8 @@
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
 
-(require schml/framework/build-compiler
-         schml/framework/helpers
-         schml/framework/errors
+(require schml/compiler/helpers
+         schml/compiler/errors
 	 schml/testing/values
 	 schml/compiler/language
          racket/fixnum)
@@ -34,18 +33,11 @@
       (let* ([heap   : Heap-Env (heap-env)]
              [code   : Code-Env (code-env code-labels)]
              [locals : Local-Env (env)])
-        (log "prog: \n\n~a\n" n)
-        (log "labels: ~a\nmain: ~a\n" code-labels exp)
         (observe (lambda () (dl-expr (dl-fn-apply code) heap exp locals)))))))
 
 (: dl-expr (-> (-> DL-Eval-Type DL-Value (Listof DL-Value) DL-Value) 
                Heap-Env D0-Expr Local-Env
                DL-Value))
-(: log (->* (String) #:rest Any Void))
-(define log 
-  (let ((l (open-output-file "log.txt" #:exists 'replace)))
-    (lambda (fmt . a)
-      (apply fprintf l fmt a))))
 
 (define (dl-expr apply heap exp env)
   ;; This is the exit implementation for this interpreter
@@ -55,7 +47,8 @@
      (define (recur exp env)
        (: recur/env (-> D0-Expr DL-Value))
        (define (recur/env e) (recur e env))
-       (log "dl-expr: ~a\n" exp)
+       (when (trace? 'All 'Vomit)
+         (logf "dl-expr:\n~v\n\n" exp)) 
        (match exp
          [(Let b* body)
           (let ([id*  (map (inst car Uid D0-Expr)  b*)]
@@ -72,7 +65,8 @@
          [(App e e*) 
           (let ([rator (recur/env e)] 
                 [rand (map recur/env e*)])
-            (log "Applying ~a\n" (cons rator rand))
+            (when (trace? 'Vomit)
+              (logf "dl-expr-apply:\n~v\n\n" (cons rator rand)))
             (apply recur  rator rand))]
          [(Op p e*) (delta p heap (map recur/env e*))]
          [(Halt) (exit 0)]
@@ -149,7 +143,8 @@
 
 (: delta-ref delta-rule)
 (define (delta-ref h v*)
-  (log "ref: ~a \n\t~a\n" v* h)
+  (when (trace? 'Vomit)
+    (logf "dl-delta-ref:n ~v\nheap:\n~v\n\n" v* h))
   (match v*
     [(list ptr index)
      (if (and (integer? ptr) (index? index))
