@@ -214,19 +214,33 @@
 (: tc-letrec (-> S0-Bnd* S0-Expr Src Env 
 		 (values S1-Expr Schml-Type)))
 (define (tc-letrec bnd* body src env)
-    (: env-extend/bnd (S0-Bnd Env . -> . Env))
-  (define (env-extend/bnd b env)
-    (match b
-      [(Bnd i t (Ann (Lambda f* t^ b) src))
-       (if t
-	   (hash-set env i t)
-	   (let ([args (map (inst Fml-type Uid Schml-Type) f*)])
-	     (if t^
-		 (hash-set env i (Fn (length args) args t^))
-		 (hash-set env i (Fn (length args) args DYN-TYPE)))))]
-      [else (raise-letrec-restrict src)]))
+    (: fold-env-extend/bnd (S0-Bnd* Env . -> . (values S0-Bnd* Env)))
+  (define (fold-env-extend/bnd b* env)
+    (for/fold : (values S0-Bnd* Env) ([bnd* : S0-Bnd* '()] [env : Env env]) ([bnd : S0-Bnd b*])
+              (match bnd
+                [(Bnd id type (Ann (Lambda f* t^ b) src))
+                 (if type
+                  (values (cons bnd bnd*) (hash-set env id type))
+                  (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
+                         [arity  (length arg-t*)])
+                    (if t^
+                        (values (cons bnd bnd*)
+                                (hash-set env id (Fn arity arg-t* t^)))
+                        (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
+                               [rhs : S0-Expr (Ann (Lambda f* DYN-TYPE b) src)])
+                          (values (cons (Bnd id type rhs) bnd*)
+                                  (hash-set env id type))))))]
+                  ;; [t^ (values (cons bnd bnd*) (hash-set env i ))]
+                  ;; []
+                  ;; [else ]) (if t
+                  ;;       (hash-set env i t)
+                  ;;       (let ([args (map (inst Fml-type Uid Schml-Type) f*)])
+                  ;;         (if t^
+                  ;;             (hash-set env i (Fn (length args) args t^))
+                  ;;             (hash-set env i (Fn (length args) args DYN-TYPE)))))]
+                [else (raise-letrec-restrict src)])))
   (let*-values 
-      ([(env) (foldl env-extend/bnd env bnd*)] 
+      ([(bnd* env) (fold-env-extend/bnd bnd* env)] 
        [(recur/env) (lambda ([e : S0-Expr]) (tc-expr e env))]
        [(bnd*) (map (mk-tc-binding src recur/env) bnd*)] 
        [(body ty-body) (tc-expr body env)])

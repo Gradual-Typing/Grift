@@ -111,7 +111,7 @@
    (test-file "odd-20-hybrid3.schml" (boole #f))
    (test-file "odd-20-hybrid4.schml" (boole #f))
    (test-file "odd-20-hybrid5.schml" (boole #f))
-   (test-file "odd-20-dynamic.schml" (boole #f))
+   (test-file "odd-20-dynamic.schml" (dynamic))
   
    ))
 
