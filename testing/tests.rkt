@@ -5,7 +5,7 @@
 	 schml/testing/values
          schml/testing/test-compile
          schml/testing/paths
-         schml/compiler/helpers)
+         schml/src/helpers)
 
 (provide (all-defined-out))
 
@@ -19,7 +19,6 @@
 (define test-data-base : Test
   (test-suite 
    "all tests"
-   ;; Imediates
    ;; Bools
    (test-file "const-false.schml" (boole #f))
    (test-file "const-true.schml" (boole #t))
@@ -27,15 +26,36 @@
    (test-file "const-one.schml" (integ 1))
    (test-file "const-ninetynine.schml" (integ 99))
    (test-file "const-larg-int.schml" (integ 123456))
-   ;; Primitive operators
-   (test-file "prim-times.schml" (integ 2000))
-   (test-file "prim-minus.schml" (integ 80))
-
-
-   (test-file "prim-lt.schml" (boole #f))
-   (test-file "prim-gt.schml" (boole #t))
-   (test-file "prim-plus.schml" (integ 120))
+   ;; Primitive operators TODO (should add more to test corners)
+   (test-file "prim-plus.schml"  (integ 10))
+   (test-file "prim-minus.schml" (integ 10))
+   (test-file "prim-times.schml" (integ 10))
+   (test-file "prim-divides.schml" (integ 10))
+   (test-file "prim-band.schml" (integ 10))
+   (test-file "prim-bor.schml" (integ 10))
+   (test-file "prim-shiftl.schml" (integ 10))
+   (test-file "prim-shiftr.schml" (integ 10))
    
+   ;; Primitive relational operators should test more corner cases
+   (test-file "prim-eq.schml" (boole #t))
+   (test-file "prim-lt.schml" (boole #t))
+   (test-file "prim-gt.schml" (boole #t))
+   (test-file "prim-le.schml" (boole #t))
+   (test-file "prim-ge.schml" (boole #t))
+   
+   ;; If
+   (test-file "if0.schml" (integ 0))
+   (test-file "if1.schml" (integ 0))
+   (test-file "if2.schml" (integ 1))
+   (test-file "if3.schml" (integ 4))
+
+   ;; Ascription
+   (test-file "ascribe-dyn.schml"       (dynamic))
+   (test-file "ascribe-int-good.schml"  (integ 10))
+   (test-file "ascribe-bool-good.schml" (boole #t))
+   (test-file "ascribe-int-bad.schml"   (blame #t "Pass"))
+   (test-file "ascribe-bool-bad.schml"  (blame #t "Pass"))
+
    ;; Lambda
    (test-file "lambda1.schml" (function))
    (test-file "lambda2.schml" (function))
@@ -77,14 +97,6 @@
    (test-file "letrec5.schml" (boole #t))
    (test-file "letrec6.schml" (integ 1))
 
-   ;; If
-   (test-file "if0.schml" (integ 0))
-   (test-file "if1.schml" (integ 0))
-   (test-file "if2.schml" (integ 1))
-   (test-file "if3.schml" (integ 4))
-
-   ;; Ascription
-
    ;; Are we blaming the correct label
    (test-file "blame1.schml" (integ 2))
    (test-file "blame2.schml" (blame #t "Right"))
@@ -100,11 +112,13 @@
    (test-file "blame11.schml" (blame #f (not-lbl "Fail")))
    (test-file "blame12.schml" (blame #f "Pass"))
    (test-file "blame13.schml" (blame #f "Pass"))
-   ;; basic computations that may make it to being
-   ;; bench marks
+   
+   ;; basic computations that may make it to being bench marks
+   ;; factorial 
    (test-file "fact5.schml" (integ 120))
    (test-file "fact-dyn-6.schml" (integ 720))
    (test-file "fact-static-6.schml" (integ 720))
+   ;; even and odd 
    (test-file "odd-20-static.schml" (boole #f))
    (test-file "odd-20-hybrid1.schml" (boole #f))
    (test-file "odd-20-hybrid2.schml" (boole #f))
@@ -112,7 +126,13 @@
    (test-file "odd-20-hybrid4.schml" (boole #f))
    (test-file "odd-20-hybrid5.schml" (boole #f))
    (test-file "odd-20-dynamic.schml" (dynamic))
-  
+   ;; ackermans these are too long for the test suite
+   (test-file "ack-1-2-static.schml" (integ 4))
+   (test-file "ack-2-3-static.schml" (integ 9))
+   ;; These are too long perhaps make an long flag or something
+   ;;(test-file "ack-3-10-static.schml" (integ 125))
+   ;;(test-file "ack-4-1-static.schml"  (integ 65533))
+   ;;(test-file "ack-static.schml"      (boole #t))
    ))
 
 (module+ main

@@ -1,9 +1,10 @@
 #lang typed/racket
 
-(require schml/compiler/helpers
-         schml/compiler/errors
+(require schml/src/helpers
+         schml/src/errors
+	 schml/src/language
 	 schml/testing/values
-	 schml/compiler/language)
+         racket/fixnum)
 
 (provide cast-lang-interp)
 
@@ -128,11 +129,17 @@
     [(>) (tc IxI->B > v*)]
     [(>=) (tc IxI->B >= v*)]
     [(<=) (tc IxI->B <= v*)]
+    [(%>>) (tc FxF->I fxrshift v*)]
+    [(%<<) (tc FxF->I fxlshift v*)]
+    [(%/) (tc IxI->I quotient v*)]
+    [(binary-and) (tc FxF->I fxand v*)]
+    [(binary-or) (tc FxF->I fxior v*)]
     [else (error 'delta "~a" p)]))
 
 (define-syntax tc
   (syntax-rules (IxI->I IxI->B)
     [(_ IxI->I p v) (tc-help p v (integer? (car v)) (integer? (cadr v)))]
+    [(_ FxF->I p v) (tc-help p v (fixnum? (car v)) (fixnum? (cadr v)))]
     [(_ IxI->B p v) (tc-help p v (integer? (car v)) (integer? (cadr v)))]))
 
 (define-syntax (tc-help stx)

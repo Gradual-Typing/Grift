@@ -1,0 +1,47 @@
+(letrec ([ack
+          (lambda ([k : Int][m : Int][n : Int]) : Int
+           (if (= n 0)
+               (if (= k 0)
+                   m
+                   (if (= k 1)
+                       0
+                       1))
+               (if (= k 0)
+                   (+ 1 (ack k m (- n 1)))
+                   (if (= k 1)
+                       (plus m (ack k m (- n 1)))
+                       (if (= k 2)
+                           (times m (ack k m (- n 1)))
+                           (ack (- k 1) m (ack k m (- n 1))))))))]
+          [plus (lambda ([m : Int] [n : Int]) : Int (ack 0 m n))]
+          [times (lambda ([m : Int] [n : Int]) : Int  (ack 1 m n))])
+ (let ([a5        (ack 0 2 3)]
+       [a6        (ack 1 2 3)]
+       [a50000    (ack 1 1 50000)] 
+       [b50000    (ack 1 2 25000)]
+       [a8        (ack 2 2 3)]
+       [a27       (ack 2 3 3)]
+       [a256      (ack 2 4 4)]
+       [a3125     (ack 2 5 5)]
+       [a46656    (ack 2 6 6)]
+       [a16       (ack 3 2 3)]     
+       [b27       (ack 3 3 2)])
+  (if (= a5 5)
+      (if (= a6 5)
+          (if (= a50000 50000)
+              (if (= b50000 50000)
+                  (if (= a8 8)
+                      (if (= a27 27)
+                          (if (= a256 256)
+                              (if (= a3125 3125)
+                                  (if (= a16 16)
+                                      (= b27 27)
+                                      #f)
+                                  #f)
+                              #f)
+                          #f)
+                      #f)
+                  #f)
+              #f)
+          #f)
+      #f)))

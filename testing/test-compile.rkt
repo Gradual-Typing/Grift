@@ -4,9 +4,9 @@
 ;; an expected value. The real compiler is then invoked. And the result once again checked.
 
 (require typed/rackunit 
-         schml/compiler/language
-         schml/compiler/errors
-         schml/compiler/compile
+         schml/src/language
+         schml/src/errors
+         schml/src/compile
          schml/testing/values)
 
 (provide (all-defined-out)
@@ -22,11 +22,11 @@
 (: test-compile (-> Path Test-Value Boolean))
 (define (test-compile path expected)
   ;; The micro compilers
-  (local-require schml/compiler/schml/reduce-to-cast-calculus
-		 schml/compiler/casts/impose-cast-semantics
-		 schml/compiler/closures/make-closures-explicit
-		 schml/compiler/data/convert-representation
-                 schml/compiler/backend-c/code-generator)
+  (local-require schml/src/schml/reduce-to-cast-calculus
+		 schml/src/casts/impose-cast-semantics
+		 schml/src/closures/make-closures-explicit
+		 schml/src/data/convert-representation
+                 schml/src/backend-c/code-generator)
   ;; The intermediary interpreters
   (local-require schml/testing/ast-interps/cast-lang-interp
 		 schml/testing/ast-interps/lambda-lang-interp
@@ -49,12 +49,9 @@
              [u0  : Data2-Lang (convert-representation d0 config)]
              [_   : Boolean    (c-backend-generate-code u0 config)])
         (ann-ck "test compiler semantics"
-                value=?  (observe (envoke-compiled-program config)) expected)
+                value=?  (observe (envoke-compiled-program #:config config)) expected)
         (compile/conf path config)
         (ann-ck "compiler semantics"
-                value=?  (observe (envoke-compiled-program config)) expected)
+                value=?  (observe (envoke-compiled-program #:config config)) expected)
         #t))))
-
-(: envoke-compiled-program (-> Config Boolean))
-(define (envoke-compiled-program config)
-  (system (path->string (Config-exec-path config)))) 
+ 

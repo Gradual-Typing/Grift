@@ -2,7 +2,7 @@
                 (if (= 0 n)
                     #f
                     (even (- n 1))))]
-         [even (lambda ([n : Int])
+         [even (lambda ([n : Int]) : Bool
                  (if (= 0 n)
                      #t
                      (odd (- n 1))))])

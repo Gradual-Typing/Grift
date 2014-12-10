@@ -1,15 +1,17 @@
 #lang typed/racket/base
 
-(require schml/compiler/compile
-         schml/compiler/helpers)
+(require schml/src/compile
+         schml/src/helpers)
 
-(require/typed schml/testing/paths [test-tmp-path Path])
+(require/typed schml/testing/paths
+               [test-tmp-path Path]
+               [test-suite-path Path])
 
 (traces '(All))
 
 (: cc (-> String Boolean))
 (define (cc t)
-  (compile (build-path "/Users/akuhlens/Work/schml/testing/suite/" t)
+  (compile (build-path test-suite-path t)
            #:exec-path (build-path test-tmp-path "d")
            #:c-path    (build-path test-tmp-path "d.c")
            #:log-path  (build-path test-tmp-path "d.log.txt")))

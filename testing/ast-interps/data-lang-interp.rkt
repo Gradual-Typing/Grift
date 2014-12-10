@@ -9,10 +9,10 @@
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
 
-(require schml/compiler/helpers
-         schml/compiler/errors
+(require schml/src/helpers
+         schml/src/errors
 	 schml/testing/values
-	 schml/compiler/language
+	 schml/src/language
          racket/fixnum)
 
 (provide data-lang-interp)
@@ -108,8 +108,9 @@
     [(>) (IxI>B >)] 
     [(>=) (IxI>B >=)] 
     [(<=) (IxI>B <=)]
-    [(<<) (FxF fxlshift)]
-    [(>>) (FxF fxrshift)]
+    [(%/) (IxI quotient)]
+    [(%<<) (FxF fxlshift)]
+    [(%>>) (FxF fxrshift)]
     [(binary-and) (FxF fxand)]
     [(binary-or) (FxF fxior)]
     [(Alloc)      (delta-alloc heap v*)]
