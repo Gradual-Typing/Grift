@@ -1,6 +1,7 @@
-#lang typed/racket/base
+#lang typed/racket
 
 (require/typed pkg/lib [pkg-directory (String . -> . (Option Path))])
+
 (provide (all-defined-out))
 
 ;; This is currently only used for testing

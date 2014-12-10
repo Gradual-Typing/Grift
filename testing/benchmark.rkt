@@ -1,10 +1,10 @@
-#lang typed/racket/base
+#lang typed/racket
 
+(require racket/port)
 (require schml/src/compile
          schml/src/helpers
          schml/testing/paths
-         schml/testing/values
-         racket/port)
+         schml/testing/values)
 
 (: run-and-log (-> Any))
 (define (run-and-log) (display "Test!\n"))
@@ -21,13 +21,12 @@
       (logf "[Error] ~a gave unexpected output\n" (path->string path))))
 
 
-(module+ main
-  (call-with-output-file (build-path test-tmp-path "benchmarks-log.txt")
-   (lambda (log)
+ (call-with-output-file (build-path test-tmp-path "benchmarks-log.txt")
+   (lambda ([log : Output-Port])
      (parameterize ([current-log-port log])
        (benchmark 5
                   (build-path test-suite-path "fact5.schml")
                   (Config 'Lazy-D
                           (build-path test-tmp-path "b.out")
                           (build-path test-tmp-path "b.c"))
-                  (integ 120))))))
+                  (integ 120)))))
