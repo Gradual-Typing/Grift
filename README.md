@@ -31,6 +31,8 @@ expr ::= lamb
      |   (expr ...)
      |   (: expr type maybe-string)
      |   (if expr expr expr)
+     |   (ref expr)
+     |   (! expr)
      |   (prim expr expr)
 prim ::= + | -  | * | boolean-and | boolean-or
      |   < | <= | = | >= | >
