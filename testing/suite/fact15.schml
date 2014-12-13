@@ -1,0 +1,6 @@
+(let ([fact (lambda ([f : (Dyn Int -> Int)] [n : Int]) : Int
+               (if (= n 0)    
+                   1
+                   (* n (f f (- n 1)))))])
+  (fact fact 15))
+  

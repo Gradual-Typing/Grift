@@ -116,6 +116,9 @@
    ;; basic computations that may make it to being bench marks
    ;; factorial 
    (test-file "fact5.schml" (integ 120))
+   (test-file "fact7.schml" (integ 5040))
+   (test-file "fact10.schml" (integ 3628800))
+
    (test-file "fact-dyn-6.schml" (integ 720))
    (test-file "fact-static-6.schml" (integ 720))
    ;; even and odd 
@@ -126,13 +129,14 @@
    (test-file "odd-20-hybrid4.schml" (boole #f))
    (test-file "odd-20-hybrid5.schml" (boole #f))
    (test-file "odd-20-dynamic.schml" (dynamic))
+   (test-file "even-odd-cps-herman.schml" (boole #t))
    ;; ackermans these are too long for the test suite
    (test-file "ack-1-2-static.schml" (integ 4))
    (test-file "ack-2-3-static.schml" (integ 9))
    ;; These are too long perhaps make an long flag or something
    ;;(test-file "ack-3-10-static.schml" (integ 125))
    ;;(test-file "ack-4-1-static.schml"  (integ 65533))
-   ;;(test-file "ack-static.schml"      (boole #t))
+   ;;(test-file "ack-static.schml"      (boole #t))   
    ))
 
 (module+ main

@@ -1,0 +1,9 @@
+(letrec ([evenk (lambda ([n : Int][k : (Dyn -> Dyn)]) : Bool
+                 (if (= n 0)
+                     (k #t)
+                     (oddk (- n 1) k)))]
+         [oddk  (lambda ([n : Int][k : (Bool -> Bool)]) : Bool
+                 (if (= n 0)
+                     (k #f)
+                     (evenk (- n 1) k)))])
+ (evenk 1000 (lambda ([v : Bool]) : Bool v)))
