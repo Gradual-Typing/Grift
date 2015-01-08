@@ -1,33 +1,12 @@
 #lang typed/racket
 #|------------------------------------------------------------------------------+
-|Pass: src/schml/parse                                    |
+|Pass: src/schml/parse                                                          |
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
 |Discription: The parse pass takes racket's native syntax objects to a set of   |
 |core structures that are annotated with the source location.                   |
-|                                                                               |
 +-------------------------------------------------------------------------------+
-|Grammar for Core-Prog found in Schml/languages/core-forms                      |
-|Prog = (Prog File-Name Next-Uvar Suffix Expr)                                  |
-|Expr = (Lambda {Formals}* {Type}? Expr)                                        |
-|     | (Var Unique-id)                                                         |
-|     | (App Expr {Expr}*)                                                      |
-|     | (Op Prim {Expr}*)                                                       |
-|          | (Ascrip {Expr} {Type} {Blame?} {Src})                              |
-|          | (If {Expr} {Expr} {Expr} {Src})                                    |
-|          | (Let {Binding} {Expr} {Src})                                       |
-|          | (Quote {Datum} {Src})                                              |
-|Binding   = (Bnd {Uvar} {Expr}) | (Bnd-Typed {Uvar} {Type} {Expr})             |
-|Formal    = (Fml {Uvar}) | (Fmlt {Uvar} {Type})                                |
-|Src       = Racket's native srcloc type                                        |
-|Blame?    = String | #f                                                        |
-|Type?     = {Type} | #f                                                        |
-|Type     = Int | Bool | (Fn {Type}* {Type})                                     |
-|Uvar      = (Uvar String Natural)                                              |
-|Datum     = Integer |  Boolean                                                 |
-|Prim      = * | + | - | %>> | %<< | %/ | < | <= | = | > | >=                  |
-|                                                                               |
 +------------------------------------------------------------------------------|#
 
 (require schml/src/helpers

@@ -1,10 +1,15 @@
 #lang typed/racket
-(require schml/src/helpers) 
 
+(require schml/src/helpers) 
 (provide (all-defined-out))
 
-(define-type Semantics (U 'Lazy-D))
+#| 
+   This is the structure that is passed to the compiler in order
+   to store state about which options are enabled. This really shouldn't be here.
+   TODO: find a more logical location for this structure...
+|#
 
+(define-type Semantics (U 'Lazy-D))
 (struct Config ([semantics : Semantics]
                 [exec-path : Path]
                 [c-path : Path]))
@@ -181,21 +186,39 @@ be usefull for optimizations or keeping state.
       (and (Bool? t) (Bool? g))
       (and (Fn? t) (Fn? g))))
 
-#| Unique Identifier |#
+#| Unique Identifier 
+   These are currently done using state passing style in passes.
+   TODO: Come up with a monadic helpers for state.
+|#
+
 (struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
 (define-type Uid* (Listof Uid))
-
 
 (: uid->string (-> Uid String))
 (define (uid->string u)
   (string-append (Uid-prefix u) (number->string (Uid-suffix u))))
 
+(: uid=? (-> Uid Uid Boolean))
 (define (uid=? [u : Uid] [v : Uid])
   (= (Uid-suffix u) (Uid-suffix v)))
 
-(define-syntax next-uid
-  (syntax-rules ()
-    [(_ prefix suffix) (values (Uid prefix suffix) (add1 suffix))]))
+#| 
+   This might be a plausable imperative implementation of Uid generation
+   For the time being it should not be used. maybe we need a gensym function
+   but for pride's sake I would like to remain functional.
+
+(: uid (-> String Uid))
+(define uid
+  (let ([unique-number : Natural (box 0)])
+    (lambda ([name : String])
+      (let ((val (unbox unique-number)))
+        (set-box! unique-number (+ val 1))
+        (Uid name val)))))
+|#
+
+(: next-uid (-> String Natural (values Uid Natural)))
+(define (next-uid prefix suffix) next-uid
+  (values (Uid prefix suffix) (add1 suffix)))
 
 (define-syntax let-uid*
   (syntax-rules ()
@@ -225,10 +248,11 @@ be usefull for optimizations or keeping state.
 
 (define-type Schml-Prim 
   (U IntxInt->Int-Primitives IntxInt->Bool-Primitives
+     #;Ref-Primitives
      ;;IntxNon0->Int-Primitives IntxNibble->Int-Primitives
      ;; I want to add these but they break the symplicity of the type system
      ;; I think in the meantime I will add them as IntxInt->Int and claim that
-     ;; they are unsafe
+     ;; they are unsafe features that are hidden away.
      ))
 
 (define-predicate Schml-Prim? Schml-Prim)
@@ -249,7 +273,15 @@ be usefull for optimizations or keeping state.
 (define-type IxN->I IntxNibble->Int-Primitives)
 (define-predicate IntxNibble->Int-Prim? IntxNibble->Int-Primitives)
 
-;; Literals of the schml languages
+#;(define-type Ref-Primitives (U 'box 'unbox 'set))
+
+
+
+#| Literals of the schml languages
+   Only Integers and Booleans in the schml language are first
+   class literal constants
+|#
+
 (define-type Schml-Literal
   (U Integer Boolean))
 
@@ -334,20 +366,23 @@ be usefull for optimizations or keeping state.
 	   (andmap consistent? (Fn-fmls t) (Fn-fmls g))
 	   (consistent? (Fn-ret t) (Fn-ret g)))))
 
-;; Join :: type X type -> type
-;; This is the join of the least precise latice
-;;     ⊑ latice example:
-;;      Int --> Int
-;;         /   \
-;;        /     \               
-;;       /       \        Joins ↑
-;;Dyn --> Int Int --> Dyn    
-;;       \       /        Meets ↓
-;;        \     /  
-;;         \   /
-;;      Dyn --> Dyn
-;;           |
-;;          Dyn
+#|
+ Join :: type X type -> type
+ This is the join of the least precise latice
+     ⊑ latice example:
+      Int --> Int
+         /   \
+        /     \               
+       /       \        Joins ↑
+Dyn --> Int Int --> Dyn    
+       \       /        Meets ↓
+        \     /  
+         \   /
+      Dyn --> Dyn
+           |
+          Dyn
+|#
+
 
 (: join (Schml-Type Schml-Type . -> . Schml-Type))
 (define (join t g)
@@ -836,7 +871,7 @@ We are going to UIL
 (define-type D2-Literal Lambda-Literal)
 
 #|-----------------------------------------------------------------------------+
-| Data3-Language created by purify-expression-context                                         |
+| Data3-Language created by purify-expression-context                          |
 +-----------------------------------------------------------------------------|#
 
 (define-type Data3-Lang
@@ -875,9 +910,3 @@ We are going to UIL
 (define-type D3-Stmt (UIL-Op! D3-Expr))
 (define-type D3-Stmt* (Listof D3-Stmt))
 (define-type D3-Literal Lambda-Literal)
-
-
-
-#|-----------------------------------------------------------------------------+
-| UIL0-Language created by remove-let                                          |
-+-----------------------------------------------------------------------------|#
