@@ -1,0 +1,4 @@
+(let ([r0 (gbox 6)])
+  (let ([r1 (: r0 (GRef Dyn))])
+    (let ([r2 : (GRef Int) r1])
+      (gunbox r2))))
