@@ -202,12 +202,12 @@
         (cond
          [(regexp-match #rx".*Int : ([0-9]+)" s) => 
           (lambda (r)
-            (integ (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+            (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
          [(regexp-match #rx".*Bool : #(t|f)" s) =>
           (lambda (r)
-            (boole (not (equal? "f" (cadr (cast r (Listof String)))))))]
+            (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
          [(regexp-match #rx".*Function : \\?" s) (function)]
-         [(regexp-match #rx".*Dynamic : \\?" s) (dynamic)]
+         [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
          [else (blame #f s)])))))
 
 (: dl-fn-apply (-> Code-Env (-> DL-Eval-Type DL-Value (Listof DL-Value) DL-Value)))

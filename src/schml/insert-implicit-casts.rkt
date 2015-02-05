@@ -56,7 +56,20 @@
 	    (mk-cast (mk-label "if" csq-src) csq csq-ty type)
 	    (mk-cast (mk-label "if" alt-src) alt alt-ty type))]
        [(Var id) (Var id)]
-       [(Quote lit) (Quote lit)])))
+       [(Quote lit) (Quote lit)]
+       [(Begin e* e)      (TODO define insert implicit casts)]
+       [(Gbox e1)         (TODO define box insert implicit casts)]
+       [(Gunbox e1)       (TODO define box insert implicit casts)]
+       [(Gbox-set! e1 e2) (TODO define box insert implicit casts)]
+       [(Mbox e1)         (TODO define box insert implicit casts)]
+       [(Munbox e1)       (TODO define box insert implicit casts)]
+       [(Mbox-set! e1 e2)     (TODO define box insert implicit casts)]
+       [(Gvector e1 e2)         (TODO define vector insert implicit casts)]
+       [(Gvector-ref e1 e2)     (TODO define vector insert implicit casts)]
+       [(Gvector-set! e1 e2 e3) (TODO define vector insert implicit casts)]
+       [(Mvector e1 e2)         (TODO define vector insert implicit casts)]
+       [(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
+       [(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)])))
 
 (: iic-bnd (S1-Bnd . -> . C0-Bnd))
   (define (iic-bnd b)
