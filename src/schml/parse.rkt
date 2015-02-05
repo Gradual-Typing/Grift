@@ -19,8 +19,9 @@
 (define (parse prgm config)
   (match-let ([(Prog name stx*) prgm])
     (let-values 
-	([(exp next-uid) (parse-top-level name stx* (hasheq) FIRST-UID-SUFFIX)])
-      (Prog (list name next-uid) exp))))
+	([((exp : S0-Expr) (next : Natural)) 
+          (run-state (parse-top-level name stx* (hasheq)) FIRST-UID-SUFFIX)])
+      (Prog (list name next) exp))))
 
 #| The type of the enviroment bindings and symbol-sets|#
 (define-type Env (HashTable Symbol Uid))
@@ -62,34 +63,58 @@
     [(+ - * binary-and binary-or < <= = >= > %/ %<< %>>) #t]
     [else #f]))
 
+(: parse-top-level (String (Listof Stx) Env . -> . (State Natural S0-Expr)))
+(define (parse-top-level name stx* env) : (State Natural S0-Expr)
+  (cond
+   [(null? stx*) (return-state (raise-file-empty-exn name))]
+   [(not (null? (cdr stx*))) (return-state (raise-<1-exp-exn name))]
+   [else (parse-expr (car stx*) env)]))
    
 #| The parser |#
-(: parse-expr (Stx Env Natural . -> . (values S0-Expr Natural)))
-(define (parse-expr stx env next)
-  (let ((src (syntax->srcloc stx))
-	(exp (syntax-unroll stx)))
-    (cond
-     [(symbol? exp) (values (parse-variable exp src env) next)]
-     [(pair? exp) 
-      (let* ((rator (car exp)) 
-	     (rand* (cdr exp)) 
-	     (exp^ (syntax-unroll rator)))
-	(cond
-	 [(symbol? exp^)
-	  (case exp^
-            [(lambda) (parse-lambda rand* src env next)]
-            [(letrec) (parse-letrec rand* src env next)]
-            [(let)    (parse-let rand* src env next)]
-            [(if)     (parse-if rand* src env next)]
-            [(:)      (parse-ascription rand* src env next)]
-            [else
-             (if (Schml-Prim? exp^) 
-                 (parse-primitive exp^ rand* src env next)
-                 (parse-application rator rand* src env next))])]
-	 [(pair? exp^) (parse-application rator rand* src env next)]
-	 [else (bad-syntax-application stx)]))]
+(: parse-expr (Stx Env . -> . (State Natural S0-Expr)))
+(define (parse-expr stx env)
+  (lambda ((next : Natural))
+    (let ((src (syntax->srcloc stx))
+          (exp (syntax-unroll stx)))
+      (cond
+        [(symbol? exp) (values (parse-variable exp src env) next)]
+        [(pair? exp) 
+         (let* ((rator (car exp)) 
+                (rand* (cdr exp)) 
+                (exp^ (syntax-unroll rator)))
+           (cond
+             [(symbol? exp^)
+              (case exp^
+                [(lambda) (parse-lambda rand* src env next)]
+                [(letrec) (parse-letrec rand* src env next)]
+                [(let)    (parse-let rand* src env next)]
+                [(if)     (parse-if rand* src env next)]
+                [(:)      (parse-ascription rand* src env next)]
+                [(begin)  (run-state (parse-begin rand* src env) next)]
+                [(box)          (TODO parse box-unbox forms)]
+                [(box-set!)     (TODO parse box-unbox forms)]
+                [(unbox)        (TODO parse box-unbox forms)]
+                [(vector)       (TODO parse vector forms)]
+                [(vector-set!)  (TODO parse vector forms)]
+                [(vector-ref)   (TODO parse vector forms)]
+                [(gbox)         (TODO NEXT)]
+                [(gunbox)       (TODO parse box-unbox forms)]
+                [(mbox)         (TODO parse box-unbox forms)]
+                [(mumbox)       (TODO parse box-unbox forms)]
+                [(gvector)      (TODO parse vector forms)]
+                [(gvector-set!) (TODO parse vector forms)]
+                [(gvector-ref)  (TODO parse vector forms)]
+                [(mvector)      (TODO parse vector forms)]
+                [(mvector-set!) (TODO parse vector forms)]
+                [(mvector-ref)  (TODO parse vector forms)]
+                [else
+                 (if (Schml-Prim? exp^) 
+                     (parse-primitive exp^ rand* src env next)
+                     (parse-application rator rand* src env next))])]
+             [(pair? exp^) (parse-application rator rand* src env next)]
+             [else (bad-syntax-application stx)]))]
      [(schml-literal? exp) (values (Ann (Quote exp) src) next)] 
-     [else (raise-unsupported-syntax-exn stx)])))
+     [else (raise-unsupported-syntax-exn stx)]))))
 
 (: parse-variable (Symbol Src Env . -> . S0-Expr))
 (define (parse-variable v s e)
@@ -99,6 +124,19 @@
 (define (parse-blame-label s)
   (let ([e (syntax-unroll s)])
     (if (string? e) e (raise-blame-label-exn s))))
+
+#| Begin the section about parsing effects |#
+
+(: parse-begin (-> (Listof Stx) Src Env (State Natural S0-Expr)))
+(define (parse-begin stx* src env)
+  (let* ([s* (reverse stx*)])
+    (if (null? s*)
+        (TODO the right error message and fixing the double reverse)
+        (do bind-state                   
+            (e* : S0-Expr* <- (parse-expr* (reverse (cdr s*)) env))
+            (e  : S0-Expr  <- (parse-expr  (car s*) env))
+            (return-state (Ann (Begin e* e) src))))))
+
 
 
 (define-type Acc2 
@@ -118,7 +156,7 @@
 	  (let ([a : Acc2 (list '() '() e n)])
 	    (match-let ([(list f* _ e n) (foldr parse-fml a f*)])
 	      (let-values ([(t) (and t (parse-type t))]
-			   [(b n) (parse-expr b e n)])
+			   [(b n) ((parse-expr b e) n)])
 		(values (Ann (Lambda f* t b) s)  n))))
 	  (raise-fml-exn stx))))
   (match stx*
@@ -163,7 +201,7 @@
 	       (match-let ([(list b* _ env-body n) (foldr unsplice-bnd a0 b*)])
 		 (let ([a1 : Acc1 (cons '() n)]) ;; again
 		   (match-let ([(cons b* n) (foldr (parse-bnd env-bnd) a1 b*)])
-		     (let-values ([(e n) (parse-expr body env-body n)])
+		     (let-values ([(e n) ((parse-expr body env-body) n)])
 		       (values (Ann (ctor b* e) src) n))))))))]
       [otherwise (raise-let-exn form stx* src)])))
 
@@ -181,7 +219,7 @@
     : Acc1
     (match-let ([(cons bnd* next) a]
 		[(list uid type exp) b])
-      (let-values ([(exp next) (parse-expr exp env next)]
+      (let-values ([(exp next) ((parse-expr exp env) next)]
 		   [(type) (and type (parse-type type))])
 	(cons (cons (Bnd uid type exp) bnd*) next)))))
 
@@ -212,9 +250,9 @@
 (define (parse-if stx* src env next)
   (match stx*
     [(list test then else)
-     (let*-values ([(tst next) (parse-expr test env next)]
-		   [(csq next) (parse-expr then env next)]
-		   [(alt next) (parse-expr else env next)])
+     (let*-values ([(tst next) ((parse-expr test env) next)]
+		   [(csq next) ((parse-expr then env) next)]
+		   [(alt next) ((parse-expr else env) next)])
        (values (Ann (If tst csq alt) src) next))]
     [othewise (raise-if-exn stx* src)]))
 
@@ -224,7 +262,7 @@
   (define (help [s : Stx] [t : Stx] [l : (U Stx False)] 
 		[src : Src] [e : Env] [n : Natural]) 
     : (values S0-Expr Natural) 
-    (let*-values ([(exp next) (parse-expr s e n)]
+    (let*-values ([(exp next) ((parse-expr s e) n)]
 		  [(type) (parse-type t)]
 		  [(lbl) (and l (parse-blame-label l))])
       (values (Ann (Ascribe exp type lbl) src) next)))
@@ -236,24 +274,29 @@
 (: parse-primitive (-> Schml-Prim (Listof Stx) Src Env Natural 
 		       (values S0-Expr Natural)))
 (define (parse-primitive sym stx* src env next)
-  (let-values ([(args next) (parse-expr* stx* env next)])
+  (let-values ([(args next) ((parse-expr* stx* env) next)])
     (values (Ann (Op sym args) src) next)))
 
 (: parse-application (-> Stx (Listof Stx) Src Env Natural
 			 (values S0-Expr Natural)))
 (define (parse-application stx stx* src env next)
-  (let*-values ([(rator next) (parse-expr stx env next)]
-		[(rands next) (parse-expr* stx* env next)])
+  (let*-values ([(rator next) ((parse-expr stx env) next)]
+		[(rands next) ((parse-expr* stx* env) next)])
     (values (Ann (App rator rands) src) next)))
 
-(: parse-expr* (-> (Listof Stx) Env Natural 
-		   (values (Listof S0-Expr) Natural)))
-(define (parse-expr* s* e n) 
-  (if (null? s*)
-      (values '() n)
-      (let*-values ([(cf new-n) (parse-expr (car s*) e n)]
-		    [(cf* newer-n) (parse-expr* (cdr s*) e new-n)])
-         (values (cons cf cf*) newer-n))))
+(: parse-expr* (-> (Listof Stx) Env (State Natural S0-Expr*)))
+(define (parse-expr* stx* env)
+  (do bind-state
+    (let ([a : Stx  (car stx*)]
+          [d : Stx* (cdr stx*)]))
+    (a : S0-Expr  <- (parse-expr a env))
+    (d : S0-Expr* <- (parse-expr* d env))
+    (return-state (cons a d))))
+
+#|
+Parse Type converts syntax objects to the core forms that
+represents types in the schml abstract syntax tree.
+|#
 
 (: parse-type (Stx . -> . Schml-Type))
 (define (parse-type stx)
@@ -261,8 +304,21 @@
     ['Int INT-TYPE]
     ['Bool BOOL-TYPE]
     ['Dyn  DYN-TYPE]
-    [(list stx* ...) (parse-fn-type stx)]
+    [(list (app syntax-unroll fst) stx* ...)
+     (match* (fst stx*)
+       #| References and Vectors are the same in a general sense |#
+       ;; Guarded
+       [('GRef  (list stx))  (GRef (parse-type stx))]
+       [('GVect (list stx))  (GVect (parse-type stx))]
+       ;; Monotonic
+       [('MRef  (list stx))  (MRef (parse-type stx))]
+       [('MVect (list stx))  (MVect (parse-type stx))]
+       #| I want to do gradual universal types |#
+       ;;[('All (list id stx* ...)) (TODO actually parse universal types)]
+       [(otherwise _) (parse-fn-type stx)])]
     [othewise (raise-type-exn stx)]))
+
+
 
 (: parse-fn-type (Stx . -> . Schml-Type))
 (define (parse-fn-type stx)
@@ -285,13 +341,5 @@
 	    (: to (Listof Stx))
 	    (Fn (length from) (map parse-type from) (car (map parse-type to))))))))
   
-(: parse-top-level
-   (String (Listof Stx) Env Natural . -> . 
-	   (values S0-Expr Natural)))
-(define (parse-top-level name stx* env next) 
-  : (values S0-Expr Natural)
-  (cond
-   [(null? stx*) (raise-file-empty-exn name)]
-   [(not (null? (cdr stx*))) (raise-<1-exp-exn name)]
-   [else (parse-expr (car stx*) env next)]))
+
 

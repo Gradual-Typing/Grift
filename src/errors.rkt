@@ -3,9 +3,11 @@
 (require schml/src/helpers)
 (provide (all-defined-out))
 
+;; Exceptions Thrown should all be subtypes of exn:schml
 (struct exn:schml exn ())
-(struct exn:schml:pass exn:schml ())
 
+;; Expception thrown in a specific pass 
+(struct exn:schml:pass exn:schml ())
 
 ;; This is a generic error handler that is usefull for
 ;; quick testing it should not be used for actuall errors
@@ -205,3 +207,8 @@
 	  (format "Error in cast compilation: Couldn't create a runtime representation of ~a"
 		  t)
 	  (current-continuation-marks))))
+
+
+;; This exception is only available while working in development mode
+
+

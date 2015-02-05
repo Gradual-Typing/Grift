@@ -5,29 +5,33 @@
 
 (provide (all-defined-out))
 
-(define-type Test-Value (U blame boole integ dynamic function))
+(define-type Test-Value (U blame bool int dyn gbox function))
 
 (struct not-lbl ([value : String])
 	#:transparent)
 (struct blame ([static? : Boolean]
 	       [lbl : (U not-lbl String False)])
 	#:transparent)
-(struct boole ([value : Boolean])
+(struct bool ([value : Boolean])
 	#:transparent)
-(struct integ ([value : Integer])
+(struct int ([value : Integer])
 	#:transparent)
-(struct dynamic ()
+(struct dyn ()
 	#:transparent)
 (struct function ()
 	#:transparent)
+
+(struct gbox ([value : Test-Value])
+  #:transparent)
 
 
 (: value=? (Any Any . -> . Boolean))
 (define (value=? x y)
   (or (and (blame? x) (blame? y) (blame=? x y))
-      (and (boole? x) (boole? y) (boole=? x y))
-      (and (integ? x) (integ? y) (integ=? x y))
-      (and (dynamic? x) (dynamic? y))
+      (and (bool? x) (bool? y) (bool=? x y))
+      (and (int? x) (int? y) (int=? x y))
+      (and (gbox? x) (gbox? y) (value=? x y))
+      (and (dyn? x) (dyn? y))
       (and (function? x) (function? y))))
 
 (: blame=? (blame blame . -> . Boolean))
@@ -48,13 +52,13 @@
              [else #f]))]))))
       
 
-(: boole=? (boole boole . -> . Boolean))
-(define (boole=? x y)
-  (eq? (boole-value x) (boole-value y)))
+(: bool=? (bool bool . -> . Boolean))
+(define (bool=? x y)
+  (eq? (bool-value x) (bool-value y)))
 
-(: integ=? (integ integ . -> . Boolean))
-(define (integ=? x y)
-  (equal? (integ-value x) (integ-value y)))
+(: int=? (int int . -> . Boolean))
+(define (int=? x y)
+  (equal? (int-value x) (int-value y)))
 
 #| capture the output of exp on current-output-port and match
    as if it were returning a value from one of our compiled
@@ -66,10 +70,10 @@
     (cond
      [(regexp-match #rx".*Int : ([0-9]+)" s) => 
       (lambda (r)
-        (integ (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+        (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
      [(regexp-match #rx".*Bool : #(t|f)" s) =>
       (lambda (r)
-        (boole (not (equal? "f" (cadr (cast r (Listof String)))))))]
+        (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
      [(regexp-match #rx".*Function : \\?" s) (function)]
-     [(regexp-match #rx".*Dynamic : \\?" s) (dynamic)]
+     [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
      [else (blame #f s)])))

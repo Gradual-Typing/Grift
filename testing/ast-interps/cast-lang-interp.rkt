@@ -192,9 +192,9 @@
                      (blame #f (exn-message e)))])
     (let ([v (thunk)])
      (cond 
-      [(integer? v) (integ v)]
-      [(boolean? v) (boole v)]
+      [(integer? v) (int v)]
+      [(boolean? v) (bool v)]
       [(CL-Proc? v) (function)]
-      [else (if (Fn? (CL-Dyn-type2 v)) (function) (dynamic))]))))
+      [else (if (Fn? (CL-Dyn-type2 v)) (function) (dyn))]))))
 
 

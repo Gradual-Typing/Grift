@@ -9,7 +9,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 
 
 +-------------------------------------------------------------------------------+
-| Source Grammar : Cast2
+| Source Grammar : Cast3
 | Target Grammar : Lambda0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
@@ -19,15 +19,15 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 ;; Only the pass is provided by this module
 (provide specify-representation)
 
-(: specify-representation (Cast2-Lang Config . -> . Lambda0-Lang))
+(: specify-representation (Cast3-Lang Config . -> . Lambda0-Lang))
 (define (specify-representation prgm comp-config)
   (match-let ([(Prog (list name count type) exp) prgm])
     (let-values ([(exp count) (sr-expr exp count)])
       (Prog (list name count type) exp))))
 
-(: sr-expr (-> C2-Expr Natural (values L0-Expr Natural)))
+(: sr-expr (-> C3-Expr Natural (values L0-Expr Natural)))
 (define (sr-expr exp next)
-  (: recur (-> C2-Expr (values L0-Expr Natural)))
+  (: recur (-> C3-Expr (values L0-Expr Natural)))
   (define (recur exp)
     (match exp
       ;;Forms to be retained
@@ -96,7 +96,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
       [(Tag t) (values (sr-tag t) next)]))
   (recur exp))
 
-(: sr-expr* (-> (Listof C2-Expr) Natural (values (Listof L0-Expr) Natural)))
+(: sr-expr* (-> (Listof C3-Expr) Natural (values (Listof L0-Expr) Natural)))
 (define (sr-expr* e* n)
   (if (null? e*)
       (values '() n)
@@ -105,7 +105,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 		      [(e n)  (sr-expr e n)])
 	  (values (cons e e*) n)))))
 
-(: sr-bnd* (-> C2-Bnd* Natural (values L0-Bnd* Natural)))
+(: sr-bnd* (-> C3-Bnd* Natural (values L0-Bnd* Natural)))
 (define (sr-bnd* b* n)
   (if (null? b*)
       (values '() n)
@@ -148,7 +148,8 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
                [stmt* (array-set* tmp-var FN-FMLS-OFFSET f*)])
           (values
            (Let bnd* (Begin (cons stmt1 (cons stmt2 stmt*)) tmp-var))
-           n))))]))
+           n))))]
+   [else (TODO implement reference code around here)]))
 
 (: sr-dyn-immediate (-> L0-Expr Integer Natural (values L0-Expr Natural)))
 (define (sr-dyn-immediate exp tag next)
@@ -172,18 +173,20 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 (define (sr-observe e t next)
   (values 
    (cond
-    [(Int? t)
-    (Begin 
-     (list (Op 'Printf (list (Quote "Int : %d\n") e)))
-     (Quote 0))]
-   [(Bool? t)
-    (If (Op '= (list (Quote TRUE-IMDT) e))
-        (Begin (list (Op 'Print (list (Quote "Bool : #t\n")))) (Quote 0))
-        (Begin (list (Op 'Print (list (Quote "Bool : #f\n")))) (Quote 0)))]
-   [(Fn? t)
-    (Begin (list (Op 'Print (list (Quote "Function : ?\n")))) (Quote 0))]
-   [(Dyn? t)
-    (Begin (list (Op 'Print (list (Quote "Dynamic : ?\n")))) (Quote 0))])
+     [(Int? t)
+      (Begin 
+        (list (Op 'Printf (list (Quote "Int : %d\n") e)))
+        (Quote 0))]
+     [(Bool? t)
+      (If (Op '= (list (Quote TRUE-IMDT) e))
+          (Begin (list (Op 'Print (list (Quote "Bool : #t\n")))) (Quote 0))
+          (Begin (list (Op 'Print (list (Quote "Bool : #f\n")))) (Quote 0)))]
+     [(Fn? t)
+      (Begin (list (Op 'Print (list (Quote "Function : ?\n")))) (Quote 0))]
+     [(Dyn? t)
+      (Begin (list (Op 'Print (list (Quote "Dynamic : ?\n")))) (Quote 0))]
+     [else (TODO implement thing for reference types)])
+   
    next))
 
 (: sr-tag (Tag-Symbol . -> . (Quote Integer)))

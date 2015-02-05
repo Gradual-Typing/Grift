@@ -190,9 +190,21 @@
 	[(Var id) (let ([ty (hash-ref env id (lookup-failed src id))])
 		    (values (Ann (Var id) (cons src ty)) ty))]
 	[(Quote lit) (let* ([ty (const-type-rule lit)])
-		       (values (Ann (Quote lit) (cons src ty)) ty))])))
+		       (values (Ann (Quote lit) (cons src ty)) ty))]
+        [(Begin e* e)          (TODO define begin type checking)]
+        [(Gbox e1)             (TODO define box type checking)]
+        [(Gunbox e1)           (TODO define box type checking)]
+        [(Gbox-set! e1 e2)     (TODO define box type checking)]
+        [(Mbox e1)             (TODO define box type checking)]
+        [(Munbox e1)           (TODO define box type checking)]
+        [(Mbox-set! e1 e2)     (TODO define box type checking)]
+        [(Gvector e1 e2)         (TODO define vector type checking)]
+        [(Gvector-ref e1 e2)     (TODO define vector type checking)]
+        [(Gvector-set! e1 e2 e3) (TODO define vector type checking)]
+        [(Mvector e1 e2)         (TODO define vector type checking)]
+        [(Mvector-ref e1 e2)     (TODO define vector type checking)]
+        [(Mvector-set! e1 e2 e3) (TODO define vector type checking)])))
   (recur exp))
-
 
 (: tc-lambda (-> Schml-Fml* Schml-Type? S0-Expr Src Env
 		 (values S1-Expr Schml-Type)))

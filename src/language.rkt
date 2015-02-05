@@ -1,5 +1,6 @@
 #lang typed/racket
 
+
 (require schml/src/helpers) 
 (provide (all-defined-out))
 
@@ -27,24 +28,41 @@ be usefull for optimizations or keeping state.
 (define-forms 
   (Prog annotation expression)
   (Ann value data)
+  ;; Procedural abstraction
   (Lambda formals return-type body)
-  (Procedure this params caster bound-vars body)
+  (App operator operands)
+  (Var id)
+  (If test then else)
+  (Ascribe expression type label)
+  ;; Primitive operators supported by the language
+  (Op operator operands)
   ;; recursive binding 
   (Letrec bindings body)
   ;; non recursive binding
   (Let bindings body)
-  (App operator operands)
-  (Op operator operands)
-  (Var id)
-  (If test then else)
-  (Ascribe expression type label)
+  ;; sequence operator
+  (Begin effects value)
+  ;; Effect operations 
+  ;; Monotonic effects
+  (Mbox value)
+  (Munbox box)
+  (Mbox-set! box value)
+  (Mvector value constructor)
+  (Mvector-set! vector offset value)
+  (Mvector-ref vector offset)
+  ;; Guarded effects
+  (Gbox value)
+  (Gunbox box)
+  (Gbox-set! box value)
+  (Gvector value constructor)
+  (Gvector-set! vector offset value)
+  (Gvector-ref vector offset)
   ;; various imediates markers
   (Quote literal)    ;; imediate data in general
   (Code-Label value) ;; marks a uid as refering to a uid
   (Tag bits)         ;; an tag for an imediate value
   (Type type)        ;; an atomic type
-  ;; Effectfull expressions
-  (Begin effects value)
+  ;; Effectfull expressions 
   (Nop)
   ;; typed bindings annotations
   (Fml identifier type)
@@ -75,81 +93,25 @@ be usefull for optimizations or keeping state.
   (Free caster variables body)
   ;; Static Global Binding
   (Labels bindings body)
+  ;; TODO figue out an appropriate comment about all forms here
+  (Procedure this params caster bound-vars body)
   ;; represents a set of moves to initialize variables before 
   (Code variables body)
   (Closure-Data code caster variables)
   (Halt)
   (Assign lhs rhs)
+  ;; Declares Local Variables
   (Locals names body)
   (Return value)
   (Relop primitive expression1 expression2)
   ;; Uil Memory Ops
   (Malloc expression)
-  (Mref expression1 expression2)
-  (Mset expression1 expression2 expression3)
-  ;; Uil IO Primitives
+  ;; Uil IO Primitives todo add C Calls and replace these
   (Printf format expressions)
   (Print expression)
   (BinOp primitive expression1 expression2))
 
 (define NO-OP (Nop))
-
-(: spaces (-> Integer Void))
-(define (spaces i)
-  (when (< 0 i)
-    (display #\space)
-    (spaces (- i 1))))
-
-(: format-ast (Any . -> . String))
-(define (format-ast x)
-  (with-output-to-string (lambda () (format-form x 0 0))))
-
-(: format-form (Any Integer Integer . -> . Void))
-(define (format-form a s i)
-  (spaces s)
-  (match a
-    [(list a ...) (let* ([i (+ i 1)]
-                         [f (lambda (a)
-                              (format-form a i i) (newline))])
-                    (display "(")
-                    (when (pair? a)
-                      (format-form (car a) 0 i)
-                      (for-each f (cdr a)))
-                    (display ")"))]
-    [(cons a b) (display "[") (let ([i (add1 i)])
-                                (format-form a 0 i) (newline)
-                                (format-form a i i) (display "]"))]
-    [(Bnd a t b) (display "[") (let ([i (add1 i)])
-                                 (format-form a 0 i) (display " : ")
-                                 (format-form t 0 (+ i 5)) (newline)
-                                 (format-form a i i) (display "]"))]
-    [(App e e*) (format-form (cons 'App (cons e e*)) 0 i)]
-    [(Lambda f t e) (display "(lambda ") (format-form f 0 i) (newline)
-     (let ([i (+ 2 i)])
-       (format-form e i i) (newline)
-       (format-form e i i))]
-    [(Prog a e) (printf "Prog: ~a\n" a) (format-form e i i)]
-    [(Let b e) (display "(let ") (format-form b 0 (+ i 5)) (newline)
-                 (format-form e (+ i 2) (+ i 2)) (display ")")]
-    [(Letrec b e) (display "(letrec ") (format-form b 0 (+ i 8)) (newline)
-     (format-form e (+ i 2) (+ i 2)) (display ")")]
-    [(If t c a) (display "(if ") (format-form t 0 (+ i 4)) (newline)
-     (format-form c (+ i 4) (+ i 4))
-     (format-form a (+ i 4) (+ i 4)) (display ")")]
-    [(Var u) (format-form u 0 0)]
-    [(Uid s n) (display s) (display "_") (display n)]
-    [(Int) (display "Int")]
-    [(Dyn) (display "Dyn")]
-    [(Bool) (display "Bool")]
-    [(Fn a (? list? p) r) (let ([f (lambda (a)
-                              (format-form a 0 0)
-                              (display " "))])
-                  (display "(")
-                  (for-each f p)
-                  (display "-> ")
-                  (format-form r 0 0)
-                  (display ")"))]
-    [otherwise (print a)]))
 
 #| Types throughout the languages |#
 
@@ -158,7 +120,15 @@ be usefull for optimizations or keeping state.
   (Int)
   (Bool)
   (Dyn)
-  (Fn arity fmls ret) 
+  (Fn arity fmls ret)
+  (MRef  arg)
+  (MVect arg)
+  (GRef  arg)
+  (GVect arg))
+
+;; TODO I am unsure of if these are being used
+;; find out and act appropriately
+(define-forms
   (String-Ptr) 
   (Any-Value)
   (Any-Type)
@@ -178,18 +148,23 @@ be usefull for optimizations or keeping state.
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
 
-
 (define (shallow-consistent? t g)
   (or (Dyn? t)
       (Dyn? g)
       (and (Int? t) (Int? g))
       (and (Bool? t) (Bool? g))
-      (and (Fn? t) (Fn? g))))
+      (and (Fn? t) (Fn? g))
+      (and (GRef? t) (GRef? g))
+      (and (GVect? t) (GVect? g))
+      (and (MRef? t) (MRef? t))
+      (and (MVect? t) (MVect? t))))
 
 #| Unique Identifier 
    These are currently done using state passing style in passes.
    TODO: Come up with a monadic helpers for state.
 |#
+
+
 
 (struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
 (define-type Uid* (Listof Uid))
@@ -201,6 +176,48 @@ be usefull for optimizations or keeping state.
 (: uid=? (-> Uid Uid Boolean))
 (define (uid=? [u : Uid] [v : Uid])
   (= (Uid-suffix u) (Uid-suffix v)))
+
+(define-syntax do
+  (syntax-rules (<- :)
+    [(_ bind e) e]
+    [(_ bind (v : t <- e0) e e* ...)
+     (bind e0 (lambda ((v : t)) (do bind e e* ...)))]
+    [(_ bind (let (b ...)) e e* ...)
+     (let (b ...) (do bind e e* ...))]
+    [(_ bind e0 e e* ...)  (bind e0 (lambda ((_ : Any)) (do bind e e* ...)))]))
+
+(define-type (State s a) (s . -> . (values a s)))
+
+
+(define #:forall (A) (run-state (ma : (State Natural A)) (s : Natural)) 
+  : (values A Natural)
+  (ma s))
+
+(define #:forall (a) (return-state (p : a))
+  : (State Natural a)
+  (lambda ((i : Natural)) (values p i)))
+
+(define #:forall (a b) (bind-state (pi : (State Natural a))
+                                   (f : (-> a (State Natural b))))
+  : (State Natural b)
+  (lambda ((i : Natural))
+    (let-values ([((p : a) (i : Natural)) (pi i)])
+      ((f p) i))))
+
+(define (uid-state (name : String))
+  : (State Natural Uid)
+  (lambda ((s : Natural))
+    (values (Uid name s) (add1 s))))
+
+(define (put-state (p : Natural))
+  : (-> Natural (values Natural Natural))
+  (lambda ((s : Natural))
+    (values p p)))
+
+(define get-state : (State Natural Natural)
+  (lambda ((i : Natural))
+    (values i i)))
+
 
 #| 
    This might be a plausable imperative implementation of Uid generation
@@ -240,7 +257,8 @@ be usefull for optimizations or keeping state.
 ;; The language created by schml/read
 (define-type Syntax-Lang (Prog String (Listof Stx)))
 
-(define-type Stx (Syntaxof Any))
+(define-type Stx (Syntaxof Any));; This might not be what I want considier Just Syntax
+(define-type Stx* (Listof Stx))
 
 #|-----------------------------------------------------------------------------+
 | Types shared by the Schml language family
@@ -298,7 +316,12 @@ be usefull for optimizations or keeping state.
 ;; Types in the schml languages
 (define-type+ Schml-Type ([Schml-Type* Listof]
 			  [Schml-Type? Option])
-  (Rec CT (U Int Bool Dyn (Fn Index (Listof Schml-Type) Schml-Type))))
+  (Rec ST (U Int Bool Dyn 
+             (GRef ST)
+             (GVect ST)
+             (MRef ST)
+             (MVect ST)
+             (Fn Index (Listof ST) ST))))
 
 (define-type Atomic-Schml-Type (U Int Bool Dyn))
 
@@ -321,10 +344,25 @@ be usefull for optimizations or keeping state.
 		 (If E E E)
 		 (Ascribe E Schml-Type (Option String))
 		 (Var Uid)
-		 (Quote Schml-Literal))
-	      Src)))
+		 (Quote Schml-Literal)
+                 (Begin (Listof E) E)
+                 ;; Monotonic effects
+                 (Mbox E)
+                 (Munbox E)
+                 (Mbox-set! E E)
+                 (Mvector E E)
+                 (Mvector-set! E E E)
+                 (Mvector-ref E E)
+                 ;; Guarded effects
+                 (Gbox E)
+                 (Gunbox E)
+                 (Gbox-set! E E)
+                 (Gvector E E)
+                 (Gvector-set! E E E)
+                 (Gvector-ref E E))
+              Src)))
 
-
+(define-type S0-Expr* (Listof S0-Expr))
 (define-type S0-Bnd (Bnd Uid Schml-Type? S0-Expr))
 (define-type S0-Bnd* (Listof S0-Bnd))
 
@@ -343,7 +381,22 @@ be usefull for optimizations or keeping state.
 		 (If E E E)
 		 (Ascribe E Schml-Type (Option String))
 		 (Var Uid)
-		 (Quote Schml-Literal))
+		 (Quote Schml-Literal)
+                 (Begin (Listof E) E)
+                 ;; Monotonic effects
+                 (Mbox E)
+                 (Munbox E)
+                 (Mbox-set! E E)
+                 (Mvector E E)
+                 (Mvector-set! E E E)
+                 (Mvector-ref E E)
+                 ;; Guarded effects
+                 (Gbox E)
+                 (Gunbox E)
+                 (Gbox-set! E E)
+                 (Gvector E E)
+                 (Gvector-set! E E E)
+                 (Gvector-ref E E))
 	      (Pair Src Schml-Type))))
 
 (define-type S1-Bnd (Bnd Uid Schml-Type S1-Expr))
@@ -364,7 +417,15 @@ be usefull for optimizations or keeping state.
       (and (Fn? t) (Fn? g)
 	   (= (Fn-arity t) (Fn-arity g))
 	   (andmap consistent? (Fn-fmls t) (Fn-fmls g))
-	   (consistent? (Fn-ret t) (Fn-ret g)))))
+	   (consistent? (Fn-ret t) (Fn-ret g)))
+      (and (GRef? t) (GRef? g) 
+           (consistent? (GRef-arg t) (GRef-arg g)))
+      (and (GVect? t) (GVect? g)
+           (consistent? (GVect-arg t) (GVect-arg g)))
+      (and (MRef? t) (MRef? g)
+           (consistent? (MRef-arg t) (MRef-arg g)))
+      (and (MVect? t) (MVect? g)
+           (consistent? (MVect-arg t) (MVect-arg g)))))
 
 #|
  Join :: type X type -> type
@@ -395,6 +456,14 @@ Dyn --> Int Int --> Dyn
     (Fn (Fn-arity t) 
 	(map join (Fn-fmls t) (Fn-fmls g)) 
 	(join (Fn-ret t) (Fn-ret g)))]
+   [(and (GRef? t) (GRef? g)) 
+    (join (GRef-arg t) (GRef-arg g))]
+   [(and (GVect? t) (GVect? g))
+    (join (GVect-arg t) (GVect-arg g))]
+   [(and (MRef? t) (MRef? g))
+    (join (MRef-arg t) (MRef-arg g))]
+   [(and (MVect? t) (MVect? g))
+    (join (MVect-arg t) (MVect-arg g))]
    [else (error 'join "Types are not consistent")]))
 
 #|-----------------------------------------------------------------------------
@@ -417,6 +486,8 @@ We are going to UIL
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Schml-Type))
 
+(define-type Cast-Literal (U Schml-Literal String Schml-Type))
+
 #|-----------------------------------------------------------------------------+
 | The Cast Language Family Types, Primitives, Literals, and Terminals        |
 +-----------------------------------------------------------------------------|#
@@ -434,8 +505,6 @@ We are going to UIL
 | applications of the cast interpreter function.
 +-----------------------------------------------------------------------------|#
 
-
-
 (define-type Cast0-Lang (Prog (List String Natural Schml-Type) C0-Expr))
 
 (define-type C0-Expr
@@ -447,6 +516,21 @@ We are going to UIL
 	  (UIL-Op E)
 	  (If E E E)
 	  (Cast E Schml-Type Schml-Type String)
+          (Begin (Listof E) E)
+          ;; Monotonic
+          (Mbox E)
+          (Munbox E)
+          (Mbox-set! E E)
+          (Mvector E E)
+          (Mvector-set! E E E)
+          (Mvector-ref E E)
+          ;; Guarded effects
+          (Gbox E)
+          (Gunbox E)
+          (Gbox-set! E E)
+          (Gvector E E)
+          (Gvector-set! E E E)
+          (Gvector-ref E E)
 	  ;; Terminals
 	  (Var Uid) 
 	  (Quote Schml-Literal))))
@@ -456,21 +540,50 @@ We are going to UIL
 (define-type C0-Bnd (Bnd Uid Schml-Type C0-Expr))
 (define-type C0-Bnd* (Listof C0-Bnd))
 
-(define-type Cast-Literal (U Schml-Literal String Schml-Type))
 
 
-#|-----------------------------------------------------------------------------+
-| Language/Cast1 created by introduce-castable-functions                       |
-+-----------------------------------------------------------------------------|#
+#| ----------------------------------------------------------------------------+
+|Cast1                                                                         |
+------------------------------------------------------------------------------|#
 
-(define-type Cast1-Lang 
- (Prog (List String Natural Schml-Type) C1-Expr))
+(define-type Cast1-Lang (Prog (List String Natural Schml-Type) C1-Expr))
 
 (define-type C1-Expr
   (Rec E (U ;; Non-Terminals
-	  (Lambda Uid* False (Castable (Option Uid) E))
+	  (Lambda Cast-Fml* Schml-Type E)
 	  (Letrec C1-Bnd* E)
 	  (Let C1-Bnd* E)
+	  (App E (Listof E))
+	  (UIL-Op E)
+	  (If E E E)
+	  (Cast E Schml-Type Schml-Type String)
+          (Begin C1-Stmt* E)
+	  ;; Terminals
+	  (Var Uid)
+	  (Quote Schml-Literal))))
+
+(define-type C1-Stmt (UIL-Op! C1-Expr))
+(define-type C1-Stmt* (Listof C1-Stmt))
+(define-type C1-Expr* (Listof C1-Expr))
+(define-type C1-Bnd (Bnd Uid Schml-Type C1-Expr))
+(define-type C1-Bnd* (Listof C1-Bnd))
+
+
+
+
+
+#|-----------------------------------------------------------------------------+
+| Language/Cast2 created by introduce-castable-functions                       |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast2-Lang 
+ (Prog (List String Natural Schml-Type) C2-Expr))
+
+(define-type C2-Expr
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Uid* False (Castable (Option Uid) E))
+	  (Letrec C2-Bnd* E)
+	  (Let C2-Bnd* E)
 	  (App E (Listof E))
 	  (UIL-Op E)
 	  (If E E E)
@@ -482,30 +595,35 @@ We are going to UIL
 	  (Type-Fn-ref E (U Index 'arity 'return))
           ;; Observations
           (Blame E)
-          ;; Terminals 
+          ;; Terminals
+          (Begin C2-Stmt* E)
 	  (Var Uid) 
 	  (Quote Schml-Literal))))
 
-(define-type C1-Expr* (Listof C1-Expr))
-(define-type C1-Bnd (Pairof Uid C1-Expr))
-(define-type C1-Bnd* (Listof C1-Bnd))
+
+(define-type C2-Stmt (UIL-Op! C2-Expr))
+(define-type C2-Stmt* (Listof C2-Stmt))
+(define-type C2-Expr* (Listof C2-Expr))
+(define-type C2-Bnd (Pairof Uid C2-Expr))
+(define-type C2-Bnd* (Listof C2-Bnd))
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast2 created by introduce-castable-functions                       |
+| Language/Cast3 created by introduce-castable-functions                       |
 +-----------------------------------------------------------------------------|#
 
 
-(define-type Cast2-Lang 
-  (Prog (List String Natural Schml-Type) C2-Expr))
+(define-type Cast3-Lang 
+  (Prog (List String Natural Schml-Type) C3-Expr))
 
-(define-type C2-Expr
+(define-type C3-Expr
   (Rec E (U ;; Non-Terminals
 	  (Lambda Uid* False (Castable (Option Uid) E))
-	  (Letrec C2-Bnd* E)
-	  (Let C2-Bnd* E)
+	  (Letrec C3-Bnd* E)
+	  (Let C3-Bnd* E)
 	  (App E (Listof E))
 	  (UIL-Op E)
 	  (If E E E)
+          (Begin C3-Stmt* E)
           ;; closure operations
           (Fn-Caster E)
           ;; FN-Type operations
@@ -525,10 +643,14 @@ We are going to UIL
 	  (Var Uid) 
 	  (Quote (U Schml-Literal String)))))
 
-(define-type C2-Expr* (Listof C2-Expr))
-(define-type C2-Bnd (Pair Uid C2-Expr))
-(define-type C2-Bnd* (Listof C2-Bnd))
+(define-type C3-Expr* (Listof C3-Expr))
+(define-type C3-Bnd   (Pair Uid C3-Expr))
+(define-type C3-Bnd*  (Listof C3-Bnd))
+(define-type C3-Stmt  (UIL-Op! C3-Expr))
+(define-type C3-Stmt* (Listof C3-Stmt))
+
 (define-type Tag-Symbol (U 'Int 'Bool 'Fn 'Atomic 'Boxed))
+
 
 #|-----------------------------------------------------------------------------+
 | The Constants for the representation of casts                                |
@@ -585,7 +707,7 @@ We are going to UIL
 	    (App E (Listof E))
 	    (UIL-Op E)
 	    (If E E E)
-	    (Begin (Listof L0-Stmt) E)
+	    (Begin L0-Stmt* E)
 	    (Fn-Caster E)
 	    ;; Terminals 
 	    (Var Uid) 
