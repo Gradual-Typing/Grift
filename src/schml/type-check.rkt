@@ -19,45 +19,6 @@
 |      and their sub-structures are consistent.                                 |
 |                                                                               |
 +-------------------------------------------------------------------------------+
-|Grammar for Core-Prog found in schml/languages/core-forms                      |
-|Core-Prog = (Core-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr})             |
-|Core-Expr = (Lambda {Formals}* {Type}? {Core-Expr} {Src})                      |
-|          | (Var {Uvar} {Src})                                                 |
-|          | (App {Expr} {Expr}* {Src})                                         |
-|          | (Op {Prim} {Expr}* {Src})                                          |
-|          | (Ascribe {Expr} {Type} {Blame?} {Src})                              |
-|          | (If {Expr} {Expr} {Expr} {Src})                                    |
-|          | (Let {Binding} {Expr} {Src})                                       |
-|          | (Quote {Datum} {Src})                                              |
-|Binding   = (Bnd {Uvar} {Type?} {Expr})                         |
-|Formal    = (Fmlt {Uvar} {Type})                                           |
-|Src       = Racket's native srcloc type                                        |
-|Blame?    = String | #f                                                        |
-|Type?     = {Type} | #f                                                        |
-|Type      = Int | Bool | (Fn {Type}* {Type}*)                                    |
-|Uvar      = (Uvar String Natural)                                              |
-|Datum     = Integer |  Boolean                                                 |
-|Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
-|                                                                               |
-+-------------------------------------------------------------------------------+
-|Grammar for Typed-Prog found in schml/languages/typed-forms                    |
-|Typed-Prog = (Typed-Prog {File-Name} {Next-Uvar-Suffix} {Core-Expr} {Core-Type})
-|Typed-Expr = (Lambda {Formals}* {Type} {Typed-Expr} {Src} {Core-Type})         |
-|           | (Var {Uvar} {Src} {Core-Type})                                    |
-|           | (App {Expr} {Expr}* {Src} {Core-Type})                            |
-|           | (Op {Prim} {Expr}* {Src})                                         |
-|           | (Ascribe {Expr} {Type} {Blame?} {Src} {Core-Type})                |
-|           | (If {Expr} {Expr} {Expr} {Src} {Core-Type})                       |
-|           | (Let {Binding} {Expr} {Src} {Core-Type})                          |
-|           | (Quote {Literal} {Src} {Core-Type})                               |
-|Binding   = (Bnd {Uvar} {Core-Type} {Expr})                                    |
-|Formal    = (Fml {Uvar} {Type})                                                |
-|Src       = Racket's native srcloc type                                        |
-|Label?    = String | #f                                                        |
-|Type      = Int | Bool | (Fn {Type}* {Type})                                   |
-|Uvar      = (Uvar String Natural)                                              |
-|Literal   = Integer |  Boolean                                                 |
-|Prim      = * | + | - | % | % | >> | << | < | <= | = | > | >=                  |
 +------------------------------------------------------------------------------|#
 (require schml/src/errors
 	 schml/src/helpers
@@ -150,18 +111,147 @@
     [(Dyn) DYN-TYPE]
     [otherwise (raise-app-not-function src t-rator)]))
 
+;; I am really just defining this in order to maintain
+;; the abstraction but the type of a begin is the type
+;; of it's final argument
+(: begin-type-rule (-> Schml-Type* Schml-Type Schml-Type))
+(define (begin-type-rule t* ty) ty)
+
+;; The type of wrapping a value in a gaurded box is a
+;; Gref of the value's type
+(: gbox-type-rule (-> Schml-Type Schml-Type))
+(define (gbox-type-rule ty) (GRef ty))
+
+;; The type of unwrapping a Dyn value is also Dyn
+;; The type of unwrapping a Ref is the type that the reference is
+;; parameterized by.
+(: gunbox-type-rule (-> Schml-Type Schml-Type))
+(define (gunbox-type-rule ty)
+  (match ty
+    [(Dyn) DYN-TYPE]
+    [(GRef g) g]
+    [otherwise (TODO raise an appropriate error here)]))
+
+;; The type of setting a dyn value is dyn
+;; The type of setting a Ref value is the type of the argurment
+(: gbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(define (gbox-set!-type-rule box-ty val-ty)
+  (match box-ty
+    [(Dyn) DYN-TYPE]
+    [(GRef g) (if (consistent? g val-ty)
+                  val-ty
+                  (TODO raise an error about type inconsistency between g and val-ty))]
+    [otherwise (TODO raise an error about box-type being type-incorrect)]))
+
+;; The type of wrapping a value in a monotonic box is a
+;; MRef of the value's type
+(: mbox-type-rule (-> Schml-Type Schml-Type))
+(define (mbox-type-rule ty) (MRef ty))
+
+;; The type of unboxing a Dyn value is also Dyn
+;; The type of unboxing a MRef is the type that the reference is
+;; parameterized by.
+(: munbox-type-rule (-> Schml-Type Schml-Type))
+(define (munbox-type-rule ty)
+  (match ty
+    [(Dyn) DYN-TYPE]
+    [(MRef m) m]
+    [otherwise (TODO raise an error about there a type error here)]))
+
+;; The type of setting a dyn value is dyn
+;; The type of setting a MRef value is the type of the armurment
+(: mbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(define (mbox-set!-type-rule box-ty val-ty)
+  (match box-ty
+    [(Dyn) DYN-TYPE]
+    [(MRef m) (if (consistent? m val-ty)
+                  val-ty
+                  (TODO raise an error about type inconsistency between m and val-ty))]
+    [otherwise (TODO raise an error about box-type beinm type-incorrect)]))
+
+;; The type of creating an array is Vect of the type of the initializing argument
+;; The size argument must be consistent with Int
+(: gvector-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(define (gvector-type-rule size-ty init-ty)
+  (if (consistent? size-ty INT-TYPE)
+      (GVect init-ty)
+      (TODO come up with an error for being inconsistent with int here)))
+
+;; The type of reffing into an Dyn is Dyn
+;; The type of reffing into a Vect T is T
+;; The type of the index must be consistent with Int
+(: gvector-ref-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(define (gvector-ref-type-rule vect-ty index-ty)
+  (if (consistent? index-ty INT-TYPE)
+      (match vect-ty
+        [(Dyn) DYN-TYPE]
+        [(GVect g) g]
+        [otherwise (TODO raise inconsistent with GVECT 'a here)])
+      (TODO raise inconsistent with INT here)))
+
+;; The type of setting a guarded vector of type T is the type of
+;; The new value as long as the new value is consistent with the old value
+;; The type of setting a Dyn is Dyn
+;; The indice must be consistent with int
+(: gvector-set!-type-rule (-> Schml-Type Schml-Type Schml-Type Schml-Type))
+(define (gvector-set!-type-rule vect-ty index-ty val-ty)
+  (if (consistent? index-ty INT-TYPE)
+      (match vect-ty
+        [(Dyn) DYN-TYPE]
+        [(GVect g) (if (consistent? g val-ty)
+                       val-ty
+                       (TODO raise a error about consistency between g and val-ty))]
+        [otherwise (TODO raise an error about consistency between (Gvect val-ty))])
+      (TODO raise an error about consistency between index-ty and int)))
+
+
+;; The type of creating an array is Vect of the type of the initializing argument
+;; The size argument must be consistent with Int
+(: mvector-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(define (mvector-type-rule size-ty init-ty)
+  (if (consistent? size-ty INT-TYPE)
+      (MVect init-ty)
+      (TODO come up with an error for being inconsistent with int here)))
+
+;; The type of reffing into an Dyn is Dyn
+;; The type of reffing into a Vect T is T
+;; The type of the index must be consistent with Int
+(: mvector-ref-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(define (mvector-ref-type-rule vect-ty index-ty)
+  (if (consistent? index-ty INT-TYPE)
+      (match vect-ty
+        [(Dyn) DYN-TYPE]
+        [(MVect g) g]
+        [otherwise (TODO raise inconsistent with MVECT 'a here)])
+      (TODO raise inconsistent with INT here)))
+
+;; The type of setting a monotonic vector of type T is the type of
+;; The new value as long as the new value is consistent with the old value
+;; The type of setting a Dyn is Dyn
+;; The indice must be consistent with int
+(: mvector-set!-type-rule (-> Schml-Type Schml-Type Schml-Type Schml-Type))
+(define (mvector-set!-type-rule vect-ty index-ty val-ty)
+  (if (consistent? index-ty INT-TYPE)
+      (match vect-ty
+        [(Dyn) DYN-TYPE]
+        [(MVect g) (if (consistent? g val-ty)
+                       val-ty
+                       (TODO raise a error about consistency between g and val-ty))]
+        [otherwise (TODO raise an error about consistency between (Mvect val-ty))])
+      (TODO raise an error about consistency between index-ty and int)))
+
+
 ;;; Procedures that destructure and restructure the ast
-;; tc-expr : (Struct Expr) * Env -> (values (Struct Expr) Type)
 (: tc-expr (-> S0-Expr Env (values S1-Expr Schml-Type)))
 (define (tc-expr exp env)
   (define-syntax-rule (map-recur exp*)
     (for/lists ([e* : (Listof S1-Expr)] [t* : (Listof Schml-Type)])
-	([e exp*]) (recur e)))
+      ([e exp*]) (recur e)))
   (: recur (-> S0-Expr (values S1-Expr Schml-Type)))
   (define (recur e)
     (let ((src (Ann-data e)))
       (match (Ann-value e)
-	[(Lambda fmls ty-ret body) 
+	[(Lambda fmls (Ann body ty-ret)) 
 	 (tc-lambda fmls ty-ret body src env)] 
 	[(Letrec bnd body) (tc-letrec bnd body src env)]
 	[(Let bnd body) (tc-let bnd body src env recur)]
@@ -191,19 +281,69 @@
 		    (values (Ann (Var id) (cons src ty)) ty))]
 	[(Quote lit) (let* ([ty (const-type-rule lit)])
 		       (values (Ann (Quote lit) (cons src ty)) ty))]
-        [(Begin e* e)          (TODO define begin type checking)]
-        [(Gbox e1)             (TODO define box type checking)]
-        [(Gunbox e1)           (TODO define box type checking)]
-        [(Gbox-set! e1 e2)     (TODO define box type checking)]
-        [(Mbox e1)             (TODO define box type checking)]
-        [(Munbox e1)           (TODO define box type checking)]
-        [(Mbox-set! e1 e2)     (TODO define box type checking)]
-        [(Gvector e1 e2)         (TODO define vector type checking)]
-        [(Gvector-ref e1 e2)     (TODO define vector type checking)]
-        [(Gvector-set! e1 e2 e3) (TODO define vector type checking)]
-        [(Mvector e1 e2)         (TODO define vector type checking)]
-        [(Mvector-ref e1 e2)     (TODO define vector type checking)]
-        [(Mvector-set! e1 e2 e3) (TODO define vector type checking)])))
+        [(Begin e* e) 
+         (let*-values ([(e  t1) (recur e)]
+                       [(e* t*) (map-recur e*)]
+                       [(ty)    (begin-type-rule t* t1)])
+           (values (Ann (Begin e* e) (cons src ty)) ty))]
+        [(Gbox e) 
+         (let*-values ([(e ty) (recur e)]
+                       [(ty)   (gbox-type-rule ty)])
+           (values (Ann (Gbox e) (cons src ty)) ty))]
+        [(Gunbox e)          
+         (let*-values ([(e ty) (recur e)]
+                       [(ty)   (gunbox-type-rule ty)])
+           (values (Ann (Gunbox e) (cons src ty)) ty))]
+        [(Gbox-set! e1 e2)
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(ty)    (gbox-set!-type-rule t1 t2)])
+           (values (Ann (Gbox-set! e1 e2) (cons src ty)) ty))]
+        [(Mbox e) 
+         (let*-values ([(e ty) (recur e)]
+                       [(ty)   (mbox-type-rule ty)])
+           (values (Ann (Mbox e) (cons src ty)) ty))]
+        [(Munbox e)          
+         (let*-values ([(e ty) (recur e)]
+                       [(ty)   (munbox-type-rule ty)])
+           (values (Ann (Munbox e) (cons src ty)) ty))]
+        [(Mbox-set! e1 e2)
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(ty)    (mbox-set!-type-rule t1 t2)])
+           (values (Ann (Mbox-set! e1 e2) (cons src ty)) ty))]
+        [(Gvector e1 e2)  
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(ty)    (gvector-type-rule t1 t2)])
+           (values (Ann (Gvector e1 e2) (cons src ty)) ty))]
+        [(Gvector-ref e1 e2)
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(ty)    (gvector-ref-type-rule t1 t2)])
+           (values (Ann (Gvector-ref e1 e2) (cons src ty)) ty))]
+        [(Gvector-set! e1 e2 e3) 
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(e3 t3) (recur e3)]
+                       [(ty)    (gvector-set!-type-rule t1 t2 t3)])
+           (values (Ann (Gvector-set! e1 e2 e3) (cons src ty)) ty))]
+        [(Mvector e1 e2)  
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(ty)    (mvector-type-rule t1 t2)])
+           (values (Ann (Mvector e1 e2) (cons src ty)) ty))]
+        [(Mvector-ref e1 e2)
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(ty)    (mvector-ref-type-rule t1 t2)])
+           (values (Ann (Mvector-ref e1 e2) (cons src ty)) ty))]
+        [(Mvector-set! e1 e2 e3) 
+         (let*-values ([(e1 t1) (recur e1)]
+                       [(e2 t2) (recur e2)]
+                       [(e3 t3) (recur e3)]
+                       [(ty)    (mvector-set!-type-rule t1 t2 t3)])
+           (values (Ann (Mvector-set! e1 e2 e3) (cons src ty)) ty))])))
   (recur exp))
 
 (: tc-lambda (-> Schml-Fml* Schml-Type? S0-Expr Src Env
@@ -212,8 +352,7 @@
   (let*-values ([(id* ty*) (unzip-formals fml*)]
 		[(body ty-body) (tc-expr body (env-extend* env id* ty*))]
 		[(ty-lambda) (lambda-type-rule src ty* ty-body ty-ret)]) 
-    (values (Ann (Lambda fml* (Fn-ret ty-lambda) body)
-		 (cons src ty-lambda))
+    (values (Ann (Lambda fml* body) (cons src ty-lambda))
 	    ty-lambda)))
 
 (: unzip-formals (-> Schml-Fml* (values (Listof Uid) Schml-Type*)))
@@ -230,7 +369,7 @@
   (define (fold-env-extend/bnd b* env)
     (for/fold : (values S0-Bnd* Env) ([bnd* : S0-Bnd* '()] [env : Env env]) ([bnd : S0-Bnd b*])
               (match bnd
-                [(Bnd id type (Ann (Lambda f* t^ b) src))
+                [(Bnd id type (Ann (Lambda f* (Ann b t^)) src))
                  (if type
                   (values (cons bnd bnd*) (hash-set env id type))
                   (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
@@ -239,7 +378,7 @@
                         (values (cons bnd bnd*)
                                 (hash-set env id (Fn arity arg-t* t^)))
                         (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
-                               [rhs : S0-Expr (Ann (Lambda f* DYN-TYPE b) src)])
+                               [rhs : S0-Expr (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
                           (values (cons (Bnd id type rhs) bnd*)
                                   (hash-set env id type))))))]
                   ;; [t^ (values (cons bnd bnd*) (hash-set env i ))]

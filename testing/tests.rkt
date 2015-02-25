@@ -1,7 +1,7 @@
-#lang typed/racket/base/no-check ;; Not actually type-checked
+#lang typed/racket/no-check ;; Not actually type-checked
 
 (require rackunit 
-	 rackunit/text-ui
+	 
 	 schml/testing/values
          schml/testing/test-compile
          schml/testing/paths
@@ -16,14 +16,15 @@
     ((_ p ... n e)
      (ann (test-case n (test-compile (simplify-path (build-path test-suite-path p ... n)) e)) Test))))
 
+
 (define test-data-base : Test
   (test-suite 
    "all tests"
    ;; Bools
    (test-file "const-false.schml" (bool #f))
-   (test-file "const-true.schml" (bool #t))
+   (test-file "const-true.schml"  (bool #t))
    ;; Ints
-   (test-file "const-one.schml" (int 1))
+   (test-file "const-one.schml"   (int 1))
    (test-file "const-ninetynine.schml" (int 99))
    (test-file "const-larg-int.schml" (int 123456))
    ;; Primitive operators TODO (should add more to test corners)
@@ -98,8 +99,8 @@
    (test-file "letrec6.schml" (int 1))
    
    ;; Gaurded Boxes
-   (test-file "gbox0.schml" (gbox (int 1)))
-   (test-file "gbox1.schml" (gbox (int 2)))
+   (test-file "gbox0.schml" (gbox))
+   (test-file "gbox1.schml" (gbox))
    (test-file "gbox2.schml" (int 2))
    (test-file "gbox3.schml" (int 3))
    (test-file "gbox4.schml" (int 4))
@@ -152,18 +153,56 @@
    ;;(test-file "ack-static.schml"      (bool #t))   
    ))
 
-(module+ main
-  (unless (directory-exists? test-tmp-path)
+
+(: find-test* (-> Path (Listof Test) (Listof Test)))
+(define (find-test* path tests)
+  (cond
+    [(schml-file? path) (cons (make-compiler-test path) tests)]
+    [(directory-exists? path)
+     (let* ([name (file-name-from-path path)]
+            [name (if name (path->string name) "Unkown Test")])
+       (cons (make-test-suite 
+              name 
+              (foldl find-test* '() (get-directory path)))
+             tests))]
+    [else tests]))
+
+(define (schml-file? (path : Path)) : Boolean
+  (let ([ext (filename-extension path)])
+    (if ext (bytes=? ext #"schml") #f)))
+
+(define (make-compiler-test (path : Path)) : Test
+  (let ([path (simplify-path path)])
+    (let-values ([(base name dir) (split-path path)])
+      (if (and (path? base) (path? name))
+          (let ([test (test-case "hi" (test-compile path (dyn)))])
+            test) 
+          (error 'make-compiler-test "~a ~a" base name)))))
+
+;; like directory-list but with full file paths
+(: get-directory (-> Path (Listof Path)))
+(define (get-directory path)
+  (for/list : (Listof Path) ([file : Path (in-directory path)]) 
+    (build-path path file)))
+
+#| The main of this file is inlined |#
+
+;; make sure that there is an unobtrusive place for temp files
+(unless (directory-exists? test-tmp-path)
     (make-directory test-tmp-path))
-  (call-with-output-file
-      (build-path test-tmp-path "t.log.txt") #:exists 'replace
-      (lambda ([f : Output-Port])
-        (parameterize ([compiler-config (Config 'Lazy-D
-                                                (build-path test-tmp-path "t.out")
-                                                (build-path test-tmp-path "t.c"))]
-                       [current-log-port f]
-                       ;;[traces '(All Vomit)]
-                       ;;[current-error-port f]
-                       )
-          (run-tests test-data-base 'verbose)))))
+
+(call-with-output-file
+    (build-path test-tmp-path "t.log.txt") #:exists 'replace
+  (lambda ([f : Output-Port])
+    (parameterize ([compiler-config (Config 'Lazy-D
+                                            (build-path test-tmp-path "t.out")
+                                            (build-path test-tmp-path "t.c"))]
+                   [current-log-port f]
+                   ;;[traces '(All Vomit)]
+                   ;;[current-error-port f]
+                   )
+      (command-line #:program "schml-test-suite"
+                    #:args () 
+                    (run-tests test-data-base)))))
+
 

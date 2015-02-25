@@ -89,13 +89,13 @@
 	([b : L0-Bnd b*])
       (match b
 	[(cons i (Lambda f* r (Castable b e)))
-	 (let-values ([(e n) (ll-expr e n)])
-	   (let ([bnd (inst cons Uid L1-Lambda)])
-	     (values (cons (bnd i (Lambda f* r (Castable b e))) bp*) bd* n)))]
+         (let-values ([(e n) (ll-expr e n)])
+           (let (#;[bnd (inst cons Uid L1-Lambda)])
+	     (values (cons (cons i (Lambda f* r (Castable b e))) bp*) bd* n)))] 
 	[(cons i e)
 	 (let-values ([(e n) (ll-expr e n)])
-	   (let ([bnd (inst cons Uid L1-Expr)])
-	     (values bp* (cons (bnd i e) bd*) n)))])))
+           (let (#;[bnd (inst cons Uid L1-Expr)]) ;; nonsensical type error
+             (values bp* (cons (cons i e) bd*) n)))])))
   (let*-values ([(bp* bd* n) (split-bnds b* n)]
 		[(e n) (ll-expr e n)])
     (: bp* L1-Bnd-Lambda*)

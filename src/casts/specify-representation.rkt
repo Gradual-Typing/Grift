@@ -6,8 +6,6 @@
 +-------------------------------------------------------------------------------+
 Description: This pass has to change the representation of anything that
 is made an immediate. Kinda breaking the abstraction that I was hoping to create.
-
-
 +-------------------------------------------------------------------------------+
 | Source Grammar : Cast3
 | Target Grammar : Lambda0
@@ -19,84 +17,171 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 ;; Only the pass is provided by this module
 (provide specify-representation)
 
-(: specify-representation (Cast3-Lang Config . -> . Lambda0-Lang))
+;; Only allocate each of these once
+(define FN-ARITY-INDEX-VALUE (Quote FN-ARITY-INDEX))
+(define FN-RETURN-INDEX-VALUE (Quote FN-RETURN-INDEX))
+(define FN-FMLS-OFFSET-VALUE (Quote FN-FMLS-OFFSET))
+(define TYPE-TAG-MASK-VALUE (Quote TYPE-TAG-MASK))
+(define TYPE-FN-TAG-VALUE (Quote TYPE-FN-TAG))
+(define TYPE-ATOMIC-TAG-VALUE (Quote TYPE-ATOMIC-TAG))
+(define TYPE-DYN-RT-VALUE-VALUE (Quote TYPE-DYN-RT-VALUE))
+(define TYPE-INT-RT-VALUE-VALUE (Quote TYPE-INT-RT-VALUE))
+(define TYPE-BOOL-RT-VALUE-VALUE (Quote TYPE-BOOL-RT-VALUE))
+(define DYN-TAG-MASK-VALUE (Quote DYN-TAG-MASK))
+(define DYN-BOXED-TAG-VALUE (Quote DYN-BOXED-TAG))
+(define DYN-INT-TAG-VALUE (Quote DYN-INT-TAG))
+(define DYN-BOOL-TAG-VALUE (Quote DYN-BOOL-TAG))
+(define DYN-IMDT-SHIFT-VALUE (Quote DYN-IMDT-SHIFT))
+(define DYN-BOX-SIZE-VALUE (Quote DYN-BOX-SIZE))
+(define DYN-VALUE-INDEX-VALUE (Quote DYN-VALUE-INDEX))
+(define DYN-TYPE-INDEX-VALUE (Quote DYN-TYPE-INDEX))
+(define FALSE-IMDT-VALUE (Quote FALSE-IMDT))
+(define TRUE-IMDT-VALUE (Quote TRUE-IMDT))
+(define UNDEF-IMDT-VALUE (Quote UNDEF-IMDT))
+(define UBOX-SIZE-VALUE (Quote UBOX-SIZE))
+(define UBOX-VALUE-INDEX-VALUE (Quote UBOX-VALUE-INDEX))
+(define GPROXY-SIZE-VALUE (Quote GPROXY-SIZE))
+(define GPROXY-FOR-INDEX-VALUE (Quote GPROXY-FOR-INDEX))
+(define GPROXY-FROM-INDEX-VALUE (Quote GPROXY-FROM-INDEX))
+(define GPROXY-TO-INDEX-VALUE (Quote GPROXY-TO-INDEX))
+(define GPROXY-BLAMES-INDEX-VALUE (Quote GPROXY-BLAMES-INDEX))
+
+(: specify-representation (Cast4-Lang Config . -> . Lambda0-Lang))
 (define (specify-representation prgm comp-config)
-  (match-let ([(Prog (list name count type) exp) prgm])
-    (let-values ([(exp count) (sr-expr exp count)])
-      (Prog (list name count type) exp))))
+  (match-let ([(Prog (list name next type) exp) prgm])
+    (let-values ([(exp next) (run-state (sr-expr exp) next)])
+      (Prog (list name next type) exp))))
 
-(: sr-expr (-> C3-Expr Natural (values L0-Expr Natural)))
-(define (sr-expr exp next)
-  (: recur (-> C3-Expr (values L0-Expr Natural)))
-  (define (recur exp)
-    (match exp
-      ;;Forms to be retained
-      [(Lambda f* _  (Castable ctr (app recur exp next)))
-       (values (Lambda f* #f (Castable ctr exp)) next)]
-      [(Letrec b* (app recur exp next)) 
-       (let-values ([(b* next) (sr-bnd* b* next)])
-	 (values (Letrec b* exp) next))]
-      [(Let b* (app recur exp next)) 
-       (let-values ([(b* next) (sr-bnd* b* next)])
-	 (values (Let b* exp) next))]
-      [(If (app recur tst next) csq alt)
-       (let*-values ([(csq next) (sr-expr csq next)]
-		     [(alt next) (sr-expr alt next)])
-	 (values (If tst csq alt) next))]
-      [(App (app recur exp next) exp*)
-       (let-values ([(exp* next) (sr-expr* exp* next)])
-	 (values (App exp exp*) next))]
-      [(Op p exp*)
-       (let-values ([(exp* next) (sr-expr* exp* next)])
-	 (values (Op p exp*) next))]
-      [(Fn-Caster (app recur e next))
-       (values (Fn-Caster e) next)]
-      [(Var i) (values (Var i) next)]
-      [(Quote k) 
-       (values (if (boolean? k)
-                   (Quote (if k TRUE-IMDT FALSE-IMDT)) 
-                   (Quote k)) 
-               next)]
-      ;; eliminated forms
-      [(Type-Fn-ref (app recur e next) k)
-       (values
-        (cond
-          [(eq? 'arity k) 
-           (Op 'Array-ref (list e (Quote FN-ARITY-INDEX)))] 
-          [(eq? 'return k) 
-           (Op 'Array-ref (list e (Quote FN-RETURN-INDEX)))]
-          [else 
-           (Op 'Array-ref (list e (Quote (+ FN-FMLS-OFFSET k))))])
-        next)]
-      [(Type-tag (app recur e next)) 
-       (values (Op 'binary-and (list e (Quote TYPE-TAG-MASK))) next)]
-      [(Dyn-tag (app recur e next))
-       (values (Op 'binary-and (list e (Quote DYN-TAG-MASK))) next)]
-      [(Dyn-immediate (app recur e next))
-       (values (Op '%>> (list e (Quote DYN-IMDT-SHIFT))) next)]
-      [(Dyn-ref (app recur e next) k)
-       (values
-        (case k
-          [(value) (Op 'Array-ref (list e (Quote DYN-VALUE-INDEX)))] 
-          [(type) (Op 'Array-ref (list e (Quote DYN-TYPE-INDEX)))])
-        next)]
-      [(Dyn-make (app recur e next) t)
-       (match t
-        [(Type (Int)) (sr-dyn-immediate e DYN-INT-TAG next)]
-        [(Type (Bool)) (sr-dyn-immediate e DYN-BOOL-TAG next)]
-        [otherwise 
-         (let-values ([(t next) (sr-expr t next)])
-           (sr-dyn-box e t next))])]
-      [(Blame (app recur e next))
-       (values (Begin (list (Op 'Print (list e))
-                            (Op 'Exit '()))
-                      (Quote UNDEF-IMDT)) next)]
-      [(Observe (app recur e next) t) (sr-observe e t next)]
-      [(Type t) (sr-type t next)]
-      [(Tag t) (values (sr-tag t) next)]))
-  (recur exp))
+(: sr-expr (-> C4-Value (State Natural L0-Expr)))
+(define (sr-expr exp)
+  (match exp
+    ;;Forms to be retained
+    [(Lambda f* (Castable c e))
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-expr e))
+         (return-state (Lambda f* (Castable c e))))]
+    [(Letrec b* e)
+     (do (bind-state : (State Natural L0-Expr))
+         (b* : L0-Bnd  <- (sr-bnd* b*))
+         (e  : L0-Expr <- (sr-expr e))
+         (return-state (Letrec b* e)))]
+    [(Let b* e)
+     (do (bind-state : (State Natural L0-Expr))
+         (b* : L0-Bnd  <- (sr-bnd* b*))
+         (e  : L0-Expr <- (sr-expr e))
+         (return-state (Let b* e)))]
+    [(If t c a)
+     (do (bind-state : (State Natural L0-Expr))
+         (t : L0-Expr <- (sr-expr t))
+         (c : L0-Expr <- (sr-expr c))
+         (a : L0-Expr <- (sr-expr a))
+         (return-state (If t c a)))]
+    [(App e e*)
+     (do (bind-state : (State Natural L0-Expr))
+         (e  : L0-Expr  <- (sr-expr e))
+         (e* : L0-Expr* <- (sr-expr* e*))
+         (return-state (App e e*)))]
+    [(Op p exp*)
+     (do (bind-state : (State Natural L0-Expr))
+         (e* : L0-Expr* <- (sr-expr* e*))
+         (return-state (Op p e*)))]
+    [(Fn-Caster e) (lift-state (inst Fn-Caster L0-Expr) (sr-expr e))]
+    [(Var i)       (return-state (Var i))]
+    [(Quote k) (let ([k  (if (boolean? k)
+                             (if k TRUE-IMDT FALSE-IMDT)
+                             k)])
+                 (return-state (Quote k)))]
+    ;; eliminated forms
+    [(Type-Fn-arity e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'Array-ref (list e FN-ARITY-INDEX-VALUE))))]
+    [(Type-Fn-return e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'Array-ref (list e FN-RETURN-INDEX-VALUE))))]
+    [(Type-Fn-arg e1 e2)
+      (do (bind-state : (State Natural L0-Expr))
+          (e1 : L0-Expr <- (sr-value e1))
+          (e2 : L0-Expr <- (sr-value e2))
+          (let ([e2^ (match e2
+                       [(Quote (? number? k)) (+ FN-FMLS-OFFSET k)]
+                       [otherwiths (Op '+ (list e2 FN-FMLS-VALUE))])])
+            (return-state (Op 'Array-ref (list e1 e2^)))))]
+    [(Type-tag e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'binary-and (list e TYPE-TAG-MASK-VALUE))))]
+    [(Dyn-tag e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'binary-and (list e DYN-TAG-MASK-VALUE))))]
+    [(Dyn-immediate e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op '%>> (list e DYN-IMDT-SHIFT-VALUE))))]
+    [(Dyn-make e1 e2)
+     (do (bind-state : (State Natural L0-Expr))
+         (e1 : L0-Expr (sr-expr e1))
+         #;(e2 : L0-Expr (sr-expr e2))
+         (sr-dyn-make e1 e2))]
+    [(Dyn-type e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'Array-ref (list e DYN-TYPE-INDEX-VALUE))))]
+    [(Dyn-value e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'Array-ref (list e DYN-VALUE-INDEX-VALUE))))]
+    [(Blame e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state
+          (Begin
+            (list (Op 'Print (list e))
+                  (Op 'Exit  (list (Quote -1))))
+            UNDEF-IMDT-VALUE)))]
+    [(Observe (app recur e next) t)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr (sr-value e))
+         (lambda ([n : Natural]) : (Values L0-Expr Natural)
+            ;; This is a break in the monad abstraction that needs fixed
+           (sr-observe e t n)))]
+    [(Type t) (lambda ([n : Natural]) (sr-type t n))]
+    [(Tag t)  (return-state (sr-tag t))]
+    [(Begin eff* exp)
+     (do (bind-state : (State Natural L0-Expr))
+         (eff* : L0-Effect <- (sr-effect* eff*))
+         (exp  : L0-Expr   <- (sr-value   exp))
+         (return-state (Begin eff* exp)))]
+    [(UGbox e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (allocate-and-set-ugbox e))]
+    [(UGbox-ref e)
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'Array-ref (list e UGBOX-VALUE-INDEX))))]
+    [(UGbox-set! e1 e2)
+     (do (bind-state : (State Natural L0-Expr))
+         (e1 : L0-Expr <- (sr-value e1))
+         (e2 : L0-Expr <- (sr-value e2))
+         (return-state (Op 'Array-set! (list e1 UGBOX-VALUE-INDEX e2))))]
+    [(GRep-proxied? (app recur/next exp next))
+     (values (GRep-proxied? exp) next)]
+    [(Gproxy for from to blames)
+     (let*-values ([(for next)  (recur for next)]
+                   [(from next) (recur from next)]
+                   [(to next)   (recur to next)]
+                   [(blames next) (recur blames next)])
+       (values (Gproxy for from to blames) next))]
+    [(Gproxy-for (app recur/next exp next)) (values (Gproxy-for exp) next)]
+    [(Gproxy-from (app recur/next exp next)) (values (Gproxy-from exp) next)]
+    [(Gproxy-to (app recur/next exp next)) (values (Gproxy-to exp) next)]
+    [(Gproxy-blames (app recur/next exp next))
+     (values (Gproxy-blames exp) next)]))
 
-(: sr-expr* (-> (Listof C3-Expr) Natural (values (Listof L0-Expr) Natural)))
+(: sr-expr* (-> (Listof C4-Expr) Natural (values (Listof L0-Expr) Natural)))
 (define (sr-expr* e* n)
   (if (null? e*)
       (values '() n)
@@ -105,7 +190,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 		      [(e n)  (sr-expr e n)])
 	  (values (cons e e*) n)))))
 
-(: sr-bnd* (-> C3-Bnd* Natural (values L0-Bnd* Natural)))
+(: sr-bnd* (-> C4-Bnd* Natural (values L0-Bnd* Natural)))
 (define (sr-bnd* b* n)
   (if (null? b*)
       (values '() n)
@@ -135,7 +220,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
    [(Int? t)  (values (Quote TYPE-INT-RT-VALUE) n)]
    [(Bool? t) (values (Quote TYPE-BOOL-RT-VALUE) n)]
    [(Dyn? t)  (values (Quote TYPE-DYN-RT-VALUE) n)]
-   [(Fn? t) 
+   [(Fn? t)
     (match-let ([(Fn a f* r) t])
       (let*-values ([(tmp n) (next-uid "tmp" n)]
                     [(tmp-var) (Var tmp)]
@@ -151,30 +236,37 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
            n))))]
    [else (TODO implement reference code around here)]))
 
-(: sr-dyn-immediate (-> L0-Expr Integer Natural (values L0-Expr Natural)))
-(define (sr-dyn-immediate exp tag next)
-  (values (Op '+ (list (Op '%<< (list exp (Quote DYN-IMDT-SHIFT))) (Quote tag)))
-          next))
-
-(: sr-dyn-box (-> L0-Expr L0-Expr Natural (values L0-Expr Natural)))
-(define (sr-dyn-box exp type next)
-  (let*-values ([(tmp next) (next-uid "dyn_box" next)]
-                [(tmp-var)  (Var tmp)])
-    (values
-     (Let (list (cons tmp (Op 'Alloc (list (Quote DYN-BOX-SIZE)))))
-     (Begin
-      (list
-       (Op 'Array-set! (list tmp-var (Quote DYN-VALUE-INDEX) exp))
-       (Op 'Array-set! (list tmp-var (Quote DYN-TYPE-INDEX) type)))
-      tmp-var))
-     next)))
+(: sr-dyn-make (-> L0-Expr C4-Expr (State Natural L0-Expr)))
+(define (sr-dyn-make e1 e2)
+  (match e2
+    [(Type (Int))
+     (return-state
+      (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
+                   DYN-INT-TAG-VALUE)))]
+    [(Type (Bool))
+     (return-state
+      (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
+                   DYN-BOOL-TAG-VALUE)))]
+    [otherwise
+     (do (bind-state : (State Natural L0-Expr))
+         (e2  : L0-Expr <- (sr-value e2))
+         (tmp : Uid     <- (next-uid "dyn_box"))
+         (let* ([tmp-var  (Var tmp)]
+                [set-val  (Op 'Array-set!
+                              (list tmp-var DYN-VALUE-INDEX-VALUE exp))]
+                [set-type (Op 'Array-set!
+                              (list tmp-var DYN-TYPE-INDEX-VALUE type))]
+                [alloc    (Op 'Alloc (list DYN-BOX-SIZE-VALUE))])
+           (return-state
+            (Let (list (cons tmp alloc))
+                 (Begin (list set-val set-type) tmp-var)))))
 
 (: sr-observe (-> L0-Expr Schml-Type Natural (values L0-Expr Natural)))
 (define (sr-observe e t next)
-  (values 
+  (values
    (cond
      [(Int? t)
-      (Begin 
+      (Begin
         (list (Op 'Printf (list (Quote "Int : %d\n") e)))
         (Quote 0))]
      [(Bool? t)
@@ -186,14 +278,14 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
      [(Dyn? t)
       (Begin (list (Op 'Print (list (Quote "Dynamic : ?\n")))) (Quote 0))]
      [else (TODO implement thing for reference types)])
-   
+
    next))
 
 (: sr-tag (Tag-Symbol . -> . (Quote Integer)))
 (define (sr-tag t)
   (case t
-    [(Int)    (Quote DYN-INT-TAG)] 
-    [(Bool)   (Quote DYN-BOOL-TAG)] 
-    [(Atomic) (Quote TYPE-ATOMIC-TAG)] 
-    [(Fn)     (Quote DYN-BOXED-TAG)] 
+    [(Int)    (Quote DYN-INT-TAG)]
+    [(Bool)   (Quote DYN-BOOL-TAG)]
+    [(Atomic) (Quote TYPE-ATOMIC-TAG)]
+    [(Fn)     (Quote DYN-BOXED-TAG)]
     [(Boxed)  (Quote TYPE-FN-TAG)]))

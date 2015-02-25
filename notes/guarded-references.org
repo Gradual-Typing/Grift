@@ -1,0 +1,7 @@
+let r1 = ref 1 in
+ler r2 = (r1 : Ref Int => Ref *) in
+  !r2  /* 1 needs to be cast to * */
+  r2 := (42: Int => *) /* <42, Int> needs to be cast to int */
+
+ (r2<Ref Int! Int?>)
+ 

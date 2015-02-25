@@ -1,0 +1,103 @@
+\documentclass{article}
+\usepackage{graphicx}
+
+
+% The purpose of this paper is to convey my idea
+% My idea is that gradual typing can be efficiently implemented
+
+
+% The papers that follow may present some notion of how I can
+% present this idea
+%% 
+%%
+%% First-class Runtime Generation of High-performance Types using Exotypes 
+%% Zachary DeVito, Daniel Ritchie, Matt Fisher, Alex Aiken, Pat Hanrahan (Stanford University)
+%% Getting F-Bounded Polymorphism into Shape 
+%% Ben Greenman, Fabian Muehlboeck, Ross Tate (Cornell University)
+%% Optimal Inference of Fields in Row-Polymorphic Records 
+%% Axel Simon (Technische Universität München)
+
+                                   
+\begin{document}
+\section{Abstract} % 4 sentances
+
+% I need something novel in order to catch people's attention
+% this is used by the programming committee to decide which papers to read
+% Write this last
+
+% The problem
+
+% Why this is an interesting problem
+
+% What my solution achieves
+
+% What this implies, Where this leads
+
+\section{Introduction} % 1 page
+% The introduction including the contributions should survey the whole paper 
+
+% Describe the problem
+
+
+% State my contributions
+% This is where I should start
+% This list will drive the entire paper
+% Use forward references to layout the paper
+
+\begin{itemize}
+\item We provide implementation strategies and analysis for various mechinisms of
+  a gradual type system.
+  \begin{itemize}
+  \item The includes space efficient casts with regards
+    to tail calls and function casts.
+  \item Support for both Guarded and Monotonic semantics for references.
+  \item First class polymorphism
+  \end{itemize}
+  \item We provide evaluation of a compiler based implementation
+  of the language.
+  \begin{itemize}
+    \item dynamic invokation (invoking closures versus dynamics values)
+    \item cast based versus coersion based intermediate languages
+    \item boxed versus unbox integers
+    \item space efficiency versus non-space-efficient perfomance and
+    and analysis of the time complexity
+  \end{itemize}
+\item We identify several areas for optimization and the results of those optimizations.
+  \begin{itemize}
+    \item common subexpression elimination on type lead to faster dynamics
+    \item type inference type to eliminate uneaded casts 
+    \item cast driven accounting for inline and code specialization
+  \end{itemize}
+\item As an artifact of this study we have create a compiler for the schml programming
+  language. This compiler comes with the test suite used to decide implementation
+  strategies at various stages of implementations.
+\end{itemize}
+
+
+% The body of the paper
+% This section should present
+
+\section{The Problem}  % 1 page
+
+% present the problem using running examples
+
+Most research regarding gradual types have come up with some logical
+foundation for the way that the type system should behave. Then implemented
+there system on top a Dynamic type system. This seems to miss the mark on
+one of the incentives for using static types -- performance improvements.
+Sometimes theses implementations are able to use type information to elide checks
+or to provably use unsafe varients of accessors, but the question remains how
+much performance is lost to various overheads of using dynamic types.
+
+
+\section{My Idea} % 2 pages
+
+\section{The Details} % 5 pages
+
+
+\section{Related Work}  % 1-2 pages
+% Give everyone credit and more
+
+\section{Conclusion & Further Work} % 1/2 page
+
+\end{document}

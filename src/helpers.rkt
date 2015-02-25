@@ -4,26 +4,26 @@
 
 #| Environments are persistent hash tables |#
 
-#| Source locations always return a string even if it is empty |# 
+#| Source locations always return a string even if it is empty |#
 (require/typed racket/base
-	       [(srcloc->string src->str) 
+	       [(srcloc->string src->str)
 		(srcloc . -> . (U False String))])
 (: srcloc->string (srcloc . -> . String))
 (define (srcloc->string x) (or (src->str x) ""))
 
 (: syntax->srcloc ((Syntaxof Any) . -> . srcloc))
 (define (syntax->srcloc x)
-  (srcloc (syntax-source x) 
+  (srcloc (syntax-source x)
 	  (syntax-line x)
-          (syntax-column x) 
-	  (syntax-position x) 
+          (syntax-column x)
+	  (syntax-position x)
 	  (syntax-span x)))
 
 (: file->srcloc (String . -> . srcloc))
 (define (file->srcloc n)
   (srcloc n #f #f #f #f))
 
-#| 
+#|
 A language form ends up just being a polymorphic record.
 This allows me to make very desciptive grammars via types later on.
 |#
@@ -32,7 +32,7 @@ This allows me to make very desciptive grammars via types later on.
   (syntax-case stx ()
     [(_ (name fields ...) f* ...)
      (with-syntax ([(types ...) (generate-temporaries #'(fields ...))])
-       #'(begin 
+       #'(begin
 	   (struct (types ...) name ([fields : types] ...) #:transparent)
 	   (define-forms f* ...)))]
     [(_) #'(void)]))
@@ -46,8 +46,8 @@ This allows me to make very desciptive grammars via types later on.
    that takes the shorter of two lists
 |#
 
-(: fold-2-left 
-   (All (a b c) 
+(: fold-2-left
+   (All (a b c)
 	(-> (-> a b c c) c (Listof a) (Listof b) c)))
 (define (fold-2-left p acc l0 l1)
   (if (or (null? l0) (null? l1))
@@ -106,7 +106,7 @@ This allows me to make very desciptive grammars via types later on.
 (define-syntax if-in-construction
   (if under-construction?
       syntax-id
-      syntax-void))    
+      syntax-void))
 
 (if-in-construction
  (provide exn:todo)
@@ -117,9 +117,104 @@ This allows me to make very desciptive grammars via types later on.
   (if under-construction?
       (syntax-rules ()
         [(_ x ...)
-         (raise 
+         (raise
           (exn:todo
            (format "TODO: ~a" '(x ...))
            (current-continuation-marks)))])
       syntax-undefined-if-used))
 
+(define-syntax do
+  (syntax-rules (<- : let let* match-let)
+    [(_ bind (let (b ...) e e* ...))
+     (let (b ...) (do bind e e* ...))]
+    [(_ bind (let* (b ...) e e* ...))
+     (let* (b ...) (do bind e e* ...))]
+    [(_ bind (match-let (b ...) e e* ...))
+     (match-let (b ...) (do bind e e* ...))]
+    [(_ (bind : T) e) (ann e : T)]
+    [(_ (bind : (C m b)) (v : a <- e0) e e* ...)
+     (bind (ann e0 (C m a)) (lambda ((v : a)) : (C m b) (do (bind : (C m b)) e e* ...)))]
+    [(_ (bind : (C m b)) (e0 : T) e e* ...)
+     (bind (ann e0 T) (lambda (_) (do (bind : (C m b)) e e* ...)))]))
+
+
+#| The state monad |#
+(define-type (State S A) (S . -> . (values A S)))
+
+(define #:forall (M A) (run-state (ma : (State M A)) (s : M))
+  : (values A M)
+  (ma s))
+
+(define #:forall (M A) (return-state (p : A))
+  : (State M A)
+  (lambda ((i : M)) (values p i)))
+
+(define #:forall (M A B) (bind-state (pi : (State M A))
+                                     (f : (-> A (State M B))))
+  : (State M B)
+  (lambda ((i : M))
+    (let-values ([((p : A) (i : M)) (pi i)])
+      ((f p) i))))
+
+(define #:forall (M) (put-state (p : M))
+  : (State M Null)
+  (lambda ((s : M))
+    (values '() p)))
+
+(define #:forall (M) get-state : (State M M)
+  (lambda ((i : M))
+    (values i i)))
+
+(define #:forall (M A B) (map-state [f : (A -> (State M B))] [l : (Listof A)])
+  : (State M (Listof B))
+  (letrec ([loop : ((Listof A) . -> . (State M (Listof B)))
+            (lambda ([l : (Listof A)]) : (State M (Listof B))
+             (if (null? l)
+                 (return-state '())
+                 (do (bind-state : (State M (Listof B)))
+                     (a : B <- (f (car l)))
+                     (d : (Listof B) <- (loop (cdr l)))
+                     (return-state (cons a d)))))])
+      (loop l)))
+
+(: lift-state (All (M A B C D)
+               (case-> [(A -> B) (State M A) -> (State M B)]
+                       [(A B -> C) (State M A) (State M B) -> (State M C)]
+                       [(A B C -> D) (State M A) (State M B) (State M C) -> (State M D)])))
+(define lift-state
+  (case-lambda
+    [(f ma)
+     (do (bind-state : (State M B))
+         (a : A <- ma)
+         (return-state (f a)))]
+    [(f ma mb)
+     (do (bind-state : (State M C))
+         (a : A <- ma)
+         (b : B <- mb)
+         (return-state (f a b)))]
+    [(f ma mb mc)
+     (do (bind-state : (State M D))
+         (a : A <- ma)
+         (b : B <- mb)
+         (c : C <- mc)
+         (return-state (f a b c)))]))
+
+;; extended conditional macros
+
+(define-syntax-rule (lif (t p) c a)
+  (let ((t p)) (if t c a)))
+
+(define-syntax ex-cond
+  (syntax-rules (else => let let-values match-let)
+    [(_ (else e* ... e))
+     (begin e* ... e)]
+    [(_ (let (b ...) c c* ...))
+     (let (b ...) (ex-cond c c* ...))]
+    [(_ (let-values (b ...) c c* ...))
+     (let (b ...) (ex-cond c c* ...))]
+    [(_ (match-let (b ...) c c* ...))
+     (let (b ...) (ex-cond c c* ...))]
+    [(_ (p => e) c c* ...)
+     (lif (t p) (e t) (ex-cond c c* ...))]
+    [(_ (p e* ... e) c c* ...)
+     (lif (t p) (begin e* ... e) (ex-cond c c* ...))]))

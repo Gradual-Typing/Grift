@@ -136,7 +136,7 @@
                  (: uid->string (-> Uid String))
                  (begin (display "((")
                         (display "long)")
-                        (printf "~a~a" (Uid-prefix lbl) (Uid-suffix lbl))
+                        (display (uid->string lbl))
                         (display ")")))
                (error 'gc-emit-expr-match))]))
 

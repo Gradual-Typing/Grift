@@ -7,127 +7,127 @@
 void* alloc_ptr;
 
 //These are the declarations
-long interp_cast_code31( long interp_cast_clos30 ,long val11 ,long type113 ,long type214 ,long label15 );
-long cast_fn2_code37( long cast_fn2_clos36 ,long f4 ,long t15 ,long t26 ,long lbl7 );
-long annon_code33( long annon_clos32 ,long v9 ,long v8 );
-long annon_code35( long annon_clos34 );
-long ack_code39( long ack_clos38 ,long m2 ,long n1 );
+long u31_interp_cast_code( long u30_interp_cast_clos ,long u11_val ,long u13_type1 ,long u14_type2 ,long u15_label );
+long u37_cast_fn2_code( long u36_cast_fn2_clos ,long u4_f ,long u5_t1 ,long u6_t2 ,long u7_lbl );
+long u33_annon_code( long u32_annon_clos ,long u9_v ,long u8_v );
+long u35_annon_code( long u34_annon_clos );
+long u39_ack_code( long u38_ack_clos ,long u2_m ,long u1_n );
 
 //Obviously this is the main function
 int main( ){
-long interp_cast10;
-long prog_returns23;
-long cast_fn23;
-long ack0;
-interp_cast10 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
-((long*)interp_cast10)[0] = ((long)interp_cast_code31);
-((long*)interp_cast10)[1] = 0;
-prog_returns23 = (cast_fn23 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr), (((long*)cast_fn23)[3] = interp_cast10, ((long*)cast_fn23)[2] = cast_fn23, ((long*)cast_fn23)[0] = ((long)cast_fn2_code37), ((long*)cast_fn23)[1] = 0, (ack0 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr), (((long*)ack0)[3] = ack0, ((long*)ack0)[2] = cast_fn23, ((long*)ack0)[0] = ((long)ack_code39), ((long*)ack0)[1] = cast_fn23, (((long (*)(long,long,long))((long*)ack0)[0])(ack0,2,3))))));
-printf("Int : %d\n", (void *)prog_returns23);
+long u10_interp_cast;
+long u23_prog_returns;
+long u3_cast_fn2;
+long u0_ack;
+u10_interp_cast = (long) (posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
+((long*)u10_interp_cast)[0] = ((long)u31_interp_cast_code);
+((long*)u10_interp_cast)[1] = 0;
+u23_prog_returns = (u3_cast_fn2 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr), (((long*)u3_cast_fn2)[3] = u10_interp_cast, ((long*)u3_cast_fn2)[2] = u3_cast_fn2, ((long*)u3_cast_fn2)[0] = ((long)u37_cast_fn2_code), ((long*)u3_cast_fn2)[1] = 0, (u0_ack = (long) (posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr), (((long*)u0_ack)[3] = u0_ack, ((long*)u0_ack)[2] = u3_cast_fn2, ((long*)u0_ack)[0] = ((long)u39_ack_code), ((long*)u0_ack)[1] = u3_cast_fn2, (((long (*)(long,long,long))((long*)u0_ack)[0])(u0_ack,2,3))))));
+printf("Int : %d\n", (void *)u23_prog_returns);
 return 0;
 }
 
 
 //Here are all the definitions for Subroutines
-long interp_cast_code31( long interp_cast_clos30 ,long val11 ,long type113 ,long type214 ,long label15 ){
-long tag16;
-long type117;
-long tag118;
-long dyn_box24;
-long tag219;
-long value20;
-long tmp_clos28;
-long tag121;
-long dyn_box25;
-long tag222;
-long tmp_clos29;
-if (type113 == 7){
-if (7 == type214){
-return val11;
+long u31_interp_cast_code( long u30_interp_cast_clos ,long u11_val ,long u13_type1 ,long u14_type2 ,long u15_label ){
+long u16_tag;
+long u17_type1;
+long u18_tag1;
+long u24_dyn_box;
+long u19_tag2;
+long u20_value;
+long u28_tmp_clos;
+long u21_tag1;
+long u25_dyn_box;
+long u22_tag2;
+long u29_tmp_clos;
+if (u13_type1 == 7){
+if (7 == u14_type2){
+return u11_val;
 } else {
-tag16 = (val11 & 7);
-if (1 == tag16){
-if (15 == type214){
-return (val11 >> 3);
+u16_tag = (u11_val & 7);
+if (1 == u16_tag){
+if (15 == u14_type2){
+return (u11_val >> 3);
 } else {
-if (7 == type214){
-return (((val11 >> 3) << 3) + 1);
+if (7 == u14_type2){
+return (((u11_val >> 3) << 3) + 1);
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-if (7 == tag16){
-if (23 == type214){
-return (val11 >> 3);
+if (7 == u16_tag){
+if (23 == u14_type2){
+return (u11_val >> 3);
 } else {
-if (7 == type214){
-return (((val11 >> 3) << 3) + 7);
+if (7 == u14_type2){
+return (((u11_val >> 3) << 3) + 7);
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-if (0 == tag16){
-type117 = ((long*)val11)[1];
-tag118 = (type117 & 7);
-if (0 == tag118){
-if (7 == type214){
-dyn_box24 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
-((long*)dyn_box24)[0] = ((long*)val11)[0];
-((long*)dyn_box24)[1] = type117;
-return dyn_box24;
+if (0 == u16_tag){
+u17_type1 = ((long*)u11_val)[1];
+u18_tag1 = (u17_type1 & 7);
+if (0 == u18_tag1){
+if (7 == u14_type2){
+u24_dyn_box = (long) (posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
+((long*)u24_dyn_box)[0] = ((long*)u11_val)[0];
+((long*)u24_dyn_box)[1] = u17_type1;
+return u24_dyn_box;
 } else {
-tag219 = (type214 & 7);
-if (tag219 == 0){
-value20 = ((long*)val11)[0];
-tmp_clos28 = ((long*)value20)[1];
-return (((long (*)(long,long,long,long,long))((long*)tmp_clos28)[0])(tmp_clos28,value20,type117,type214,label15));
+u19_tag2 = (u14_type2 & 7);
+if (u19_tag2 == 0){
+u20_value = ((long*)u11_val)[0];
+u28_tmp_clos = ((long*)u20_value)[1];
+return (((long (*)(long,long,long,long,long))((long*)u28_tmp_clos)[0])(u28_tmp_clos,u20_value,u17_type1,u14_type2,u15_label));
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-if (type117 == 15){
-if (15 == type214){
-return ((long*)val11)[0];
+if (u17_type1 == 15){
+if (15 == u14_type2){
+return ((long*)u11_val)[0];
 } else {
-if (7 == type214){
-return ((((long*)val11)[0] << 3) + 1);
+if (7 == u14_type2){
+return ((((long*)u11_val)[0] << 3) + 1);
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-if (type117 == 23){
-if (23 == type214){
-return ((long*)val11)[0];
+if (u17_type1 == 23){
+if (23 == u14_type2){
+return ((long*)u11_val)[0];
 } else {
-if (7 == type214){
-return ((((long*)val11)[0] << 3) + 7);
+if (7 == u14_type2){
+return ((((long*)u11_val)[0] << 3) + 7);
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 }
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
@@ -135,52 +135,52 @@ return 0;
 }
 }
 } else {
-tag121 = (type113 & 7);
-if (0 == tag121){
-if (7 == type214){
-dyn_box25 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
-((long*)dyn_box25)[0] = val11;
-((long*)dyn_box25)[1] = type113;
-return dyn_box25;
+u21_tag1 = (u13_type1 & 7);
+if (0 == u21_tag1){
+if (7 == u14_type2){
+u25_dyn_box = (long) (posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
+((long*)u25_dyn_box)[0] = u11_val;
+((long*)u25_dyn_box)[1] = u13_type1;
+return u25_dyn_box;
 } else {
-tag222 = (type214 & 7);
-if (tag222 == 0){
-tmp_clos29 = ((long*)val11)[1];
-return (((long (*)(long,long,long,long,long))((long*)tmp_clos29)[0])(tmp_clos29,val11,type113,type214,label15));
+u22_tag2 = (u14_type2 & 7);
+if (u22_tag2 == 0){
+u29_tmp_clos = ((long*)u11_val)[1];
+return (((long (*)(long,long,long,long,long))((long*)u29_tmp_clos)[0])(u29_tmp_clos,u11_val,u13_type1,u14_type2,u15_label));
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-if (type113 == 15){
-if (15 == type214){
-return val11;
+if (u13_type1 == 15){
+if (15 == u14_type2){
+return u11_val;
 } else {
-if (7 == type214){
-return ((val11 << 3) + 1);
+if (7 == u14_type2){
+return ((u11_val << 3) + 1);
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-if (type113 == 23){
-if (23 == type214){
-return val11;
+if (u13_type1 == 23){
+if (23 == u14_type2){
+return u11_val;
 } else {
-if (7 == type214){
-return ((val11 << 3) + 7);
+if (7 == u14_type2){
+return ((u11_val << 3) + 7);
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
 }
 } else {
-puts(((const char*) label15));
+puts(((const char*) u15_label));
 exit(-1);
 return 0;
 }
@@ -189,48 +189,48 @@ return 0;
 }
 }
 
-long cast_fn2_code37( long cast_fn2_clos36 ,long f4 ,long t15 ,long t26 ,long lbl7 ){
-long annon26;
-long annon27;
-if (((long*)t15)[0] == ((long*)t26)[0]){
-annon26 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 8), alloc_ptr);
-((long*)annon26)[7] = f4;
-((long*)annon26)[6] = t26;
-((long*)annon26)[5] = t15;
-((long*)annon26)[4] = lbl7;
-((long*)annon26)[3] = ((long*)cast_fn2_clos36)[3];
-((long*)annon26)[2] = ((long*)cast_fn2_clos36)[2];
-((long*)annon26)[0] = ((long)annon_code33);
-((long*)annon26)[1] = ((long*)cast_fn2_clos36)[2];
-return annon26;
+long u37_cast_fn2_code( long u36_cast_fn2_clos ,long u4_f ,long u5_t1 ,long u6_t2 ,long u7_lbl ){
+long u26_annon;
+long u27_annon;
+if (((long*)u5_t1)[0] == ((long*)u6_t2)[0]){
+u26_annon = (long) (posix_memalign(&alloc_ptr, 8, 8 * 8), alloc_ptr);
+((long*)u26_annon)[7] = u4_f;
+((long*)u26_annon)[6] = u6_t2;
+((long*)u26_annon)[5] = u5_t1;
+((long*)u26_annon)[4] = u7_lbl;
+((long*)u26_annon)[3] = ((long*)u36_cast_fn2_clos)[3];
+((long*)u26_annon)[2] = ((long*)u36_cast_fn2_clos)[2];
+((long*)u26_annon)[0] = ((long)u33_annon_code);
+((long*)u26_annon)[1] = ((long*)u36_cast_fn2_clos)[2];
+return u26_annon;
 } else {
-annon27 = (long) (posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr);
-((long*)annon27)[3] = lbl7;
-((long*)annon27)[2] = ((long*)cast_fn2_clos36)[2];
-((long*)annon27)[0] = ((long)annon_code35);
-((long*)annon27)[1] = ((long*)cast_fn2_clos36)[2];
-return annon27;
+u27_annon = (long) (posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr);
+((long*)u27_annon)[3] = u7_lbl;
+((long*)u27_annon)[2] = ((long*)u36_cast_fn2_clos)[2];
+((long*)u27_annon)[0] = ((long)u35_annon_code);
+((long*)u27_annon)[1] = ((long*)u36_cast_fn2_clos)[2];
+return u27_annon;
 }
 }
 
-long annon_code33( long annon_clos32 ,long v9 ,long v8 ){
-return (((long (*)(long,long,long,long,long))((long*)((long*)annon_clos32)[3])[0])(((long*)annon_clos32)[3],(((long (*)(long,long,long))((long*)((long*)annon_clos32)[7])[0])(((long*)annon_clos32)[7],(((long (*)(long,long,long,long,long))((long*)((long*)annon_clos32)[3])[0])(((long*)annon_clos32)[3],v9,((long*)((long*)annon_clos32)[6])[2],((long*)((long*)annon_clos32)[5])[2],((long*)annon_clos32)[4])),(((long (*)(long,long,long,long,long))((long*)((long*)annon_clos32)[3])[0])(((long*)annon_clos32)[3],v8,((long*)((long*)annon_clos32)[6])[3],((long*)((long*)annon_clos32)[5])[3],((long*)annon_clos32)[4])))),((long*)((long*)annon_clos32)[5])[1],((long*)((long*)annon_clos32)[6])[1],((long*)annon_clos32)[4]));
+long u33_annon_code( long u32_annon_clos ,long u9_v ,long u8_v ){
+return (((long (*)(long,long,long,long,long))((long*)((long*)u32_annon_clos)[3])[0])(((long*)u32_annon_clos)[3],(((long (*)(long,long,long))((long*)((long*)u32_annon_clos)[7])[0])(((long*)u32_annon_clos)[7],(((long (*)(long,long,long,long,long))((long*)((long*)u32_annon_clos)[3])[0])(((long*)u32_annon_clos)[3],u9_v,((long*)((long*)u32_annon_clos)[6])[2],((long*)((long*)u32_annon_clos)[5])[2],((long*)u32_annon_clos)[4])),(((long (*)(long,long,long,long,long))((long*)((long*)u32_annon_clos)[3])[0])(((long*)u32_annon_clos)[3],u8_v,((long*)((long*)u32_annon_clos)[6])[3],((long*)((long*)u32_annon_clos)[5])[3],((long*)u32_annon_clos)[4])))),((long*)((long*)u32_annon_clos)[5])[1],((long*)((long*)u32_annon_clos)[6])[1],((long*)u32_annon_clos)[4]));
 }
 
-long annon_code35( long annon_clos34 ){
-puts(((const char*) ((long*)annon_clos34)[3]));
+long u35_annon_code( long u34_annon_clos ){
+puts(((const char*) ((long*)u34_annon_clos)[3]));
 exit(-1);
 return 0;
 }
 
-long ack_code39( long ack_clos38 ,long m2 ,long n1 ){
-if (m2 == 0){
-return (n1 + 1);
+long u39_ack_code( long u38_ack_clos ,long u2_m ,long u1_n ){
+if (u2_m == 0){
+return (u1_n + 1);
 } else {
-if (n1 == 0){
-return (((long (*)(long,long,long))((long*)((long*)ack_clos38)[3])[0])(((long*)ack_clos38)[3],(m2 - 1),1));
+if (u1_n == 0){
+return (((long (*)(long,long,long))((long*)((long*)u38_ack_clos)[3])[0])(((long*)u38_ack_clos)[3],(u2_m - 1),1));
 } else {
-return (((long (*)(long,long,long))((long*)((long*)ack_clos38)[3])[0])(((long*)ack_clos38)[3],(m2 - 1),(((long (*)(long,long,long))((long*)((long*)ack_clos38)[3])[0])(((long*)ack_clos38)[3],m2,(n1 - 1)))));
+return (((long (*)(long,long,long))((long*)((long*)u38_ack_clos)[3])[0])(((long*)u38_ack_clos)[3],(u2_m - 1),(((long (*)(long,long,long))((long*)((long*)u38_ack_clos)[3])[0])(((long*)u38_ack_clos)[3],u2_m,(u1_n - 1)))));
 }
 }
 }

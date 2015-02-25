@@ -6,5 +6,5 @@
        (gunbox dynref)
        (begin (gbox-set! intref 8)
               (if (= (gunbox intref) 8)
-                  (gunbox intref)
-                  (gunbox boolref)))))))
+                  (: (gunbox intref)  Dyn)
+                  (: (gunbox boolref) Dyn)))))))

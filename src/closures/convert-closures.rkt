@@ -89,18 +89,17 @@
 		   [bndc (cons u1 clos)])
 	      (values (cons bndp bndp*) (cons bndc bndc*) next))))))))
 
-(: cc-bnd-data* (-> L2-Bnd-Data* Natural
-		    (values L3-Bnd-Data* Natural)))
+(: cc-bnd-data* (-> L2-Bnd-Data* Natural (values L3-Bnd-Data* Natural)))
 (define (cc-bnd-data* bnd* next)
-  (let ((Bnd* (inst cons L3-Bnd-Data L3-Bnd-Data*)))
+  (let (#;(Bnd* (inst cons L3-Bnd-Data L3-Bnd-Data*))) ;; causes a type error
     (if (null? bnd*)
       (values '() next)
       (let ([bnd (car bnd*)] [bnd* (cdr bnd*)])
 	(let*-values ([(bnd* next) (cc-bnd-data* bnd* next)])
 	  (match-let ([(cons uid exp) bnd])
 	    (let*-values ([(exp next) (cc-expr exp next)]
-			  [(bnd) (cons uid exp)])
-	      (values (Bnd* bnd bnd*) next))))))))
+			  [(bnd) (ann (cons uid exp) L3-Bnd-Data)])
+	      (values (cons bnd bnd*) next))))))))
 
 
 (define-syntax-rule (mk-uid/uid u s next)

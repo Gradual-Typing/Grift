@@ -8,20 +8,19 @@
 (define-type Test-Value (U blame bool int dyn gbox function))
 
 (struct not-lbl ([value : String])
-	#:transparent)
+  #:transparent)
 (struct blame ([static? : Boolean]
 	       [lbl : (U not-lbl String False)])
-	#:transparent)
+  #:transparent)
 (struct bool ([value : Boolean])
-	#:transparent)
+  #:transparent)
 (struct int ([value : Integer])
-	#:transparent)
+  #:transparent)
 (struct dyn ()
-	#:transparent)
+  #:transparent)
 (struct function ()
-	#:transparent)
-
-(struct gbox ([value : Test-Value])
+  #:transparent)
+(struct gbox ()
   #:transparent)
 
 
@@ -30,7 +29,7 @@
   (or (and (blame? x) (blame? y) (blame=? x y))
       (and (bool? x) (bool? y) (bool=? x y))
       (and (int? x) (int? y) (int=? x y))
-      (and (gbox? x) (gbox? y) (value=? x y))
+      (and (gbox? x) (gbox? y))
       (and (dyn? x) (dyn? y))
       (and (function? x) (function? y))))
 

@@ -8,17 +8,70 @@
 
 (provide cast-lang-interp)
 
-(define-type CL-Value (U Boolean Integer CL-Proc CL-Dyn))
+(define-type CL-Value (U Boolean Integer CL-Proc CL-Dyn CL-GRef))
 (define-type CL-Value* (Listof CL-Value))
 
 ;; This is a common idiom because typed-racket has a glitch concerning functions and
 ;; Unions
+
 (struct CL-Proc ([value : (-> CL-Value* CL-Value)]))
 
 (struct CL-Dyn ([label : String]
-                 [value : CL-Value]
-                 [type1 : Schml-Type]
-                 [type2 : Schml-Type]))
+                [value : CL-Value]
+                [type1 : Schml-Type]
+                [type2 : Schml-Type]))
+
+;; The Guarded ADT Until Specify Representation
+(define-type CL-GRef (U CL-GProxy CL-GBox))
+
+(struct CL-GProxy  ([value : CL-GRef]
+                    [t1 : Schml-Type]
+                    [t2 : Schml-Type]
+                    [label : Blame-Label]))
+
+(struct CL-GBox  ([value : CL-Value]) #:mutable)
+
+(: make-gbox (-> CL-Value CL-GBox))
+(define (make-gbox val)
+  (CL-GBox val))
+
+(: write-gbox (-> CL-GBox CL-Value CL-Value))
+(define (write-gbox b v)
+  (begin (set-CL-GBox-value! b v) v))
+
+(: unproxied-gref? (-> CL-GRef Boolean : CL-GBox))
+(define unproxied-gref? CL-GBox?)
+
+(: proxied-gref? (-> CL-GRef Boolean : CL-GProxy))
+(define proxied-gref? CL-GProxy?)
+
+(define-predicate gref? CL-GRef)
+
+(: cast-gref (-> CL-GRef Schml-Type Schml-Type Blame-Label CL-GRef))
+(define cast-gref CL-GProxy)
+
+(: read-gref (-> Cast-Type CL-GRef CL-Value))
+(define (read-gref cast r)
+  (cond
+    [(CL-GBox? r) (CL-GBox-value r)]
+    [(CL-GProxy? r)
+     (cast (read-gref cast (CL-GProxy-value r))
+           (CL-GProxy-t1 r)
+           (CL-GProxy-t2 r)
+           (CL-GProxy-label r))]
+    [else (TODO ERROR about vilation of the adt invarient)]))
+
+(: write-gref (-> Cast-Type CL-GRef CL-Value CL-Value))
+(define (write-gref cast r v)
+  (cond
+    [(CL-GBox? r) (write-gbox r v)]
+    [(CL-GProxy? r)
+      (write-gref cast 
+                  (CL-GProxy-value r)
+                  (cast v
+                        (CL-GProxy-t1 r)
+                        (CL-GProxy-t2 r)
+                        (CL-GProxy-label r)))]))
 
 (define-type (Env a) (HashTable Uid (Boxof (U 'undefined a))))
 
@@ -63,9 +116,10 @@
 (define-syntax-rule (empty-env)
   (hash))
 
-(define-type cast-type (-> String CL-Value Schml-Type Schml-Type CL-Value))
-(: mk-cast cast-type)
-(define (mk-cast l e t g)
+(define-type Cast-Type (-> CL-Value Schml-Type Schml-Type Blame-Label CL-Value))
+
+(: mk-cast Cast-Type)
+(define (mk-cast e t g l)
   (if (equal? t g) 
       e 
       (CL-Dyn l e t g)))
@@ -78,7 +132,7 @@
       (observe (lambda (): CL-Value (eval exp (empty-env)))))))
 
 (define-type eval-expr-type (-> C0-Expr (Env CL-Value) CL-Value))
-(: interp-expr (-> cast-type apply-type eval-expr-type))
+(: interp-expr (-> Cast-Type apply-type eval-expr-type))
 (define (interp-expr cast apply)
   (: recur eval-expr-type)
   (define (recur exp env)
@@ -110,9 +164,20 @@
       [(App e e*) (apply (recur/env e) (map recur/env e*))]
       [(Op p e*) (delta p (map recur/env e*))]
       [(Cast (app recur/env val) t-exp t-cast label)
-       (cast label val t-exp t-cast)]
+       (cast val t-exp t-cast label)]
       [(Var id) (env-lookup env id)]
       [(Quote k) k]
+      [(Begin e* e) (begin (for-each recur/env e*) (recur/env e))]
+      ;; Guarded references
+      [(Gbox e)    (make-gbox (recur/env e))]
+      [(Gunbox (app recur/env e))
+       (if (gref? e)
+           (read-gref cast e)
+           (TODO raise an error about type invarients being broken))]
+      [(Gbox-set! (app recur/env e1) e2) 
+       (if (gref? e1)
+           (write-gref cast e1 (recur/env e2))
+           (TODO raise an error here about the type system being broken))]
       [e (error 'interp "Umatched expression ~a" e)]))
   recur)
 
@@ -153,24 +218,29 @@
  
 
 ;; The lazy-d parts
-(: apply-cast-ld cast-type)
-(define (apply-cast-ld l1 v1 t1 t2)
+(: apply-cast-ld Cast-Type)
+(define (apply-cast-ld v1 t1 t2 l1)
   (if (shallow-consistent? t1 t2)
-      (if (Dyn? t1)
-	  (match v1
-	    [(CL-Dyn l2 v2 t3 t1)
-	     (apply-cast-ld l1 v2 t3 t2)]
-	    [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])
-	  (mk-cast l1 v1 t1 t2))
+      (cond
+       [(Dyn? t1)
+        (match v1 
+          [(CL-Dyn l2 v2 t3 t1) (apply-cast-ld v2 t3 t2 l1)]
+          [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])]
+       [(and (GRef? t1) (GRef? t2)) 
+        (if (gref? v1)
+            (cast-gref v1 (GRef-arg t1) (GRef-arg t2) l1)
+            (error 'cast-lang-interp "language invarient broken"))]
+       [else (mk-cast v1 t1 t2 l1)])
       (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
 
 (define-type apply-type (-> CL-Value CL-Value* CL-Value))
-(: apply-lazy (-> cast-type apply-type))
+
+(: apply-lazy (-> Cast-Type apply-type))
 (define (apply-lazy cast)
   (: cast/lbl (-> String (-> CL-Value Schml-Type Schml-Type CL-Value)))
   (define (cast/lbl l)
     (lambda ([v : CL-Value] [t1 : Schml-Type] [t2 : Schml-Type]) : CL-Value
-      (cast l v t1 t2)))
+      (cast v t1 t2 l)))
   (: recur apply-type)
   (define (recur rator rands)
     (match rator
@@ -179,7 +249,7 @@
                           (map (cast/lbl lbl) rands t3* t1*)
                           (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))))
               (result (recur val rands^)))
-         (cast lbl result t2 t4))]
+         (cast result t2 t4 lbl))]
       [otherwise (if (CL-Proc? rator)
                      ((CL-Proc-value rator) rands)
                      (error 'interp "Unexpected value in apply-lazy match ~a" rator))]))
@@ -194,6 +264,7 @@
      (cond 
       [(integer? v) (int v)]
       [(boolean? v) (bool v)]
+      [(gref? v)    (gbox)]
       [(CL-Proc? v) (function)]
       [else (if (Fn? (CL-Dyn-type2 v)) (function) (dyn))]))))
 

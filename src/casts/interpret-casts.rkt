@@ -5,10 +5,10 @@
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                             |
 +------------------------------------------------------------------------------+
 |Discription:
- -This pass creates a cast-interpreter that can cast arbitrary values at 
+ -This pass creates a cast-interpreter that can cast arbitrary values at
   runtime.
  -Coverts runtime casts to applications of the cast-interpreter.
- -Specializes casts with known types, at this point represented with the cast 
+ -Specializes casts with known types, at this point represented with the cast
   form, to the shortest branch of the cast tree that is relevant.
  -Replaces types that are structure with a psuedo constructor call
  -Replaces tags atomic types with the Type form.
@@ -33,7 +33,7 @@
                   [(prog-uid next) (next-uid "prog_returns" next)]
                   [(prog-bnd) (cons prog-uid exp)]
                   [(prog-var) (Var prog-uid)])
-      (Prog (list name next type) 
+      (Prog (list name next type)
        (Letrec interp-bnd
         (Let (list prog-bnd)
          (Observe prog-var type)))))))
@@ -48,18 +48,18 @@
 
 (: finalize-interp-code (C3-Expr Natural . -> . (values C3-Expr Natural)))
 (define (finalize-interp-code interp-cast next)
-  (let*-values ([(v next)  (next-uid "val" next)]     
-		[(v2 next) (next-uid "val" next)]     
-		[(t1 next) (next-uid "type1" next)]   
-		[(t2 next) (next-uid "type2" next)]   
-		[(l next)  (next-uid "label" next)]) 
+  (let*-values ([(v next)  (next-uid "val" next)]
+		[(v2 next) (next-uid "val" next)]
+		[(t1 next) (next-uid "type1" next)]
+		[(t2 next) (next-uid "type2" next)]
+		[(l next)  (next-uid "label" next)])
     (let ([v-var   (Var v)]
-	  [v2-var  (Var v2)]  
-	  [t1-var  (Var t1)]  
-	  [t2-var  (Var t2)]  
+	  [v2-var  (Var v2)]
+	  [t1-var  (Var t1)]
+	  [t2-var  (Var t2)]
 	  [l-var   (Var l)])
       (let-values ([(body next) (cast-Any-Type->Any-Type v-var t1-var t2-var l-var next)])
-	(values (Lambda (list v t1 t2 l) #f (Castable #f body)) next)))))
+	(values (Lambda (list v t1 t2 l) (Castable #f body)) next)))))
 
 (: ic-expr (-> Cast-Rule (-> C2-Expr Natural (values C3-Expr Natural))))
 (define (ic-expr interp-cast)
@@ -67,19 +67,19 @@
   (define (recur exp next)
     (: recur/next (-> C2-Expr (values C3-Expr Natural)))
     (define (recur/next exp) (recur exp next))
-    (match exp 
-      [(Lambda f* t (Castable ctr (app recur/next exp next))) 
-       (values (Lambda f* #f (Castable ctr exp)) next)]
-      [(Letrec b* (app recur/next exp next)) 
+    (match exp
+      [(Lambda f* (Castable ctr (app recur/next exp next)))
+       (values (Lambda f* (Castable ctr exp)) next)]
+      [(Letrec b* (app recur/next exp next))
        (let-values ([(b* next) (cata-bnd* b* next)])
 	 (values (Letrec b* exp) next))]
       [(Let b* (app recur/next exp next))
        (let-values ([(b* next) (cata-bnd* b* next)])
 	 (values (Let b* exp) next))]
-      [(App (app recur/next exp next) exp*) 
+      [(App (app recur/next exp next) exp*)
        (let-values ([(exp* next) (recur* exp* next)])
 	 (values (App exp exp*) next))]
-      [(Op p exp*) 
+      [(Op p exp*)
        (let-values ([(exp* next) (recur* exp* next)])
 	 (values (Op p exp*) next))]
       [(Runtime-Cast (app recur/next v next) t1 t2 l)
@@ -99,10 +99,33 @@
 		     [(alt next) (recur alt next)])
 	 (values (If tst csq alt) next))]
       [(Var i) (values (Var i) next)]
-      [(Quote k) (values (Quote k) next)]))
-  
+      [(Quote k) (values (Quote k) next)]
+            [(Begin exp* exp)
+       (let*-values ([(exp* next) (recur* exp* next)]
+                     [(exp  next) (recur  exp  next)])
+         (values (Begin exp* exp) next))]
+      [(UGbox (app recur/next exp next)) (values (UGbox exp) next)]
+      [(UGbox-ref (app recur/next exp next)) (values (UGbox-ref exp) next)]
+      [(UGbox-set! exp1 exp2)
+       (let*-values ([(exp1 next) (recur exp1 next)]
+                     [(exp2 next) (recur exp2 next)])
+         (values (UGbox-set! exp1 exp2) next))]
+      [(GRep-proxied? (app recur/next exp next))
+       (values (GRep-proxied? exp) next)]
+      [(Gproxy for from to blames)
+       (let*-values ([(for next)  (recur for next)]
+                     [(from next) (recur from next)]
+                     [(to next)   (recur to next)]
+                     [(blames next) (recur blames next)])
+         (values (Gproxy for from to blames) next))]
+      [(Gproxy-for (app recur/next exp next)) (values (Gproxy-for exp) next)]
+      [(Gproxy-from (app recur/next exp next)) (values (Gproxy-from exp) next)]
+      [(Gproxy-to (app recur/next exp next)) (values (Gproxy-to exp) next)]
+      [(Gproxy-blames (app recur/next exp next)) 
+       (values (Gproxy-blames exp) next)]))
+
   (: recur* (-> (Listof C2-Expr) Natural (values (Listof C3-Expr) Natural)))
-  (define (recur* e* n) 
+  (define (recur* e* n)
     (if (null? e*)
 	(values '() n)
 	(let*-values ([(e) (car e*)]
@@ -110,7 +133,7 @@
 		      [(e n) (recur e n)])
 	  (values (cons e e*) n))))
   (: cata-bnd* (-> C2-Bnd* Natural (values C3-Bnd* Natural)))
-  (define (cata-bnd* b* n) 
+  (define (cata-bnd* b* n)
     (if (null? b*)
 	(values '() n)
 	(match-let ([(cons i r) (car b*)])
@@ -152,10 +175,10 @@
         (cond
          [(or (Dyn? v)
               (Int? v)
-              (Bool? v)) 
+              (Bool? v))
           (Tag 'Atomic)]
          [(Fn? v) (Tag 'Fn)]
-         [else (error 'type-tag)])) 
+         [else (error 'type-tag)]))
       (Type-tag o)))
 
 ;; performs compile time folding of prim = on literals
@@ -168,7 +191,7 @@
    [(and (Type? o) (Type? x)) (Quote (equal? (Type-type o) (Type-type x)))]
    [else (Op '= (list o x))]))
 
-;; construct new type literals based on the fn-ref operation 
+;; construct new type literals based on the fn-ref operation
 (: fn-ref (-> C3-Expr (U Index 'return 'arity) C3-Expr))
 (define (fn-ref t i)
   (if (Type? t)
@@ -210,7 +233,7 @@
     [(_ n ([t v] [t* v*] ...) b)
      (let ((tmp : C3-Expr v))
        (if (or (Quote? tmp) (Tag? tmp) (Type? tmp) (Var? tmp))
-           ;;if the expression is a terminal then just update the binding 
+           ;;if the expression is a terminal then just update the binding
            (let ((t : C3-Expr tmp)) (let$* n ([t* v*] ...) b))
            ;;if the expression is non terminal bind a var and bind the
            ;;expression to the var
@@ -221,7 +244,7 @@
 
 (: cast-Any-Type->Any-Type Cast-Rule)
 (define (cast-Any-Type->Any-Type v t1 t2 lbl next)
-  (let$* next ([val v] 
+  (let$* next ([val v]
                [type1 t1])
      (if$ next (op=? type1 (Type DYN-TYPE))
           (cast-Dyn->Any-Type val type1 t2 lbl next)
@@ -230,7 +253,7 @@
 
 (: cast-Ground-Type->Any-Type Cast-Rule)
 (define (cast-Ground-Type->Any-Type v t1 t2 lbl next)
-  (let$* next ([type1 t1] 
+  (let$* next ([type1 t1]
                [tag1 (type-tag type1)])
      (cond$ next
       [(op=? (Tag 'Fn) tag1) (cast-Fn->Any-Type v type1 t2 lbl next)]
@@ -242,7 +265,7 @@
 (define (cast-Dyn->Any-Type v t1 t2 lbl next)
   (let$* next ([val v]
                [type2 t2])
-   
+
     (if$ next (op=? (Type DYN-TYPE) type2)
          (values v next)
          (let$* next ([val v]
@@ -253,8 +276,8 @@
              [(op=? (Tag 'Bool) tag)
               (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type BOOL-TYPE) type2 lbl next)]
              [(op=? (Tag 'Boxed) tag)
-              (cast-Ground-Type->Any-Type (Dyn-ref val 'value) 
-                                          (Dyn-ref val 'type) 
+              (cast-Ground-Type->Any-Type (Dyn-ref val 'value)
+                                          (Dyn-ref val 'type)
                                           type2 lbl next)]
              [else (values (Blame lbl) next)])))))
 
@@ -286,7 +309,7 @@
 (define (cast-Fn->Fn v t1 t2 lbl next)
   (let$* next ([type2 t2]
                [tag2 (type-tag type2)])
-         (if$ next (op=? tag2 (Tag 'Fn)) 
+         (if$ next (op=? tag2 (Tag 'Fn))
               (let$* next ([value v])
                 (values (App (Fn-Caster value) (list value t1 type2 lbl)) next))
               (values (Blame lbl) next))))
