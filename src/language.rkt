@@ -778,8 +778,10 @@ We are going to UIL
 (define UNDEF-IMDT-VALUE (Quote UNDEF-IMDT))
 
 ;; Guarded Representation
+(define GREP-TAG-MASK #b111)
 (define UGBOX-SIZE 1)
 (define UGBOX-VALUE-INDEX 0)
+(define GPROXY-TAG  #b001)
 (define GPROXY-SIZE 4)
 (define GPROXY-FOR-INDEX 0)
 (define GPROXY-FROM-INDEX 1)

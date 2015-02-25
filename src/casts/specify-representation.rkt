@@ -17,6 +17,18 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
 ;; Only the pass is provided by this module
 (provide specify-representation)
 
+(TODO Rewrite any allocating procedures in this pass.
+      Remebering the lessons of the runtime class.
+      No complex expressions should be able to be evaluated while
+      Allocating and setting a chunk of memory.
+      Otherwise you will end up with partially initiallized chucks
+      of memory in the heap while you are executing other code.
+      Write some test cases to test this.
+      Is it possible to enforce this by require all constructors to only
+      have variables as sub expressions.
+      Perhaps one pass before this.
+      member to force the evaluation of sub-arguments)
+
 ;; Only allocate each of these once
 (define FN-ARITY-INDEX-VALUE (Quote FN-ARITY-INDEX))
 (define FN-RETURN-INDEX-VALUE (Quote FN-RETURN-INDEX))
@@ -146,7 +158,10 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
          (e : L0-Expr (sr-value e))
          (lambda ([n : Natural]) : (Values L0-Expr Natural)
             ;; This is a break in the monad abstraction that needs fixed
-           (sr-observe e t n)))]
+            ;; But I want to remove the Observe abstraction and implement
+            ;; Entirely here and now -- Let's get really observations are
+            ;; not expressions
+            (sr-observe e t n)))]
     [(Type t) (lambda ([n : Natural]) (sr-type t n))]
     [(Tag t)  (return-state (sr-tag t))]
     [(Begin eff* exp)
@@ -157,7 +172,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
     [(UGbox e)
      (do (bind-state : (State Natural L0-Expr))
          (e : L0-Expr <- (sr-value e))
-         (allocate-and-set-ugbox e))]
+         (alloc-set-ugbox e))]
     [(UGbox-ref e)
      (do (bind-state : (State Natural L0-Expr))
          (e : L0-Expr <- (sr-value e))
@@ -168,18 +183,61 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
          (e2 : L0-Expr <- (sr-value e2))
          (return-state (Op 'Array-set! (list e1 UGBOX-VALUE-INDEX e2))))]
     [(GRep-proxied? (app recur/next exp next))
-     (values (GRep-proxied? exp) next)]
+     (do (bind-state : (State Natural L0-Expr))
+         (e : L0-Expr <- (sr-value e))
+         (return-state (Op 'binary-and (list e GREP-TAG-MASK-VALUE))))]
     [(Gproxy for from to blames)
-     (let*-values ([(for next)  (recur for next)]
-                   [(from next) (recur from next)]
-                   [(to next)   (recur to next)]
-                   [(blames next) (recur blames next)])
-       (values (Gproxy for from to blames) next))]
-    [(Gproxy-for (app recur/next exp next)) (values (Gproxy-for exp) next)]
-    [(Gproxy-from (app recur/next exp next)) (values (Gproxy-from exp) next)]
-    [(Gproxy-to (app recur/next exp next)) (values (Gproxy-to exp) next)]
-    [(Gproxy-blames (app recur/next exp next))
-     (values (Gproxy-blames exp) next)]))
+     (do (bind-state : (State Natural L0-Expr))
+         (for     : L0-Expr <- (sr-value for))
+         (from    : L0-Expr <- (sr-value from))
+         (to      : L0-Expr <- (sr-value to))
+         (blames  : L0-Expr <- (sr-value blames))
+         (alloc-tag-set-gproxy for from to blames))]
+    [(Gproxy-for e)
+     (lift-state (untag-deref-gproxy GPROXY-FOR-INDEX-VALUE) (sr-expr e))]
+    [(Gproxy-from e)
+     (lift-state (untag-deref-gproxy GPROXY-FROM-INDEX-VALUE) (sr-expr e))]
+    [(Gproxy-to e)
+     (lift-state (untag-deref-gproxy GPROXY-TO-INDEX-VALUE) (sr-expr e))]
+    [(Gproxy-blames e)
+     (lift-state (untag-deref-gproxy GPROXY-BLAMES-INDEX-VALUE) (sr-expr e))]))
+
+(: untag-deref-gproxy (-> L0-Expr (-> L0-Expr L0-Expr)))
+(define (untag-deref-gproxy index-e)
+  (lambda ((proxy-e : L0-Expr)) : L0-Expr
+   (Op 'Array-ref (list (Op 'binary-xor (list proxy-e GREP-PTR-MASK-VALUE))
+                        index-e))))
+
+(: alloc-tag-set-gproxy
+   (L0-Expr L0-Expr L0-Expr L0-Expr . -> . (State Natural L0-Expr)))
+(define (alloc-tag-set-gproxy for from to blames)
+  (do (bind-state : (State Natural L0-Expr))
+      (tmp : Uid (uid-state "gproxy"))
+      (let* ([tmp-var (Var tmp)]
+             [alloc   (Op 'alloc (list GPROXY-SIZE-VALUE))]
+             [set-for (Op 'Array-set!
+                          (list tmp-var GPROXY-FOR-INDEX-VALUE for))]
+             [set-from (Op 'Array-set!
+                           (list tmp-var GPROXY-FROM-INDEX-VALUE from))]
+             [set-to (Op 'Array-set! 
+                         (list tmp-var GPROXY-TO-INDEX-VALUE to))]
+             [set-blames (Op 'Array-set!
+                             (list tmp-var GPROXY-BLAMES-INDEX-VALUE blames))])
+        (return-state
+         (Let (list (cons tmp alloc))
+              (Begin (list set-for set-from set-to set-blames)
+                     (Op 'binary-xor (list tmp-var GPROXY-TAG-VALUE))))))))
+
+(define (alloc-set-ugbox e)
+  (do (bind-state : (State Natural L0-Expr))
+      (tmp : Uid (uid-state "gproxy"))
+      (let* ([tmp-var (Var tmp)]
+             [alloc   (Op 'alloc (list UGBOX-SIZE-VALUE))]
+             [set     (Op 'Array-set! (list tmp-var UGBOX-VALUE-INDEX-VALUE e))])
+        (return-state
+         (Let (list (cons tmp alloc))
+              (Begin (list set)
+                     (Op 'binary-xor (list tmp-var UGBOX-TAG-VALUE)))))))))
 
 (: sr-expr* (-> (Listof C4-Expr) Natural (values (Listof L0-Expr) Natural)))
 (define (sr-expr* e* n)
@@ -259,7 +317,7 @@ is made an immediate. Kinda breaking the abstraction that I was hoping to create
                 [alloc    (Op 'Alloc (list DYN-BOX-SIZE-VALUE))])
            (return-state
             (Let (list (cons tmp alloc))
-                 (Begin (list set-val set-type) tmp-var)))))
+                 (Begin (list set-val set-type) tmp-var)))))]))
 
 (: sr-observe (-> L0-Expr Schml-Type Natural (values L0-Expr Natural)))
 (define (sr-observe e t next)
