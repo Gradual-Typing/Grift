@@ -60,7 +60,7 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))
          (if (and (GRef? t1) (GRef? t2))
-             (return-state (Gproxy e (Quote t1) (Quote t2) (Quote l)))
+             (return-state (Gproxy e (Type t1) (Type t2) (Quote l)))
              (return-state (Cast e t1 t2 l))))]
     [(Letrec b* e)
      (do (bind-state : (State Natural C2-Expr))

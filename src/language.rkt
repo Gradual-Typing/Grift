@@ -1,6 +1,5 @@
 #lang typed/racket
 
-
 (require schml/src/helpers)
 (provide (all-defined-out))
 
@@ -73,20 +72,27 @@ be usefull for optimizations or keeping state.
   (Fn-Cast expressiong type-exp type-cast label)
   ;;Type Operations
   (Type-Fn-ref expression index)
+  (Type-Fn-arity expression)
+  (Type-Fn-arg expression index)
+  (Type-Fn-return expression)
   (Type-tag expression)
-  ;; closure operations
+  ;; closure Representation
   (Fn-Caster expression)
+;;(Closure-ref the var)
+  (LetP bindings body)
+  (LetC bindings body);; Can create cyclic immutable data
+  (Procedure this params caster bound-vars body)
+  ;; represents a set of moves to initialize variables before
+  (Code variables body)
   ;; Dyn operations
   (Dyn-tag expression)
   (Dyn-immediate expression)
-  (Dyn-ref expression index)
+  (Dyn-type expression)
+  (Dyn-value expression)
   (Dyn-make expression type)
   ;; Observational Operations
   (Blame expression)
   (Observe expression type)
-  ;; Non recursive binding forms
-  (LetP bindings body)
-  (LetC bindings body)
   ;; Lambda subforms
   (Castable caster body)
   (Bound closure variables body)
@@ -94,9 +100,6 @@ be usefull for optimizations or keeping state.
   ;; Static Global Binding
   (Labels bindings body)
   ;; TODO figue out an appropriate comment about all forms here
-  (Procedure this params caster bound-vars body)
-  ;; represents a set of moves to initialize variables before
-  (Code variables body)
   (Closure-Data code caster variables)
   (Halt)
   (Assign lhs rhs)
@@ -213,8 +216,9 @@ be usefull for optimizations or keeping state.
       (= (Uid-suffix u) (Uid-suffix v))))
 
 ;; If you are in the state monad you can purely allocate and increment
+(define-type Nat Natural)
 (define (uid-state (name : String))
-  : (State Natural Uid)
+  : (State Nat Uid)
   (lambda ((s : Natural))
     (values (Uid name s) (add1 s))))
 
@@ -264,7 +268,10 @@ be usefull for optimizations or keeping state.
 
 (define-predicate Schml-Prim? Schml-Prim)
 
-(define-type IntxInt->Int-Primitives (U '* '+ '- 'binary-and 'binary-or '%/ '%>> '%<<))
+(define-type IntxInt->Int-Primitives (U '* '+ '-
+                                        'binary-and 'binary-or 'binary-xor
+                                        '%/ '%>> '%<<))
+
 (define-type IxI->I-Prim IntxInt->Int-Primitives)
 (define-predicate IntxInt->Int-Prim? IntxInt->Int-Primitives)
 
@@ -476,7 +483,7 @@ We are going to UIL
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Schml-Type))
 
-(define-type Cast-Literal (U Schml-Literal Blame-Label Schml-Type))
+(define-type Cast-Literal (U Schml-Literal Blame-Label))
 
 #|-----------------------------------------------------------------------------+
 | The Cast Language Family Types, Primitives, Literals, and Terminals        |
@@ -582,7 +589,7 @@ We are going to UIL
 (define-type C1-Bnd*  (Listof C1-Bnd))
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast2 created by introduce-castable-functions                       |
+| Language/Cast2 created by introduce-castable-references                      |
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast2-Lang
@@ -599,6 +606,7 @@ We are going to UIL
           ;; Terminals
           (Begin C2-Expr* E)
 	  (Var Uid)
+          (Type Schml-Type)
 	  (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
 	  (Runtime-Cast E E E E)
@@ -666,7 +674,8 @@ We are going to UIL
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
-          (Dyn-ref E (U 'value 'type))
+          (Dyn-type E)
+          (Dyn-value E)
           (Dyn-make E E) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame E)
@@ -684,11 +693,147 @@ We are going to UIL
 
 (define-type Tag-Symbol (U 'Int 'Bool 'Fn 'Atomic 'Boxed))
 
+#|-----------------------------------------------------------------------------+
+| Language/Cast4 created by label-lambdas                    |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast4-Lang
+  (Prog (List String Natural Schml-Type) C4-Expr))
+
+(define-type C4-Expr
+  (Rec E (U ;; Non-Terminals
+          (Letrec C4-Bnd-Lambda* E)
+	  (Let C4-Bnd-Data* E)
+	  (App E (Listof E))
+	  (UIL-Op E)
+	  (If E E E)
+          (Begin C4-Expr* E)
+          ;; closure operations
+          (Fn-Caster E)
+          ;; FN-Type operations
+	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-tag E)
+          ;; Dyn operations
+          (Dyn-tag E)
+          (Dyn-immediate E)
+          (Dyn-type E)
+          (Dyn-value E)
+          (Dyn-make E E) ;; This is bad and I do not like it
+          ;; Observational Operations
+          (Blame E)
+          (Observe E Schml-Type)
+          ;; Terminals
+          (Type Schml-Type)
+          (Tag Tag-Symbol)
+	  (Var Uid)
+          (GRep E)
+	  (Quote Cast-Literal))))
+
+(define-type C4-Expr* (Listof C4-Expr))
+(define-type C4-Bnd-Lambda* (Listof C4-Bnd-Lambda))
+(define-type C4-Bnd-Lambda  (Pairof Uid C4-Lambda))
+(define-type C4-Bnd-Data* (Listof C4-Bnd-Data))
+(define-type C4-Bnd-Data  (Pairof Uid C4-Expr))
+(define-type C4-Lambda (Lambda Uid* (Castable (Option Uid) C4-Expr)))
+
+
+#|-----------------------------------------------------------------------------+
+| Language/Cast5 created by label-lambdas                    |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast5-Lang
+  (Prog (List String Natural Schml-Type) C5-Expr))
+
+(define-type C5-Expr
+  (Rec E (U ;; Non-Terminals
+          (Letrec C5-Bnd-Lambda* E)
+	  (Let C5-Bnd-Data* E)
+	  (App E (Listof E))
+	  (UIL-Op E)
+	  (If E E E)
+          (Begin C5-Expr* E)
+          ;; closure operations
+          (Fn-Caster E)
+          ;; FN-Type operations
+	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-tag E)
+          ;; Dyn operations
+          (Dyn-tag E)
+          (Dyn-immediate E)
+          (Dyn-type E)
+          (Dyn-value E)
+          (Dyn-make E E) ;; This is bad and I do not like it
+          ;; Observational Operations
+          (Blame E)
+          (Observe E Schml-Type)
+          ;; Terminals
+          (Type Schml-Type)
+          (Tag Tag-Symbol)
+	  (Var Uid)
+          (GRep E)
+	  (Quote Cast-Literal))))
+
+(define-type C5-Expr* (Listof C5-Expr))
+(define-type C5-Bnd-Lambda* (Listof C5-Bnd-Lambda))
+(define-type C5-Bnd-Lambda  (Pairof Uid C5-Lambda))
+(define-type C5-Bnd-Data* (Listof C5-Bnd-Data))
+(define-type C5-Bnd-Data  (Pairof Uid C5-Expr))
+(define-type C5-Lambda (Lambda Uid* (Free (Option Uid) Uid* C5-Expr)))
+
+
+#|-----------------------------------------------------------------------------+
+| Language/Cast6 created by label-lambdas                    |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast6-Lang
+  (Prog (List String Natural Schml-Type) C6-Expr))
+
+(define-type C6-Expr
+  (Rec E (U ;; Non-Terminals
+          (LetP C6-Bnd-Procedure* (LetC C6-Bnd-Closure* E))
+	  (Let C6-Bnd-Data* E)
+	  (App (Pair E E) (Listof E))
+	  (UIL-Op E)
+	  (If E E E)
+          (Begin C6-Expr* E)
+          ;; closure operations
+          ;;(Closure-ref E E)
+          (Fn-Caster E)
+          ;; FN-Type operations
+	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-tag E)
+          ;; Dyn operations
+          (Dyn-tag E)
+          (Dyn-immediate E)
+          (Dyn-type E)
+          (Dyn-value E)
+          (Dyn-make E E) ;; This is bad and I do not like it
+          ;; Observational Operations
+          (Blame E)
+          (Observe E Schml-Type)
+          ;; Terminals
+          (Type Schml-Type)
+          (Tag Tag-Symbol)
+	  (Var Uid)
+          (GRep E)
+	  (Quote Cast-Literal))))
+
+(define-type C6-Expr* (Listof C6-Expr))
+(define-type C6-Procedure
+  (Procedure Uid Uid* (Option Uid) Uid* C6-Expr))
+(define-type C6-Closure (Closure-Data Uid (Option Uid) (Listof Uid)))
+(define-type C6-Bnd-Procedure (Pairof Uid C6-Procedure))
+(define-type C6-Bnd-Procedure* (Listof C6-Bnd-Procedure))
+(define-type C6-Bnd-Closure (Pairof Uid C6-Closure))
+(define-type C6-Bnd-Closure* (Listof C6-Bnd-Closure))
+(define-type C6-Bnd-Data (Pairof Uid C6-Expr))
+(define-type C6-Bnd-Data* (Listof C6-Bnd-Data))
+
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast4 created by normalize-context                                  |
 +-----------------------------------------------------------------------------|#
-
+#|
 
 (define-type Cast4-Lang
   (Prog (List String Natural Schml-Type) C4-Value))
@@ -705,22 +850,21 @@ We are going to UIL
           ;; closure operations
           (Fn-Caster V)
           ;; FN-Type operations
+          (Type Schml-Type)
+          (Type-tag V)
           (Type-Fn-arity V)
 	  (Type-Fn-return V)
           (Type-Fn-arg V V)
-          (Type-tag V)
           ;; Dyn operations
-          (IDyn V V)
-          (IDyn-tag V)
-          (IDyn-immediate V)
-          (BDyn V V)
-          (BDyn-value V)
-          (BDyn-type V)
+          (Dyn-make V V)
+          (Dyn-tag V)
+          (Dyn-immediate V)
+          (Dyn-value V)
+          (Dyn-type V)
           ;; Observational Operations
           (Blame V)
           (Observe V Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep-Value V)
@@ -741,6 +885,8 @@ We are going to UIL
 (define-type C4-Bnd   (Pair Uid C4-Value))
 (define-type C4-Bnd*  (Listof C4-Bnd))
 
+
+|#
 
 #|-----------------------------------------------------------------------------+
 | The Constants for the representation of casts                                |
@@ -775,7 +921,6 @@ We are going to UIL
 (define TRUE-IMDT #b001)
 ;; Unreachable Value
 (define UNDEF-IMDT 0)
-(define UNDEF-IMDT-VALUE (Quote UNDEF-IMDT))
 
 ;; Guarded Representation
 (define GREP-TAG-MASK #b111)
@@ -788,7 +933,10 @@ We are going to UIL
 (define GPROXY-TO-INDEX 2)
 (define GPROXY-BLAMES-INDEX 3)
 
-
+;; Closure representation
+(define CLOS-CODE-INDEX 0)
+(define CLOS-CSTR-INDEX 1)
+(define CLOS-FVAR-OFFSET 2)
 
 
 
@@ -814,12 +962,25 @@ We are going to UIL
 	    (App E (Listof E))
 	    (UIL-Op E)
 	    (If E E E)
-	    (Begin L0-Stmt* E)
+	    (Begin L0-Effect* E)
 	    (Fn-Caster E)
 	    ;; Terminals
 	    (Var Uid)
 	    (Quote Lambda-Literal))))
 
+(define-type L0-Effect
+  (Rec E
+   (U (Letrec L0-Bnd* E)
+      (Let L0-Bnd* E)
+      (Begin L0-Effect* No-Op)
+      (App L0-Expr L0-Expr*)
+      (If L0-Expr E E)
+      No-Op
+      (UIL-Op! L0-Expr))))
+
+
+(define-type L0-Expr* (Listof L0-Expr))
+(define-type L0-Effect* (Listof L0-Effect))
 (define-type L0-Stmt (UIL-Op! L0-Expr))
 (define-type L0-Stmt* (Listof L0-Stmt))
 (define-type L0-Bnd (Pair Uid L0-Expr))
@@ -834,7 +995,7 @@ We are going to UIL
 
 (define-type L1-Expr
   (Rec E (U  ;; Non terminals
-	  (Letrec L1-Bnd-Lambda* E)
+          (Letrec L1-Bnd-Lambda* E)
 	  (Let L1-Bnd-Data* E)
 	  (App E (Listof E))
 	  (UIL-Op E)
@@ -892,6 +1053,7 @@ We are going to UIL
 ;; Intermediate language were all lambda have no free variables
 ;; they are explicitly passed as a structure and implicitly extracted by procedures
 
+#|
 (define-type Lambda3-Lang
   (Prog (List String Natural Schml-Type) L3-Expr))
 
@@ -920,7 +1082,7 @@ We are going to UIL
 (define-type L3-Bnd-Data* (Listof L3-Bnd-Data))
 (define-type L3-Stmt (UIL-Op! L3-Expr))
 (define-type L3-Stmt* (Listof L3-Stmt))
-
+|#
 #|-----------------------------------------------------------------------------+
 | Language/Lambda4 created by specify-representation                           |
 +-----------------------------------------------------------------------------|#
@@ -958,9 +1120,7 @@ We are going to UIL
 ;; The representation of closures is that they are arrays containing their
 ;; free variables.
 
-(define CLOS-CODE-INDEX 0)
-(define CLOS-CSTR-INDEX 1)
-(define CLOS-FVAR-OFFSET 2)
+
 
 
 #|-----------------------------------------------------------------------------+

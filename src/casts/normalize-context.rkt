@@ -43,18 +43,15 @@ Description:
     [(Fn-Caster e) (lift-state (inst Fn-Caster C4-Value) (nc-value e))]
     [(Var i) (return-state (Var i))]
     [(Quote k) (return-state (Quote k))]
-    [(Type-Fn-ref e k)
-     (do (bind-state : (State Natural C4-Value))
-         (e : C4-Value <- (nc-value e))
-         (return-state (Type-Fn-ref e k)))]
+    [(Type-Fn-arity e) (lift-state (inst Type-Fn-arity C4-Value) (nc-value e))]
+    [(Type-Fn-arg e1 e2) (lift-state (inst Type-Fn-arg C4-Value C4-Value)
+                                     (nc-value e1) (nc-value e2))]
+    [(Type-Fn-return e) (lift-state (inst Type-Fn-return C4-Value) (nc-value e))]
     [(Type-tag e) (lift-state (inst Type-tag C4-Value) (nc-value e))]
     [(Dyn-tag e)  (lift-state (inst Dyn-tag C4-Value) (nc-value e))]
-    [(Dyn-immediate e)
-     (lift-state (inst Dyn-immediate C4-Value) (nc-value e))]
-    [(Dyn-ref e k)
-     (do (bind-state : (State Natural C4-Value))
-         (e : C4-Value <- (nc-value e))
-         (return-state (Dyn-ref e k)))]
+    [(Dyn-immediate e) (lift-state (inst Dyn-immediate C4-Value) (nc-value e))]
+    [(Dyn-type e) (lift-state (inst Dyn-type C4-Value) (nc-value e))]
+    [(Dyn-value e) (lift-state (inst Dyn-value C4-Value) (nc-value e))]
     [(Dyn-make e1 e2)
      (lift-state (inst Dyn-make C4-Value C4-Value) (nc-value e1) (nc-value e2))]
     [(Blame e) (lift-state (inst Blame C4-Value) (nc-value e))]
@@ -173,7 +170,8 @@ Description:
     [(Type-tag e) (nc-effect e)]
     [(Dyn-tag e) (nc-effect e)]
     [(Dyn-immediate e) (nc-effect e)]
-    [(Dyn-ref e _) (nc-effect e)]
+    [(Dyn-value e) (nc-effect e)]
+    [(Dyn-type e) (nc-effect e)]
     [(UGbox e) (nc-effect e)]
     [(UGbox-ref e) (nc-effect e)]
     [(GRep-proxied? e) (nc-effect e)]

@@ -99,6 +99,7 @@
 		     [(alt next) (recur alt next)])
 	 (values (If tst csq alt) next))]
       [(Var i) (values (Var i) next)]
+      [(Type t) (values (Type t) next)]
       [(Quote k) (values (Quote k) next)]
             [(Begin exp* exp)
        (let*-values ([(exp* next) (recur* exp* next)]
@@ -121,7 +122,7 @@
       [(Gproxy-for (app recur/next exp next)) (values (Gproxy-for exp) next)]
       [(Gproxy-from (app recur/next exp next)) (values (Gproxy-from exp) next)]
       [(Gproxy-to (app recur/next exp next)) (values (Gproxy-to exp) next)]
-      [(Gproxy-blames (app recur/next exp next)) 
+      [(Gproxy-blames (app recur/next exp next))
        (values (Gproxy-blames exp) next)]))
 
   (: recur* (-> (Listof C2-Expr) Natural (values (Listof C3-Expr) Natural)))
@@ -276,9 +277,7 @@
              [(op=? (Tag 'Bool) tag)
               (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type BOOL-TYPE) type2 lbl next)]
              [(op=? (Tag 'Boxed) tag)
-              (cast-Ground-Type->Any-Type (Dyn-ref val 'value)
-                                          (Dyn-ref val 'type)
-                                          type2 lbl next)]
+              (cast-Ground-Type->Any-Type (Dyn-value val) (Dyn-type val) type2 lbl next)]
              [else (values (Blame lbl) next)])))))
 
 

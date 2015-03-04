@@ -124,11 +124,15 @@ This allows me to make very desciptive grammars via types later on.
       syntax-undefined-if-used))
 
 (define-syntax do
-  (syntax-rules (<- : let let* match-let)
+  (syntax-rules (<- : let let* let-values let*-values match-let)
     [(_ bind (let (b ...) e e* ...))
      (let (b ...) (do bind e e* ...))]
     [(_ bind (let* (b ...) e e* ...))
      (let* (b ...) (do bind e e* ...))]
+    [(_ bind (let-values (b ...) e e* ...))
+     (let-values (b ...) (do bind e e* ...))]
+    [(_ bind (let*-values (b ...) e e* ...))
+     (let*-values (b ...) (do bind e e* ...))]
     [(_ bind (match-let (b ...) e e* ...))
      (match-let (b ...) (do bind e e* ...))]
     [(_ (bind : T) e) (ann e : T)]

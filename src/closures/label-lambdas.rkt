@@ -30,11 +30,11 @@
   (match exp
     ;; This line should only be reached if the lambda
     ;; is not being bound by a let or a letrec
-    [(Lambda f* ret-t (Castable ctr exp))
+    [(Lambda f* (Castable ctr exp))
      (let*-values ([(name next) (next-uid "annon" next)]
 		   [(exp next) (ll-expr exp next)])
        (values
-	(Letrec (list (cons name (Lambda f* ret-t (Castable ctr exp))))
+	(Letrec (list (cons name (Lambda f* (Castable ctr exp))))
 		(Var name))
 	next))]
     ;; This is okay because of the absence of side effects are pure?
@@ -88,10 +88,10 @@
 	       [n   : Natural n])
 	([b : L0-Bnd b*])
       (match b
-	[(cons i (Lambda f* r (Castable b e)))
+	[(cons i (Lambda f* (Castable b e)))
          (let-values ([(e n) (ll-expr e n)])
            (let (#;[bnd (inst cons Uid L1-Lambda)])
-	     (values (cons (cons i (Lambda f* r (Castable b e))) bp*) bd* n)))] 
+	     (values (cons (cons i (Lambda f* (Castable b e))) bp*) bd* n)))] 
 	[(cons i e)
 	 (let-values ([(e n) (ll-expr e n)])
            (let (#;[bnd (inst cons Uid L1-Expr)]) ;; nonsensical type error
