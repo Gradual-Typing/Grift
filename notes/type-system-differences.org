@@ -1,0 +1,16 @@
+* What are types
+** (PL Theory) Course prediction of the value an expression will return
+** (PL Implementation) classifications of data based on 
+   interface
+** I am sure that both sides would have more to say about types
+* Why are they important from an implementation point of view
+** The lowest level code has a very local and static view of how data is treated
+** Type Systems build allow you to generate code that has more invarients
+*** Fail More Gracefully
+*** Won't Run Unless it Will Return a Res
+** avoiding segmentation faults
+* How do we check type saftey?
+** Dynamic
+** Static
+* H 
+* There are niave two strat

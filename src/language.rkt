@@ -694,7 +694,7 @@ We are going to UIL
 (define-type Tag-Symbol (U 'Int 'Bool 'Fn 'Atomic 'Boxed))
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast4 created by label-lambdas                    |
+| Language/Cast created by label-lambdas                    |
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast4-Lang
@@ -782,7 +782,7 @@ We are going to UIL
 
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast6 created by label-lambdas                    |
+| Language/Cast6 created by convert-closures                                   |
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast6-Lang
@@ -830,6 +830,67 @@ We are going to UIL
 (define-type C6-Bnd-Data* (Listof C6-Bnd-Data))
 
 
+
+#|-----------------------------------------------------------------------------+
+| Language/Cast7 created by convert-closures                                   |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast7-Lang
+  (Prog (List String Natural Schml-Type) C7-Value))
+
+(define-type C7-Value
+  (Rec V (U ;; Non-Terminals
+          (LetP C7-Bnd-Procedure* (LetC C7-Bnd-Closure* V))
+	  (Let C7-Bnd-Data* V)
+	  (App (Pair V V) (Listof V))
+	  (UIL-Op V)
+	  (If V V V)
+          (Begin C7-Effect* V)
+          ;;closure operations
+          ;;(Closure-ref V V)
+          (Fn-Caster V)
+          ;; FN-Type operations
+	  (Type-Fn-ref V (U Index 'arity 'return))
+          (Type-tag V)
+          ;; Dyn operations
+          (Dyn-tag V)
+          (Dyn-immediate V)
+          (Dyn-type V)
+          (Dyn-value V)
+          (Dyn-make V V) ;; This is bad and I do not like it
+          ;; Observational Operations
+          (Blame V)
+          (Observe V Schml-Type)
+          ;; Terminals
+          (Type Schml-Type)
+          (Tag Tag-Symbol)
+	  (Var Uid)
+          (GRep V)
+	  (Quote Cast-Literal))))
+
+(define-type C7-Effect
+  (Rec E
+   (U (LetP C7-Bnd-Procedure* (LetC C7-Bnd-Closure* E))
+      (Let C7-Bnd-Data* E)
+      (Begin C7-Effect* No-Op)
+      (App (Pair C7-Value C7-Value) (Listof C7-Value))
+      (If C7-Value E E)
+      No-Op
+      (GRep-Effect C7-Value))))
+
+(define-type C7-Value* (Listof C7-Value))
+(define-type C7-Effect* (Listof C7-Effect))
+(define-type C7-Procedure
+  (Procedure Uid Uid* (Option Uid) Uid* C7-Value))
+(define-type C7-Closure (Closure-Data Uid (Option Uid) (Listof Uid)))
+(define-type C7-Bnd-Procedure (Pairof Uid C7-Procedure))
+(define-type C7-Bnd-Procedure* (Listof C7-Bnd-Procedure))
+(define-type C7-Bnd-Closure (Pairof Uid C7-Closure))
+(define-type C7-Bnd-Closure* (Listof C7-Bnd-Closure))
+(define-type C7-Bnd-Data (Pairof Uid C7-Value))
+(define-type C7-Bnd-Data* (Listof C7-Bnd-Data))
+
+
 #|-----------------------------------------------------------------------------+
 | Language/Cast4 created by normalize-context                                  |
 +-----------------------------------------------------------------------------|#
@@ -870,6 +931,7 @@ We are going to UIL
           (GRep-Value V)
 	  (Quote Cast-Literal))))
 
+
 (define-type C4-Effect
   (Rec E
    (U (Letrec C4-Bnd* E)
@@ -884,7 +946,6 @@ We are going to UIL
 (define-type C4-Effect* (Listof C4-Effect))
 (define-type C4-Bnd   (Pair Uid C4-Value))
 (define-type C4-Bnd*  (Listof C4-Bnd))
-
 
 |#
 
