@@ -43,6 +43,10 @@
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
     [(Var u) (values (Var u) (set u))]
     [(Quote k) (values (Quote k) (set))]
+    [(Tag t) (values (Tag t) (set))]
+    ;; Observables Representation
+    [(Blame (app uf-expr e f)) (values (Blame e) f)]
+    [(Observe (app uf-expr e f) t) (values (Observe e t) f)]
     ;; Type Representation
     [(Type t) (values (Type t) (set))]
     [(Type-tag (app uf-expr e e-fvars)) (values (Type-tag e) e-fvars)]

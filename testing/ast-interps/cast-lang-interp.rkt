@@ -8,7 +8,7 @@
 
 (provide cast-lang-interp)
 
-(define-type CL-Value (U Boolean Integer CL-Proc CL-Dyn CL-GRef))
+(define-type CL-Value (U Boolean Integer CL-Proc CL-Dyn CL-GRef Blame-Label))
 (define-type CL-Value* (Listof CL-Value))
 
 ;; This is a common idiom because typed-racket has a glitch concerning functions and
@@ -66,7 +66,7 @@
   (cond
     [(CL-GBox? r) (write-gbox r v)]
     [(CL-GProxy? r)
-      (write-gref cast 
+      (write-gref cast
                   (CL-GProxy-value r)
                   (cast v
                         (CL-GProxy-t1 r)
@@ -107,7 +107,7 @@
 (: env-extend-rec* (-> (Env CL-Value) Uid* (Listof (-> (Env CL-Value) CL-Value)) (Env CL-Value)))
 (define (env-extend-rec* env uid* f-rhs*)
   (let* ([env^ (env-extend/undef* env uid*)])
-    (for-each (lambda ([uid : Uid] [f-rhs : (-> (Env CL-Value) CL-Value)]) 
+    (for-each (lambda ([uid : Uid] [f-rhs : (-> (Env CL-Value) CL-Value)])
                 (env-set! env^ uid (f-rhs env^)))
               uid*
               f-rhs*)
@@ -120,13 +120,13 @@
 
 (: mk-cast Cast-Type)
 (define (mk-cast e t g l)
-  (if (equal? t g) 
-      e 
+  (if (equal? t g)
+      e
       (CL-Dyn l e t g)))
 
 (: cast-lang-interp (-> Cast0-Lang Config Test-Value))
 (define (cast-lang-interp prgm comp-config)
-  (let ([eval (interp-expr apply-cast-ld (apply-lazy apply-cast-ld))] 
+  (let ([eval (interp-expr apply-cast-ld (apply-lazy apply-cast-ld))]
 	[observe observe-lazy])
     (match-let ([(Prog _ exp) prgm])
       (observe (lambda (): CL-Value (eval exp (empty-env)))))))
@@ -146,18 +146,15 @@
     (when (trace? 'Vomit)
       (logf "cl-expr:\n~v\n\n" exp))
     (match exp
-      [(Lambda fml*  _  body)
-       (let ([id* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
-         (CL-Proc (lambda ([arg* : CL-Value*]) (recur body (env-extend* env id* arg*)))))]
-      [(Letrec bnd* body) 
-       (let ([id*  (map (inst Bnd-identifier Uid Schml-Type C0-Expr) bnd*)]
-             [rhs* (map (inst Bnd-expression Uid Schml-Type C0-Expr) bnd*)])
+      [(Lambda id* body)
+       (CL-Proc (lambda ([arg* : CL-Value*]) (recur body (env-extend* env id* arg*))))]
+      [(Letrec bnd* body)
+       (let ([id*  (map (inst car Uid C0-Expr) bnd*)]
+             [rhs* (map (inst cdr Uid C0-Expr) bnd*)])
          (recur body (env-extend-rec* env id* (map-curry-recur rhs*))))]
       [(Let bnd* body)
-       (let ([id*  (map (inst Bnd-identifier Uid Schml-Type C0-Expr) bnd*)]
-             [rhs* (map (lambda ([b : C0-Bnd])
-                          (recur/env (Bnd-expression b)))
-                        bnd*)])
+       (let ([id*  (map (inst car Uid C0-Expr) bnd*)]
+             [rhs* (map (lambda ([b : C0-Bnd]) (recur/env (cdr b))) bnd*)])
          (recur body (env-extend* env id* rhs*)))]
       [(If (app recur/env tst) csq alt)
        (if tst (recur/env csq) (recur/env alt))]
@@ -174,7 +171,7 @@
        (if (gref? e)
            (read-gref cast e)
            (TODO raise an error about type invarients being broken))]
-      [(Gbox-set! (app recur/env e1) e2) 
+      [(Gbox-set! (app recur/env e1) e2)
        (if (gref? e1)
            (write-gref cast e1 (recur/env e2))
            (TODO raise an error here about the type system being broken))]
@@ -213,9 +210,9 @@
      (with-syntax ([(tmp ...) (generate-temporaries #'(e ...))])
        #'(let ((tmp e) ...)
            (if (and (? tmp) ...)
-               (p tmp ...) 
+               (p tmp ...)
                (error 'cfi-delta "type error ~a" `(p ,e ...)))))]))
- 
+
 
 ;; The lazy-d parts
 (: apply-cast-ld Cast-Type)
@@ -223,10 +220,10 @@
   (if (shallow-consistent? t1 t2)
       (cond
        [(Dyn? t1)
-        (match v1 
+        (match v1
           [(CL-Dyn l2 v2 t3 t1) (apply-cast-ld v2 t3 t2 l1)]
           [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])]
-       [(and (GRef? t1) (GRef? t2)) 
+       [(and (GRef? t1) (GRef? t2))
         (if (gref? v1)
             (cast-gref v1 (GRef-arg t1) (GRef-arg t2) l1)
             (error 'cast-lang-interp "language invarient broken"))]
@@ -257,15 +254,14 @@
 
 (: observe-lazy (-> (-> CL-Value) Test-Value))
 (define (observe-lazy thunk)
-  (with-handlers ([exn:schml:type:dynamic? 
+  (with-handlers ([exn:schml:type:dynamic?
 		   (lambda ([e : exn:schml:type:dynamic])
                      (blame #f (exn-message e)))])
     (let ([v (thunk)])
-     (cond 
+     (cond
       [(integer? v) (int v)]
       [(boolean? v) (bool v)]
       [(gref? v)    (gbox)]
       [(CL-Proc? v) (function)]
-      [else (if (Fn? (CL-Dyn-type2 v)) (function) (dyn))]))))
-
-
+      [(CL-Dyn? v) (if (Fn? (CL-Dyn-type2 v)) (function) (dyn))]
+      [else (error "returned unexpected value")]))))

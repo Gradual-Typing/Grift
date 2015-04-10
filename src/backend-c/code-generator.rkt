@@ -43,6 +43,12 @@
 (define warn-int-conversion : Opt-Warning
   (make-parameter '(#f . "int-conversion")))
 
+(define warn-unused-value : Opt-Warning
+  (make-parameter '(#f . "unused-value")))
+
+
+
+
 (: emit-opt-warning (-> Opt-Warning Void))
 (define (emit-opt-warning warning)
   (let* ([option (warning)]
@@ -58,6 +64,5 @@
   (with-output-to-string
     (lambda ()
       (emit-opt-warning warn-format)
-      (emit-opt-warning warn-int-conversion))))
-    
-  
+      (emit-opt-warning warn-int-conversion)
+      (emit-opt-warning warn-unused-value))))

@@ -116,29 +116,6 @@ Description: This pass create effect, and value contexts
         (return-state (cons id (Procedure s f* c? b* e))))))
 
 
-;; Their are a few assumption that are being made here that
-;; ends up assuming that make begin is called at every sight
-;; where a begin in constructed in this recursion tree.
-
-(: make-begin
-   (case->
-    (-> C7-Effect* C7-Value  C7-Value)
-    (-> C7-Effect* No-Op C7-Effect)))
-(define (make-begin eff* res)
-  (: splice-eff (-> C7-Effect C7-Effect* C7-Effect*))
-  (define (splice-eff eff rest)
-    (cond
-      [(No-Op? eff) rest]
-      [(Begin? eff) (append (ann (Begin-effects eff) C7-Effect*) rest)]
-      [else (cons eff rest)]))
-  (let ([eff* (foldl splice-eff '() eff*)])
-    (cond
-      [(null? eff*) res]
-      [(Begin? res) (Begin (append eff* (Begin-effects res))
-                           (Begin-value res))]
-      [(and (No-Op? res) (null? (cdr eff*))) (car eff*)]
-      [else (Begin eff* res)])))
-
 
 (: nc-expr->effect* (-> C6-Expr* (State Natural C7-Effect*)))
 (define (nc-expr->effect* eff*) (map-state nc-expr->effect eff*))

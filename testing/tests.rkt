@@ -1,7 +1,7 @@
 #lang typed/racket/no-check ;; Not actually type-checked
 
-(require rackunit 
-	 
+(require rackunit
+         rackunit/text-ui
 	 schml/testing/values
          schml/testing/test-compile
          schml/testing/paths
@@ -18,7 +18,7 @@
 
 
 (define test-data-base : Test
-  (test-suite 
+  (test-suite
    "all tests"
    ;; Bools
    (test-file "const-false.schml" (bool #f))
@@ -36,14 +36,14 @@
    (test-file "prim-bor.schml" (int 10))
    (test-file "prim-shiftl.schml" (int 10))
    (test-file "prim-shiftr.schml" (int 10))
-   
+
    ;; Primitive relational operators should test more corner cases
    (test-file "prim-eq.schml" (bool #t))
    (test-file "prim-lt.schml" (bool #t))
    (test-file "prim-gt.schml" (bool #t))
    (test-file "prim-le.schml" (bool #t))
    (test-file "prim-ge.schml" (bool #t))
-   
+
    ;; If
    (test-file "if0.schml" (int 0))
    (test-file "if1.schml" (int 0))
@@ -97,7 +97,7 @@
    (test-file "letrec4.schml" (bool #t))
    (test-file "letrec5.schml" (bool #t))
    (test-file "letrec6.schml" (int 1))
-   
+
    ;; Gaurded Boxes
    (test-file "gbox0.schml" (gbox))
    (test-file "gbox1.schml" (gbox))
@@ -109,8 +109,8 @@
    (test-file "gbox7.schml" (int 7))
    (test-file "gbox8.schml" (bool #t))
    (test-file "gbox9.schml" (bool #f))
-   ;; 
-   
+   ;;
+
    ;; Are we blaming the correct label
    (test-file "blame1.schml" (int 2))
    (test-file "blame2.schml" (blame #t "Right"))
@@ -126,16 +126,16 @@
    (test-file "blame11.schml" (blame #f (not-lbl "Fail")))
    (test-file "blame12.schml" (blame #f "Pass"))
    (test-file "blame13.schml" (blame #f "Pass"))
-   
+
    ;; basic computations that may make it to being bench marks
-   ;; factorial 
+   ;; factorial
    (test-file "fact5.schml" (int 120))
    (test-file "fact7.schml" (int 5040))
    (test-file "fact10.schml" (int 3628800))
 
    (test-file "fact-dyn-6.schml" (int 720))
    (test-file "fact-static-6.schml" (int 720))
-   ;; even and odd 
+   ;; even and odd
    (test-file "odd-20-static.schml" (bool #f))
    (test-file "odd-20-hybrid1.schml" (bool #f))
    (test-file "odd-20-hybrid2.schml" (bool #f))
@@ -150,8 +150,9 @@
    ;; These are too long perhaps make an long flag or something
    ;;(test-file "ack-3-10-static.schml" (int 125))
    ;;(test-file "ack-4-1-static.schml"  (int 65533))
-   ;;(test-file "ack-static.schml"      (bool #t))   
+   ;;(test-file "ack-static.schml"      (bool #t))
    ))
+
 
 
 (: find-test* (-> Path (Listof Test) (Listof Test)))
@@ -161,8 +162,8 @@
     [(directory-exists? path)
      (let* ([name (file-name-from-path path)]
             [name (if name (path->string name) "Unkown Test")])
-       (cons (make-test-suite 
-              name 
+       (cons (make-test-suite
+              name
               (foldl find-test* '() (get-directory path)))
              tests))]
     [else tests]))
@@ -176,13 +177,13 @@
     (let-values ([(base name dir) (split-path path)])
       (if (and (path? base) (path? name))
           (let ([test (test-case "hi" (test-compile path (dyn)))])
-            test) 
+            test)
           (error 'make-compiler-test "~a ~a" base name)))))
 
 ;; like directory-list but with full file paths
 (: get-directory (-> Path (Listof Path)))
 (define (get-directory path)
-  (for/list : (Listof Path) ([file : Path (in-directory path)]) 
+  (for/list : (Listof Path) ([file : Path (in-directory path)])
     (build-path path file)))
 
 #| The main of this file is inlined |#
@@ -202,7 +203,5 @@
                    ;;[current-error-port f]
                    )
       (command-line #:program "schml-test-suite"
-                    #:args () 
+                    #:args ()
                     (run-tests test-data-base)))))
-
-

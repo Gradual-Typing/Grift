@@ -181,6 +181,14 @@ This allows me to make very desciptive grammars via types later on.
                      (return-state (cons a d)))))])
       (loop l)))
 
+(: foldr-state (All (M A B) (-> (A B -> (State M B)) B (Listof A) (State M B))))
+(define (foldr-state f a l)
+  (if (null? l)
+      (return-state (ann a B))
+      (do (bind-state : (State M B))
+          (a : B <- (foldr-state f a (cdr l)))
+          (f (car l) a))))
+
 (: lift-state (All (M A B C D)
                (case-> [(A -> B) (State M A) -> (State M B)]
                        [(A B -> C) (State M A) (State M B) -> (State M C)]

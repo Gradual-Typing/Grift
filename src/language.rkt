@@ -241,6 +241,41 @@ be usefull for optimizations or keeping state.
 		 body ...))]))
 
 
+;; Their are a few assumption that are being made here that
+;; ends up assuming that make begin is called at every sight
+;; where a begin in constructed in this recursion tree.
+
+(: make-begin
+   (case->
+    (-> C7-Effect* C7-Value  C7-Value)
+    (-> C7-Effect* No-Op C7-Effect)
+    (-> D1-Effect* D1-Value  D1-Value)
+    (-> D1-Effect* No-Op D1-Effect)
+    (-> D2-Effect* D2-Value  D2-Value)
+    (-> D2-Effect* D2-Pred D2-Pred)
+    (-> D2-Effect* No-Op D2-Effect)
+    ))
+(define (make-begin eff* res)
+  (: splice-eff (case->
+                 (-> C7-Effect C7-Effect* C7-Effect*)
+                 ;; Since D2 effect is a strict subset of D1-effect
+                 ;; It must come before D1 because the first type to
+                 ;; match is used
+                 (-> D2-Effect D2-Effect* D2-Effect*)
+                 (-> D1-Effect D1-Effect* D1-Effect*)))
+  (define (splice-eff eff rest)
+    (cond
+      [(No-Op? eff) rest]
+      [(Begin? eff) (append (Begin-effects eff) rest)]
+      [else (cons eff rest)]))
+  (let ([eff* (foldl splice-eff '() eff*)])
+    (cond
+      [(null? eff*) res]
+      [(Begin? res) (Begin (append eff* (Begin-effects res))
+                           (Begin-value res))]
+      [(and (No-Op? res) (null? (cdr eff*))) (car eff*)]
+      [else (Begin eff* res)])))
+
 #|-----------------------------------------------------------------------------+
 | Language/Schml-Syntax
 +-----------------------------------------------------------------------------|#
@@ -469,6 +504,8 @@ We are going to UIL
 
 (define-type UIL-Prim  (U Schml-Prim Array-Prim))
 (define-type UIL-Prim! (U Array-Prim! Print-Prim! Runtime-Prim!))
+(define-predicate uil-prim-effect? UIL-Prim!)
+(define-predicate uil-prim-value? UIL-Prim)
 
 (define-type UIL-Expr-Prim (U Array-Prim IxI->I-Prim))
 
@@ -676,7 +713,7 @@ We are going to UIL
           (Dyn-immediate E)
           (Dyn-type E)
           (Dyn-value E)
-          (Dyn-make E E) ;; This is bad and I do not like it
+          (Dyn-make E E) 
           ;; Observational Operations
           (Blame E)
           (Observe E Schml-Type)
@@ -718,7 +755,7 @@ We are going to UIL
           (Dyn-immediate E)
           (Dyn-type E)
           (Dyn-value E)
-          (Dyn-make E E) ;; This is bad and I do not like it
+          (Dyn-make E E) 
           ;; Observational Operations
           (Blame E)
           (Observe E Schml-Type)
@@ -889,6 +926,10 @@ We are going to UIL
 (define-type C7-Bnd-Closure* (Listof C7-Bnd-Closure))
 (define-type C7-Bnd-Data (Pairof Uid C7-Value))
 (define-type C7-Bnd-Data* (Listof C7-Bnd-Data))
+
+
+
+
 
 
 #|-----------------------------------------------------------------------------+
@@ -1191,33 +1232,28 @@ We are going to UIL
 
 
 (define-type Data0-Lang
-  (Prog (List String Natural Schml-Type)
-	(Labels D0-Bnd-Code*
-		D0-Expr)))
+  (Prog (List String Natural Schml-Type) D0-Expr))
 
 (define-type D0-Bnd-Code* (Listof D0-Bnd-Code))
 (define-type D0-Bnd-Code (Pairof Uid D0-Code))
 (define-type D0-Code (Code Uid* D0-Expr))
 
 (define-type D0-Expr
-  (Rec E (U (Let D0-Bnd* E)
+  (Rec E (U (Labels D0-Bnd-Code* E)
+            (Let D0-Bnd* E)
 	    (App E (Listof E))
+            (UIL-Op! E)
 	    (UIL-Op E)
 	    (If E E E)
-	    (Begin D0-Stmt* E)
+	    (Begin D0-Expr* E)
 	    Halt
 	    (Var Uid)
 	    (Code-Label Uid)
 	    (Quote D0-Literal))))
 
 (define-type D0-Expr* (Listof D0-Expr))
-
-(define-type D0-Stmt (UIL-Op! D0-Expr))
-(define-type D0-Stmt* (Listof D0-Stmt))
-
 (define-type D0-Bnd* (Listof D0-Bnd))
 (define-type D0-Bnd  (Pairof Uid D0-Expr))
-
 (define-type D0-Literal Lambda-Literal)
 
 #|-----------------------------------------------------------------------------+
@@ -1237,35 +1273,43 @@ We are going to UIL
   (Rec T
    (U (Let D1-Bnd* T)
       (If D1-Pred T T)
-      (Begin D1-Stmt* T)
-      (Return D1-Expr))))
+      (Begin D1-Effect* T)
+      (Return D1-Value))))
 
-(define-type D1-Expr
- (Rec E
-  (U (Let D1-Bnd* E)
-     (If D1-Pred E E)
-     (Begin D1-Stmt* E)
-     (App E (Listof E))
-     (Op (U IxI->I-Prim Array-Prim) (Listof E))
+(define-type D1-Value
+ (Rec V
+  (U (Let D1-Bnd* V)
+     (If D1-Pred V V)
+     (Begin D1-Effect* V)
+     (App V (Listof V))
+     (Op (U IxI->I-Prim Array-Prim) (Listof V))
      Halt
      (Var Uid)
      (Code-Label Uid)
      (Quote D1-Literal))))
 
-(define-type D1-Expr* (Listof D1-Expr))
+(define-type D1-Value* (Listof D1-Value))
 
 (define-type D1-Pred
  (Rec P
   (U (Let D1-Bnd* P)
      (If D1-Pred P P)
-     (Begin D1-Stmt* P)
-     (Relop IxI->B-Prim D1-Expr D1-Expr))))
+     (Begin D1-Effect* P)
+     (App D1-Value D1-Value*)
+     (Relop IxI->B-Prim D1-Value D1-Value))))
 
-(define-type D1-Stmt (UIL-Op! D1-Expr))
+(define-type D1-Effect
+ (Rec E
+  (U (Let D1-Bnd* E)
+     (If D1-Pred E E)
+     (Begin D1-Effect* No-Op)
+     (App D1-Value D1-Value*)
+     (UIL-Op! D1-Value)
+     No-Op)))
 
-(define-type D1-Stmt* (Listof D1-Stmt))
+(define-type D1-Effect* (Listof D1-Effect))
 
-(define-type D1-Bnd  (Pairof Uid D1-Expr))
+(define-type D1-Bnd  (Pairof Uid D1-Value))
 
 (define-type D1-Bnd* (Listof D1-Bnd))
 
@@ -1280,43 +1324,47 @@ We are going to UIL
 	(Labels D2-Bnd-Code*
 		D2-Body)))
 
+(define-type D2-Body (Locals Uid* D2-Tail))
 (define-type D2-Bnd-Code* (Listof D2-Bnd-Code))
 (define-type D2-Bnd-Code (Pairof Uid D2-Code))
 (define-type D2-Code (Code Uid* D2-Body))
 
-(define-type D2-Body (Locals Uid* D2-Tail))
-
 (define-type D2-Tail
   (Rec T
-   (U (Begin D2-Stmt* T)
-      (If D2-Pred T T)
-      (Return D2-Expr))))
+   (U (If D2-Pred T T)
+      (Begin D2-Effect* T)
+      (Return D2-Value))))
 
-(define-type D2-Expr
- (Rec E
-  (U (If D2-Pred E E)
-     (Begin D2-Stmt* E)
-     (App E (Listof E))
-     (Op (U IxI->I-Prim Array-Prim) (Listof E))
+(define-type D2-Value
+ (Rec V
+  (U (If D2-Pred V V)
+     (Begin D2-Effect* V)
+     (App V (Listof V))
+     (Op (U IxI->I-Prim Array-Prim) (Listof V))
      Halt
      (Var Uid)
      (Code-Label Uid)
      (Quote D2-Literal))))
 
-(define-type D2-Expr* (Listof D2-Expr))
+(define-type D2-Value* (Listof D2-Value))
 
 (define-type D2-Pred
  (Rec P
-  (U (If P P P)
-     (Begin D2-Stmt* P)
-     (App D2-Expr (Listof D2-Expr))
-     (Relop IxI->B-Prim D2-Expr D2-Expr))))
+  (U (If D2-Pred P P)
+     (Begin D2-Effect* P)
+     (App D2-Value D2-Value*)
+     (Relop IxI->B-Prim D2-Value D2-Value))))
 
-(define-type D2-Stmt
-  (U (UIL-Op! D2-Expr)
-     (Assign Uid D2-Expr)))
+(define-type D2-Effect
+ (Rec E
+  (U (If D2-Pred E E)
+     (Begin D2-Effect* No-Op)
+     (App D2-Value D2-Value*)
+     (UIL-Op! D2-Value)
+     (Assign Uid D2-Value)
+     No-Op)))
 
-(define-type D2-Stmt* (Listof D2-Stmt))
+(define-type D2-Effect* (Listof D2-Effect))
 
 (define-type D2-Literal Lambda-Literal)
 

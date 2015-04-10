@@ -62,6 +62,16 @@
          (return-state (Op p e*)))]
     [(Var i)   (return-state (Var i))]
     [(Quote k) (return-state (Quote k))]
+    [(Tag t)   (return-state (Tag t))]
+    ;; Observables Representation
+    [(Blame e)
+     (do (bind-state : (State Nat C4-Expr))
+         (e  : C4-Expr  <- (ll-expr  e))
+         (return-state (Blame e)))]
+    [(Observe e t)
+     (do (bind-state : (State Nat C4-Expr))
+         (e  : C4-Expr  <- (ll-expr  e))
+         (return-state (Observe e t)))]
     ;; Type Representation
     [(Type t) (return-state (Type t))]
     [(Type-tag e) (lift-state (inst Type-tag C4-Expr) (ll-expr e))]

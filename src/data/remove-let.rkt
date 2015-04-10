@@ -4,8 +4,8 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-| Description: This pass introduces the concept of keeping track
-| of the context of an ast node.
+| Description: This pass records local variables and treats let bindings as
+| their initialization
 +-------------------------------------------------------------------------------+
 | Grammer:
 +------------------------------------------------------------------------------|#
@@ -16,6 +16,13 @@
 
 ;; Only the pass is provided by this module
 (provide remove-let)
+
+#;
+(TODO this pass has a very wierd interface for effects.
+      I think that at the time I was trying to be clever.
+      This should be fixed to be more naive.
+      A perhaps everything in the body should be in the state
+      monad.)
 
 (: remove-let (-> Data1-Lang Config Data2-Lang))
 (define (remove-let prgm comp-config)
@@ -35,13 +42,13 @@
 
 (: rl-body (-> D1-Tail D2-Body))
 (define (rl-body tail)
-  (let-values ([(tail local-vars) (rl-tail tail)]) 
+  (let-values ([(tail local-vars) (rl-tail tail)])
     (Locals local-vars tail)))
 
 (: rl-tail (-> D1-Tail (values D2-Tail Uid*)))
 (define (rl-tail tail)
   (match tail
-    [(Let bnd* tail) 
+    [(Let bnd* tail)
      (let*-values ([(tail lv*) (rl-tail tail)]
                    [(stm* lv*) (rl-bnd* bnd* lv*)])
        (values (Begin stm* tail) lv*))]
@@ -52,34 +59,34 @@
        (values  (If t c a) (append t-lv* c-lv* a-lv*)))]
     [(Begin stm* tail)
      (let*-values ([(tail lv*) (rl-tail tail)]
-                  [(stm* lv*) (rl-stmt* stm* lv*)])
+                  [(stm* lv*)  (rl-effect* stm* lv*)])
        (values (Begin stm* tail) lv*))]
-    [(Return exp) 
-     (let-values ([(exp lv*) (rl-expr exp)])
+    [(Return exp)
+     (let-values ([(exp lv*) (rl-value exp)])
        (values (Return exp) lv*))]))
 
-(: rl-expr (-> D1-Expr (values D2-Expr Uid*)))
-(define (rl-expr exp)
+(: rl-value (-> D1-Value (values D2-Value Uid*)))
+(define (rl-value exp)
   (match exp
     [(Let bnd* exp)
-     (let*-values ([(exp lv*) (rl-expr exp)]
+     (let*-values ([(exp lv*) (rl-value exp)]
                    [(stm* lv*) (rl-bnd* bnd* lv*)])
        (values (Begin stm* exp) lv*))]
     [(If t c a)
      (let*-values ([(t t-lv*) (rl-pred t)]
-                   [(c c-lv*) (rl-expr c)]
-                   [(a a-lv*) (rl-expr a)])
+                   [(c c-lv*) (rl-value c)]
+                   [(a a-lv*) (rl-value a)])
          (values (If t c a) (append t-lv* c-lv* a-lv*)))]
     [(Begin stm* exp)
-     (let*-values ([(exp lv*) (rl-expr exp)]
-                   [(stm* lv*) (rl-stmt* stm* lv*)])
+     (let*-values ([(exp lv*) (rl-value exp)]
+                   [(stm* lv*) (rl-effect* stm* lv*)])
        (values (Begin stm* exp) lv*))]
-    [(App exp exp*) 
-     (let*-values ([(exp lv*) (rl-expr exp)]
-                   [(exp* lv*^) (rl-expr* exp*)])
+    [(App exp exp*)
+     (let*-values ([(exp lv*) (rl-value exp)]
+                   [(exp* lv*^) (rl-value* exp*)])
        (values (App exp exp*) (append lv* lv*^)))]
     [(Op p exp*)
-     (let*-values ([(exp* lv*) (rl-expr* exp*)])
+     (let*-values ([(exp* lv*) (rl-value* exp*)])
        (values (Op p exp*) lv*))]
     [(Halt) (values (Halt) '())]
     [(Var i) (values (Var i) '())]
@@ -100,30 +107,30 @@
          (values (If t c a) (append t-lv* c-lv* a-lv*)))]
     [(Begin stm* pred)
      (let*-values ([(pred lv*) (rl-pred pred)]
-                   [(stm* lv*) (rl-stmt* stm* lv*)])
-       (values (Begin stm* pred) lv*))]
+                   [(stm* lv*) (rl-effect* stm* lv*)])
+       (values (make-begin stm* pred) lv*))]
     [(Relop p e1 e2)
-     (let-values ([(e1 e1-lv*) (rl-expr e1)]
-                  [(e2 e2-lv*) (rl-expr e2)])
+     (let-values ([(e1 e1-lv*) (rl-value e1)]
+                  [(e2 e2-lv*) (rl-value e2)])
        (values (Relop p e1 e2) (append e1-lv* e2-lv*)))]))
 
-(: rl-expr* (-> (Listof D1-Expr) (values (Listof D2-Expr) Uid*)))
-(define (rl-expr* exp*) 
+(: rl-value* (-> (Listof D1-Value) (values (Listof D2-Value) Uid*)))
+(define (rl-value* exp*)
   (if (null? exp*)
       (values '() '())
       (let*-values ([(a d) (values (car exp*) (cdr exp*))]
-                    [(e e-lv*) (rl-expr a)]
-                    [(e* e*-lv*) (rl-expr* d)])
+                    [(e e-lv*) (rl-value a)]
+                    [(e* e*-lv*) (rl-value* d)])
         (values (cons e e*) (append e-lv* e*-lv*)))))
 
-(: rl-bnd (->  D1-Bnd Uid* (values D2-Stmt Uid*)))
+(: rl-bnd (->  D1-Bnd Uid* (values D2-Effect Uid*)))
 (define (rl-bnd bnd lv*)
-  (match-let ([(cons uid rhs) bnd]) 
-    (let-values ([(rhs lv*^) (rl-expr rhs)])
+  (match-let ([(cons uid rhs) bnd])
+    (let-values ([(rhs lv*^) (rl-value rhs)])
       (values (Assign uid rhs) (cons uid (append lv*^ lv*))))))
 
-(: rl-bnd* (->  D1-Bnd* Uid* (values D2-Stmt* Uid*)))
-(define (rl-bnd* bnd* lv*) 
+(: rl-bnd* (->  D1-Bnd* Uid* (values D2-Effect* Uid*)))
+(define (rl-bnd* bnd* lv*)
   (if (null? bnd*)
       (values bnd* lv*)
       (let*-values ([(a) (car bnd*)]
@@ -132,20 +139,36 @@
                     [(a* lv*) (rl-bnd* d lv*)])
         (values (cons a a*) lv*))))
 
-(: rl-stmt (-> D1-Stmt Uid* (values D2-Stmt Uid*)))
-(define (rl-stmt stm uid*)
-  (match-let ([(Op p! exp*) stm])
-    (let*-values ([(exp* lv*) (rl-expr* exp*)])
-      (values (Op p! exp*) (append lv* uid*)))))
+(: rl-effect (-> D1-Effect Uid* (values D2-Effect Uid*)))
+(define (rl-effect eff lv*)
+  (match eff
+    [(Let bnd* exp)
+     (let*-values ([(exp lv*)  (rl-effect exp lv*)]
+                   [(stm* lv*) (rl-bnd* bnd* lv*)])
+       (values (make-begin (append stm* (list exp)) NO-OP) lv*))]
+    [(If t c a)
+     (let*-values ([(t p-lv*) (rl-pred t)]
+                   [(c lv*)   (rl-effect c lv*)]
+                   [(a lv*) (rl-effect a lv*)])
+         (values (If t c a) (append p-lv* lv*)))]
+    [(Begin stm* _)
+     (let*-values ([(stm* lv*) (rl-effect* stm* lv*)])
+       (values (make-begin stm* NO-OP) lv*))]
+    [(App exp exp*)
+     (let*-values ([(exp lv*^)   (rl-value exp)]
+                   [(exp* lv*^^) (rl-value* exp*)])
+       (values (App exp exp*) (append lv*^ lv*^^ lv*)))]
+    [(Op p exp*)
+     (let*-values ([(exp* lv*^) (rl-value* exp*)])
+      (values (Op p exp*) (append lv*^ lv*)))]
+    [(No-Op) (values NO-OP lv*)]))
 
-(: rl-stmt* (-> D1-Stmt* Uid* (values D2-Stmt* Uid*)))
-(define (rl-stmt* stm* lv*)
+(: rl-effect* (-> D1-Effect* Uid* (values D2-Effect* Uid*)))
+(define (rl-effect* stm* lv*)
   (if (null? stm*)
       (values stm* lv*)
       (let*-values ([(a) (car stm*)]
                     [(d) (cdr stm*)]
-                    [(a lv*) (rl-stmt a lv*)]
-                    [(a* lv*) (rl-stmt* d lv*)])
+                    [(a lv*) (rl-effect a lv*)]
+                    [(a* lv*) (rl-effect* d lv*)])
         (values (cons a a*) lv*))))
-
-

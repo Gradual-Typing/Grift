@@ -4,7 +4,6 @@
          schml/src/helpers)
 (require schml/src/schml/reduce-to-cast-calculus
          schml/src/casts/impose-cast-semantics
-         schml/src/closures/make-closures-explicit
          schml/src/data/convert-representation
          schml/src/backend-c/code-generator)
 
@@ -16,8 +15,10 @@
 (: default-c-path-string String)
 (define default-c-path-string "a.c")
 
+#;(TODO move logging to the individual and meta passes)
+
 ;; This is the main compiler it is composed of several micro
-;; compilers for successivly lower level languages. 
+;; compilers for successivly lower level languages.
 (: compile/conf (Path Config . -> . Boolean))
 (define (compile/conf path config)
   (when (trace? 'Source 'All 'Vomit)
@@ -27,13 +28,13 @@
          [_   (when (trace? 'Cast0 'All 'Vomit) (logf "Cast0:\n~v\n\n" c0))]
 
          ;; lower casts into a weakly typed language with lexical closures
-         [l0  : Lambda0-Lang (impose-cast-semantics c0 config)]
-         [_   (when (trace? 'Lambda0 'All 'Vomit) (logf "Lambda0:\n~a\n\n" l0))]
+         [d0  : Data0-Lang (impose-cast-semantics c0 config)]
+         [_   (when (trace? 'Data0 'All 'Vomit) (logf "Lambda0:\n~a\n\n" d0))]
 
-         ;; convert lambdas to flat functions and closure data structures
+      #| ;; convert lambdas to flat functions and closure data structures
          [d0  : Data0-Lang (make-closures-explicit l0 config)]
          [_   (when (trace? 'Data0 'All 'Vomit) (logf "Data0:\n~v\n\n" d0))]
-
+       |#
          ;; change how the language is representated in order to make
          ;;    the conversion to c easy
          [uil : Data2-Lang (convert-representation d0 config)]
