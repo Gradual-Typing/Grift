@@ -5,7 +5,7 @@
 
 (provide (all-defined-out))
 
-(define-type Test-Value (U blame bool int dyn gbox function))
+(define-type Test-Value (U blame bool int unit dyn gbox function))
 
 (struct not-lbl ([value : String])
   #:transparent)
@@ -22,11 +22,14 @@
   #:transparent)
 (struct gbox ()
   #:transparent)
+(struct unit ()
+  #:transparent)
 
 
 (: value=? (Any Any . -> . Boolean))
 (define (value=? x y)
   (or (and (blame? x) (blame? y) (blame=? x y))
+      (and (unit? x) (unit? y))
       (and (bool? x) (bool? y) (bool=? x y))
       (and (int? x) (int? y) (int=? x y))
       (and (gbox? x) (gbox? y))
@@ -35,7 +38,7 @@
 
 (: blame=? (blame blame . -> . Boolean))
 (define (blame=? x y)
-  (and 
+  (and
    (eq? (blame-static? x) (blame-static? y))
    (let ([x (blame-lbl x)]
 	 [y (blame-lbl y)])
@@ -49,7 +52,7 @@
              [(equal? x y)]
              [(regexp-match y x) #t]
              [else #f]))]))))
-      
+
 
 (: bool=? (bool bool . -> . Boolean))
 (define (bool=? x y)
@@ -67,7 +70,7 @@
   (let ([s (with-output-to-string (lambda () exp))])
     (when (trace? 'Out 'All 'Vomit) (logf "program output:\n ~a\n" s))
     (cond
-     [(regexp-match #rx".*Int : ([0-9]+)" s) => 
+     [(regexp-match #rx".*Int : ([0-9]+)" s) =>
       (lambda (r)
         (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
      [(regexp-match #rx".*Bool : #(t|f)" s) =>
@@ -75,4 +78,6 @@
         (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
      [(regexp-match #rx".*Function : \\?" s) (function)]
      [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
+     [(regexp-match #rx".*GReference : \\?" s) (gbox)]
+     [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
      [else (blame #f s)])))

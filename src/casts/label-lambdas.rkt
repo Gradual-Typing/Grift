@@ -51,7 +51,7 @@
          (csq : C4-Expr <- (ll-expr csq))
          (alt : C4-Expr <- (ll-expr alt))
          (return-state (If tst csq alt)))]
-    [(App e e*)
+    [(App e e*) ;; TODO implement direct call optimization
      (do (bind-state : (State Nat C4-Expr))
          (e  : C4-Expr  <- (ll-expr  e))
          (e* : C4-Expr* <- (ll-expr* e*))
@@ -75,15 +75,24 @@
     ;; Type Representation
     [(Type t) (return-state (Type t))]
     [(Type-tag e) (lift-state (inst Type-tag C4-Expr) (ll-expr e))]
-    [(Type-Fn-ref e i)
+    [(Type-Fn-arg e i)
      (do (bind-state : (State Nat C4-Expr))
          (e  : C4-Expr <- (ll-expr  e))
-         (return-state (Type-Fn-ref e i)))]
+         (i  : C4-Expr <- (ll-expr i))
+         (return-state (Type-Fn-arg e i)))]
+    [(Type-Fn-return e)
+     (do (bind-state : (State Nat C4-Expr))
+         (e  : C4-Expr <- (ll-expr  e))
+         (return-state (Type-Fn-return e)))]
+    [(Type-Fn-arity e)
+     (do (bind-state : (State Nat C4-Expr))
+         (e  : C4-Expr <- (ll-expr  e))
+         (return-state (Type-Fn-arity e)))]
     ;; Dynamic Representation
     [(Dyn-tag e)
      (do (bind-state : (State Nat C4-Expr))
          (e : C4-Expr <- (ll-expr e))
-         (return-state (Fn-Caster e)))]
+         (return-state (Dyn-tag e)))]
     [(Dyn-immediate e)
      (do (bind-state : (State Nat C4-Expr))
          (e : C4-Expr <- (ll-expr e))

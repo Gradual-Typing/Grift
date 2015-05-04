@@ -41,6 +41,7 @@ This allows me to make very desciptive grammars via types later on.
   (begin (define-type id t)
 	 (define-type id* (c* id)) ...))
 
+
 #| In order to simulate the ability to pass the wrong
    number of arguments to a function I need a fold-right
    that takes the shorter of two lists
@@ -74,12 +75,37 @@ This allows me to make very desciptive grammars via types later on.
   (let ([t*? (traces)])
     (and t*? (if (or (memq s t*?) ...) #t #f))))
 
-
 (: current-log-port (Parameter Output-Port))
 (define current-log-port (make-parameter (current-error-port)))
 
 (define-syntax-rule (logf fmt a ...)
-  (fprintf (current-log-port) fmt a ...))
+  (let ()
+    (fprintf (current-log-port) fmt a ...)
+    (flush-output (current-log-port))))
+
+(define-syntax-rule (pass/log (o ...) (p in c ...))
+  (let ([t? (trace? 'p 'All 'o ...)])
+    (when t? (logf "~a input:\n~a\n\n" 'p in))
+    (let ([out (p  in c ...)])
+      (when t? (logf "~a output:\n~a\n\n" 'p in))
+      out)))
+
+(define-syntax-rule (log-body n (v ...) e ... b)
+  (let ([t? (trace? 'n 'All)])
+    (when t?
+      (logf "~v input:\n" 'n)
+      (logf "\t~v : ~v\n" 'v v) ...
+      (logf "\n"))
+    e ...
+    (let ([out b])
+      (when t?
+        (logf "~v output:\n\t~v\n\n" 'n out)
+        (flush-output (current-log-port)))
+      out)))
+
+(define-syntax-rule (tracef (s ...) fmt a ...)
+  (when (trace? s ...)
+    (logf fmt a ...)))
 
 ;; allows for conditional compilation
 (define-for-syntax under-construction?
@@ -92,6 +118,24 @@ This allows me to make very desciptive grammars via types later on.
 (define-for-syntax syntax-void
   (syntax-rules ()
     [(_ x ...) (void)]))
+
+(define-syntax-rule (trace-define (f a ...) e ... b)
+  (define (f a ...)
+    (define t? (trace? 'All 'f))
+    (define n (box 0))
+    (when t?
+      (logf "~v ~v input:\n" 'f (unbox n))
+      (logf "\t~v : ~v\n" 'a a) ...
+      (logf "\n")
+      (flush-output (current-log-port)))
+    (let ()
+      e ...
+      (let ([out b])
+        (when t?
+          (logf "~v ~v output: ~v" 'f n out)
+          (flush-output (current-log-port))
+          (set-box! n (+ (unbox n) 1)))
+        out))))
 
 ;; An error a syntax tranformer that reports the current macro is undefined
 (define-for-syntax syntax-undefined-if-used
@@ -168,6 +212,7 @@ This allows me to make very desciptive grammars via types later on.
 (define #:forall (M) get-state : (State M M)
   (lambda ((i : M))
     (values i i)))
+
 
 (define #:forall (M A B) (map-state [f : (A -> (State M B))] [l : (Listof A)])
   : (State M (Listof B))

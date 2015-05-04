@@ -11,10 +11,11 @@
 
 (: cc (-> String Boolean))
 (define (cc t)
-  (compile (build-path test-suite-path t)
+  (compile (build-path t) #;(build-path test-suite-path t)
            #:exec-path (build-path test-tmp-path "d")
            #:c-path    (build-path test-tmp-path "d.c")
-           #:log-path  (build-path test-tmp-path "d.log.txt")))
+           #:log-path  (build-path test-tmp-path "d.log.txt")
+           #:c-flags   (list "-g")))
 
 (module+ main
   (unless (directory-exists? test-tmp-path)
@@ -25,5 +26,3 @@
      [(< 1 (vector-length args)) (display "please only specify one file to compile!\n")]
      [(cc (vector-ref args 0)) (display "success :)\n")]
      [else (display "success :)\n")])))
- 
-

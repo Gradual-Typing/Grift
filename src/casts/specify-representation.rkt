@@ -48,6 +48,7 @@ exposed as the effects that they truelly are.
 (define DYN-BOXED-TAG-VALUE       : D0-Expr (Quote DYN-BOXED-TAG))
 (define DYN-INT-TAG-VALUE         : D0-Expr (Quote DYN-INT-TAG))
 (define DYN-BOOL-TAG-VALUE        : D0-Expr (Quote DYN-BOOL-TAG))
+(define DYN-UNIT-TAG-VALUE        : D0-Expr (Quote DYN-UNIT-TAG))
 (define DYN-IMDT-SHIFT-VALUE      : D0-Expr (Quote DYN-IMDT-SHIFT))
 (define DYN-BOX-SIZE-VALUE        : D0-Expr (Quote DYN-BOX-SIZE))
 (define DYN-VALUE-INDEX-VALUE     : D0-Expr (Quote DYN-VALUE-INDEX))
@@ -55,6 +56,7 @@ exposed as the effects that they truelly are.
 (define FALSE-IMDT-VALUE          : D0-Expr (Quote FALSE-IMDT))
 (define TRUE-IMDT-VALUE           : D0-Expr (Quote TRUE-IMDT))
 (define UNDEF-IMDT-VALUE          : D0-Expr (Quote UNDEF-IMDT))
+(define UNIT-IMDT-VALUE           : D0-Expr (Quote UNIT-IMDT))
 (define GREP-TAG-MASK-VALUE       : D0-Expr (Quote GREP-TAG-MASK))
 (define UGBOX-SIZE-VALUE          : D0-Expr (Quote UGBOX-SIZE))
 (define UGBOX-VALUE-INDEX-VALUE   : D0-Expr (Quote UGBOX-VALUE-INDEX))
@@ -68,18 +70,44 @@ exposed as the effects that they truelly are.
 (define CLOS-CSTR-INDEX-VALUE     : D0-Expr (Quote CLOS-CSTR-INDEX))
 (define CLOS-FVAR-OFFSET-VALUE    : D0-Expr (Quote CLOS-FVAR-OFFSET))
 
+
 (: specify-representation (Cast6-Lang Config -> Data0-Lang))
 (define (specify-representation prgm comp-config)
+  #;(logf "specify-representation:\n~a\n" prgm)
   (match-let ([(Prog (list name next type) expr) prgm])
-    (match-let-values ([(expr next) (run-state ((sr-expr (hash)) expr) next)])
-      (Prog (list name next type) expr))))
+    (let ([sr-top-expr (sr-expr (hash) empty-index-map)])
+      (let-values ([(expr next) (run-state (sr-top-expr expr) next)])
+        (Prog (list name next type) expr)))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
 ;; closure must turn into memory loads.
 
-(: sr-expr (-> Env (-> C6-Expr (State Nat D0-Expr))))
-(define (sr-expr env)
+(define-type IndexMap (-> Uid Uid Nat))
+
+(: index-closure (-> Uid Uid* IndexMap))
+(define (index-closure clos fvar*)
+  (define ((fvar-err f))
+    (error 'specifiy-representation
+           "failed attempt to index free var ~a from clos ~a"
+           f clos))
+  (define (clos-err c f) (error 'specify-representation
+                           "unbound closure index ~a from closure ~a inside of clos ~a"
+                           f c clos))
+  (let ([map (for/fold ([index : (HashTable Uid Nat) (hash)])
+                       ([fvar : Uid fvar*] [i : Nat (in-naturals CLOS-FVAR-OFFSET)])
+               (hash-set index fvar i))])
+    (lambda ([c : Uid] [f : Uid]) : Nat
+     #;(logf "index-closure: ~a ~a ~a\n\ttable: ~a\n" clos c f map)
+     (if (uid=? c clos)
+         (hash-ref map f (fvar-err f))
+         (clos-err c f)))))
+
+(define (empty-index-map u i)
+  (error 'specify-representation "attempt to index without index map ~a ~a" u i))
+
+(: sr-expr (-> Env IndexMap (-> C6-Expr (State Nat D0-Expr))))
+(define (sr-expr env cenv)
   (: recur* (-> C6-Expr* (State Nat D0-Expr*)))
   (define (recur* e*) (map-state recur e*))
   (: recur (-> C6-Expr (State Nat D0-Expr)))
@@ -87,10 +115,10 @@ exposed as the effects that they truelly are.
    (match e
       [(Let b* e)
        (do (bind-state : (State Nat D0-Expr))
-           (b* : D0-Bnd*  <- (sr-bnd* env b*))
+           (b* : D0-Bnd*  <- (sr-bnd* env cenv b*))
            (let* ([id* (map (inst car Uid Any) b*)]
                   [env (extend* env id* (map var id*))])
-             (e  : D0-Expr  <- ((sr-expr env) e))
+             (e  : D0-Expr  <- ((sr-expr env cenv) e))
              (return-state (Let b* e))))]
       [(If t c a)
        (do (bind-state : (State Nat D0-Expr))
@@ -99,26 +127,25 @@ exposed as the effects that they truelly are.
            (a : D0-Expr <- (recur a))
            (return-state (If t c a)))]
       [(App (cons e e^) e*)
+       #;(TODO this is likely broken fix it)
        (do (bind-state : (State Nat D0-Expr))
            (e  : D0-Expr  <- (recur  e))
            (e^ : D0-Expr  <- (recur  e^))
            (e* : D0-Expr* <- (recur* e*))
-           (return-state
-            (if (Code-Label? e)
-                (App e (cons e^ e*))
-                (App (Op 'Array-ref (list e (Quote CLOS-CODE-INDEX)))
-                     (cons e^ e*)))))]
+           (return-state (App e (cons e^ e*))))]
       [(Op p e*)
        (do (bind-state : (State Nat D0-Expr))
            (e* : D0-Expr* <- (recur* e*))
            (return-state (Op p e*)))]
-      [(Quote k) (return-state
-                  (if (boolean? k)
-                      (if k
-                          TRUE-IMDT-VALUE
-                          FALSE-IMDT-VALUE)
-                      (Quote k)))]
-     ;; FN Representation
+      [(Quote k)
+       (return-state
+        (cond
+          [(null? k)  UNIT-IMDT-VALUE]
+          [(boolean? k) (if k TRUE-IMDT-VALUE FALSE-IMDT-VALUE)]
+          [(fixnum? k) (Quote k)]
+          [(string? k) (Quote k)]
+          [else (error 'specify-representation/quote "given ~a" k)]))]
+     ;; Closure Representation
      [(LetP p* (LetC c* e))
        (do (bind-state : (State Nat D0-Expr))
            (p* : D0-Bnd-Code*  <- (sr-bndp* p*))
@@ -126,15 +153,23 @@ exposed as the effects that they truelly are.
                   [env : Env  (extend* env l* (map label l*))]
                   [u*  : Uid* (map (inst car Uid Any) c*)]
                   [env : Env  (extend* env u* (map var u*))])
-             (c* : (Pair D0-Bnd* D0-Expr*) <- (sr-bndc* env c*))
-             (e  : D0-Expr <- ((sr-expr env) e))
+             (c* : (Pair D0-Bnd* D0-Expr*) <- (sr-bndc* env cenv c*))
+             (e  : D0-Expr <- ((sr-expr env cenv) e))
              (return-state (Labels p* (Let (car c*) (Begin (cdr c*) e))))))]
-      [(Fn-Caster e)
+      [(Closure-caster e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
            (return-state (Op 'Array-ref (list e CLOS-CSTR-INDEX-VALUE))))]
+      [(Closure-code e)
+       (do (bind-state : (State Nat D0-Expr))
+           (e : D0-Expr <- (recur e))
+           (return-state (Op 'Array-ref (list e CLOS-CODE-INDEX-VALUE))))]
+      [(Closure-ref clos fvar)
+       (return-state
+        (Op 'Array-ref (list (Var clos) (Quote (cenv clos fvar)))))]
       [(Var i)  (return-state (lookup env i))]
-     ;; Type Representation
+      [(Code-Label u) (return-state (Code-Label u))]
+      ;; Type Representation
       [(Type t) (lambda ([n : Nat]) (sr-type t n))]
       [(Type-Fn-arity e)
        (do (bind-state : (State Nat D0-Expr))
@@ -172,7 +207,7 @@ exposed as the effects that they truelly are.
       [(Dyn-make e1 e2)
        (do (bind-state : (State Nat D0-Expr))
            (e1 : D0-Expr <- (recur e1))
-           (sr-dyn-make e1 e2 env))]
+           (sr-dyn-make e1 e2 env cenv))]
       [(Dyn-type e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
@@ -193,12 +228,7 @@ exposed as the effects that they truelly are.
       [(Observe e t)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
-         (lambda ([n : Nat]) : (Values D0-Expr Nat)
-                 ;; This is a break in the monad abstraction that needs fixed
-                 ;; But I want to remove the Observe abstraction and implement
-                 ;; Entirely here and now -- Let's get really observations are
-                 ;; not expressions
-                 (sr-observe e t n)))]
+           (sr-observe e t))]
       ;; References Representation
       [(Begin eff* exp)
        (do (bind-state : (State Nat D0-Expr))
@@ -209,22 +239,29 @@ exposed as the effects that they truelly are.
       [(UGbox e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
-         (alloc-set-ugbox e))]
+           (alloc-set-ugbox e))]
       [(UGbox-ref e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
-         (return-state (Op 'Array-ref (list e UGBOX-VALUE-INDEX-VALUE))))]
+           (return-state (Op 'Array-ref (list e UGBOX-VALUE-INDEX-VALUE))))]
+      [(UGbox-set! e1 e2)
+       (do (bind-state : (State Nat D0-Expr))
+           (e1 : D0-Expr <- (recur e1))
+           (e2 : D0-Expr <- (recur e2))
+           (return-state (Op 'Array-set! (list e1 UGBOX-VALUE-INDEX-VALUE e2))))]
       [(GRep-proxied? e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
-         (return-state (Op 'binary-and (list e GREP-TAG-MASK-VALUE))))]
+           (return-state
+            (Op '= (list GPROXY-TAG-VALUE
+                         (Op 'binary-and (list e GREP-TAG-MASK-VALUE))))))]
       [(Gproxy for from to blames)
        (do (bind-state : (State Nat D0-Expr))
            (for     : D0-Expr <- (recur for))
-         (from    : D0-Expr <- (recur from))
-         (to      : D0-Expr <- (recur to))
-         (blames  : D0-Expr <- (recur blames))
-         (alloc-tag-set-gproxy for from to blames))]
+           (from    : D0-Expr <- (recur from))
+           (to      : D0-Expr <- (recur to))
+           (blames  : D0-Expr <- (recur blames))
+           (alloc-tag-set-gproxy for from to blames))]
       [(Gproxy-for e)
        (lift-state (untag-deref-gproxy GPROXY-FOR-INDEX-VALUE) (recur e))]
       [(Gproxy-from e)
@@ -245,21 +282,30 @@ exposed as the effects that they truelly are.
    (D0-Expr D0-Expr D0-Expr D0-Expr . -> . (State Nat D0-Expr)))
 (define (alloc-tag-set-gproxy for from to blames)
   (do (bind-state : (State Nat D0-Expr))
-      (tmp : Uid <- (uid-state "gproxy"))
-      (let* ([tmp-var (Var tmp)]
-             [alloc   (Op 'Alloc (list GPROXY-SIZE-VALUE))]
-             [set-for (Op 'Array-set!
-                          (list tmp-var GPROXY-FOR-INDEX-VALUE for))]
-             [set-from (Op 'Array-set!
-                           (list tmp-var GPROXY-FROM-INDEX-VALUE from))]
-             [set-to (Op 'Array-set!
-                         (list tmp-var GPROXY-TO-INDEX-VALUE to))]
-             [set-blames (Op 'Array-set!
-                             (list tmp-var GPROXY-BLAMES-INDEX-VALUE blames))])
+      (tmpp : Uid <- (uid-state "gproxy"))
+      (tmpf : Uid <- (uid-state "tmp-for"))
+      (tmpm : Uid <- (uid-state "tmp-from"))
+      (tmpt : Uid <- (uid-state "tmp-to"))
+      (tmpl : Uid <- (uid-state "tmp-blames"))
+      (let* ([tmp-var : D0-Expr (Var tmpp)]
+             [alloc   : D0-Expr (Op 'Alloc (list GPROXY-SIZE-VALUE))]
+             [set-for : D0-Expr
+              (Op 'Array-set! (list tmp-var GPROXY-FOR-INDEX-VALUE (Var tmpf)))]
+             [set-from : D0-Expr
+              (Op 'Array-set! (list tmp-var GPROXY-FROM-INDEX-VALUE (Var tmpm)))]
+             [set-to : D0-Expr
+              (Op 'Array-set! (list tmp-var GPROXY-TO-INDEX-VALUE (Var tmpt)))]
+             [set-blames : D0-Expr
+              (Op 'Array-set! (list tmp-var GPROXY-BLAMES-INDEX-VALUE (Var tmpl)))]
+             [bnd-tmps : (Listof (Pairof Uid D0-Expr))
+              (list (cons tmpf for) (cons tmpm from)
+                    (cons tmpt to) (cons tmpt blames))]
+             [set* : (Listof D0-Expr)
+              (list set-for set-from set-to set-blames)]
+             [bnd-alloc : (Listof (Pairof Uid D0-Expr)) (list (cons tmpp alloc))]
+             [tag-proxy : D0-Expr (Op 'binary-or (list tmp-var GPROXY-TAG-VALUE))])
         (return-state
-         (Let (list (cons tmp alloc))
-              (Begin (list set-for set-from set-to set-blames)
-                     (Op 'binary-xor (list tmp-var GPROXY-TAG-VALUE))))))))
+         (Let bnd-tmps (Let bnd-alloc (Begin set* tag-proxy)))))))
 
 (: alloc-set-ugbox (D0-Expr . -> . (State Nat D0-Expr)))
 (define (alloc-set-ugbox e)
@@ -273,17 +319,17 @@ exposed as the effects that they truelly are.
               (Begin (list set) tmp-var))))))
 
 ;; What to do with a binding
-(: sr-bnd (-> Env (-> C6-Bnd-Data (State Nat D0-Bnd))))
-(define (sr-bnd env)
+(: sr-bnd (-> Env IndexMap (-> C6-Bnd-Data (State Nat D0-Bnd))))
+(define (sr-bnd env cenv)
   (lambda ([b : C6-Bnd-Data]) : (State Nat D0-Bnd)
     (do (bind-state : (State Nat D0-Bnd))
-        (e : D0-Expr <- ((sr-expr env) (cdr b)))
+        (e : D0-Expr <- ((sr-expr env cenv) (cdr b)))
         (let ([i : Uid (car b)])
           (return-state (cons i e))))))
 
 ;; And the catamorphism for a List of bind
-(: sr-bnd* (-> Env C6-Bnd-Data* (State Nat D0-Bnd*)))
-(define (sr-bnd* env b*) (map-state (sr-bnd env) b*))
+(: sr-bnd* (-> Env IndexMap C6-Bnd-Data* (State Nat D0-Bnd*)))
+(define (sr-bnd* env cenv b*) (map-state (sr-bnd env cenv) b*))
 
 (: sr-type (-> Schml-Type Nat (values D0-Expr Nat)))
 (define (sr-type t n)
@@ -305,6 +351,7 @@ exposed as the effects that they truelly are.
    [(Int? t)  (values (Quote TYPE-INT-RT-VALUE) n)]
    [(Bool? t) (values (Quote TYPE-BOOL-RT-VALUE) n)]
    [(Dyn? t)  (values (Quote TYPE-DYN-RT-VALUE) n)]
+   [(Unit? t)  (values (Quote TYPE-UNIT-RT-VALUE) n)]
    [(Fn? t)
     (match-let ([(Fn a f* r) t])
       (let*-values ([(tmp n) (next-uid "tmp" n)]
@@ -326,8 +373,8 @@ exposed as the effects that they truelly are.
 ;; Since we have access to unboxed static ints should we just
 ;; abandon the unboxed dyn integers another a mixture of static
 ;; allocation and and constant lifting could be used to make all
-(: sr-dyn-make (-> D0-Expr C6-Expr Env (State Nat D0-Expr)))
-(define (sr-dyn-make e1 e2 env)
+(: sr-dyn-make (-> D0-Expr C6-Expr Env IndexMap (State Nat D0-Expr)))
+(define (sr-dyn-make e1 e2 env cenv)
   (match e2
     [(Type (Int))
      (return-state
@@ -337,36 +384,44 @@ exposed as the effects that they truelly are.
      (return-state
       (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
                    DYN-BOOL-TAG-VALUE)))]
+    [(Type (Bool))
+     (return-state
+      (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
+                   DYN-UNIT-TAG-VALUE)))]
     [otherwise
      (do (bind-state : (State Nat D0-Expr))
-         (e2  : D0-Expr <- ((sr-expr env) e2))
+         (e2  : D0-Expr <- ((sr-expr env cenv) e2))
          (sr-alloc "dyn_box" e1 e2))]))
 
-(: sr-observe (-> D0-Expr Schml-Type Nat (values D0-Expr Nat)))
-(define (sr-observe e t next)
-  (values
-   (cond
-     [(Int? t)
-      (Begin
-        (list (Op 'Printf (list (Quote "Int : %d\n") e)))
-        (Quote 0))]
-     [(Bool? t)
-      (If (Op '= (list (Quote TRUE-IMDT) e))
-          (Begin (list (Op 'Print (list (Quote "Bool : #t\n")))) (Quote 0))
-          (Begin (list (Op 'Print (list (Quote "Bool : #f\n")))) (Quote 0)))]
-     [(Fn? t)
-      (Begin (list (Op 'Print (list (Quote "Function : ?\n")))) (Quote 0))]
-     [(Dyn? t)
-      (Begin (list (Op 'Print (list (Quote "Dynamic : ?\n")))) (Quote 0))]
-     [else (TODO implement thing for reference types)])
+(: sr-observe (-> D0-Expr Schml-Type (State Nat D0-Expr)))
+(define (sr-observe e t)
+  (: generate-print (Uid Schml-Type -> D0-Expr))
+  (define (generate-print id ty)
+    (cond
+      [(Int? t) (Op 'Printf (list (Quote "Int : %d\n") (Var id)))]
+      [(Unit? t) (Op 'Printf (list (Quote "Unit : ()\n")))]
+      [(Bool? t) (If (Op '= (list (Quote TRUE-IMDT) (Var id)))
+                     (Op 'Print (list (Quote "Bool : #t\n")))
+                     (Op 'Print (list (Quote "Bool : #f\n"))))]
+      [(Fn? t) (Op 'Print (list (Quote "Function : ?\n")))]
+      [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
+      [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
+      [else (TODO implement thing for reference types)]))
+  (do (bind-state : (State Nat D0-Expr))
+      (res : Uid <- (uid-state "result"))
+      (let ([prt : D0-Expr (generate-print res t)])
+        (return-state
+         (Let (list (cons res e))
+              (Begin (list prt)
+                     (Quote 0)))))))
 
-   next))
-
+#;(TODO GET RID OF TAGS IN THE COMPILER)
 (: sr-tag (Tag-Symbol . -> . (Quote Integer)))
 (define (sr-tag t)
   (case t
     [(Int)    (Quote DYN-INT-TAG)]
     [(Bool)   (Quote DYN-BOOL-TAG)]
+    [(Unit)   (Quote DYN-UNIT-TAG)]
     [(Atomic) (Quote TYPE-ATOMIC-TAG)]
     [(Fn)     (Quote DYN-BOXED-TAG)]
     [(Boxed)  (Quote TYPE-FN-TAG)]))
@@ -380,52 +435,54 @@ exposed as the effects that they truelly are.
 
 (: sr-bndp (-> C6-Bnd-Procedure (State Nat D0-Bnd-Code)))
 (define (sr-bndp b)
-  (match-let ([(cons u (Procedure cp param* ctr? fvar* exp)) b])
-    (let* ([env (for/hash : Env ([u fvar*] [i (in-naturals)])
-                  (values u (sr-clos-ref-free (Var cp) i)))]
-           [env (extend* env param* (map var param*))])
+  (match-let ([(cons u (Procedure cp param* code ctr? fvar* exp)) b])
+    (let* ([env (for/hash : Env ([fvar fvar*] [i (in-naturals 2)])
+                  (values fvar (sr-clos-ref-free (Var cp) i)))]
+           [env (extend* env param* (map var param*))]
+           [cenv (index-closure cp fvar*)])
       (do (bind-state : (State Nat D0-Bnd-Code))
-          (exp : D0-Expr <- ((sr-expr env) exp))
+          (exp : D0-Expr <- ((sr-expr env cenv) exp))
           (return-state
            (cons u (Code (cons cp param*) exp)))))))
 
-(: sr-bndc* (-> Env C6-Bnd-Closure* (State Nat (Pair D0-Bnd* D0-Expr*))))
-(define (sr-bndc* env b*)
+(: sr-bndc* (-> Env IndexMap C6-Bnd-Closure* (State Nat (Pair D0-Bnd* D0-Expr*))))
+(define (sr-bndc* env cenv b*)
   (do (bind-state : (State Nat (Pair D0-Bnd* D0-Expr*)))
-      (b* : (Listof (Pairof D0-Bnd D0-Expr*)) <- (map-state (sr-bndc env) b*))
+      (b* : (Listof (Pairof D0-Bnd D0-Expr*)) <- (map-state (sr-bndc env cenv) b*))
       (let ([b* (map (inst car D0-Bnd Any) b*)]
             [e* (append-map (inst cdr Any D0-Expr*) b*)])
         (return-state (ann (cons b* e*) (Pair D0-Bnd* D0-Expr*))))))
 
 ;; The representation of closures as created by letrec
-(: sr-bndc (-> Env (-> C6-Bnd-Closure (State Nat (Pair D0-Bnd D0-Expr*)))))
-(define (sr-bndc env)
+(: sr-bndc (-> Env IndexMap (-> C6-Bnd-Closure (State Nat (Pair D0-Bnd D0-Expr*)))))
+(define (sr-bndc env cenv)
   ;; Capture/Initialize the values of the closure
-  (: mk-set* (-> Uid Uid (Option Uid) Uid* D0-Expr*))
-  (define (mk-set* clos code cst? fvar*)
-    (let ([clos (lookup env clos)]
-          [code (lookup env code)]
-          [cst  (if cst? (lookup env cst?) FALSE-IMDT-VALUE)])
-      (cons
-       (sr-clos-set-code clos code)
-       (cons
-        (sr-clos-set-caster clos cst)
-        (for/list : (Listof D0-Expr) ([fvar : Uid fvar*] [i : Integer (in-naturals)])
-          (sr-clos-set-free clos i (lookup env fvar)))))))
+  (: mk-set* (-> D0-Expr D0-Expr D0-Expr D0-Expr* D0-Expr*))
+  (define (mk-set* clos code cst fvar*)
+    (cons
+     (sr-clos-set-code clos code)
+     (cons
+      (sr-clos-set-caster clos cst)
+      (for/list : (Listof D0-Expr) ([fvar : D0-Expr fvar*] [i : Integer (in-naturals)])
+          (sr-clos-set-free clos i fvar)))))
   (lambda ([b : C6-Bnd-Closure]) : (State Nat (Pair D0-Bnd D0-Expr*))
-    (match-let ([(cons uid (Closure-Data lbl ctr? free*)) b])
-      (let ([bnd  : D0-Bnd   (cons uid (sr-clos-alloc uid lbl ctr? free*))]
-            [set* : D0-Expr* (mk-set* uid lbl ctr? free*)])
-        (return-state (ann (cons bnd set*) (Pair D0-Bnd D0-Expr*)))))))
+    (match-let ([(cons uid (Closure-Data lbl ctr free*)) b])
+      (do (bind-state : (State Nat (Pair D0-Bnd D0-Expr*)))
+          (lbl : D0-Expr  <- ((sr-expr env cenv) lbl))
+          (ctr : D0-Expr  <- ((sr-expr env cenv) ctr))
+          (fr* : D0-Expr* <- (map-state (sr-expr env cenv) free*))
+          (let ([bnd  : D0-Bnd   (cons uid (sr-clos-alloc fr*))]
+                [set* : D0-Expr* (mk-set* (Var uid) lbl ctr fr*)])
+            (return-state (ann (cons bnd set*) (Pair D0-Bnd D0-Expr*))))))))
 
 ;; The representation details for closures without recursion
-(: sr-clos-alloc (-> Uid Uid (Option Uid) Uid* D0-Expr))
-(define (sr-clos-alloc clos code ctr? free*)
+(: sr-clos-alloc (-> (Listof Any) D0-Expr))
+(define (sr-clos-alloc free*)
   (Op 'Alloc (list (Quote (+ CLOS-FVAR-OFFSET (length free*))))))
 
 (: sr-clos-set-code (-> D0-Expr D0-Expr D0-Expr))
 (define (sr-clos-set-code clos code)
-  (Op 'Array-set! (list code CLOS-CODE-INDEX-VALUE code)))
+  (Op 'Array-set! (list clos CLOS-CODE-INDEX-VALUE code)))
 
 (: sr-clos-set-caster (-> D0-Expr D0-Expr D0-Expr))
 (define (sr-clos-set-caster clos caster)
@@ -473,7 +530,12 @@ exposed as the effects that they truelly are.
 
 (: lookup (-> Env Uid D0-Expr))
 (define (lookup e u)
-  (hash-ref e u (lambda () (error "Unbound uid in program"))))
+  (hash-ref e u (lookup-error e u)))
+
+(define (lookup-error e u)
+  (lambda ()
+    (error 'specify-representation/lookup
+           "Unbound uid ~a\n\tin program with env ~a" u e)))
 
 (define-type Triv (U (Quote String) (Quote Integer) (Code-Label Uid) (Var Uid)))
 (define-predicate triv? Triv)

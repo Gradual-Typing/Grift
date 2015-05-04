@@ -50,7 +50,12 @@
     ;; Type Representation
     [(Type t) (values (Type t) (set))]
     [(Type-tag (app uf-expr e e-fvars)) (values (Type-tag e) e-fvars)]
-    [(Type-Fn-ref (app uf-expr e e-fvars) i) (values (Type-Fn-ref e i) e-fvars)]
+    [(Type-Fn-arg (app uf-expr e e-fvars) (app uf-expr i i-fvars))
+     (values (Type-Fn-arg e i) (set-union e-fvars i-fvars))]
+    [(Type-Fn-return (app uf-expr e e-fvars))
+     (values (Type-Fn-return e) e-fvars)]
+    [(Type-Fn-arity (app uf-expr e e-fvars))
+     (values (Type-Fn-arity e) e-fvars)]
     ;; Dynamic Representation
     [(Dyn-tag (app uf-expr e e-fvars)) (values (Dyn-tag e) e-fvars)]
     [(Dyn-immediate (app uf-expr e e-fvars)) (values (Dyn-immediate e) e-fvars)]
@@ -105,9 +110,10 @@
   ;; id-subtract is set remove with the arguments in reverse
   (define (id-subtract f s) (set-remove s f))
   (match-let ([(Lambda f* (Castable ctr? (app uf-expr e fvars))) lam])
-    (let* ([fvars (foldl id-subtract fvars f*)]
-	   [fvars (if ctr? (set-add fvars ctr?) fvars)])
-      (values (Lambda f* (Free ctr? (set->list fvars) e)) fvars))))
+    #;(TODO the second call to fvars is bloating closures and is could likely be removed)
+    (let* ([fvars  (foldl id-subtract fvars f*)]
+           [fvars^ (if ctr? (set-add fvars ctr?) fvars)])
+      (values (Lambda f* (Free ctr? (set->list fvars) e)) fvars^))))
 
 (: uf-bnd-lambda* (-> C4-Bnd-Lambda*
                       (values (Setof Uid)

@@ -177,6 +177,7 @@
    [('Alloc (list exp)) (begin (display "(long) (posix_memalign(&alloc_ptr, 8, 8 * ")
                                (emit-value exp)
                                (display "), alloc_ptr)"))]
+   [('Exit (list exp)) (begin (display "exit") (emit-wrap (emit-value exp)))]
    [(p (list exp1 exp2))
     (emit-wrap
      (emit-value exp1)
@@ -190,7 +191,8 @@
        [(binary-or)  (display " | ")]
        [(binary-xor) (display " ^ ")]
        [else (error 'backend-c-emit-op)])
-     (emit-value exp2))]))
+     (emit-value exp2))]
+   [(other wise) (error 'backend-c/generate-c/emit-op "unmatched value")]))
 
 
 

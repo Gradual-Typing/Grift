@@ -25,147 +25,227 @@
 ;; Only the pass is provided by this module
 (provide interpret-casts)
 
+(: specialize-casts? (Parameterof Boolean))
+(define specialize-casts?
+  (make-parameter #t))
+
+(: recursive-dyn-cast? (Parameterof Boolean))
+(define recursive-dyn-cast?
+  (make-parameter #t))
+
+
+
 (: interpret-casts (Cast2-Lang Config . -> . Cast3-Lang))
-(define (interpret-casts prgm config)
+(trace-define (interpret-casts prgm config)
   (match-let ([(Prog (list name next type) exp) prgm])
-    (let*-values ([(interp-cast interp-bnd next) (mk-cast-interp next)]
-                  [(exp next) ((ic-expr interp-cast) exp next)]
-                  [(prog-uid next) (next-uid "prog_returns" next)]
-                  [(prog-bnd) (cons prog-uid exp)]
-                  [(prog-var) (Var prog-uid)])
-      (Prog (list name next type)
-       (Letrec interp-bnd
-        (Let (list prog-bnd)
-         (Observe prog-var type)))))))
+    (let-values ([(exp next) (run-state (ic-prgm exp type) next)])
+      (Prog (list name next type) exp))))
 
-(: mk-cast-interp (Natural . -> . (values Cast-Rule C3-Bnd* Natural)))
-(define (mk-cast-interp next)
-  (let*-values ([(interp-uid next) (next-uid "interp_cast" next)]
-		[(interp-var) (Var interp-uid)]
-		[(interp-fn next) (finalize-interp-code interp-var next)])
-    (values (interp-cast interp-var) (list (cons interp-uid interp-fn)) next)))
+(: ic-prgm (C2-Expr Schml-Type -> (State Nat C3-Expr)))
+(define (ic-prgm exp type)
+  (do (bind-state : (State Nat C3-Expr))
+      (cst : Uid     <- (uid-state "interp_cast"))
+      (let* ([interp (mk-interped-caster cst)]
+             [spec   (mk-specialized-caster interp)]
+             [judge  (mk-judicious-caster spec interp)])
+        (bnd : C3-Bnd* <- (mk-cast-interp cst spec))
+        (exp : C3-Expr <- ((ic-expr judge) exp))
+        (return-state (Letrec bnd (Observe exp type))))))
 
+#;
+(let*-values ([(interp-cast interp-bnd next) (mk-cast-interp next)]
+              [(exp next) ((ic-expr interp-cast) exp next)]
+              [(prog-uid next) (next-uid "prog_returns" next)]
+              [(prog-bnd) (cons prog-uid exp)]
+              [(prog-var) (Var prog-uid)])
+  )
 
-(: finalize-interp-code (C3-Expr Natural . -> . (values C3-Expr Natural)))
-(define (finalize-interp-code interp-cast next)
-  (let*-values ([(v next)  (next-uid "val" next)]
-		[(v2 next) (next-uid "val" next)]
-		[(t1 next) (next-uid "type1" next)]
-		[(t2 next) (next-uid "type2" next)]
-		[(l next)  (next-uid "label" next)])
-    (let ([v-var   (Var v)]
-	  [v2-var  (Var v2)]
-	  [t1-var  (Var t1)]
-	  [t2-var  (Var t2)]
-	  [l-var   (Var l)])
-      (let-values ([(body next) (cast-Any-Type->Any-Type v-var t1-var t2-var l-var next)])
-	(values (Lambda (list v t1 t2 l) (Castable #f body)) next)))))
+(: mk-cast-interp (Uid Cast-Rule -> (State Nat C3-Bnd*)))
+(define (mk-cast-interp name spec)
+  (do (bind-state : (State Nat C3-Bnd*))
+      (rhs : C3-Expr <- (finalize-interp-code spec))
+      (let ([bnd : C3-Bnd (cons name rhs)])
+        (return-state (list bnd)))))
+#;
+(let*-values ([(interp-uid next) (next-uid "interp_cast" next)]
+              [(interp-var) (Var interp-uid)]
+              [(interp-fn next) (finalize-interp-code interp-var next)])
+  (values (interp-cast interp-var) (list (cons interp-uid interp-fn)) next))
 
-(: ic-expr (-> Cast-Rule (-> C2-Expr Natural (values C3-Expr Natural))))
-(define (ic-expr interp-cast)
-  (: recur (-> C2-Expr Natural (values C3-Expr Natural)))
-  (define (recur exp next)
-    (: recur/next (-> C2-Expr (values C3-Expr Natural)))
-    (define (recur/next exp) (recur exp next))
+(: finalize-interp-code (Cast-Rule -> (State Nat C3-Expr)))
+(define (finalize-interp-code spec)
+  (do (bind-state : (State Nat C3-Expr))
+      (v  : Uid <- (uid-state "val"))
+      (t1 : Uid <- (uid-state "type1"))
+      (t2 : Uid <- (uid-state "type2"))
+      (l  : Uid <- (uid-state "label"))
+      (full-cast-tree  : C3-Expr
+        <- (spec (Var v) (Var t1) (Var t2) (Var l)))
+      (return-state
+       (Lambda (list v t1 t2 l)
+        (Castable #f full-cast-tree)))))
+
+(: ic-expr (-> Cast-Rule (-> C2-Expr (State Nat C3-Expr))))
+(define (ic-expr mk-cast)
+  (: ic-bnd (-> C2-Bnd (State Nat C3-Bnd)))
+  (define (ic-bnd b)
+    (do (bind-state : (State Nat C3-Bnd))
+        (match-let ([(cons u e) b])
+          (e : C3-Expr <- (recur e))
+          (return-state (cons u e)))))
+  (: recur (-> C2-Expr (State Nat C3-Expr)))
+  (define (recur exp)
     (match exp
-      [(Lambda f* (Castable ctr (app recur/next exp next)))
-       (values (Lambda f* (Castable ctr exp)) next)]
-      [(Letrec b* (app recur/next exp next))
-       (let-values ([(b* next) (cata-bnd* b* next)])
-	 (values (Letrec b* exp) next))]
-      [(Let b* (app recur/next exp next))
-       (let-values ([(b* next) (cata-bnd* b* next)])
-	 (values (Let b* exp) next))]
-      [(App (app recur/next exp next) exp*)
-       (let-values ([(exp* next) (recur* exp* next)])
-	 (values (App exp exp*) next))]
+      [(Lambda f* (Castable ctr exp))
+       (do (bind-state : (State Nat C3-Expr))
+           (exp : C3-Expr <- (recur exp))
+           (return-state (Lambda f* (Castable ctr exp))))]
+      [(Letrec b* exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (b*  : C3-Bnd* <- (map-state ic-bnd b*))
+           (exp : C3-Expr <- (recur exp))
+           (return-state (Letrec b* exp)))]
+      [(Let b* exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (b*  : C3-Bnd* <- (map-state ic-bnd b*))
+           (exp : C3-Expr <- (recur exp))
+           (return-state (Let b* exp)))]
+      [(App exp exp*)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (exp* : C3-Expr* <- (map-state recur exp*))
+           (return-state (App exp exp*)))]
       [(Op p exp*)
-       (let-values ([(exp* next) (recur* exp* next)])
-	 (values (Op p exp*) next))]
-      [(Runtime-Cast (app recur/next v next) t1 t2 l)
-       (let*-values ([(t1 next) (recur t1 next)]
-		     [(t2 next) (recur t2 next)]
-		     [(l next) (recur l next)])
-	 (interp-cast v t1 t2 l next))]
-      [(Cast (app recur/next e next) t1 t2 l)
-       ((specialize-cast interp-cast) e (Type t1) (Type t2) (Quote l) next)]
-      [(Fn-Cast (app recur/next e next) t1 t2 l)
-       (cast-Fn->Fn e (Type t1) (Type t2) (Quote l) next)]
-      [(Type-Fn-ref (app recur/next e next) s)
-       (values (Type-Fn-ref e s) next)]
-      [(Blame (app recur/next e next)) (values (Blame e) next)]
-      [(If (app recur/next tst next) csq alt)
-       (let*-values ([(csq next) (recur csq next)]
-		     [(alt next) (recur alt next)])
-	 (values (If tst csq alt) next))]
-      [(Var i) (values (Var i) next)]
-      [(Type t) (values (Type t) next)]
-      [(Quote k) (values (Quote k) next)]
-            [(Begin exp* exp)
-       (let*-values ([(exp* next) (recur* exp* next)]
-                     [(exp  next) (recur  exp  next)])
-         (values (Begin exp* exp) next))]
-      [(UGbox (app recur/next exp next)) (values (UGbox exp) next)]
-      [(UGbox-ref (app recur/next exp next)) (values (UGbox-ref exp) next)]
+       (do (bind-state : (State Nat C3-Expr))
+           (exp* : C3-Expr* <- (map-state recur exp*))
+           (return-state (Op p exp*)))]
+      [(Runtime-Cast v t1 t2 l)
+       (do (bind-state : (State Nat C3-Expr))
+           (v  : C3-Expr <- (recur v))
+           (t1 : C3-Expr <- (recur t1))
+           (t2 : C3-Expr <- (recur t2))
+           (l  : C3-Expr <- (recur l))
+           (mk-cast v t1 t2 l))]
+      [(Cast v t1 t2 l)
+       (do (bind-state : (State Nat C3-Expr))
+           (v  : C3-Expr <- (recur v))
+           (mk-cast v (Type t1) (Type t2) (Quote l)))]
+      [(Fn-Cast e t1 t2 l)
+       (do (bind-state : (State Nat C3-Expr))
+           (e  : C3-Expr <- (recur e))
+           (cast-fn e (Type t1) (Type t2) (Quote l)))]
+      [(Type-Fn-arg e i)
+       (do (bind-state : (State Nat C3-Expr))
+           (e  : C3-Expr <- (recur e))
+           (i  : C3-Expr <- (recur i))
+           (return-state (Type-Fn-arg e i)))]
+      [(Type-Fn-return e)
+       (do (bind-state : (State Nat C3-Expr))
+           (e  : C3-Expr <- (recur e))
+           (return-state (Type-Fn-return e)))]
+      [(Type-Fn-arity e)
+       (do (bind-state : (State Nat C3-Expr))
+           (e  : C3-Expr <- (recur e))
+           (return-state (Type-Fn-arity e)))]
+      [(Blame e)
+       (do (bind-state : (State Nat C3-Expr))
+           (e  : C3-Expr <- (recur e))
+           (return-state (Blame e)))]
+      [(If tst csq alt)
+       (do (bind-state : (State Nat C3-Expr))
+           (tst  : C3-Expr <- (recur tst))
+           (csq  : C3-Expr <- (recur csq))
+           (alt  : C3-Expr <- (recur alt))
+           (return-state (If tst csq alt)))]
+      [(Var i) (return-state (Var i))]
+      [(Type t) (return-state (Type t))]
+      [(Quote k) (return-state (Quote k))]
+      [(Begin exp* exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp* : C3-Expr* <- (map-state recur exp*))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (Begin exp* exp)))]
+      [(UGbox exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (UGbox exp)))]
+      [(UGbox-ref exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (UGbox-ref exp)))]
       [(UGbox-set! exp1 exp2)
-       (let*-values ([(exp1 next) (recur exp1 next)]
-                     [(exp2 next) (recur exp2 next)])
-         (values (UGbox-set! exp1 exp2) next))]
-      [(GRep-proxied? (app recur/next exp next))
-       (values (GRep-proxied? exp) next)]
-      [(Gproxy for from to blames)
-       (let*-values ([(for next)  (recur for next)]
-                     [(from next) (recur from next)]
-                     [(to next)   (recur to next)]
-                     [(blames next) (recur blames next)])
-         (values (Gproxy for from to blames) next))]
-      [(Gproxy-for (app recur/next exp next)) (values (Gproxy-for exp) next)]
-      [(Gproxy-from (app recur/next exp next)) (values (Gproxy-from exp) next)]
-      [(Gproxy-to (app recur/next exp next)) (values (Gproxy-to exp) next)]
-      [(Gproxy-blames (app recur/next exp next))
-       (values (Gproxy-blames exp) next)]))
-
-  (: recur* (-> (Listof C2-Expr) Natural (values (Listof C3-Expr) Natural)))
-  (define (recur* e* n)
-    (if (null? e*)
-	(values '() n)
-	(let*-values ([(e) (car e*)]
-		      [(e* n) (recur* (cdr e*) n)]
-		      [(e n) (recur e n)])
-	  (values (cons e e*) n))))
-  (: cata-bnd* (-> C2-Bnd* Natural (values C3-Bnd* Natural)))
-  (define (cata-bnd* b* n)
-    (if (null? b*)
-	(values '() n)
-	(match-let ([(cons i r) (car b*)])
-	  (let*-values ([(b* n) (cata-bnd* (cdr b*) n)]
-			[(r n) (recur r n)])
-	    (values (cons (cons i r) b*) n)))))
+       (do (bind-state : (State Nat C3-Expr))
+           (exp1 : C3-Expr  <- (recur exp1))
+           (exp2 : C3-Expr  <- (recur exp2))
+           (return-state (UGbox-set! exp1 exp2)))]
+      [(GRep-proxied? exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (GRep-proxied? exp)))]
+      [(Gproxy e1 e2 e3 e4)
+       (do (bind-state : (State Nat C3-Expr))
+           (e1 : C3-Expr  <- (recur e1))
+           (e2 : C3-Expr  <- (recur e2))
+           (e3 : C3-Expr  <- (recur e3))
+           (e4 : C3-Expr  <- (recur e4))
+           (return-state (Gproxy e1 e2 e3 e4)))]
+      [(Gproxy-for exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (Gproxy-for exp)))]
+      [(Gproxy-from exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (Gproxy-from exp)))]
+      [(Gproxy-to exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (Gproxy-to exp)))]
+      [(Gproxy-blames exp)
+       (do (bind-state : (State Nat C3-Expr))
+           (exp  : C3-Expr  <- (recur exp))
+           (return-state (Gproxy-blames exp)))]))
   recur)
 
 ;; A Cast rule is part of the decision tree for allowed versus
 ;; not allowed casts. They use a few macros that keep invariants
 ;; managable and allow literals to prune the tree to only possible
 ;; needed branches
-(define-type Cast-Rule (-> C3-Expr C3-Expr C3-Expr C3-Expr Natural
-			   (values C3-Expr Natural)))
+(define-type Cast-Rule (C3-Expr C3-Expr C3-Expr C3-Expr ->
+                        (State Nat C3-Expr)))
 
 ;; Build a custom cast decision tree
-(: specialize-cast (-> Cast-Rule Cast-Rule))
-
-(define (specialize-cast interp-cast)
-  (lambda (v t1 t2 l next)
-    (if #f
-        (cast-Any-Type->Any-Type v t1 t2 l next)
-        (interp-cast v t1 t2 l next))))
+(: mk-specialized-caster (-> Cast-Rule Cast-Rule))
+(define (mk-specialized-caster interp)
+  (define rec-cast : Cast-Rule
+    (if (recursive-dyn-cast?) interp spec-cast-undyned))
+  (: specialized-caster Cast-Rule)
+  (define (specialized-caster v t1 t2 l)
+    (cast-any rec-cast v t1 t2 l))
+  specialized-caster)
 
 ;; Invoke the prebuild tree as a function
-(: interp-cast (-> C3-Expr Cast-Rule))
-(define (interp-cast interp-var)
-  (: help Cast-Rule)
-  (define (help v t1 t2 l next)
-    (values (App interp-var (list v t1 t2 l)) next))
-  help)
+(: mk-interped-caster (-> Uid Cast-Rule))
+(define (mk-interped-caster interp-uid)
+  (define interp-var (Var interp-uid))
+  (: interped-caster Cast-Rule)
+  (define (interped-caster v t1 t2 l)
+    (return-state (App interp-var (list v t1 t2 l))))
+  interped-caster)
+
+(: mk-judicious-caster (-> Cast-Rule Cast-Rule Cast-Rule))
+(define (mk-judicious-caster spec interp)
+  (: spec^ Cast-Rule)
+  (define (spec^ v t1 t2 l)
+    (if (or (Quote? v) (Type? t1) (Type? t2))
+        (spec v t1 t2 l)
+        (interp v t1 t2 l)))
+  (if (specialize-casts?)
+      spec^
+      interp))
+
+
+
 
 ;;These functions type to fold predicates in order to allow ifs to
 ;;generate only checks that are actually needed
@@ -193,8 +273,8 @@
    [else (Op '= (list o x))]))
 
 ;; construct new type literals based on the fn-ref operation
-(: fn-ref (-> C3-Expr (U Index 'return 'arity) C3-Expr))
-(define (fn-ref t i)
+#;(: fn-ref (-> C3-Expr (U Index 'return 'arity) C3-Expr))
+#;(define (fn-ref t i)
   (if (Type? t)
       (let ((t (Type-type t)))
         (if (Fn? t)
@@ -203,112 +283,136 @@
              [(eq? i 'arity)  (Quote (Fn-arity t))]
              [else (Type ((inst list-ref Schml-Type) (Fn-fmls t) i))])
             (error 'fn-ref "generated a function ref for non function type")))
-      (Type-Fn-ref t i)))
+      (cond
+        [(eq? i 'return) (Type-Fn-return t)]
+        [(eq? i 'arity)  (Type-Fn-arity t)]
+        [else (Type-Fn-arg t (Quote i))])))
 
 ;; if$ and cond$ will prune branches if the condition is (Quote #t) or (Quote #f)
-(define-syntax if$
-  (lambda (stx)
-    (syntax-case stx ()
-      [(_ n t c a)
-       (begin ;(print-syntax-width +inf.0) (print stx) (newline)
-         #'(let-values  ([(tmp-t) t])
-             (if (Quote? tmp-t)
-                 (if (Quote-literal tmp-t)
-                     c
-                     a)
-                 (let*-values ([(tmp-c n) c]
-                               [(tmp-a n) a])
-                   (values (If tmp-t tmp-c tmp-a) n)))))])))
+(: if$ (C3-Expr (State Nat C3-Expr) (State Nat C3-Expr) -> (State Nat C3-Expr)))
+(define (if$ t c a)
+  (if (Quote? t)
+      (if (Quote-literal t)
+          c
+          a)
+      (do (bind-state : (State Nat C3-Expr))
+          (tmp-c : C3-Expr <- c)
+          (tmp-a : C3-Expr <- a)
+          (return-state (If t tmp-c tmp-a)))))
 
 (define-syntax cond$
   (syntax-rules (else)
-    [(_ n (else c)) c]
-    [(_ n (t c) (t* c*) ...)
-     (if$ n t c (cond$ n (t* c*) ...))]))
+    [(_ (else c)) c]
+    [(_ (t c) (t* c*) ...)
+     (if$ t c (cond$ (t* c*) ...))]))
 
 ;; make sure that t is a terminal expression
 ;; expects to be used in the store passing style expressions
 (define-syntax let$*
   (syntax-rules ()
-    [(_ n () b) b]
-    [(_ n ([t v] [t* v*] ...) b)
+    [(_ () b) b]
+    [(_ ([t v] [t* v*] ...) b)
      (let ((tmp : C3-Expr v))
        (if (or (Quote? tmp) (Tag? tmp) (Type? tmp) (Var? tmp))
            ;;if the expression is a terminal then just update the binding
-           (let ((t : C3-Expr tmp)) (let$* n ([t* v*] ...) b))
+           (let ((t : C3-Expr tmp)) (let$* ([t* v*] ...) b))
            ;;if the expression is non terminal bind a var and bind the
            ;;expression to the var
+           (do (bind-state : (State Nat C3-Expr))
+               (u : Uid <- (uid-state (~a 't)))
+               (let* ([t : C3-Expr (Var u)])
+                 (body : C3-Expr <- (let$* ([t* v*] ...) b))
+                 (return-state (Let (list (cons u tmp)) body))))))]))
+#;
            (let-values ([(uid n) (next-uid (~a 't) n)])
              (let ([t : C3-Expr (Var uid)])
                (let-values ([(body n) (let$* n ([t* v*] ...) b)])
-                 (values (Let (list (cons uid tmp)) body) n))))))]))
-
-(: cast-Any-Type->Any-Type Cast-Rule)
-(define (cast-Any-Type->Any-Type v t1 t2 lbl next)
-  (let$* next ([val v]
-               [type1 t1])
-     (if$ next (op=? type1 (Type DYN-TYPE))
-          (cast-Dyn->Any-Type val type1 t2 lbl next)
-          (cast-Ground-Type->Any-Type val type1 t2 lbl next))))
+                 (values (Let (list (cons uid tmp)) body) n))))
 
 
-(: cast-Ground-Type->Any-Type Cast-Rule)
-(define (cast-Ground-Type->Any-Type v t1 t2 lbl next)
-  (let$* next ([type1 t1]
-               [tag1 (type-tag type1)])
-     (cond$ next
-      [(op=? (Tag 'Fn) tag1) (cast-Fn->Any-Type v type1 t2 lbl next)]
-      [(op=? type1 (Type INT-TYPE)) (cast-Int->Any-Type v type1 t2 lbl next)]
-      [(op=? type1 (Type BOOL-TYPE)) (cast-Bool->Any-Type v type1 t2 lbl next)]
-      [else (values (Blame lbl) next)])))
+(define-type Cast-Prim-Rule
+  (Cast-Rule C3-Expr C3-Expr C3-Expr C3-Expr -> (State Nat C3-Expr)))
 
-(: cast-Dyn->Any-Type Cast-Rule)
-(define (cast-Dyn->Any-Type v t1 t2 lbl next)
-  (let$* next ([val v]
-               [type2 t2])
+(define-type Cast-Aux-Rule
+  (C3-Expr C3-Expr C3-Expr C3-Expr -> (State Nat C3-Expr)))
 
-    (if$ next (op=? (Type DYN-TYPE) type2)
-         (values v next)
-         (let$* next ([val v]
-                      [tag (Dyn-tag val)])
-          (cond$ next
-             [(op=? (Tag 'Int) tag)
-              (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type INT-TYPE) type2 lbl next)]
-             [(op=? (Tag 'Bool) tag)
-              (cast-Ground-Type->Any-Type (Dyn-immediate val) (Type BOOL-TYPE) type2 lbl next)]
-             [(op=? (Tag 'Boxed) tag)
-              (cast-Ground-Type->Any-Type (Dyn-value val) (Dyn-type val) type2 lbl next)]
-             [else (values (Blame lbl) next)])))))
+(: cast-any Cast-Prim-Rule)
+(define (cast-any cast-undyned v t1 t2 lbl)
+  (let$* ([type1 t1] [type2 t2])
+   (cond$
+    [(op=? type1 type2) (return-state v)]
+    [(op=? type1 (Type DYN-TYPE)) (cast-dyn cast-undyned v type1 type2 lbl)]
+    [else (cast-ground v type1 type2 lbl)])))
 
+(: cast-dyn Cast-Prim-Rule)
+(define (cast-dyn cast-undyned v t1 t2 lbl)
+  (let$* ([val v] [tag (Dyn-tag val)])
+   (cond$
+    [(op=? (Tag 'Int) tag)
+     (cast-undyned (Dyn-immediate val) (Type INT-TYPE) t2 lbl)]
+    [(op=? (Tag 'Bool) tag)
+     (cast-undyned (Dyn-immediate val) (Type BOOL-TYPE) t2 lbl)]
+    [(op=? (Tag 'Unit) tag)
+     (cast-undyned (Quote '()) (Type BOOL-TYPE) t2 lbl)]
+    [(op=? (Tag 'Boxed) tag)
+     (cast-undyned (Dyn-value val) (Dyn-type val) t2 lbl)]
+    [else (return-state (Blame (Quote "Unexpected value in cast tree")))])))
 
-(: cast-Int->Any-Type Cast-Rule)
-(define (cast-Int->Any-Type v t1 t2 lbl next)
-  (let$* next ([type2 t2])
-    (cond$ next
-     [(op=? (Type INT-TYPE) type2) (values v next)]
-     [(op=? (Type DYN-TYPE) type2) (values (Dyn-make v (Type INT-TYPE)) next)]
-     [else (values (Blame lbl) next)])))
+(: spec-cast-undyned Cast-Aux-Rule)
+(define (spec-cast-undyned v t1 t2 lbl)
+  ;; There is an invarient that there will only ever be one level of dyn
+  (let$* ([type1 t1] [type2 t2])
+   (cond$
+    [(op=? type1 type2) (return-state v)]
+    [else (cast-ground v type1 type2 lbl)])))
 
-(: cast-Bool->Any-Type Cast-Rule)
-(define (cast-Bool->Any-Type v t1 t2 lbl next)
-  (let$* next ([type2 t2])
-    (cond$ next
-     [(op=? (Type BOOL-TYPE) type2) (values v next)]
-     [(op=? (Type DYN-TYPE) type2) (values (Dyn-make v (Type BOOL-TYPE)) next)]
-     [else (values (Blame lbl) next)])))
+(: cast-ground Cast-Aux-Rule)
+(define (cast-ground v t1 t2 lbl)
+  (let$* ([type1 t1])
+     (cond$
+      [(op=? type1 (Type INT-TYPE))  (cast-int v type1 t2 lbl)]
+      [(op=? type1 (Type BOOL-TYPE)) (cast-bool v type1 t2 lbl)]
+      [(op=? type1 (Type UNIT-TYPE)) (cast-unit v type1 t2 lbl)]
+      [else
+       (let$* ([tag1 (type-tag type1)])
+        (if$ (op=? (Tag 'Fn) tag1)
+             (cast-fn v type1 t2 lbl)
+             (return-state (Blame (Quote "Unexpected Type1 in cast tree")))))])))
 
-(: cast-Fn->Any-Type Cast-Rule)
-(define (cast-Fn->Any-Type v t1 t2 lbl next)
-  (let$* next ([type2 t2])
-    (if$ next (op=? (Type DYN-TYPE) type2)
-         (values (Dyn-make v t1) next)
-         (cast-Fn->Fn v t1 type2 lbl next))))
+#;(TODO do something more clever than the current boxing schema)
+(: cast-int Cast-Aux-Rule)
+(define (cast-int v t1 t2 lbl)
+ (let$* ([val v][type2 t2])
+  (cond$
+   ;;[(op=? (Type INT-TYPE) type2) (return-state val)]
+   [(op=? (Type DYN-TYPE) type2) (return-state (Dyn-make val (Type INT-TYPE)))]
+   [else (return-state (Blame lbl))])))
 
-(: cast-Fn->Fn Cast-Rule)
-(define (cast-Fn->Fn v t1 t2 lbl next)
-  (let$* next ([type2 t2]
-               [tag2 (type-tag type2)])
-         (if$ next (op=? tag2 (Tag 'Fn))
-              (let$* next ([value v])
-                (values (App (Fn-Caster value) (list value t1 type2 lbl)) next))
-              (values (Blame lbl) next))))
+(: cast-unit Cast-Aux-Rule)
+(define (cast-unit v t1 t2 lbl)
+  (let$* ([val v][type2 t2])
+  (cond$
+   ;; this is likely uneeded
+   ;;[(op=? (Type UNIT-TYPE) type2) (return-state val)]
+   [(op=? (Type DYN-TYPE) type2) (return-state (Dyn-make val (Type UNIT-TYPE)))]
+   [else (return-state (Blame lbl))])))
+
+(: cast-bool Cast-Aux-Rule)
+(define (cast-bool v t1 t2 lbl)
+  (let$* ([val v][type2 t2])
+  (cond$
+   ;; this is probabaly uneeded
+   ;;[(op=? (Type BOOL-TYPE) type2) (return-state val)]
+   [(op=? (Type DYN-TYPE) type2) (return-state (Dyn-make val (Type BOOL-TYPE)))]
+   [else (return-state (Blame lbl))])))
+
+(: cast-fn Cast-Aux-Rule)
+(define (cast-fn v t1 t2 lbl)
+  (let$* ([type2 t2])
+    (if$ (op=? (Type DYN-TYPE) type2)
+         (return-state (Dyn-make v t1))
+         (let$* ([tag2 (type-tag type2)])
+          (if$ (op=? tag2 (Tag 'Fn))
+               (let$* ([value v])
+                (return-state (App (Fn-Caster value) (list value t1 type2 lbl))))
+               (return-state (Blame lbl)))))))

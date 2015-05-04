@@ -12,7 +12,8 @@
 (define-type Semantics (U 'Lazy-D))
 (struct Config ([semantics : Semantics]
                 [exec-path : Path]
-                [c-path : Path]))
+                [c-path : Path]
+                [c-flags : (Listof String)]))
 
 
 #|
@@ -71,17 +72,19 @@ be usefull for optimizations or keeping state.
   (Runtime-Cast expression type-exp type-cast label)
   (Fn-Cast expressiong type-exp type-cast label)
   ;;Type Operations
-  (Type-Fn-ref expression index)
   (Type-Fn-arity expression)
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
   (Type-tag expression)
   ;; closure Representation
   (Fn-Caster expression)
-;;(Closure-ref the var)
+  (Closure-Data code caster variables)
+  (Closure-code var)
+  (Closure-ref this var)
+  (Closure-caster this)
   (LetP bindings body)
   (LetC bindings body);; Can create cyclic immutable data
-  (Procedure this params caster bound-vars body)
+  (Procedure this params code caster bound-vars body)
   ;; represents a set of moves to initialize variables before
   (Code variables body)
   ;; Dyn operations
@@ -100,7 +103,6 @@ be usefull for optimizations or keeping state.
   ;; Static Global Binding
   (Labels bindings body)
   ;; TODO figue out an appropriate comment about all forms here
-  (Closure-Data code caster variables)
   (Halt)
   (Assign lhs rhs)
   ;; Declares Local Variables
@@ -132,6 +134,7 @@ be usefull for optimizations or keeping state.
 
 ;; Schml types
 (define-forms
+  (Unit)
   (Int)
   (Bool)
   (Dyn)
@@ -151,6 +154,7 @@ be usefull for optimizations or keeping state.
   (Bottom-Type))
 
 ;;Constants for the types
+(define UNIT-TYPE (Unit))
 (define INT-TYPE (Int))
 (define BOOL-TYPE (Bool))
 (define DYN-TYPE (Dyn))
@@ -328,22 +332,25 @@ be usefull for optimizations or keeping state.
 |#
 
 (define-type Schml-Literal
-  (U Integer Boolean))
+  (U Integer Boolean Null))
 
 (define (schml-literal? x)
   (or (and (integer? x) (>= x 0) (<= x (expt 2 64)))
-      (boolean? x)))
+      (boolean? x)
+      (null? x)))
 
-(: schml-literal->type (Schml-Literal -> (U Bool Int)))
+(: schml-literal->type (Schml-Literal -> (U Bool Int Unit)))
 (define (schml-literal->type x)
-  (if (boolean? x)
-      BOOL-TYPE
-      INT-TYPE))
+  (cond
+    [(boolean? x) BOOL-TYPE]
+    [(integer? x) INT-TYPE]
+    [(null? x)    UNIT-TYPE]
+    [else (error 'language/schml-literal->type "~a" x)]))
 
 ;; Types in the schml languages
 (define-type+ Schml-Type ([Schml-Type* Listof]
 			  [Schml-Type? Option])
-  (Rec ST (U Int Bool Dyn
+  (Rec ST (U Int Bool Dyn Unit
              (GRef ST)
              (GVect ST)
              (MRef ST)
@@ -352,7 +359,7 @@ be usefull for optimizations or keeping state.
 
 (define-type Schml-Fn-Type (Fn Index Schml-Type* Schml-Type))
 
-(define-type Atomic-Schml-Type (U Int Bool Dyn))
+(define-type Atomic-Schml-Type (U Unit Int Bool Dyn))
 
 (define-predicate schml-type? Schml-Type)
 
@@ -444,6 +451,7 @@ be usefull for optimizations or keeping state.
 (: consistent? (Schml-Type Schml-Type . -> . Boolean))
 (define (consistent? t g)
   (or (Dyn? t) (Dyn? g)
+      (and (Unit? t) (Unit? g))
       (and (Int? t) (Int? g))
       (and (Bool? t) (Bool? g))
       (and (Fn? t) (Fn? g)
@@ -482,6 +490,7 @@ Dyn --> Int Int --> Dyn
   (cond
    [(Dyn? t) g]
    [(Dyn? g) t]
+   [(and (Unit? t) (Unit? g)) UNIT-TYPE]
    [(and (Int? t) (Int? g)) INT-TYPE]
    [(and (Bool? t) (Bool? g)) BOOL-TYPE]
    [(and (Fn? t) (Fn? g) (= (Fn-arity t) (Fn-arity g)))
@@ -601,7 +610,9 @@ We are going to UIL
 	  (Cast E Schml-Type Schml-Type Blame-Label)
 	  (Fn-Cast E Schml-Type Schml-Type Blame-Label)
           ;; FN-Type operations
-	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
           ;; Observations
           (Blame E)
           ;; Monotonic
@@ -650,7 +661,9 @@ We are going to UIL
 	  (Cast E Schml-Type Schml-Type Blame-Label)
 	  (Fn-Cast E Schml-Type Schml-Type Blame-Label)
           ;; FN-Type operations
-	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
           ;; Observations
           (Blame E)
           ;; Guarded Representation
@@ -706,14 +719,17 @@ We are going to UIL
           ;; closure operations
           (Fn-Caster E)
           ;; FN-Type operations
-	  (Type-Fn-ref E (U Index 'arity 'return))
+	  ;; FN-Type operations
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
           (Type-tag E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
           (Dyn-type E)
           (Dyn-value E)
-          (Dyn-make E E) 
+          (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
           (Observe E Schml-Type)
@@ -728,7 +744,7 @@ We are going to UIL
 (define-type C3-Bnd   (Pair Uid C3-Expr))
 (define-type C3-Bnd*  (Listof C3-Bnd))
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Fn 'Atomic 'Boxed))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed))
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast created by label-lambdas                    |
@@ -748,14 +764,16 @@ We are going to UIL
           ;; closure operations
           (Fn-Caster E)
           ;; FN-Type operations
-	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
           (Type-tag E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
           (Dyn-type E)
           (Dyn-value E)
-          (Dyn-make E E) 
+          (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
           (Observe E Schml-Type)
@@ -792,7 +810,9 @@ We are going to UIL
           ;; closure operations
           (Fn-Caster E)
           ;; FN-Type operations
-	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
           (Type-tag E)
           ;; Dyn operations
           (Dyn-tag E)
@@ -834,10 +854,13 @@ We are going to UIL
 	  (If E E E)
           (Begin C6-Expr* E)
           ;; closure operations
-          ;;(Closure-ref E E)
-          (Fn-Caster E)
+          (Closure-code E)
+          (Closure-caster E)
+          (Closure-ref Uid Uid)
           ;; FN-Type operations
-	  (Type-Fn-ref E (U Index 'arity 'return))
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
           (Type-tag E)
           ;; Dyn operations
           (Dyn-tag E)
@@ -853,12 +876,13 @@ We are going to UIL
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
-	  (Quote Cast-Literal))))
+	  (Quote Cast-Literal)
+          (Code-Label Uid))))
 
 (define-type C6-Expr* (Listof C6-Expr))
 (define-type C6-Procedure
-  (Procedure Uid Uid* (Option Uid) Uid* C6-Expr))
-(define-type C6-Closure (Closure-Data Uid (Option Uid) (Listof Uid)))
+  (Procedure Uid Uid* Uid (Option Uid) Uid* C6-Expr))
+(define-type C6-Closure (Closure-Data C6-Expr C6-Expr C6-Expr*))
 (define-type C6-Bnd-Procedure (Pairof Uid C6-Procedure))
 (define-type C6-Bnd-Procedure* (Listof C6-Bnd-Procedure))
 (define-type C6-Bnd-Closure (Pairof Uid C6-Closure))
@@ -887,7 +911,9 @@ We are going to UIL
           ;;(Closure-ref V V)
           (Fn-Caster V)
           ;; FN-Type operations
-	  (Type-Fn-ref V (U Index 'arity 'return))
+          (Type-Fn-arg V V)
+          (Type-Fn-return V)
+          (Type-Fn-arity V)
           (Type-tag V)
           ;; Dyn operations
           (Dyn-tag V)
@@ -918,7 +944,7 @@ We are going to UIL
 (define-type C7-Value* (Listof C7-Value))
 (define-type C7-Effect* (Listof C7-Effect))
 (define-type C7-Procedure
-  (Procedure Uid Uid* (Option Uid) Uid* C7-Value))
+  (Procedure Uid Uid* Uid (Option Uid) Uid* C7-Value))
 (define-type C7-Closure (Closure-Data Uid (Option Uid) (Listof Uid)))
 (define-type C7-Bnd-Procedure (Pairof Uid C7-Procedure))
 (define-type C7-Bnd-Procedure* (Listof C7-Bnd-Procedure))
@@ -1005,13 +1031,16 @@ We are going to UIL
 (define TYPE-DYN-RT-VALUE #b0111)
 (define TYPE-INT-RT-VALUE #b1111)
 (define TYPE-BOOL-RT-VALUE #b10111)
+(define TYPE-UNIT-RT-VALUE #b11111)
 
 ;; The representation of Dynamic Immediates
 (define DYN-TAG-MASK  #b111)
+(define DYN-IMDT-SHIFT 3)
 (define DYN-BOXED-TAG #b000)
 (define DYN-INT-TAG   #b001)
+(define DYN-UNIT-TAG  #b010)
 (define DYN-BOOL-TAG  #b111)
-(define DYN-IMDT-SHIFT 3)
+
 
 ;; Boxed Dynamics are just a cons cell
 (define DYN-BOX-SIZE 2)
@@ -1021,6 +1050,7 @@ We are going to UIL
 ;; Immediates
 (define FALSE-IMDT #b000)
 (define TRUE-IMDT #b001)
+(define UNIT-IMDT #b000)
 ;; Unreachable Value
 (define UNDEF-IMDT 0)
 
@@ -1028,12 +1058,14 @@ We are going to UIL
 (define GREP-TAG-MASK #b111)
 (define UGBOX-SIZE 1)
 (define UGBOX-VALUE-INDEX 0)
+(define UGBOX-TAG #b000)
 (define GPROXY-TAG  #b001)
 (define GPROXY-SIZE 4)
 (define GPROXY-FOR-INDEX 0)
 (define GPROXY-FROM-INDEX 1)
 (define GPROXY-TO-INDEX 2)
 (define GPROXY-BLAMES-INDEX 3)
+
 
 ;; Closure representation
 (define CLOS-CODE-INDEX 0)

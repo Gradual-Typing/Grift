@@ -25,7 +25,7 @@
       monad.)
 
 (: remove-let (-> Data1-Lang Config Data2-Lang))
-(define (remove-let prgm comp-config)
+(trace-define (remove-let prgm comp-config)
   (match-let ([(Prog (list name count type) (Labels bnd-code* tail)) prgm])
     (let ([bnd-code* : D2-Bnd-Code* (rl-bnd-code* bnd-code*)]
           [body : D2-Body (rl-body tail)])
@@ -47,6 +47,7 @@
 
 (: rl-tail (-> D1-Tail (values D2-Tail Uid*)))
 (define (rl-tail tail)
+  (logf "rl-tail ~v\n\n" tail)
   (match tail
     [(Let bnd* tail)
      (let*-values ([(tail lv*) (rl-tail tail)]
@@ -63,10 +64,12 @@
        (values (Begin stm* tail) lv*))]
     [(Return exp)
      (let-values ([(exp lv*) (rl-value exp)])
-       (values (Return exp) lv*))]))
+       (values (Return exp) lv*))]
+    [other (error 'remove-let/rl-tail "~a" other)]))
 
 (: rl-value (-> D1-Value (values D2-Value Uid*)))
 (define (rl-value exp)
+  (logf "rl-value ~v\n\n" exp)
   (match exp
     [(Let bnd* exp)
      (let*-values ([(exp lv*) (rl-value exp)]
@@ -91,12 +94,14 @@
     [(Halt) (values (Halt) '())]
     [(Var i) (values (Var i) '())]
     [(Code-Label i) (values (Code-Label i) '())]
-    [(Quote k) (values (Quote k) '())]))
+    [(Quote k) (values (Quote k) '())]
+    [other (error 'remove-let/rl-value "~a" other)]))
 
 (: rl-pred (-> D1-Pred (values D2-Pred Uid*)))
 (define (rl-pred exp)
+  (logf "rl-pred ~v\n\n" exp)
   (match exp
-    [(Let bnd* pred)
+    [(Let bnd* exp)
      (let*-values ([(pred lv*) (rl-pred exp)]
                    [(stm* lv*) (rl-bnd* bnd* lv*)])
        (values (Begin stm* pred) lv*))]
@@ -112,7 +117,12 @@
     [(Relop p e1 e2)
      (let-values ([(e1 e1-lv*) (rl-value e1)]
                   [(e2 e2-lv*) (rl-value e2)])
-       (values (Relop p e1 e2) (append e1-lv* e2-lv*)))]))
+       (values (Relop p e1 e2) (append e1-lv* e2-lv*)))]
+    [(App exp exp*)
+     (let*-values ([(exp lv*) (rl-value exp)]
+                   [(exp* lv*^) (rl-value* exp*)])
+       (values (App exp exp*) (append lv* lv*^)))]
+    [other (error 'remove-let/rl-pred "~a" other)]))
 
 (: rl-value* (-> (Listof D1-Value) (values (Listof D2-Value) Uid*)))
 (define (rl-value* exp*)
@@ -141,6 +151,7 @@
 
 (: rl-effect (-> D1-Effect Uid* (values D2-Effect Uid*)))
 (define (rl-effect eff lv*)
+  (logf "rl-effect ~v\n\n" eff)
   (match eff
     [(Let bnd* exp)
      (let*-values ([(exp lv*)  (rl-effect exp lv*)]
@@ -161,7 +172,8 @@
     [(Op p exp*)
      (let*-values ([(exp* lv*^) (rl-value* exp*)])
       (values (Op p exp*) (append lv*^ lv*)))]
-    [(No-Op) (values NO-OP lv*)]))
+    [(No-Op) (values NO-OP lv*)]
+    [other (error 'remove-let/rl-value "~a" other)]))
 
 (: rl-effect* (-> D1-Effect* Uid* (values D2-Effect* Uid*)))
 (define (rl-effect* stm* lv*)

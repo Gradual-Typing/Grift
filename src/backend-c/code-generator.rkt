@@ -24,14 +24,30 @@
 (define (invoke-c-compiler config)
   (let* ([out (path->string (Config-exec-path config))]
          [in  (path->string (Config-c-path config))]
-         [cmd (format "cc -o ~a ~a ~a" out in (warning-flags))])
+         [flags (append-flags (Config-c-flags config))]
+         [cmd (format "cc -o ~a ~a ~a" out in flags)])
     (when (trace? 'Vomit)
       (logf "System call: ~a" cmd))
+    (flush-output (current-log-port))
+    (flush-output (current-error-port))
+    (flush-output)
     (parameterize
         ([current-error-port (if (trace? 'CC-Errors 'All 'Vomit)
                                  (current-log-port)
                                  (current-error-port))])
       (system cmd))))
+
+(: append-flags : (Listof String) -> String)
+(define (append-flags s)
+  (if (null? s)
+      (warning-flags)
+      (with-output-to-string
+        (lambda ()
+          (let loop ([s s])
+            (unless (null? s)
+              (display (car s))
+              (display " ")
+              (loop (cdr s))))))))
 
 ;; C compiler warnings written with regard to clang
 ;; I need to check to make sure that these option will work with gcc

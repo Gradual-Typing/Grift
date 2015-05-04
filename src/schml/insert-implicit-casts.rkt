@@ -40,10 +40,10 @@
        [(Let bnd* (and (Ann _ (cons src type^)) body))
 	(Let (map iic-bnd bnd*) (mk-cast (mk-label "let" src) (iic-expr body) type^ type))]
        [(Letrec bnd* (and (Ann _ (cons src type^)) body))
-	(Letrec (map iic-bnd bnd*) (mk-cast (mk-label "letrec" src) (iic-expr body) type^ type))]
+	(Letrec (map iic-bnd bnd*) 
+                (mk-cast (mk-label "letrec" src) (iic-expr body) type^ type))]
        [(App rator rand*) (iic-application rator rand* src type)]
        [(Op (Ann prim rand-ty*) rand*)
-	;;(Ann  type)
 	(Op prim (map (iic-operand/cast src) rand* rand-ty*))]
        [(Ascribe exp t1 lbl?)
 	(let ([lbl (if lbl? (th lbl?) (mk-label "ascription" src))])

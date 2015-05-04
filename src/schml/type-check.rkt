@@ -137,9 +137,9 @@
 (: gbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
 (define (gbox-set!-type-rule box-ty val-ty)
   (match box-ty
-    [(Dyn) DYN-TYPE]
+    [(Dyn) UNIT-TYPE]
     [(GRef g) (if (consistent? g val-ty)
-                  val-ty
+                  UNIT-TYPE
                   (TODO raise an error about type inconsistency between g and val-ty))]
     [otherwise (TODO raise an error about box-type being type-incorrect)]))
 

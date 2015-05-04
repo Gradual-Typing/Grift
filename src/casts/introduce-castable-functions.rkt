@@ -48,73 +48,49 @@
      (do (bind-state : (State Casters C1-Expr))
          (uid : Uid     <- (get-caster (length f*)))
          (exp : C1-Expr <- (icf-expr exp))
-         (return-state (Lambda f* (Castable uid exp))))
-     #;(let*-values ([(f*) (map (inst Fml-identifier Uid Schml-Type) f*)]
-                     [(uid state) (get-caster (length f*) state)]
-		     [(exp state) (icf-expr exp state)])
-         (values (Lambda f* (Castable uid exp)) state))]
-      [(Cast exp t1 t2 lbl)
-       (do (bind-state : (State Casters C1-Expr))
-           (exp : C1-Expr <- (icf-expr exp))
-           (if (and (Fn? t1) (Fn? t2))
-               (return-state (Fn-Cast exp t1 t2 lbl))
-               (return-state (Cast exp t1 t2 lbl))))
-       #;
-       (let*-values ([(exp state) (icf-expr exp state)])
-	 (if (and (Fn? t1) (Fn? t2))
-             (values (Fn-Cast exp t1 t2 lbl) state)
-             (values (Cast exp t1 t2 lbl) state)))]
-      [(Letrec bnd* exp)
-       (do (bind-state : (State Casters C1-Expr))
-           (bnd* : C1-Bnd* <- (icf-bnd* bnd*))
-           (exp : C1-Expr  <- (icf-expr exp))
-           (return-state (Letrec bnd* exp)))
-       #;
-       (let*-values ([(bnd* state) (icf-bnd* bnd* state)]
-		     [(exp state) (icf-expr exp state)])
-	 (values (Letrec bnd* exp) state))]
-      [(Let bnd* exp)
-       (do (bind-state : (State Casters C1-Expr))
-           (bnd* : C1-Bnd* <- (icf-bnd* bnd*))
-           (exp : C1-Expr  <- (icf-expr exp))
-           (return-state (Let bnd* exp)))
-       #;
-       (let*-values ([(bnd* state) (icf-bnd* bnd* state)]
-		     [(exp state) (icf-expr exp state)])
-	 (values (Let bnd* exp) state))]
-      [(App exp exp*)
-       (do (bind-state : (State Casters C1-Expr))
-           (exp  : C1-Expr  <- (icf-expr  exp))
-           (exp* : C1-Expr* <- (icf-expr* exp*))
-           (return-state (App exp exp*)))
-       #;
-       (let*-values ([(exp state) (icf-expr exp state)]
-		     [(exp* state) (icf-expr* exp* state)])
-	 (values (App exp exp*) state))]
-      [(Op p exp*)
-       (do (bind-state : (State Casters C1-Expr))
-           (exp* : C1-Expr* <- (icf-expr* exp*))
-           (return-state (Op p exp*)))
-       #;
-       (let*-values ([(exp* state) (icf-expr* exp* state)])
-       (values (Op p exp*) state))]
-      [(If tst csq alt)
-       (do (bind-state : (State Casters C1-Expr))
-           (tst : C1-Expr <- (icf-expr tst))
-           (csq : C1-Expr <- (icf-expr csq))
-           (alt : C1-Expr <- (icf-expr alt))
-           (return-state (If tst csq alt)))]
-      [(Begin e* e)
-       (do (bind-state : (State Casters C1-Expr))
-           (e* : C1-Expr* <- (icf-expr* e*))
-           (e  : C1-Expr  <- (icf-expr  e))
-           (return-state (Begin e* e)))]
-      [(Gbox e) (lift-state (inst Gbox C1-Expr) (icf-expr e))]
-      [(Gunbox e) (lift-state (inst Gunbox C1-Expr) (icf-expr e))]
-      [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! C1-Expr C1-Expr)
-                                     (icf-expr e1) (icf-expr e2))]
-      [(Var id)    (return-state (Var id))]
-      [(Quote lit) (return-state (Quote lit))]))
+         (return-state (Lambda f* (Castable uid exp))))]
+    [(Cast exp t1 t2 lbl)
+     (do (bind-state : (State Casters C1-Expr))
+         (exp : C1-Expr <- (icf-expr exp))
+         (if (and (Fn? t1) (Fn? t2))
+             (return-state (Fn-Cast exp t1 t2 lbl))
+             (return-state (Cast exp t1 t2 lbl))))]
+    [(Letrec bnd* exp)
+     (do (bind-state : (State Casters C1-Expr))
+         (bnd* : C1-Bnd* <- (icf-bnd* bnd*))
+         (exp : C1-Expr  <- (icf-expr exp))
+         (return-state (Letrec bnd* exp)))]
+    [(Let bnd* exp)
+     (do (bind-state : (State Casters C1-Expr))
+         (bnd* : C1-Bnd* <- (icf-bnd* bnd*))
+         (exp : C1-Expr  <- (icf-expr exp))
+         (return-state (Let bnd* exp)))]
+    [(App exp exp*)
+     (do (bind-state : (State Casters C1-Expr))
+         (exp  : C1-Expr  <- (icf-expr  exp))
+         (exp* : C1-Expr* <- (icf-expr* exp*))
+         (return-state (App exp exp*)))]
+    [(Op p exp*)
+     (do (bind-state : (State Casters C1-Expr))
+         (exp* : C1-Expr* <- (icf-expr* exp*))
+         (return-state (Op p exp*)))]
+    [(If tst csq alt)
+     (do (bind-state : (State Casters C1-Expr))
+         (tst : C1-Expr <- (icf-expr tst))
+         (csq : C1-Expr <- (icf-expr csq))
+         (alt : C1-Expr <- (icf-expr alt))
+         (return-state (If tst csq alt)))]
+    [(Begin e* e)
+     (do (bind-state : (State Casters C1-Expr))
+         (e* : C1-Expr* <- (icf-expr* e*))
+         (e  : C1-Expr  <- (icf-expr  e))
+         (return-state (Begin e* e)))]
+    [(Gbox e) (lift-state (inst Gbox C1-Expr) (icf-expr e))]
+    [(Gunbox e) (lift-state (inst Gunbox C1-Expr) (icf-expr e))]
+    [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! C1-Expr C1-Expr)
+                                   (icf-expr e1) (icf-expr e2))]
+    [(Var id)    (return-state (Var id))]
+    [(Quote lit) (return-state (Quote lit))]))
 
 (: icf-expr* (-> C0-Expr* (State Casters C1-Expr*)))
 (define (icf-expr* e*) (map-state icf-expr e*))
@@ -143,8 +119,9 @@
 	  (if bnd?
 	      (return-state (car bnd?))
 	      (let-values ([(bnd next) (run-state (mk-caster-bnd arity) next)])
-		(put-state (cons next (hash-set table arity bnd)))
-                (return-state (car bnd))))))))
+		(do (bind-state : (State Casters Uid))
+                    (_ : Null <- (put-state (cons next (hash-set table arity bnd))))
+                    (return-state (car bnd)))))))))
 
 (: no-casters (HashTable Index C1-Bnd))
 (define no-casters (hasheq))
@@ -157,21 +134,17 @@
   (do (bind-state : (State Natural C1-Bnd))
       (uid : Uid     <- (uid-state (format "cast_fn~a" ary)))
       (rhs : C1-Expr <- (mk-caster-fn ary uid))
-      (return-state (cons uid rhs)))
-  #;
-  (let*-values ([(uid next) (next-uid (format "cast_fn~a" ary) next)]
-		[(rhs next) (mk-caster-fn ary next uid)])
-    (values (cons uid rhs) next)))
+      (return-state (cons uid rhs))))
 
 ;; make a function that builds a function proxy for the cast of a specific
 ;; arity. This function is always of the following form
-#|(lambda (v t1 t2 l)
-    (if (= (fn-type-arity t1) (fn-type-arity t2))
+#|
+(lambda (v t1 t2 l)
+  (if (= (fn-type-arity t1) (fn-type-arity t2))
       (lambda (a ...)
         (cast (v (cast a (fn-type-arg t2) (fn-type-arg t1) l) ...)
-              (fn-type-ret t1)
-              (fn-type-ret t2)
-              l)))|#
+              (fn-type-ret t1) (fn-type-ret t2) l)))
+|#
 (: mk-caster-fn (-> Index Uid (State Natural C1-Expr)))
 (define (mk-caster-fn ary name)
   ;; create uids for all arguments to the proxy
@@ -181,19 +154,20 @@
 	(return-state vars)
         (do (bind-state : (State Natural Uid*))
             (uid : Uid <- (uid-state "v"))
-            (mk-caster-ids ary (cons uid vars)))))
+            (mk-caster-ids (- ary 1) (cons uid vars)))))
   ;; create expression for the runtime cast of arguments to the proxy
   (: mk-casted-args (-> C1-Expr C1-Expr C1-Expr Uid* C1-Expr*))
   (define (mk-casted-args t1 t2 lbl uid*)
     (: loop (-> Uid* Index C1-Expr*))
     (define (loop uid* index)
-      (if (null? uid*)
-	  '()
-	  (let ([val : C1-Expr (Var (car uid*))]
-		[t1 : C1-Expr (Type-Fn-ref t1 index)]
-		[t2 : C1-Expr (Type-Fn-ref t2 index)])
-	    (cons (Runtime-Cast val t2 t1 lbl)        ;; contravarient argument cast
-		  (loop (cdr uid*) (cast (add1 index) Index))))))
+      (let ([i (Quote index)])
+        (if (null? uid*)
+            '()
+            (let ([val : C1-Expr (Var (car uid*))]
+                  [t1 : C1-Expr (Type-Fn-arg t1 i)]
+                  [t2 : C1-Expr (Type-Fn-arg t2 i)])
+              (cons (Runtime-Cast val t2 t1 lbl)        ;; contravarient argument cast
+                    (loop (cdr uid*) (cast (add1 index) Index)))))))
     (loop uid* 0))
   (do (bind-state : (State Natural C1-Expr))
       ;; create the uids for the casting function
@@ -212,13 +186,13 @@
              ;; formals for the casting function
              [caster-fml : Uid* (list fn t1 t2 lbl)]
              ;; cast the return of the unproxied application
-             [t1-ret    : C1-Expr (Type-Fn-ref t1-var 'return)]
-             [t2-ret    : C1-Expr (Type-Fn-ref t2-var 'return)]
+             [t1-ret    : C1-Expr (Type-Fn-return t1-var)]
+             [t2-ret    : C1-Expr (Type-Fn-return t2-var)]
              [call      : C1-Expr (App fn-var args)]
              [cast-call : C1-Expr (Runtime-Cast call t1-ret t2-ret lbl-var)]
              ;; application isn't performed if the arity is a mismatch
-             [arity-t1 : C1-Expr (Type-Fn-ref t1-var 'arity)]
-             [arity-t2 : C1-Expr (Type-Fn-ref t2-var 'arity)]
+             [arity-t1 : C1-Expr (Type-Fn-arity t1-var)]
+             [arity-t2 : C1-Expr (Type-Fn-arity t2-var)]
              [arity-test : C1-Expr (Op '= (list arity-t1 arity-t2))]
              ;; the closure to return if arity is correct
              [then-cast : C1-Expr (Lambda uid* (Castable name cast-call))]

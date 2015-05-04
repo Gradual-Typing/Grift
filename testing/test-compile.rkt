@@ -14,7 +14,7 @@
 
 (define compiler-config : (Parameter Config)
   (make-parameter
-   (Config 'Lazy-D (build-path "t.out") (build-path "t.c"))))
+   (Config 'Lazy-D (build-path "t.out") (build-path "t.c") '())))
 
 (define-syntax-rule (ann-ck msg ? v e)
   (check ? v e msg))

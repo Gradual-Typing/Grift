@@ -8,7 +8,7 @@
 
 (provide cast-lang-interp)
 
-(define-type CL-Value (U Boolean Integer CL-Proc CL-Dyn CL-GRef Blame-Label))
+(define-type CL-Value (U Boolean Integer Null CL-Proc CL-Dyn CL-GRef Blame-Label))
 (define-type CL-Value* (Listof CL-Value))
 
 ;; This is a common idiom because typed-racket has a glitch concerning functions and
@@ -261,6 +261,7 @@
      (cond
       [(integer? v) (int v)]
       [(boolean? v) (bool v)]
+      [(null? v)    (unit)]
       [(gref? v)    (gbox)]
       [(CL-Proc? v) (function)]
       [(CL-Dyn? v) (if (Fn? (CL-Dyn-type2 v)) (function) (dyn))]

@@ -51,6 +51,7 @@
    (test-file "if3.schml" (int 4))
 
    ;; Ascription
+   (test-file "int-dyn-int.schml"   (int 1))
    (test-file "ascribe-dyn.schml"       (dyn))
    (test-file "ascribe-int-good.schml"  (int 10))
    (test-file "ascribe-bool-good.schml" (bool #t))
@@ -80,6 +81,9 @@
    (test-file "let9.schml" (int 100))
    (test-file "let10.schml" (dyn))
    (test-file "let11.schml" (bool #f))
+   (test-file "let12.1.schml" (dyn))
+   (test-file "let12.2.schml" (dyn))
+   (test-file "let12.3.schml" (blame #f #f))
    (test-file "let12.schml" (dyn))
    (test-file "let13.schml" (dyn))
    (test-file "let14.schml" (int 5))
@@ -197,7 +201,8 @@
   (lambda ([f : Output-Port])
     (parameterize ([compiler-config (Config 'Lazy-D
                                             (build-path test-tmp-path "t.out")
-                                            (build-path test-tmp-path "t.c"))]
+                                            (build-path test-tmp-path "t.c")
+                                            '())]
                    [current-log-port f]
                    ;;[traces '(All Vomit)]
                    ;;[current-error-port f]
