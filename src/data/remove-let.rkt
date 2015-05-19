@@ -156,6 +156,7 @@
     [(Let bnd* exp)
      (let*-values ([(exp lv*)  (rl-effect exp lv*)]
                    [(stm* lv*) (rl-bnd* bnd* lv*)])
+       (logf "rl-effect/let\n stm* ~a\n exp ~a\n\n" stm* exp)
        (values (make-begin (append stm* (list exp)) NO-OP) lv*))]
     [(If t c a)
      (let*-values ([(t p-lv*) (rl-pred t)]

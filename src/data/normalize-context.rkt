@@ -25,7 +25,7 @@
 
 (: nc-tail (-> D0-Expr (State D1-Bnd-Code* D1-Tail)))
 (define (nc-tail exp)
-  (logf "nc-tail ~v\n\n" exp)
+  (logging nc-tail ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-tail exp)))]
@@ -51,7 +51,7 @@
 
 (: nc-value (-> D0-Expr (State D1-Bnd-Code* D1-Value)))
 (define (nc-value exp)
-  (logf "nc-value ~v\n\n" exp)
+  (logging nc-value ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-value exp)))]
@@ -90,25 +90,25 @@
 
 (: nc-effect (-> D0-Expr (State D1-Bnd-Code* D1-Effect)))
 (define (nc-effect exp)
-  (logf "nc-effect ~v\n\n" exp)
+  (logging nc-effect ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-effect exp)))]
     [(Let bnd* exp)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (bnd* : D1-Bnd* <- (nc-bnd* bnd*))
-         (val  : D1-Effect <- (nc-effect exp))
-         (return-state (Let bnd* val)))]
+         (eff  : D1-Effect <- (nc-effect exp))
+         (return-state (Let bnd* eff)))]
     [(If t c a)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (t : D1-Pred  <- (nc-pred t))
          (c : D1-Effect <- (nc-effect c))
          (a : D1-Effect <- (nc-effect a))
          (return-state (If t c a)))]
-    [(Begin eff* exp)
+    [(Begin eff* eff)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (eff* : D1-Effect* <- (nc-effect* eff*))
-         (eff  : D1-Effect  <- (nc-effect exp))
+         (eff  : D1-Effect  <- (nc-effect eff))
          (return-state (make-begin (append eff* (list eff)) NO-OP)))]
     [(App exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
@@ -133,6 +133,7 @@
 
 (: nc-pred (-> D0-Expr (State D1-Bnd-Code* D1-Pred)))
 (define (nc-pred exp)
+  (logging nc-pref ('Vomit) "~v" exp) 
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-pred exp)))]

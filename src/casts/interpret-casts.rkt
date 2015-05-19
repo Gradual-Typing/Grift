@@ -27,7 +27,7 @@
 
 (: specialize-casts? (Parameterof Boolean))
 (define specialize-casts?
-  (make-parameter #t))
+  (make-parameter #f))
 
 (: recursive-dyn-cast? (Parameterof Boolean))
 (define recursive-dyn-cast?
@@ -254,12 +254,12 @@
   (if (Type? o)
       (let ([v (Type-type o)])
         (cond
-         [(or (Dyn? v)
-              (Int? v)
-              (Bool? v))
+         [(or (Dyn? v) (Int? v) (Bool? v))
           (Tag 'Atomic)]
+         [(GRef? v) (Tag 'GRef)]
          [(Fn? v) (Tag 'Fn)]
-         [else (error 'type-tag)]))
+         [else (error 'interpret-casts/type-tag
+                      "Unexpected ~a" v)]))
       (Type-tag o)))
 
 ;; performs compile time folding of prim = on literals
@@ -375,9 +375,12 @@
       [(op=? type1 (Type UNIT-TYPE)) (cast-unit v type1 t2 lbl)]
       [else
        (let$* ([tag1 (type-tag type1)])
-        (if$ (op=? (Tag 'Fn) tag1)
-             (cast-fn v type1 t2 lbl)
-             (return-state (Blame (Quote "Unexpected Type1 in cast tree")))))])))
+        (cond$
+         [(op=? (Tag 'Fn) tag1) (cast-fn v type1 t2 lbl)]
+         [(op=? (Tag 'GRef) tag1) (cast-gref v type1 t2 lbl)]
+         [else
+          (return-state
+           (Blame (Quote "Unexpected Type1 in cast tree")))]))])))
 
 #;(TODO do something more clever than the current boxing schema)
 (: cast-int Cast-Aux-Rule)
@@ -394,7 +397,8 @@
   (cond$
    ;; this is likely uneeded
    ;;[(op=? (Type UNIT-TYPE) type2) (return-state val)]
-   [(op=? (Type DYN-TYPE) type2) (return-state (Dyn-make val (Type UNIT-TYPE)))]
+   [(op=? (Type DYN-TYPE) type2)
+    (return-state (Dyn-make val (Type UNIT-TYPE)))]
    [else (return-state (Blame lbl))])))
 
 (: cast-bool Cast-Aux-Rule)
@@ -403,8 +407,26 @@
   (cond$
    ;; this is probabaly uneeded
    ;;[(op=? (Type BOOL-TYPE) type2) (return-state val)]
-   [(op=? (Type DYN-TYPE) type2) (return-state (Dyn-make val (Type BOOL-TYPE)))]
+   [(op=? (Type DYN-TYPE) type2)
+    (return-state (Dyn-make val (Type BOOL-TYPE)))]
    [else (return-state (Blame lbl))])))
+
+(: cast-gref Cast-Aux-Rule)
+(define (cast-gref v t1 t2 lbl)
+  (: gref-arg (C3-Expr -> C3-Expr))
+  (define (gref-arg t)
+    (match t
+      [(Type (GRef a)) (Type a)]
+      [other (Type-GRef-to t)]))
+  (let$* ([val v] [type1 t1] [type2 t2])
+   (if$ (op=? (Type DYN-TYPE) type2)
+        (return-state (Dyn-make val t1))
+        (let$* ([tag_gref (type-tag type2)])
+         (if$ (op=? tag_gref (Tag 'GRef))
+              (let$* ([g1 (gref-arg type1)]
+                      [g2 (gref-arg type2)])
+               (return-state (Gproxy val g1 g2 lbl)))
+              (return-state (Blame lbl)))))))
 
 (: cast-fn Cast-Aux-Rule)
 (define (cast-fn v t1 t2 lbl)

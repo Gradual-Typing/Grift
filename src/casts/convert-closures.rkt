@@ -117,6 +117,10 @@
       ;; Type Representation
       [(Type t) (return-state (Type t))]
       [(Type-tag e) (lift-state (inst Type-tag C6-Expr) (cc-expr/env e))]
+      [(Type-GRef-to e)
+       (do (bind-state : (State Nat C6-Expr))
+           (e  : C6-Expr <- (cc-expr/env  e))
+           (return-state (Type-GRef-to e)))]
       [(Type-Fn-arg e i)
        (do (bind-state : (State Nat C6-Expr))
            (e : C6-Expr <- (cc-expr/env e))

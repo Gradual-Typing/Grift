@@ -72,10 +72,11 @@ be usefull for optimizations or keeping state.
   (Runtime-Cast expression type-exp type-cast label)
   (Fn-Cast expressiong type-exp type-cast label)
   ;;Type Operations
+  (Type-tag expression)
   (Type-Fn-arity expression)
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
-  (Type-tag expression)
+  (Type-GRef-to expression)
   ;; closure Representation
   (Fn-Caster expression)
   (Closure-Data code caster variables)
@@ -272,7 +273,8 @@ be usefull for optimizations or keeping state.
       [(No-Op? eff) rest]
       [(Begin? eff) (append (Begin-effects eff) rest)]
       [else (cons eff rest)]))
-  (let ([eff* (foldl splice-eff '() eff*)])
+  (logging make-begin ('Vomit) "eff*: ~v\nres: ~v" eff* res)
+  (let ([eff* (foldr splice-eff '() eff*)])
     (cond
       [(null? eff*) res]
       [(Begin? res) (Begin (append eff* (Begin-effects res))
@@ -664,6 +666,7 @@ We are going to UIL
           (Type-Fn-arg E E)
           (Type-Fn-return E)
           (Type-Fn-arity E)
+          (Type-GRef-to E)
           ;; Observations
           (Blame E)
           ;; Guarded Representation
@@ -675,15 +678,8 @@ We are going to UIL
 
 
 (define-type (GRep A)
-  (U (GRep-proxied? A)
-     (UGbox A)
-     (UGbox-set! A A)
-     (UGbox-ref A)
-     (Gproxy A A A A)
-     (Gproxy-for A)
-     (Gproxy-from A)
-     (Gproxy-to A)
-     (Gproxy-blames A)))
+  (U (GRep-Value A)
+     (GRep-Effect A)))
 
 (define-type (GRep-Value A)
   (U (GRep-proxied? A)
@@ -718,12 +714,12 @@ We are going to UIL
           (Begin C3-Expr* E)
           ;; closure operations
           (Fn-Caster E)
-          ;; FN-Type operations
-	  ;; FN-Type operations
+          ;; Type operations
+          (Type-tag E)
           (Type-Fn-arg E E)
           (Type-Fn-return E)
           (Type-Fn-arity E)
-          (Type-tag E)
+          (Type-GRef-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -744,7 +740,7 @@ We are going to UIL
 (define-type C3-Bnd   (Pair Uid C3-Expr))
 (define-type C3-Bnd*  (Listof C3-Bnd))
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef))
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast created by label-lambdas                    |
@@ -763,11 +759,12 @@ We are going to UIL
           (Begin C4-Expr* E)
           ;; closure operations
           (Fn-Caster E)
-          ;; FN-Type operations
+          ;; Type operations
+          (Type-tag E)
           (Type-Fn-arg E E)
           (Type-Fn-return E)
           (Type-Fn-arity E)
-          (Type-tag E)
+          (Type-GRef-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -809,11 +806,12 @@ We are going to UIL
           (Begin C5-Expr* E)
           ;; closure operations
           (Fn-Caster E)
-          ;; FN-Type operations
+          ;; Type operations
+          (Type-tag E)
           (Type-Fn-arg E E)
           (Type-Fn-return E)
           (Type-Fn-arity E)
-          (Type-tag E)
+          (Type-GRef-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -858,10 +856,11 @@ We are going to UIL
           (Closure-caster E)
           (Closure-ref Uid Uid)
           ;; FN-Type operations
+          (Type-tag E)
           (Type-Fn-arg E E)
           (Type-Fn-return E)
           (Type-Fn-arity E)
-          (Type-tag E)
+          (Type-GRef-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -911,10 +910,11 @@ We are going to UIL
           ;;(Closure-ref V V)
           (Fn-Caster V)
           ;; FN-Type operations
+          (Type-tag V)
           (Type-Fn-arg V V)
           (Type-Fn-return V)
           (Type-Fn-arity V)
-          (Type-tag V)
+          (Type-GRef-to V)
           ;; Dyn operations
           (Dyn-tag V)
           (Dyn-immediate V)
@@ -953,69 +953,6 @@ We are going to UIL
 (define-type C7-Bnd-Data (Pairof Uid C7-Value))
 (define-type C7-Bnd-Data* (Listof C7-Bnd-Data))
 
-
-
-
-
-
-#|-----------------------------------------------------------------------------+
-| Language/Cast4 created by normalize-context                                  |
-+-----------------------------------------------------------------------------|#
-#|
-
-(define-type Cast4-Lang
-  (Prog (List String Natural Schml-Type) C4-Value))
-
-(define-type C4-Value
-  (Rec V (U
-	  (Lambda Uid* (Castable (Option Uid) V))
-	  (Letrec C4-Bnd* V)
-	  (Let C4-Bnd* V)
-	  (App V (Listof V))
-	  (UIL-Op V)
-	  (If V V V)
-          (Begin C4-Effect* V)
-          ;; closure operations
-          (Fn-Caster V)
-          ;; FN-Type operations
-          (Type Schml-Type)
-          (Type-tag V)
-          (Type-Fn-arity V)
-	  (Type-Fn-return V)
-          (Type-Fn-arg V V)
-          ;; Dyn operations
-          (Dyn-make V V)
-          (Dyn-tag V)
-          (Dyn-immediate V)
-          (Dyn-value V)
-          (Dyn-type V)
-          ;; Observational Operations
-          (Blame V)
-          (Observe V Schml-Type)
-          ;; Terminals
-          (Tag Tag-Symbol)
-	  (Var Uid)
-          (GRep-Value V)
-	  (Quote Cast-Literal))))
-
-
-(define-type C4-Effect
-  (Rec E
-   (U (Letrec C4-Bnd* E)
-      (Let C4-Bnd* E)
-      (Begin C4-Effect* No-Op)
-      (App C4-Value C4-Value*)
-      (If C4-Value E E)
-      No-Op
-      (GRep-Effect C4-Value))))
-
-(define-type C4-Value* (Listof C4-Value))
-(define-type C4-Effect* (Listof C4-Effect))
-(define-type C4-Bnd   (Pair Uid C4-Value))
-(define-type C4-Bnd*  (Listof C4-Bnd))
-
-|#
-
 #|-----------------------------------------------------------------------------+
 | The Constants for the representation of casts                                |
 +-----------------------------------------------------------------------------|#
@@ -1024,10 +961,24 @@ We are going to UIL
 (define FN-RETURN-INDEX 1)
 (define FN-FMLS-OFFSET 2)
 
-;; The representation of Immediates for types
+;; The representation of tagged structure types
+;; My thought is that types can be allocated statically
+;; so there doesn't really need to be much though put
+;; it may even be worth not tagging them and just laying
+;; the types explicitly;
 (define TYPE-TAG-MASK #b111)
 (define TYPE-FN-TAG #b000)
-(define TYPE-ATOMIC-TAG #b111)
+(define TYPE-GREF-TAG #b001)
+;; Hypothetical extensions to type tags
+;; Though more organization could le
+;;(define TYPE-GVECT-TAG #b010)
+;;(define TYPE-MREF-TAG #b011)
+;;(define TYPE-MVECT-TAG #b100)
+;;(define TYPE-IARRAY-TAG #b101)
+;;(define TYPE-MU-TAG #b110)
+
+(define TYPE-ATOMIC-TAG #b111) ;; This should be TYPE-IMDT-TAG
+;; Immediate types are tagged with #b111
 (define TYPE-DYN-RT-VALUE #b0111)
 (define TYPE-INT-RT-VALUE #b1111)
 (define TYPE-BOOL-RT-VALUE #b10111)
@@ -1040,7 +991,6 @@ We are going to UIL
 (define DYN-INT-TAG   #b001)
 (define DYN-UNIT-TAG  #b010)
 (define DYN-BOOL-TAG  #b111)
-
 
 ;; Boxed Dynamics are just a cons cell
 (define DYN-BOX-SIZE 2)
@@ -1066,6 +1016,9 @@ We are going to UIL
 (define GPROXY-TO-INDEX 2)
 (define GPROXY-BLAMES-INDEX 3)
 
+;; GREF Type Representation
+(define TYPE-GREF-SIZE  1)
+(define GREF-TO-INDEX 0)
 
 ;; Closure representation
 (define CLOS-CODE-INDEX 0)

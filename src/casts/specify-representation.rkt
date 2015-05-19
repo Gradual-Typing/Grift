@@ -69,11 +69,12 @@ exposed as the effects that they truelly are.
 (define CLOS-CODE-INDEX-VALUE     : D0-Expr (Quote CLOS-CODE-INDEX))
 (define CLOS-CSTR-INDEX-VALUE     : D0-Expr (Quote CLOS-CSTR-INDEX))
 (define CLOS-FVAR-OFFSET-VALUE    : D0-Expr (Quote CLOS-FVAR-OFFSET))
-
+(define TYPE-GREF-SIZE-VALUE      : D0-Expr (Quote TYPE-GREF-SIZE))
+(define TYPE-GREF-TAG-VALUE       : D0-Expr (Quote TYPE-GREF-TAG))
+(define GREF-TO-INDEX-VALUE       : D0-Expr (Quote GREF-TO-INDEX))
 
 (: specify-representation (Cast6-Lang Config -> Data0-Lang))
-(define (specify-representation prgm comp-config)
-  #;(logf "specify-representation:\n~a\n" prgm)
+(trace-define (specify-representation prgm comp-config)
   (match-let ([(Prog (list name next type) expr) prgm])
     (let ([sr-top-expr (sr-expr (hash) empty-index-map)])
       (let-values ([(expr next) (run-state (sr-top-expr expr) next)])
@@ -170,7 +171,7 @@ exposed as the effects that they truelly are.
       [(Var i)  (return-state (lookup env i))]
       [(Code-Label u) (return-state (Code-Label u))]
       ;; Type Representation
-      [(Type t) (lambda ([n : Nat]) (sr-type t n))]
+      [(Type t) (sr-type t)]
       [(Type-Fn-arity e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
@@ -187,6 +188,10 @@ exposed as the effects that they truelly are.
                         [(Quote (? number? k)) (Quote (+ FN-FMLS-OFFSET k))]
                         [otherwiths (Op '+ (list e2 FN-FMLS-OFFSET-VALUE))])])
            (return-state (Op 'Array-ref (list e1 e2^)))))]
+      [(Type-GRef-to e)
+       (do (bind-state : (State Nat D0-Expr))
+           (e : D0-Expr <- (recur e))
+           (return-state (Op 'Array-ref (list e GREF-TO-INDEX-VALUE))))]
       [(Type-tag e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
@@ -283,10 +288,10 @@ exposed as the effects that they truelly are.
 (define (alloc-tag-set-gproxy for from to blames)
   (do (bind-state : (State Nat D0-Expr))
       (tmpp : Uid <- (uid-state "gproxy"))
-      (tmpf : Uid <- (uid-state "tmp-for"))
-      (tmpm : Uid <- (uid-state "tmp-from"))
-      (tmpt : Uid <- (uid-state "tmp-to"))
-      (tmpl : Uid <- (uid-state "tmp-blames"))
+      (tmpf : Uid <- (uid-state "for"))
+      (tmpm : Uid <- (uid-state "from"))
+      (tmpt : Uid <- (uid-state "to"))
+      (tmpl : Uid <- (uid-state "blames"))
       (let* ([tmp-var : D0-Expr (Var tmpp)]
              [alloc   : D0-Expr (Op 'Alloc (list GPROXY-SIZE-VALUE))]
              [set-for : D0-Expr
@@ -299,7 +304,7 @@ exposed as the effects that they truelly are.
               (Op 'Array-set! (list tmp-var GPROXY-BLAMES-INDEX-VALUE (Var tmpl)))]
              [bnd-tmps : (Listof (Pairof Uid D0-Expr))
               (list (cons tmpf for) (cons tmpm from)
-                    (cons tmpt to) (cons tmpt blames))]
+                    (cons tmpt to) (cons tmpl blames))]
              [set* : (Listof D0-Expr)
               (list set-for set-from set-to set-blames)]
              [bnd-alloc : (Listof (Pairof Uid D0-Expr)) (list (cons tmpp alloc))]
@@ -310,7 +315,7 @@ exposed as the effects that they truelly are.
 (: alloc-set-ugbox (D0-Expr . -> . (State Nat D0-Expr)))
 (define (alloc-set-ugbox e)
   (do (bind-state : (State Nat D0-Expr))
-      (tmp : Uid <- (uid-state "gproxy"))
+      (tmp : Uid <- (uid-state "ugbox"))
       (let* ([tmp-var (Var tmp)]
              [alloc   (Op 'Alloc (list UGBOX-SIZE-VALUE))]
              [set     (Op 'Array-set! (list tmp-var UGBOX-VALUE-INDEX-VALUE e))])
@@ -331,8 +336,8 @@ exposed as the effects that they truelly are.
 (: sr-bnd* (-> Env IndexMap C6-Bnd-Data* (State Nat D0-Bnd*)))
 (define (sr-bnd* env cenv b*) (map-state (sr-bnd env cenv) b*))
 
-(: sr-type (-> Schml-Type Nat (values D0-Expr Nat)))
-(define (sr-type t n)
+(: sr-type (-> Schml-Type (State Nat D0-Expr)))
+(define (sr-type t)
   (: array-set* (-> D0-Expr Integer (Listof D0-Expr) (Listof D0-Expr)))
   (define (array-set* a i f*)
     (if (null? f*)
@@ -340,32 +345,50 @@ exposed as the effects that they truelly are.
         (cons
          (Op 'Array-set! (list a (Quote i) (car f*)))
          (array-set* a (add1 i) (cdr f*)))))
-  (: sr-type* (-> (Listof Schml-Type) Nat (values (Listof D0-Expr) Nat)))
-  (define (sr-type* t* n)
-    (if (null? t*)
-        (values '() n)
-        (let*-values ([(t n) (sr-type (car t*) n)]
-                      [(t* n) (sr-type* (cdr t*) n)])
-          (values (cons t t*) n))))
-  (cond
-   [(Int? t)  (values (Quote TYPE-INT-RT-VALUE) n)]
-   [(Bool? t) (values (Quote TYPE-BOOL-RT-VALUE) n)]
-   [(Dyn? t)  (values (Quote TYPE-DYN-RT-VALUE) n)]
-   [(Unit? t)  (values (Quote TYPE-UNIT-RT-VALUE) n)]
-   [(Fn? t)
-    (match-let ([(Fn a f* r) t])
-      (let*-values ([(tmp n) (next-uid "tmp" n)]
-                    [(tmp-var) (Var tmp)]
-                    [(f* n) (sr-type* f* n)]
-                    [(r n) (sr-type r n)])
-        (let* ([bnd (cons tmp (Op 'Alloc (list (Quote (+ a FN-FMLS-OFFSET)))))]
-               [bnd* (list bnd)]
-               [stmt1 (Op 'Array-set! (list tmp-var (Quote FN-ARITY-INDEX) (Quote a)))]
-               [stmt2 (Op 'Array-set! (list tmp-var (Quote FN-RETURN-INDEX) r))]
-               [stmt* (array-set* tmp-var FN-FMLS-OFFSET f*)])
-          (values
-           (Let bnd* (Begin (cons stmt1 (cons stmt2 stmt*)) tmp-var))
-           n))))]
+  (match t
+   [(Int)  (return-state (Quote TYPE-INT-RT-VALUE))]
+   [(Bool) (return-state (Quote TYPE-BOOL-RT-VALUE))]
+   [(Dyn)  (return-state (Quote TYPE-DYN-RT-VALUE))]
+   [(Unit) (return-state (Quote TYPE-UNIT-RT-VALUE))]
+   ;; abstract over allocating so that all allocations
+   ;; are shorter than this.
+   [(GRef t)
+    (do (bind-state : (State Nat D0-Expr))
+        (gref-u : Uid <- (uid-state "GRefT"))
+        (ty-u   : Uid <- (uid-state "ty"))
+        (ty-e : D0-Expr <- (sr-type t))
+        (let* ([gref-v : D0-Expr (Var gref-u)]
+               [ty-v   : D0-Expr (Var ty-u)]
+               [alloc  : D0-Expr
+                (Op 'Alloc (list TYPE-GREF-SIZE-VALUE))]
+               [stmt   : D0-Expr
+                (Op 'Array-set! (list gref-v GREF-TO-INDEX-VALUE ty-v))]
+               [ty-bnd : D0-Bnd (cons ty-u ty-e)]
+               [gref-bnd : D0-Bnd (cons gref-u alloc)])
+          (return-state
+           (Let (list ty-bnd)
+            (Let (list gref-bnd)
+             (Begin (list stmt)
+              (Op 'binary-or (list gref-v TYPE-GREF-TAG-VALUE))))))))]
+   [(Fn a f* r)
+    (do (bind-state : (State Nat D0-Expr))
+        (tmp : Uid <- (uid-state "FunT"))
+        (f*  : D0-Expr* <- (map-state sr-type f*))
+        (r   : D0-Expr  <- (sr-type r))
+        (let* ([tmp-var (Var tmp)]
+               [bnd
+                (cons tmp (Op 'Alloc (list (Quote (+ a FN-FMLS-OFFSET)))))]
+               [bnd*
+                (list bnd)]
+               [stmt1
+                (Op 'Array-set! (list tmp-var (Quote FN-ARITY-INDEX) (Quote a)))]
+               [stmt2
+                (Op 'Array-set! (list tmp-var (Quote FN-RETURN-INDEX) r))]
+               [stmt*
+                (array-set* tmp-var FN-FMLS-OFFSET f*)])
+          (return-state
+           (Let bnd*
+            (Begin (cons stmt1 (cons stmt2 stmt*)) tmp-var)))))]
    [else (TODO implement reference code around here)]))
 
 
@@ -423,8 +446,9 @@ exposed as the effects that they truelly are.
     [(Bool)   (Quote DYN-BOOL-TAG)]
     [(Unit)   (Quote DYN-UNIT-TAG)]
     [(Atomic) (Quote TYPE-ATOMIC-TAG)]
-    [(Fn)     (Quote DYN-BOXED-TAG)]
-    [(Boxed)  (Quote TYPE-FN-TAG)]))
+    [(Fn)     (Quote TYPE-FN-TAG)]
+    [(GRef)   (Quote TYPE-GREF-TAG)]
+    [(Boxed)  (Quote DYN-BOXED-TAG)]))
 
 ;; This is a pretty concise way of performing this but one could imagine looking at
 ;; only the capture form and build the set and ref forms at once.

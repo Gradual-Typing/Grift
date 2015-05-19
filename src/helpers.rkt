@@ -83,12 +83,18 @@ This allows me to make very desciptive grammars via types later on.
     (fprintf (current-log-port) fmt a ...)
     (flush-output (current-log-port))))
 
+
 (define-syntax-rule (pass/log (o ...) (p in c ...))
   (let ([t? (trace? 'p 'All 'o ...)])
     (when t? (logf "~a input:\n~a\n\n" 'p in))
     (let ([out (p  in c ...)])
       (when t? (logf "~a output:\n~a\n\n" 'p in))
       out)))
+
+
+(define-syntax-rule (logging n (o ...) f a ...)
+  (let ([t? (trace? 'n 'All 'o ...)])
+    (when t? (logf (format "~a: ~a\n\n" 'n f) a ...))))
 
 (define-syntax-rule (log-body n (v ...) e ... b)
   (let ([t? (trace? 'n 'All)])

@@ -11,7 +11,7 @@
 Type (GRep A) where
   ;; Unguarded Boxes
   UGbox  A : {A : Set} -> A -> GRep A
-  ;; Proxies for Guarded Representations
+  ;;xies for Guarded Representations
   Gproxy A : GRep B -> (B : Type) -> (A : Type) -> Blame-Label -> GRep A
 
 ;; The only two things that you can do with an GRep A are proxy it
@@ -60,7 +60,10 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))
          (if (and (GRef? t1) (GRef? t2))
-             (return-state (Gproxy e (Type t1) (Type t2) (Quote l)))
+             (let ([t1^ : Schml-Type (GRef-arg t1)]
+                   [t2^ : Schml-Type (GRef-arg t2)])
+               (return-state
+                (Gproxy e (Type t1^) (Type t2^) (Quote l))))
              (return-state (Cast e t1 t2 l))))]
     [(Letrec b* e)
      (do (bind-state : (State Natural C2-Expr))
@@ -106,10 +109,10 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
          (let* ([l-var  (Var loop)]
                 [r-var  (Var ref)]
                 [r-var^ (Gproxy-for r-var)]
-                [t2     (Gproxy-to r-var)]
                 [t1     (Gproxy-from r-var)]
+                [t2     (Gproxy-to r-var)]
                 [lbl    (Gproxy-blames r-var)]
-                [recur  (App l-var (list r-var))]
+                [recur  (App l-var (list r-var^))]
                 [lexp   (Lambda (list ref)
                          (Castable #f
                           (If (GRep-proxied? r-var)
@@ -132,7 +135,8 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
                 [t2  : C2-Expr (Gproxy-to r-var)]
                 [lbl : C2-Expr (Gproxy-blames r-var)]
                 [r-var^ : C2-Expr (Gproxy-for r-var)]
-                [cast-val : C2-Expr (Runtime-Cast v-var t1 t2 lbl)]
+                ;; Switched t1 t2 for a check
+                [cast-val : C2-Expr (Runtime-Cast v-var t2 t1 lbl)]
                 [lexp : C2-Expr (Lambda (list ref val)
                                  (Castable #f
                                   (If (GRep-proxied? r-var)

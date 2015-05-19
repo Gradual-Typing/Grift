@@ -88,6 +88,10 @@
      (do (bind-state : (State Nat C4-Expr))
          (e  : C4-Expr <- (ll-expr  e))
          (return-state (Type-Fn-arity e)))]
+    [(Type-GRef-to e)
+     (do (bind-state : (State Nat C4-Expr))
+         (e  : C4-Expr <- (ll-expr  e))
+         (return-state (Type-GRef-to e)))]
     ;; Dynamic Representation
     [(Dyn-tag e)
      (do (bind-state : (State Nat C4-Expr))

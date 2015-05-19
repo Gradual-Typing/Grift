@@ -69,8 +69,8 @@
       (write-gref cast
                   (CL-GProxy-value r)
                   (cast v
-                        (CL-GProxy-t1 r)
                         (CL-GProxy-t2 r)
+                        (CL-GProxy-t1 r)
                         (CL-GProxy-label r)))]))
 
 (define-type (Env a) (HashTable Uid (Boxof (U 'undefined a))))
@@ -125,7 +125,7 @@
       (CL-Dyn l e t g)))
 
 (: cast-lang-interp (-> Cast0-Lang Config Test-Value))
-(define (cast-lang-interp prgm comp-config)
+(trace-define (cast-lang-interp prgm comp-config)
   (let ([eval (interp-expr apply-cast-ld (apply-lazy apply-cast-ld))]
 	[observe observe-lazy])
     (match-let ([(Prog _ exp) prgm])

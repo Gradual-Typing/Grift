@@ -132,8 +132,7 @@
     [(GRef g) g]
     [otherwise (TODO raise an appropriate error here)]))
 
-;; The type of setting a dyn value is dyn
-;; The type of setting a Ref value is the type of the argurment
+;; The type of setting a reference is always unit
 (: gbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
 (define (gbox-set!-type-rule box-ty val-ty)
   (match box-ty
