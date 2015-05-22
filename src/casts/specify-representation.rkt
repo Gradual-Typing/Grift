@@ -38,6 +38,7 @@ exposed as the effects that they truelly are.
 (define FN-ARITY-INDEX-VALUE      : D0-Expr (Quote FN-ARITY-INDEX))
 (define FN-RETURN-INDEX-VALUE     : D0-Expr (Quote FN-RETURN-INDEX))
 (define FN-FMLS-OFFSET-VALUE      : D0-Expr (Quote FN-FMLS-OFFSET))
+
 (define TYPE-TAG-MASK-VALUE       : D0-Expr (Quote TYPE-TAG-MASK))
 (define TYPE-FN-TAG-VALUE         : D0-Expr (Quote TYPE-FN-TAG))
 (define TYPE-ATOMIC-TAG-VALUE     : D0-Expr (Quote TYPE-ATOMIC-TAG))
@@ -191,7 +192,10 @@ exposed as the effects that they truelly are.
       [(Type-GRef-to e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))
-           (return-state (Op 'Array-ref (list e GREF-TO-INDEX-VALUE))))]
+           (return-state
+            (let ([arg : D0-Expr
+                   (Op 'binary-xor (list e TYPE-GREF-TAG-VALUE))])
+              (Op 'Array-ref (list arg GREF-TO-INDEX-VALUE)))))]
       [(Type-tag e)
        (do (bind-state : (State Nat D0-Expr))
            (e : D0-Expr <- (recur e))

@@ -1,7 +1,7 @@
 #lang typed/racket
 
 (require typed/rackunit
-         schml/testing-compile
+         schml/testing/test-compile
          schml/testing/paths)
 
 (provide (all-defined-out))
@@ -20,11 +20,9 @@
    (test-file "boxes" "gbox7-2.schml" (int 42))
    (test-file "boxes" "gbox7-3.schml" (int 42))
    (test-file "boxes" "gbox7-4.schml" (int 42))
-   (test-file "boxes" "gbox7.schml" (int 7))
-   (test-file "boxes" "gbox8.schml" (bool #t))
+   (test-file "boxes" "gbox7-5.schml" (int 42))
+   (test-file "boxes" "gbox7-6.schml" (int 42))
+   (test-file "boxes" "gbox7-7.schml" (int 42))
+   (test-file "boxes" "gbox8.schml" (int 42))
    (test-file "boxes" "gbox9.schml" (bool #f))
    ))
-
-
-
-

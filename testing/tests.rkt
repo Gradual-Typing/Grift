@@ -3,7 +3,7 @@
 (require typed/rackunit
          typed/rackunit/text-ui
          schml/src/helpers
-         schml/testing-compile
+         schml/testing/test-compile
          schml/testing/paths)
 
 (provide (all-defined-out))

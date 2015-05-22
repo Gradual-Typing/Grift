@@ -2,4 +2,7 @@
   (let ([r1 (: r0 (GRef Dyn))])
     (let ([r2 (: r1 (GRef Int))])
       (let ([r3 (: r2 Dyn)])
-        (gunbox r3)))))
+        (begin
+         (gbox-set! r3 42)
+         (: (gunbox r3) Int "wrong"))))))
+        

@@ -1,21 +1,23 @@
 #lang typed/racket/base
 
 (require schml/src/compile
-         schml/src/helpers)
+         schml/src/helpers
+         schml/testing/test-compile)
 
 (require/typed schml/testing/paths
                [test-tmp-path Path]
                [test-suite-path Path])
 
-(traces '(All))
+(define log (open-output-file (build-path test-tmp-path "d.log.txt")
+                              #:exists 'replace))
 
 (: cc (-> String Boolean))
-(define (cc t)
-  (compile (build-path t) #;(build-path test-suite-path t)
-           #:exec-path (build-path test-tmp-path "d")
-           #:c-path    (build-path test-tmp-path "d.c")
-           #:log-path  (build-path test-tmp-path "d.log.txt")
-           #:c-flags   (list "-g")))
+(define (cc path)
+  (let ([path (build-path path)])
+    (parameterize ([current-log-port log]
+                   [traces '(All Vomit)])
+      (test-compile "debug" path (debug))
+      #t)))
 
 (module+ main
   (unless (directory-exists? test-tmp-path)

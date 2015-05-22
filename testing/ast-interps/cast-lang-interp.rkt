@@ -19,7 +19,8 @@
 (struct CL-Dyn ([label : String]
                 [value : CL-Value]
                 [type1 : Schml-Type]
-                [type2 : Schml-Type]))
+                [type2 : Schml-Type])
+  #:transparent)
 
 ;; The Guarded ADT Until Specify Representation
 (define-type CL-GRef (U CL-GProxy CL-GBox))
@@ -27,9 +28,12 @@
 (struct CL-GProxy  ([value : CL-GRef]
                     [t1 : Schml-Type]
                     [t2 : Schml-Type]
-                    [label : Blame-Label]))
+                    [label : Blame-Label])
+  #:transparent)
 
-(struct CL-GBox  ([value : CL-Value]) #:mutable)
+(struct CL-GBox  ([value : CL-Value])
+  #:mutable
+  #:transparent)
 
 (: make-gbox (-> CL-Value CL-GBox))
 (define (make-gbox val)
@@ -37,7 +41,7 @@
 
 (: write-gbox (-> CL-GBox CL-Value CL-Value))
 (define (write-gbox b v)
-  (begin (set-CL-GBox-value! b v) v))
+  (begin (set-CL-GBox-value! b v) '()))
 
 (: unproxied-gref? (-> CL-GRef Boolean : CL-GBox))
 (define unproxied-gref? CL-GBox?)
@@ -131,11 +135,18 @@
     (match-let ([(Prog _ exp) prgm])
       (observe (lambda (): CL-Value (eval exp (empty-env)))))))
 
+(define i-depth (box 0))
+(define (inc [r : (Boxof Integer)]) (set-box! r (add1 (unbox r))))
+(define (dec [r : (Boxof Integer)]) (set-box! r (sub1 (unbox r))))
+(define (get [r : (Boxof Integer)]) (unbox r))
+
 (define-type eval-expr-type (-> C0-Expr (Env CL-Value) CL-Value))
 (: interp-expr (-> Cast-Type apply-type eval-expr-type))
 (define (interp-expr cast apply)
   (: recur eval-expr-type)
   (define (recur exp env)
+    (inc i-depth)
+    (logging cast/interp-expr (All) "~a> ~v" (get i-depth) exp)
     (: recur/env (-> C0-Expr CL-Value))
     (define (recur/env e) (recur e env))
     (define (map-curry-recur [exp* : C0-Expr*])
@@ -143,9 +154,8 @@
         (lambda ([env : (Env CL-Value)]): CL-Value
                 (recur exp env)))
       (map curry-recur exp*))
-    (when (trace? 'Vomit)
-      (logf "cl-expr:\n~v\n\n" exp))
-    (match exp
+    (define res
+      (match exp
       [(Lambda id* body)
        (CL-Proc (lambda ([arg* : CL-Value*]) (recur body (env-extend* env id* arg*))))]
       [(Letrec bnd* body)
@@ -176,6 +186,9 @@
            (write-gref cast e1 (recur/env e2))
            (TODO raise an error here about the type system being broken))]
       [e (error 'interp "Umatched expression ~a" e)]))
+    (logging cast/interp-res (all) "~a > ~v" (get i-depth) res)
+    (dec i-depth)
+    res)
   recur)
 
 (: delta (-> Symbol CL-Value* CL-Value))
@@ -213,22 +226,29 @@
                (p tmp ...)
                (error 'cfi-delta "type error ~a" `(p ,e ...)))))]))
 
-
 ;; The lazy-d parts
+(define c-depth (box 0))
+
 (: apply-cast-ld Cast-Type)
 (define (apply-cast-ld v1 t1 t2 l1)
-  (if (shallow-consistent? t1 t2)
-      (cond
-       [(Dyn? t1)
-        (match v1
-          [(CL-Dyn l2 v2 t3 t1) (apply-cast-ld v2 t3 t2 l1)]
-          [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])]
-       [(and (GRef? t1) (GRef? t2))
-        (if (gref? v1)
-            (cast-gref v1 (GRef-arg t1) (GRef-arg t2) l1)
-            (error 'cast-lang-interp "language invarient broken"))]
-       [else (mk-cast v1 t1 t2 l1)])
-      (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
+  (inc c-depth)
+  (logging apply-cast-ld (All) "~a > ~v ~v ~v ~v" (get c-depth) v1 t1 t2 l1)
+  (define res
+    (if (shallow-consistent? t1 t2)
+        (cond
+          [(Dyn? t1)
+           (match v1
+             [(CL-Dyn l2 v2 t3 t1) (apply-cast-ld v2 t3 t2 l1)]
+             [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])]
+          [(and (GRef? t1) (GRef? t2))
+           (if (gref? v1)
+               (cast-gref v1 (GRef-arg t1) (GRef-arg t2) l1)
+               (error 'cast-lang-interp "language invarient broken"))]
+          [else (mk-cast v1 t1 t2 l1)])
+        (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
+  (logging apply-cast-res (All) "~a > ~v" (get c-depth) res)
+  (dec c-depth)
+  res)
 
 (define-type apply-type (-> CL-Value CL-Value* CL-Value))
 

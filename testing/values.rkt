@@ -5,7 +5,7 @@
 
 (provide (all-defined-out))
 
-(define-type Test-Value (U blame bool int unit dyn gbox function))
+(define-type Test-Value (U blame bool int unit dyn gbox function debug))
 
 (struct not-lbl ([value : String])
   #:transparent)
@@ -24,11 +24,16 @@
   #:transparent)
 (struct unit ()
   #:transparent)
-
+(struct debug ()
+  #:transparent)
 
 (: value=? (Any Any . -> . Boolean))
 (define (value=? x y)
-  (or (and (blame? x) (blame? y) (blame=? x y))
+  (or (cond
+        [(debug? x) (begin (logging value=? (All) "~v" y) #t)]
+        [(debug? y) (begin (logging value=? (All) "~v" x) #t)]
+        [else #f])
+      (and (blame? x) (blame? y) (blame=? x y))
       (and (unit? x) (unit? y))
       (and (bool? x) (bool? y) (bool=? x y))
       (and (int? x) (int? y) (int=? x y))
