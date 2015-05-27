@@ -1,8 +1,7 @@
 #lang typed/racket
 
 (require typed/rackunit
-         schml/testing/test-compile
-         schml/testing/paths)
+         "../../test-compile.rkt")
 
 (provide (all-defined-out))
 

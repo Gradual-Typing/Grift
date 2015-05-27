@@ -3,7 +3,7 @@
 (require schml/src/helpers
          schml/src/errors
 	 schml/src/language
-	 schml/testing/values
+	 "../values.rkt"
          racket/fixnum)
 
 (provide cast-lang-interp)

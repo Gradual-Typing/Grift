@@ -2,7 +2,7 @@
 
 (require typed/rackunit
          typed/rackunit/text-ui
-         schml/testing/test-compile)
+         "../../test-compile.rkt")
 
 (provide (all-defined-out))
 

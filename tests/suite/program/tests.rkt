@@ -1,8 +1,7 @@
 #lang typed/racket
 
 (require typed/rackunit
-         schml/testing/test-compile
-         schml/testing/paths)
+         "../../test-compile.rkt")
 
 (provide (all-defined-out))
 
@@ -28,7 +27,4 @@
    (test-file "program" "ack-1-2-static.schml" (int 4))
    (test-file "program" "ack-2-3-static.schml" (int 9))
    ;; These are too long perhaps make an long flag or something
-   ;;(test-file "ack-3-10-static.schml" (int 125))
-   ;;(test-file "ack-4-1-static.schml"  (int 65533))
-   ;;(test-file "ack-static.schml"      (bool #t))
    ))

@@ -7,8 +7,8 @@
          schml/src/language
          schml/src/errors
          schml/src/compile
-         schml/testing/values
-         schml/testing/paths
+         "./values.rkt"
+         "./paths.rkt"
          schml/src/helpers)
 
 (require ;; The passes
@@ -17,10 +17,10 @@
          schml/src/data/convert-representation
          schml/src/backend-c/code-generator
          ;; The interpreters
-         schml/testing/ast-interps/cast-lang-interp)
+         "./ast-interps/cast-lang-interp.rkt")
 
 (provide (all-defined-out)
-         (all-from-out schml/testing/values)
+         (all-from-out "./values.rkt")
          Config)
 
 (define compiler-config : (Parameter Config)
@@ -60,3 +60,7 @@
 
 (define-syntax-rule (test-file p ... n e)
   (test-compile n (simplify-path (build-path test-suite-path p ... n)) e))
+
+(define-syntax-rule (make-test-file p ...)
+  (syntax-rules ()
+    [(n e) (test-compile n (simplify-path (build-path test-suite-path p ... n)) e)]))

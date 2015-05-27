@@ -448,27 +448,26 @@ represents types in the schml abstract syntax tree.
     [othewise (raise-type-exn stx)]))
 
 
-
 (: parse-fn-type (Stx . -> . Schml-Type))
 (define (parse-fn-type stx)
   (let ([stx* (syntax-unroll stx)])
     (if (not (stx-list? stx*))
 	(raise-type-exn stx)
-	(letrec ([loop : ((Listof Stx) . -> .
-			  (values (Listof Stx) (Listof Stx)))
+	(letrec ([loop : ((Listof Stx) . -> . (values (Listof Stx) Stx))
 		  (lambda ([s* : (Listof Stx)])
 		    (if (null? s*)
 			(raise-type-exn stx)
 			(let ((fst : Stx (car s*))
 			      (rst : (Listof Stx) (cdr s*)))
 			  (if (arrow? fst)
-			      (values '() rst)
+			      (match rst
+                                [(list stx) (values '() stx)]
+                                [other (raise-type-exn stx)])
 			      (let-values ([(from to) (loop rst)])
 				(values (cons fst from) to))))))])
 	  (let-values ([(from to) (loop stx*)])
-	    (: from (Listof Stx))
-	    (: to (Listof Stx))
-	    (Fn (length from) (map parse-type from) (car (map parse-type to))))))))
+	    (: from (Listof Stx)) (: to Stx)
+	    (Fn (length from) (map parse-type from) (parse-type to)))))))
 
 (if-in-construction
  (check-equal? (parse-fn-type #'(Int -> Int)) (Fn 1 `(,INT-TYPE) INT-TYPE))
@@ -476,4 +475,6 @@ represents types in the schml abstract syntax tree.
  (check-equal? (parse-fn-type #'(Bool -> Bool)) (Fn 1 `(,BOOL-TYPE) BOOL-TYPE))
  (check-equal? (parse-fn-type #'(Int Bool -> Int)) (Fn 2 `(,INT-TYPE ,BOOL-TYPE) INT-TYPE))
  (check-equal? (parse-fn-type #'((-> Bool) -> (-> Int)))
-               (Fn 1 `(,(Fn 0 '() BOOL-TYPE)) (Fn 0 '() INT-TYPE))))
+               (Fn 1 `(,(Fn 0 '() BOOL-TYPE)) (Fn 0 '() INT-TYPE)))
+ (check-exn exn:schml:parse? (lambda () (parse-fn-type #'(-> Int Int))))
+ (check-exn exn:schml:parse? (lambda () (parse-fn-type #'(-> (-> Bool Int))))))

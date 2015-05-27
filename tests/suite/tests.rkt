@@ -1,10 +1,7 @@
 #lang typed/racket
 
 (require typed/rackunit
-         schml/testing/test-compile
-         schml/testing/paths)
-
-
+         "../test-compile.rkt")
 
 (require "core/tests.rkt"
          "boxes/tests.rkt"
@@ -12,10 +9,11 @@
          "large/tests.rkt")
 
 (provide (all-defined-out)
-         (all-from-out "core/tests.rkt"
-                       "boxes/tests.rkt"
-                       "program/tests.rkt"
-                       "large/tests.rkt"))
+         (all-from-out 
+          "core/tests.rkt"
+          "boxes/tests.rkt"
+          "program/tests.rkt"
+          "large/tests.rkt"))
 
 (define most-tests : Test
   (test-suite "most tests"

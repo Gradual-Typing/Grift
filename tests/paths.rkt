@@ -10,7 +10,7 @@
 (define schml-path (or (pkg-directory "schml") (current-directory)))
 
 (: test-path Path)
-(define test-path (build-path schml-path "testing"))
+(define test-path (build-path schml-path "tests"))
 
 (: test-suite-path Path)
 (define test-suite-path (build-path test-path "suite"))
