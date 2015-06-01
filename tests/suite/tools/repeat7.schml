@@ -1,0 +1,12 @@
+(letrec ([fib
+          (lambda (n) 
+           (let ([last  (gbox 0)]
+                 [llast (gbox 1)])
+            (repeat (n 0 n)
+             (let ([tmp (gunbox llast)])
+              (begin
+               (gbox-set! llast (gunbox llast))
+               (gbox-set! last  (+ (gunbox last) tmp)))))))])
+  (fib 10))
+                           
+                             

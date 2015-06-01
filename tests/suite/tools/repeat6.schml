@@ -1,0 +1,4 @@
+(let([b (gbox 0)])
+ (repeat (i 0 1000) 
+  (let ([a (lambda () (gbox-set! b (+ (unbox b) 1)))])
+    (repeat (i 0 1000) (a)))))
