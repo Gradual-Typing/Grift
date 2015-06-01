@@ -13,7 +13,12 @@
 	 schml/src/errors
          schml/src/language)
 
+(require typed/syntax/stx)
+
+
 (if-in-construction (require typed/rackunit))
+
+
 
 (provide parse)
 
@@ -54,10 +59,6 @@
 	a
 	(raise-unsupported-syntax-exn stx))))
 
-
-;; stx-list? is equivalent to (and (list? o) (andmap syntax? o))
-(define-predicate stx-list? (Listof Stx))
-
 (: reserved-symbol? (Symbol . -> . Boolean))
 (define (reserved-symbol? x)
   (case x
@@ -65,6 +66,7 @@
     [(gbox gunbox gbox-set! gvector gvector-ref gvector-set!) #t]
     [(mbox munbox mbox-set! mvector mvector-ref mvector-set!) #t]
     [(+ - * binary-and binary-or < <= = >= > %/ %<< %>>) #t]
+    [(timer-start timer-stop timer-report repeat) #t]
     [else #f]))
 
 (: parse-top-level (String (Listof Stx) Env . -> . (State Natural S0-Expr)))
@@ -81,15 +83,15 @@
     (let ((src (syntax->srcloc stx))
           (exp (syntax-unroll stx)))
       (cond
-        [(symbol? exp) (values (parse-variable exp src env) next)]
+        [(symbol? exp) (run-state (parse-variable exp src env) next)]
         [(pair? exp)
          (let* ((rator (car exp))
                 (rand* (cdr exp))
-                (exp^ (syntax-unroll rator)))
+                (exp^  (syntax-unroll rator)))
            (cond
              [(symbol? exp^)
               (case exp^
-                [(lambda) (parse-lambda rand* src env next)]
+                [(lambda) (run-state (parse-lambda rand* src env) next)]
                 [(letrec) (parse-letrec rand* src env next)]
                 [(let)    (parse-let rand* src env next)]
                 [(if)     (parse-if rand* src env next)]
@@ -113,8 +115,9 @@
                 [(mvector)      (run-state (parse-mvector rand* src env) next)]
                 [(mvector-set!) (run-state (parse-mvector-set! rand* src env) next)]
                 [(mvector-ref)  (run-state (parse-mvector-ref rand* src env) next)]
+                [(repeat)       (run-state (parse-repeat rand* src env) next)]
                 [else
-                 (if (Schml-Prim? exp^)
+                 (if (schml-primitive? exp^)
                      (run-state (parse-primitive exp^ rand* src env) next)
                      (run-state (parse-application rator rand* src env) next))])]
              [(pair? exp^) (run-state (parse-application rator rand* src env) next)]
@@ -122,11 +125,22 @@
      [(schml-literal? exp) (values (Ann (Quote exp) src) next)]
      [else (raise-unsupported-syntax-exn stx)]))))
 
+(: parse-repeat ((Listof Stx) Src Env . -> . (State Nat S0-Expr)))
+(define (parse-repeat s* s e)
+  (match s*
+    [(list (app stx->list (list (app syntax-e id) snd trd)) eff)
+     (let ([_ (id-check id '() s)])
+       (do (bind-state : (State Nat S0-Expr))
+           (uid   : Uid <- (uid-state (symbol->string id)))
+           (start : S0-Expr <- (parse-expr snd e))
+           (stop  : S0-Expr <- (parse-expr trd e))
+           (eff   : S0-Expr <- (parse-expr eff (env-extend e id uid)))
+           (return-state (Ann (Repeat uid start stop eff) s))))]
+    [other (error 'parse/repeat "invalid syntax with iritants ~a ~a ~a" s* s e)]))
 
-
-(: parse-variable (Symbol Src Env . -> . S0-Expr))
+(: parse-variable (Symbol Src Env . -> . (State Nat S0-Expr)))
 (define (parse-variable v s e)
-  (Ann (Var (env-lookup e v s)) s))
+  (return-state (Ann (Var (env-lookup e v s)) s)))
 
 (: parse-blame-label (Stx . -> . String))
 (define (parse-blame-label s)
@@ -266,29 +280,25 @@
 
 (define-type Acc2
   (List Schml-Fml* (Listof Symbol) Env Natural))
-(: parse-lambda (-> (Listof Stx) Src Env Natural
-		    (values S0-Expr Natural)))
-(define (parse-lambda stx* src env next)
-  (define (help [stx : Stx]
-		[t : (U Stx False)]
-		[b : Stx]
-		[s : Src]
-		[e : Env]
-		[n : Natural])
-    : (values S0-Expr Natural)
+
+(: parse-lambda ((Listof Stx) Src Env -> (State Nat S0-Expr)))
+(define (parse-lambda stx* src env)
+  (define (help [stx : Stx] [t : (U Stx False)] [b : Stx] [s : Src] [e : Env])
+    : (State Nat S0-Expr)
     (let ([f* (syntax-unroll stx)])
       (if (stx-list? f*)
-	  (let ([a : Acc2 (list '() '() e n)])
-	    (match-let ([(list f* _ e n) (foldr parse-fml a f*)])
-	      (let-values ([(t) (and t (parse-type t))]
-			   [(b n) ((parse-expr b e) n)])
-		(values (Ann (Lambda f* (Ann b t)) s)  n))))
+          (do (bind-state : (State Nat S0-Expr))
+              (n : Nat <- get-state)
+              (let ([a : Acc2 (list '() '() e n)])
+	      (match-let ([(list f* _ e n) (foldr parse-fml a f*)])
+                (let ([t (and t (parse-type t))])
+                  (_ : Null <- (put-state n))
+                  (b : S0-Expr <- (parse-expr b e))
+                  (return-state (Ann (Lambda f* (Ann b t)) s))))))
 	  (raise-fml-exn stx))))
   (match stx*
-    [(list fmls body)
-     (help fmls #f body src env next)]
-    [(list fmls (? colon?) type body)
-     (help fmls type body src env next)]
+    [(list fmls body) (help fmls #f body src env)]
+    [(list fmls (? colon?) type body) (help fmls type body src env)]
     [otherwise (raise-lambda-exn stx* src)]))
 
 (: parse-fml (Stx Acc2 . -> . Acc2))
@@ -302,7 +312,7 @@
 	     [e (env-extend e s u)])
 	(cond
 	 [(memq s s*) (raise-duplicate-binding s l)]
-	 [(reserved-symbol? s) (raise-reservered-sym s l)]
+	 [(reserved-symbol? s) (raise-reserved-symbol s l)]
 	 [else (list (cons f f*) (cons s s*) e (add1 n))]))))
   (let ((src (syntax->srcloc stx)))
     (match (syntax-unroll stx)
@@ -342,14 +352,21 @@
 
 (: parse-bnd (Env . -> . (Tmp-Bnd Acc1 . -> . Acc1)))
 (define (parse-bnd env)
-  (lambda ([b : Tmp-Bnd] [a : Acc1])
-    : Acc1
+  (lambda ([b : Tmp-Bnd] [a : Acc1]) : Acc1
     (match-let ([(cons bnd* next) a]
 		[(list uid type exp) b])
       (let-values ([(exp next) ((parse-expr exp env) next)]
 		   [(type) (and type (parse-type type))])
 	(cons (cons (Bnd uid type exp) bnd*) next)))))
 
+(: id-check (Any (Listof Symbol) Src -> (Listof Symbol) : #:+ Symbol))
+(define (id-check x bnds src)
+  (define (raise-non-identifier x s)
+    (TODO raise a better error message))
+  (and (or (symbol? x) (raise-non-identifier x src))
+       (or (not (memq x bnds)) (raise-duplicate-binding x src))
+       (or (not (reserved-symbol? x)) (raise-reserved-symbol x src))
+       (cons x bnds)))
 
 (: unsplice-bnd (Stx Acc0 -> Acc0))
 (define (unsplice-bnd stx acc)
@@ -360,7 +377,7 @@
       (let ([u (Uid (symbol->string s) n)])
 	(cond
 	 [(memq s s*) (raise-duplicate-binding s l)]
-	 [(reserved-symbol? s) (raise-reservered-sym s l)]
+	 [(reserved-symbol? s) (raise-reserved-symbol s l)]
 	 [else (list (cons (list u t r) b*) (cons s s*)
 		     (env-extend e s u)     (add1 n))]))))
   (let ([loc (syntax->srcloc stx)])
@@ -398,7 +415,7 @@
     [(list exp type lbl) (help exp type lbl src env next)]
     [othewise (raise-ascribe-exn stx* src)]))
 
-(: parse-primitive (-> Schml-Prim (Listof Stx) Src Env (State Natural S0-Expr)))
+(: parse-primitive (-> Schml-Primitive (Listof Stx) Src Env (State Natural S0-Expr)))
 (define (parse-primitive sym stx* src env)
   (do (bind-state : (State Natural S0-Expr))
       (args : S0-Expr* <- (parse-expr* stx* env))

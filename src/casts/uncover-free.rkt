@@ -71,6 +71,8 @@
     [(Begin (app uf-expr* e* e*-fvars)
             (app uf-expr  e  e-fvars))
      (values (Begin e* e) (set-union e*-fvars e-fvars))]
+    [(Repeat i (app uf-expr e1 f1) (app uf-expr e2 f2) (app uf-expr e3 f3))
+     (values (Repeat i e1 e2 e3) (set-subtract (set-union f1 f2 f3) (set i)))]
     ;; Gaurded Representation
     [(GRep-proxied? (app uf-expr e fvars)) (values (GRep-proxied? e) fvars)]
     [(UGbox (app uf-expr e fvars)) (values (UGbox e) fvars)]

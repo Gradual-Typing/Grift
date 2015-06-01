@@ -103,6 +103,9 @@ be usefull for optimizations or keeping state.
   (Free caster variables body)
   ;; Static Global Binding
   (Labels bindings body)
+  ;; Benchmarking tools language forms
+  ;; low cost repetition
+  (Repeat var start end body)
   ;; TODO figue out an appropriate comment about all forms here
   (Halt)
   (Assign lhs rhs)
@@ -171,6 +174,8 @@ be usefull for optimizations or keeping state.
 (define INTxINT-TYPE (list INT-TYPE INT-TYPE))
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
+(define ->UNIT-TYPE (Fn 0 '() UNIT-TYPE))
+
 
 (define (shallow-consistent? t g)
   (or (Dyn? t) (Dyn? g)
@@ -298,28 +303,50 @@ be usefull for optimizations or keeping state.
 | Types shared by the Schml language family
 +-----------------------------------------------------------------------------|#
 
+(define-type Schml-Primitive (U Schml-Prim Schml-Prim!))
+
+(: schml-primitive? (-> Any Boolean : Schml-Primitive))
+(define (schml-primitive? x)
+  (or (schml-prim? x) (schml-prim!? x)))
+
 (define-type Schml-Prim
-  (U IntxInt->Int-Primitives IntxInt->Bool-Primitives
-     #;Ref-Primitives
-     ;;IntxNon0->Int-Primitives IntxNibble->Int-Primitives
-     ;; I want to add these but they break the symplicity of the type system
-     ;; I think in the meantime I will add them as IntxInt->Int and claim that
-     ;; they are unsafe features that are hidden away.
-     ))
+  (U IntxInt->Int-Primitive IntxInt->Bool-Primitive))
 
-(define-predicate Schml-Prim? Schml-Prim)
+(: schml-prim? (Any -> Boolean : Schml-Prim))
+(define (schml-prim? x)
+  (or (IntxInt->Int-primitive? x)
+      (IntxInt->Bool-primitive? x)))
 
-(define-type IntxInt->Int-Primitives (U '* '+ '-
+(define-type Schml-Prim!
+  (U Timer-Primitive))
+
+(: schml-prim!? (Any -> Boolean : Schml-Prim!))
+(define (schml-prim!? x)
+  (or (timer-primitive? x)))
+
+(define-type IntxInt->Int-Primitive (U '* '+ '-
                                         'binary-and 'binary-or 'binary-xor
                                         '%/ '%>> '%<<))
 
-(define-type IxI->I-Prim IntxInt->Int-Primitives)
-(define-predicate IntxInt->Int-Prim? IntxInt->Int-Primitives)
+(define-type IxI->I-Prim IntxInt->Int-Primitive)
 
-(define-type IntxInt->Bool-Primitives (U '< '<= '= '> '>=))
-(define-type IxI->B-Prim IntxInt->Bool-Primitives)
-(define-predicate IntxInt->Bool-Prim? IntxInt->Bool-Primitives)
+(: IntxInt->Int-primitive? (-> Any Boolean : IntxInt->Int-Primitive))
+(define (IntxInt->Int-primitive? x)
+  (or (eq? '* x) (eq? '+ x) (eq? '- x)
+      (eq? 'binary-and x) (eq? 'binary-or x) (eq? 'binary-xor x)
+      (eq? '%/ x) (eq? '%>> x) (eq? '%<< x)))
 
+
+(define-type IntxInt->Bool-Primitive (U '< '<= '= '> '>=))
+(define-type IxI->B-Prim IntxInt->Bool-Primitive)
+
+(: IntxInt->Bool-primitive? (Any -> Boolean : IntxInt->Bool-Primitive))
+(define (IntxInt->Bool-primitive? x)
+  (or (eq? '< x) (eq? '<= x)
+      (eq? '= x)
+      (eq? '> x) (eq? '>= x)))
+
+#|
 (define-type IntxNon0->Int-Primitives '/)
 (define-type Ix!0->I IntxNon0->Int-Primitives)
 (define-predicate IntxNon0->Int-Prim? IntxNon0->Int-Primitives)
@@ -327,6 +354,15 @@ be usefull for optimizations or keeping state.
 (define-type IntxNibble->Int-Primitives (U '<< '>>))
 (define-type IxN->I IntxNibble->Int-Primitives)
 (define-predicate IntxNibble->Int-Prim? IntxNibble->Int-Primitives)
+|#
+
+(define-type Timer-Primitive (U 'timer-start 'timer-stop 'timer-report))
+
+(: timer-primitive? (Any -> Boolean : Timer-Primitive))
+(define (timer-primitive? x)
+  (or (eq? 'timer-start  x)
+      (eq? 'timer-stop   x)
+      (eq? 'timer-report x)))
 
 #| Literals of the schml languages
    Only Integers and Booleans in the schml language are first
@@ -378,12 +414,13 @@ be usefull for optimizations or keeping state.
 		 (Letrec S0-Bnd* E)
 		 (Let S0-Bnd* E)
 		 (App E (Listof E))
-		 (Op Schml-Prim (Listof E))
+		 (Op Schml-Primitive (Listof E))
 		 (If E E E)
 		 (Ascribe E Schml-Type (Option Blame-Label))
 		 (Var Uid)
 		 (Quote Schml-Literal)
                  (Begin (Listof E) E)
+                 (Repeat Uid E E E)
                  ;; Monotonic effects
                  (Mbox E)
                  (Munbox E)
@@ -418,12 +455,13 @@ be usefull for optimizations or keeping state.
 		 (Letrec S1-Bnd* E)
 		 (Let S1-Bnd* E)
 		 (App E (Listof E))
-		 (Op (Ann Schml-Prim Schml-Type*) (Listof E))
+		 (Op (Ann Schml-Primitive Schml-Type*) (Listof E))
 		 (If E E E)
 		 (Ascribe E Schml-Type (Option Blame-Label))
 		 (Var Uid)
 		 (Quote Schml-Literal)
                  (Begin (Listof E) E)
+                 (Repeat Uid E E E)
                  ;; Monotonic effects
                  (Mbox E)
                  (Munbox E)
@@ -443,12 +481,13 @@ be usefull for optimizations or keeping state.
 (define-type S1-Bnd (Bnd Uid Schml-Type S1-Expr))
 (define-type S1-Bnd* (Listof S1-Bnd))
 
-(: schml-prim->type
-   (-> Schml-Prim (Fn Index (Listof (U Int Bool)) (U Int Bool))))
-(define (schml-prim->type p)
+(: schml-primitive->type
+   (-> Schml-Primitive (Fn Index (Listof (U Int Bool)) (U Int Bool Unit))))
+(define (schml-primitive->type p)
   (cond
-   [(IntxInt->Bool-Prim? p) INTxINT->BOOL-TYPE]
-   [(IntxInt->Int-Prim? p)  INTxINT->INT-TYPE]))
+   [(IntxInt->Bool-primitive? p) INTxINT->BOOL-TYPE]
+   [(IntxInt->Int-primitive? p)  INTxINT->INT-TYPE]
+   [(timer-primitive? p)         ->UNIT-TYPE]))
 
 (: consistent? (Schml-Type Schml-Type . -> . Boolean))
 (define (consistent? t g)
@@ -514,7 +553,7 @@ We are going to UIL
 -----------------------------------------------------------------------------|#
 
 (define-type UIL-Prim  (U Schml-Prim Array-Prim))
-(define-type UIL-Prim! (U Array-Prim! Print-Prim! Runtime-Prim!))
+(define-type UIL-Prim! (U Schml-Prim! Array-Prim! Print-Prim! Runtime-Prim!))
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
 
@@ -558,10 +597,11 @@ We are going to UIL
 	  (Letrec C0-Bnd* E)
 	  (Let C0-Bnd* E)
 	  (App E (Listof E))
-	  (UIL-Op E)
+	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
 	  (Cast E Schml-Type Schml-Type Blame-Label)
           (Begin C0-Expr* E)
+          (Repeat Uid E E E)
           ;; Monotonic
           (Mbox (Ann E (Pair Blame-Label Schml-Type)))
           (Munbox E)
@@ -601,10 +641,11 @@ We are going to UIL
 	  (Letrec C1-Bnd* E)
 	  (Let C1-Bnd* E)
 	  (App E (Listof E))
-	  (UIL-Op E)
+	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
           ;; Terminals
           (Begin C1-Expr* E)
+          (Repeat Uid E E E)
 	  (Var Uid)
 	  (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
@@ -651,10 +692,11 @@ We are going to UIL
 	  (Letrec C2-Bnd* E)
 	  (Let C2-Bnd* E)
 	  (App E (Listof E))
-	  (UIL-Op E)
+          (Op Schml-Primitive (Listof E))
 	  (If E E E)
           ;; Terminals
           (Begin C2-Expr* E)
+          (Repeat Uid E E E)
 	  (Var Uid)
           (Type Schml-Type)
 	  (Quote Cast-Literal)
@@ -709,9 +751,10 @@ We are going to UIL
 	  (Letrec C3-Bnd* E)
 	  (Let C3-Bnd* E)
 	  (App E (Listof E))
-	  (UIL-Op E)
+          (Op Schml-Primitive (Listof E))
 	  (If E E E)
           (Begin C3-Expr* E)
+          (Repeat Uid E E E)
           ;; closure operations
           (Fn-Caster E)
           ;; Type operations
@@ -754,9 +797,10 @@ We are going to UIL
           (Letrec C4-Bnd-Lambda* E)
 	  (Let C4-Bnd-Data* E)
 	  (App E (Listof E))
-	  (UIL-Op E)
+          (Op Schml-Primitive (Listof E))
 	  (If E E E)
           (Begin C4-Expr* E)
+          (Repeat Uid E E E)
           ;; closure operations
           (Fn-Caster E)
           ;; Type operations
@@ -801,9 +845,10 @@ We are going to UIL
           (Letrec C5-Bnd-Lambda* E)
 	  (Let C5-Bnd-Data* E)
 	  (App E (Listof E))
-	  (UIL-Op E)
+          (Op Schml-Primitive (Listof E))
 	  (If E E E)
           (Begin C5-Expr* E)
+          (Repeat Uid E E E)
           ;; closure operations
           (Fn-Caster E)
           ;; Type operations
@@ -848,9 +893,10 @@ We are going to UIL
           (LetP C6-Bnd-Procedure* (LetC C6-Bnd-Closure* E))
 	  (Let C6-Bnd-Data* E)
 	  (App (Pair E E) (Listof E))
-	  (UIL-Op E)
+          (Op Schml-Primitive (Listof E))
 	  (If E E E)
           (Begin C6-Expr* E)
+          (Repeat Uid E E E)
           ;; closure operations
           (Closure-code E)
           (Closure-caster E)
@@ -903,9 +949,10 @@ We are going to UIL
           (LetP C7-Bnd-Procedure* (LetC C7-Bnd-Closure* V))
 	  (Let C7-Bnd-Data* V)
 	  (App (Pair V V) (Listof V))
-	  (UIL-Op V)
+          (Op Schml-Primitive (Listof V))
 	  (If V V V)
           (Begin C7-Effect* V)
+          (Repeat Uid V V V)
           ;;closure operations
           ;;(Closure-ref V V)
           (Fn-Caster V)
@@ -936,6 +983,7 @@ We are going to UIL
    (U (LetP C7-Bnd-Procedure* (LetC C7-Bnd-Closure* E))
       (Let C7-Bnd-Data* E)
       (Begin C7-Effect* No-Op)
+      (Repeat Uid C7-Value C7-Value E)
       (App (Pair C7-Value C7-Value) (Listof C7-Value))
       (If C7-Value E E)
       No-Op
@@ -1025,197 +1073,11 @@ We are going to UIL
 (define CLOS-CSTR-INDEX 1)
 (define CLOS-FVAR-OFFSET 2)
 
-
-
-#|-----------------------------------------------------------------------------+
-| The Lambda Language Family Types, Primitives, Literals, and Terminals        |
-+-----------------------------------------------------------------------------|#
-
-(define-type Lambda-Literal (U Integer String))
-
-
+(define-type Data-Literal (U Integer String))
 
 #|-----------------------------------------------------------------------------+
-| Language/Lambda0 produced by specify-cast-representation                     |
+| Data0-Language created by make-closures-explicit                             |
 +-----------------------------------------------------------------------------|#
-
-(define-type Lambda0-Lang
-  (Prog (List String Natural Schml-Type) L0-Expr))
-
-(define-type L0-Expr
-  (Rec E (U (Lambda Uid* (Castable (Option Uid) E))
-	    (Letrec L0-Bnd* E)
-	    (Let L0-Bnd* E)
-	    (App E (Listof E))
-	    (UIL-Op E)
-	    (If E E E)
-	    (Begin L0-Effect* E)
-	    (Fn-Caster E)
-	    ;; Terminals
-	    (Var Uid)
-	    (Quote Lambda-Literal))))
-
-(define-type L0-Effect
-  (Rec E
-   (U (Letrec L0-Bnd* E)
-      (Let L0-Bnd* E)
-      (Begin L0-Effect* No-Op)
-      (App L0-Expr L0-Expr*)
-      (If L0-Expr E E)
-      No-Op
-      (UIL-Op! L0-Expr))))
-
-
-(define-type L0-Expr* (Listof L0-Expr))
-(define-type L0-Effect* (Listof L0-Effect))
-(define-type L0-Stmt (UIL-Op! L0-Expr))
-(define-type L0-Stmt* (Listof L0-Stmt))
-(define-type L0-Bnd (Pair Uid L0-Expr))
-(define-type L0-Bnd* (Listof L0-Bnd))
-
-
-#|-----------------------------------------------------------------------------+
-| Language/Lambda1 created by label-lambdas                                    |
-+-----------------------------------------------------------------------------|#
-
-(define-type Lambda1-Lang (Prog (List String Natural Schml-Type) L1-Expr))
-
-(define-type L1-Expr
-  (Rec E (U  ;; Non terminals
-          (Letrec L1-Bnd-Lambda* E)
-	  (Let L1-Bnd-Data* E)
-	  (App E (Listof E))
-	  (UIL-Op E)
-	  (If E E E)
-	  (Begin (Listof (UIL-Op! E)) E)
-	  (Fn-Caster E)
-	  ;; Terminals
-	  Halt
-	  (Var Uid)
-	  (Quote Lambda-Literal))))
-
-(define-type L1-Stmt (UIL-Op! L1-Expr))
-(define-type L1-Stmt* (Listof L1-Stmt))
-(define-type L1-Bnd-Lambda* (Listof L1-Bnd-Lambda))
-(define-type L1-Bnd-Lambda  (Pairof Uid L1-Lambda))
-(define-type L1-Bnd-Data* (Listof L1-Bnd-Data))
-(define-type L1-Bnd-Data  (Pairof Uid L1-Expr))
-
-(define-type L1-Lambda
-  (Lambda Uid* (Castable (Option Uid) L1-Expr)))
-
-
-#|-----------------------------------------------------------------------------+
-| Language/Lambda2 created by uncover-free                                     |
-+-----------------------------------------------------------------------------|#
-(define-type Lambda2-Lang (Prog (List String Natural Schml-Type) L2-Expr))
-
-(define-type L2-Expr
-  (Rec E (U ;; Non-Terminal
-	  (Letrec L2-Bnd-Lambda* E)
-	  (Let L2-Bnd-Data* E)
-	  (App E (Listof E))
-	  (UIL-Op E)
-	  (If E E E)
-	  (Begin L2-Stmt* E)
-	  (Fn-Caster E)
-	  Halt
-	  (Var Uid)
-	  (Quote Lambda-Literal))))
-
-(define-type L2-Bnd-Lambda* (Listof L2-Bnd-Lambda))
-(define-type L2-Bnd-Lambda (Pairof Uid L2-Lambda))
-(define-type L2-Bnd-Data* (Listof L2-Bnd-Data))
-(define-type L2-Bnd-Data (Pairof Uid L2-Expr))
-(define-type L2-Stmt (UIL-Op! L2-Expr))
-(define-type L2-Stmt* (Listof L2-Stmt))
-
-(define-type L2-Lambda
-  (Lambda Uid* (Free (Option Uid) (Listof Uid) L2-Expr)))
-
-
-#|-----------------------------------------------------------------------------+
-| Language/Lambda3 created by convert-closures                                 |
-+-----------------------------------------------------------------------------|#
-;; Intermediate language were all lambda have no free variables
-;; they are explicitly passed as a structure and implicitly extracted by procedures
-
-#|
-(define-type Lambda3-Lang
-  (Prog (List String Natural Schml-Type) L3-Expr))
-
-(define-type L3-Expr
-  (Rec E (U ;; Non Terminals
-	 (LetP L3-Bnd-Procedure* (LetC L3-Bnd-Closure* E))
-	 (Let L3-Bnd-Data* E)
-	 (App (Pair (Var Uid) (Var Uid)) (Listof E))
-	 (UIL-Op E)
-	 (If E E E)
-	 (Begin L3-Stmt* E)
-	 (Fn-Caster E)
-	 ;; Terminals
-	 Halt
-	 (Var Uid)
-	 (Quote Lambda-Literal))))
-
-(define-type L3-Procedure
-  (Procedure Uid Uid* (Option Uid) Uid* L3-Expr))
-(define-type L3-Closure (Closure-Data Uid (Option Uid) (Listof Uid)))
-(define-type L3-Bnd-Procedure (Pairof Uid L3-Procedure))
-(define-type L3-Bnd-Procedure* (Listof L3-Bnd-Procedure))
-(define-type L3-Bnd-Closure (Pairof Uid L3-Closure))
-(define-type L3-Bnd-Closure* (Listof L3-Bnd-Closure))
-(define-type L3-Bnd-Data (Pairof Uid L3-Expr))
-(define-type L3-Bnd-Data* (Listof L3-Bnd-Data))
-(define-type L3-Stmt (UIL-Op! L3-Expr))
-(define-type L3-Stmt* (Listof L3-Stmt))
-|#
-#|-----------------------------------------------------------------------------+
-| Language/Lambda4 created by specify-representation                           |
-+-----------------------------------------------------------------------------|#
-;; procedures are now just routines that have an explicit
-;; layout for parameters
-(define-type Lambda4-Lang
-  (Prog (List String Natural Schml-Type) L4-Expr))
-
-
-(define-type L4-Expr
-  (Rec E
-       (U (Labels L4-Bnd-Code* (Let L4-Bnd-Data* E))
-	  (Let L4-Bnd-Data* E)
-	  (App E (Listof E))
-	  (UIL-Op E)
-	  (If E E E)
-	  (Begin L4-Stmt* E)
-	  ;; Terminals
-          Halt
-	  (Code-Label Uid)
-	  (Var Uid)
-	  (Quote Lambda-Literal))))
-
-(define-type L4-Expr* (Listof L4-Expr))
-
-(define-type L4-Bnd-Code* (Listof L4-Bnd-Code))
-(define-type L4-Bnd-Code (Pairof Uid L4-Code))
-(define-type L4-Code (Code Uid* L4-Expr))
-(define-type L4-Bnd-Data* (Listof L4-Bnd-Data))
-(define-type L4-Bnd-Data  (Pairof Uid L4-Expr))
-(define-type L4-Stmt (UIL-Op! L4-Expr))
-(define-type L4-Stmt* (Listof L4-Stmt))
-
-
-;; The representation of closures is that they are arrays containing their
-;; free variables.
-
-
-
-
-#|-----------------------------------------------------------------------------+
-| Data0-Language created by make-closures-explicit                           |
-+-----------------------------------------------------------------------------|#
-
-
-
 (define-type Data0-Lang
   (Prog (List String Natural Schml-Type) D0-Expr))
 
@@ -1228,9 +1090,10 @@ We are going to UIL
             (Let D0-Bnd* E)
 	    (App E (Listof E))
             (UIL-Op! E)
-	    (UIL-Op E)
+            (UIL-Op E)
 	    (If E E E)
 	    (Begin D0-Expr* E)
+            (Repeat Uid E E E)
 	    Halt
 	    (Var Uid)
 	    (Code-Label Uid)
@@ -1239,7 +1102,7 @@ We are going to UIL
 (define-type D0-Expr* (Listof D0-Expr))
 (define-type D0-Bnd* (Listof D0-Bnd))
 (define-type D0-Bnd  (Pairof Uid D0-Expr))
-(define-type D0-Literal Lambda-Literal)
+(define-type D0-Literal Data-Literal)
 
 #|-----------------------------------------------------------------------------+
 | Data1-Language created by normalize-context                                          |
@@ -1259,7 +1122,7 @@ We are going to UIL
    (U (Let D1-Bnd* T)
       (If D1-Pred T T)
       (Begin D1-Effect* T)
-      (Return D1-Value))))
+      D1-Value)))
 
 (define-type D1-Value
  (Rec V
@@ -1273,14 +1136,11 @@ We are going to UIL
      (Code-Label Uid)
      (Quote D1-Literal))))
 
-(define-type D1-Value* (Listof D1-Value))
-
 (define-type D1-Pred
  (Rec P
   (U (Let D1-Bnd* P)
      (If D1-Pred P P)
      (Begin D1-Effect* P)
-     (App D1-Value D1-Value*)
      (Relop IxI->B-Prim D1-Value D1-Value))))
 
 (define-type D1-Effect
@@ -1288,17 +1148,21 @@ We are going to UIL
   (U (Let D1-Bnd* E)
      (If D1-Pred E E)
      (Begin D1-Effect* No-Op)
+     (Repeat Uid E E E)
      (App D1-Value D1-Value*)
      (UIL-Op! D1-Value)
      No-Op)))
 
+
+(define-type D1-Value* (Listof D1-Value))
 (define-type D1-Effect* (Listof D1-Effect))
 
 (define-type D1-Bnd  (Pairof Uid D1-Value))
 
 (define-type D1-Bnd* (Listof D1-Bnd))
 
-(define-type D1-Literal Lambda-Literal)
+(define-type D1-Literal Data-Literal)
+
 
 #|-----------------------------------------------------------------------------+
 | Data2-Language created by remove-let                                          |
@@ -1318,7 +1182,7 @@ We are going to UIL
   (Rec T
    (U (If D2-Pred T T)
       (Begin D2-Effect* T)
-      (Return D2-Value))))
+      D2-Value)))
 
 (define-type D2-Value
  (Rec V
@@ -1331,8 +1195,6 @@ We are going to UIL
      (Code-Label Uid)
      (Quote D2-Literal))))
 
-(define-type D2-Value* (Listof D2-Value))
-
 (define-type D2-Pred
  (Rec P
   (U (If D2-Pred P P)
@@ -1344,17 +1206,22 @@ We are going to UIL
  (Rec E
   (U (If D2-Pred E E)
      (Begin D2-Effect* No-Op)
+     (Repeat Uid E E E)
      (App D2-Value D2-Value*)
      (UIL-Op! D2-Value)
      (Assign Uid D2-Value)
      No-Op)))
 
+
+(define-type D2-Value* (Listof D2-Value))
+
 (define-type D2-Effect* (Listof D2-Effect))
 
-(define-type D2-Literal Lambda-Literal)
+(define-type D2-Literal Data-Literal)
+
 
 #|-----------------------------------------------------------------------------+
-| Data3-Language created by purify-expression-context                          |
+| Data3-Language created by remove-complex-opera                               |
 +-----------------------------------------------------------------------------|#
 
 (define-type Data3-Lang
@@ -1362,34 +1229,154 @@ We are going to UIL
 	(Labels D3-Bnd-Code*
 		D3-Body)))
 
+(define-type D3-Body (Locals Uid* D3-Tail))
 (define-type D3-Bnd-Code* (Listof D3-Bnd-Code))
 (define-type D3-Bnd-Code (Pairof Uid D3-Code))
 (define-type D3-Code (Code Uid* D3-Body))
 
-(define-type D3-Body (Locals Uid* D3-Tail))
-
 (define-type D3-Tail
   (Rec T
-   (U (Begin D3-Stmt* T)
-      (If D3-Pred T T)
-      (Return D3-Expr))))
+   (U (If D3-Pred T T)
+      (Begin D3-Effect* T)
+      (App D3-Trivial D3-Trivial*)
+      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
+      Halt
+      D3-Trivial)))
 
-(define-type D3-Expr
- (Rec E
-  (U (If D3-Pred E E)
-     (App E (Listof E))
-     (UIL-Op E)
+
+(define-type D3-Value
+ (Rec V
+  (U Halt
+     (If D3-Pred V V)
+     (Begin D3-Effect* V)
+     (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
      Halt
-     (Var Uid)
-     (Code-Label Uid)
-     (Quote D3-Literal))))
+     D3-Trivial
+     (App D3-Trivial D3-Trivial*))))
 
 (define-type D3-Pred
  (Rec P
-  (U (App D3-Expr (Listof D3-Expr))
-     (Relop IxI->B-Prim D3-Expr D3-Expr))))
+  (U (If D3-Pred P P)
+     (Begin D3-Effect* P)
+     (Relop IxI->B-Prim D3-Trivial D3-Trivial))))
 
-(define-type D3-Expr* (Listof D3-Expr))
-(define-type D3-Stmt (UIL-Op! D3-Expr))
-(define-type D3-Stmt* (Listof D3-Stmt))
-(define-type D3-Literal Lambda-Literal)
+(define-type D3-Effect
+ (Rec E
+  (U (If D3-Pred E E)
+     (Begin D3-Effect* No-Op)
+     (Repeat Uid Uid Uid E)
+     (App D3-Trivial D3-Trivial*)
+     (UIL-Op! D3-Trivial)
+     (Assign Uid D3-Value)
+     No-Op)))
+
+(define-type D3-Trivial
+  (U (Code-Label Uid)
+     (Var Uid)
+     (Quote D3-Literal)))
+
+(define-type D3-Value* (Listof D3-Value))
+(define-type D3-Trivial* (Listof D3-Trivial))
+(define-type D3-Effect* (Listof D3-Effect))
+
+(define-type D3-Literal Data-Literal)
+
+
+
+#|-----------------------------------------------------------------------------+
+| Data4-Language created by flatten-assignments                                |
++-----------------------------------------------------------------------------|#
+
+(define-type Data4-Lang
+  (Prog (List String Natural Schml-Type)
+	(Labels D4-Bnd-Code*
+		D4-Body)))
+
+(define-type D4-Body (Locals Uid* D4-Tail))
+(define-type D4-Bnd-Code* (Listof D4-Bnd-Code))
+(define-type D4-Bnd-Code (Pairof Uid D4-Code))
+(define-type D4-Code (Code Uid* D4-Body))
+
+(define-type D4-Tail
+  (Rec T
+   (U (If D3-Pred T T)
+      (Begin D3-Effect* T)
+      (App D3-Trivial D3-Trivial*)
+      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
+      Halt
+      D3-Trivial)))
+
+(define-type D4-Pred
+ (Rec P
+  (U (If D4-Pred P P)
+     (Begin D4-Effect* P)
+     (Relop IxI->B-Prim D4-Trivial D4-Trivial))))
+
+(define-type D4-Effect
+ (Rec E
+  (U (If D4-Pred E E)
+     (Begin D4-Effect* No-Op)
+     (Repeat Uid D4-Trivial D4-Trivial E)
+     (UIL-Op! D4-Trivial)
+     (Assign Uid D4-Trivial)
+     (Assign Uid (UIL-Op D4-Trivial))
+     (Assign Uid (App D4-Trivial D4-Trivial*))
+     No-Op)))
+
+(define-type D4-Trivial
+  (U (Code-Label Uid)
+     (Var Uid)
+     (Quote D4-Literal)))
+
+
+(define-type D4-Trivial* (Listof D4-Trivial))
+(define-type D4-Effect* (Listof D4-Effect))
+
+(define-type D4-Literal Data-Literal)
+
+
+#|-----------------------------------------------------------------------------+
+| Data5-Language created by flatten-assignments                                |
++-----------------------------------------------------------------------------|#
+
+(define-type Data5-Lang
+  (Prog (List String Natural Schml-Type)
+	(Labels D5-Bnd-Code*
+		D5-Body)))
+
+(define-type D5-Body (Locals Uid* D5-Tail))
+(define-type D5-Bnd-Code* (Listof D5-Bnd-Code))
+(define-type D5-Bnd-Code (Pairof Uid D5-Code))
+(define-type D5-Code (Code Uid* D5-Body))
+
+(define-type D5-Tail
+  (Rec T
+   (U (If D3-Pred T T)
+      (Begin D3-Effect* T)
+      (App D3-Trivial D3-Trivial*)
+      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
+      Halt
+      D3-Trivial)))
+
+(define-type D5-Pred (Relop IxI->B-Prim D5-Trivial D5-Trivial))
+
+(define-type D5-Effect
+ (Rec E
+  (U (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
+     (Repeat Uid D5-Trivial D5-Trivial E)
+     (UIL-Op! D5-Trivial)
+     (Assign Uid D5-Trivial)
+     (Assign Uid (UIL-Op D5-Trivial))
+     (Assign Uid (App D5-Trivial D5-Trivial*))
+     No-Op)))
+
+(define-type D5-Trivial
+  (U (Code-Label Uid)
+     (Var Uid)
+     (Quote D5-Literal)))
+
+(define-type D5-Trivial* (Listof D5-Trivial))
+(define-type D5-Effect* (Listof D5-Effect))
+
+(define-type D5-Literal Data-Literal)
+

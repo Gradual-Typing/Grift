@@ -93,8 +93,14 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
     [(Begin e* e)
      (do (bind-state : (State Natural C2-Expr))
          (e* : C2-Expr* <- (icr-expr* e*))
-       (e  : C2-Expr  <- (icr-expr  e))
-       (return-state (Begin e* e)))]
+         (e  : C2-Expr  <- (icr-expr  e))
+         (return-state (Begin e* e)))]
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State Natural C2-Expr))
+         (e1 : C2-Expr <- (icr-expr e1))
+         (e2 : C2-Expr <- (icr-expr e2))
+         (e3 : C2-Expr <- (icr-expr e3))
+         (return-state (Repeat i e1 e2 e3)))]
     [(Gbox e)
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))

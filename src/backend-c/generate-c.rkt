@@ -23,16 +23,17 @@
 (define C-EXIT "exit(-1)")
 
 (: C-INCLUDES (Listof String))
-(define C-INCLUDES '("stdio.h" "stdlib.h"))
+(define C-INCLUDES '("stdio.h" "stdlib.h" "sys/time.h"))
 
 
-(: generate-c (-> Data2-Lang Config Void))
+(: generate-c (-> Data5-Lang Config Void))
 (define (generate-c prgm config)
-  (match-let ([(Prog (list name count type) (Labels lbl* exp)) prgm])
-    (call-with-output-file (Config-c-path config) #:exists 'replace #:mode 'text
+  #|(match-let ([(Prog (list name count type) (Labels lbl* exp)) prgm])
+     (call-with-output-file (Config-c-path config) #:exists 'replace #:mode 'text
       (lambda ([p : Output-Port])
        (parameterize ([current-output-port p])
-         (emit-program name type lbl* exp))))))
+        (emit-program name type lbl* exp)))))
+  |# (TODO finish generate-c))
 
 (: emit-program (-> String Schml-Type D2-Bnd-Code* D2-Body Void))
 (define (emit-program name type code* body)
@@ -51,7 +52,14 @@
   (for ([i : String C-INCLUDES])
     (display "#include <") (display i) (display ">\n"))
   (newline)
-  (display "void* alloc_ptr;\n"))
+  (display "void* alloc_ptr;\n")
+  (newline)
+  (display "//This is global state for the timer.")
+  (display "struct timeval timer_start;")
+  (display "struct timeval timer_stop;")
+  (display "bool timer_started;")
+  (display "bool timer_stopped;")
+  (newline))
 
 (: emit-declarations (-> D2-Bnd-Code* Void))
 (define (emit-declarations code*)

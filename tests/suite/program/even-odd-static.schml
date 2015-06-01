@@ -1,4 +1,4 @@
-(letrec ([odd (lambda ([n : Int]) : Bool
+(letrec ([odd (lambda (n) : Bool
                 (if (= 0 n)
                     #f
                     (even (- n 1))))]

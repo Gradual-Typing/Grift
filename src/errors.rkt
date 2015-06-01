@@ -85,7 +85,7 @@
 (define-syntax-rule (raise-duplicate-binding sym src)
   (raise-parse-exn src "duplicate bindings for ~a" sym))
 
-(define-syntax-rule (raise-reservered-sym sym src)
+(define-syntax-rule (raise-reserved-symbol sym src)
   (raise-parse-exn src "attemp to bind reserved symbol ~a" sym))
 
 (define-syntax-rule (raise-fml-exn stx)

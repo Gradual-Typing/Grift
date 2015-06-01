@@ -71,6 +71,12 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (val  : D1-Value   <- (nc-value exp))
          (return-state (Begin eff* val)))]
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State D1-Bnd-Code* D1-Effect))
+         (e1 : D1-Value <- (nc-value e1))
+         (e2 : D1-Value <- (nc-value e2))
+         (e3 : D1-Effect <- (nc-effect e3))
+         (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote '()))))]
     [(App exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
          (val  : D1-Value  <- (nc-value  exp))
@@ -110,6 +116,12 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (eff  : D1-Effect  <- (nc-effect eff))
          (return-state (make-begin (append eff* (list eff)) NO-OP)))]
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State D1-Bnd-Code* D1-Effect))
+         (e1 : D1-Value <- (nc-value e1))
+         (e2 : D1-Value <- (nc-value e2))
+         (e3 : D1-Effect <- (nc-effect e3))
+         (return-state (Repeat i e1 e2 e3)))]
     [(App exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (val  : D1-Value  <- (nc-value  exp))
@@ -133,7 +145,7 @@
 
 (: nc-pred (-> D0-Expr (State D1-Bnd-Code* D1-Pred)))
 (define (nc-pred exp)
-  (logging nc-pref ('Vomit) "~v" exp) 
+  (logging nc-pref ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-pred exp)))]
@@ -164,7 +176,7 @@
          ;; ops in pred position. This is probably foolish we should try
          ;; to eliminate this.
          (val* : D1-Value* <- (nc-value* exp*))
-         (if (IntxInt->Bool-Prim? p)
+         (if (IntxInt->Bool-primitive? p)
              (match val*
                [(list a b) (return-state (Relop p a b))]
                [other (error 'nc-pred-op)])
@@ -178,7 +190,7 @@
 (: nc-value-op (-> (U UIL-Prim UIL-Prim!) D1-Value* D1-Value))
 (define (nc-value-op p exp*)
   (cond
-   [(IntxInt->Bool-Prim? p)
+   [(IntxInt->Bool-primitive? p)
     (match exp*
       [(list a b)
        (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT))]

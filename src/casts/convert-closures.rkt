@@ -162,6 +162,12 @@
            (e* : C6-Expr* <- (map-state cc-expr/env e*))
            (e  : C6-Expr  <- (cc-expr/env  e))
            (return-state (Begin e* e)))]
+      [(Repeat i e1 e2 e3)
+       (do (bind-state : (State Nat C6-Expr))
+           (e1 : C6-Expr <- (cc-expr/env e1))
+           (e2 : C6-Expr <- (cc-expr/env e2))
+           (e3 : C6-Expr <- (cc-expr/env e3))
+           (return-state (Repeat i e1 e2 e3)))]
       ;; Gaurded Representation
       [(GRep-proxied? e)
        (lift-state (inst GRep-proxied? C6-Expr) (cc-expr/env e))]

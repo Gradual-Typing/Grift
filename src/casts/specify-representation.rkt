@@ -138,7 +138,9 @@ exposed as the effects that they truelly are.
       [(Op p e*)
        (do (bind-state : (State Nat D0-Expr))
            (e* : D0-Expr* <- (recur* e*))
-           (return-state (Op p e*)))]
+           (cond
+             [(schml-prim? p) (return-state (Op p e*))]
+             [(schml-prim!? p) (return-state (Op p e*))]))]
       [(Quote k)
        (return-state
         (cond
@@ -244,6 +246,12 @@ exposed as the effects that they truelly are.
            (eff* : D0-Expr* <- (recur* eff*))
            (exp  : D0-Expr  <- (recur exp))
            (return-state (Begin eff* exp)))]
+      [(Repeat i e1 e2 e3)
+       (do (bind-state : (State Nat D0-Expr))
+           (e1 : D0-Expr <- (recur e1))
+           (e2 : D0-Expr <- (recur e2))
+           (e3 : D0-Expr <- (recur e3))
+           (return-state (Repeat i e1 e2 e3)))]
       ;; Guarded
       [(UGbox e)
        (do (bind-state : (State Nat D0-Expr))

@@ -166,6 +166,8 @@
     [(Begin stm* _)
      (let*-values ([(stm* lv*) (rl-effect* stm* lv*)])
        (values (make-begin stm* NO-OP) lv*))]
+    [(Repeat i st sp (app rl-effect stm lv))
+     (values (Repeat i st sp stm) lv)]
     [(App exp exp*)
      (let*-values ([(exp lv*^)   (rl-value exp)]
                    [(exp* lv*^^) (rl-value* exp*)])

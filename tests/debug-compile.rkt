@@ -2,9 +2,9 @@
 
 (require schml/src/compile
          schml/src/helpers
-         schml/testing/test-compile)
+         "./test-compile.rkt")
 
-(require/typed schml/testing/paths
+(require/typed "./paths.rkt"
                [test-tmp-path Path]
                [test-suite-path Path])
 

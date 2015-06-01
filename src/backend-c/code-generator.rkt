@@ -7,7 +7,7 @@
 (provide (all-defined-out))
 
 ;; Basic driver for the entire backend
-(: c-backend-generate-code (Data2-Lang Config . -> . Boolean))
+(: c-backend-generate-code (Data5-Lang Config . -> . Boolean))
 (define (c-backend-generate-code uil config)
   ;; Write the C code to a file
   (when (trace? 'Vomit)

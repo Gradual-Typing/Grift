@@ -9,6 +9,7 @@
 (define core-tests : Test
   (test-suite
    "core tests"
+   (test-file "core" "const-unit.schml" (unit))
    ;; Bools
    (test-file "core" "const-false.schml" (bool #f))
    (test-file "core" "const-true.schml"  (bool #t))

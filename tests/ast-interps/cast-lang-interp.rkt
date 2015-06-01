@@ -175,6 +175,18 @@
       [(Var id) (env-lookup env id)]
       [(Quote k) k]
       [(Begin e* e) (begin (for-each recur/env e*) (recur/env e))]
+      [(Repeat id start stop eff)
+       (let* ([start (recur start env)]
+              [stop  (recur stop  env)])
+         (letrec ([loop : (Integer Integer -> CL-Value)
+                   (lambda ([index : Integer] [stop : Integer]) : CL-Value
+                    (if (< index stop)
+                        (begin (recur eff (env-extend* env (cons id '()) (cons index '())))
+                               (loop (+ index 1) stop))
+                        '()))])
+               (if (and (integer? start) (integer? stop))
+                   (loop start stop)
+                   (TODO come up with an error message for start not an integer))))]
       ;; Guarded references
       [(Gbox e)    (make-gbox (recur/env e))]
       [(Gunbox (app recur/env e))
@@ -209,13 +221,18 @@
     [(%/) (tc IxI->I quotient v*)]
     [(binary-and) (tc FxF->I fxand v*)]
     [(binary-or) (tc FxF->I fxior v*)]
+    [(timer-start) (tc ->U timer-start v*)]
+    [(timer-stop)  (tc ->U timer-stop v*)]
+    [(timer-report) (tc ->U timer-report v*)]
     [else (error 'delta "~a" p)]))
 
 (define-syntax tc
-  (syntax-rules (IxI->I IxI->B)
+  (syntax-rules (IxI->I IxI->B ->U)
     [(_ IxI->I p v) (tc-help p v (integer? (car v)) (integer? (cadr v)))]
-    [(_ FxF->I p v) (tc-help p v (fixnum? (car v)) (fixnum? (cadr v)))]
-    [(_ IxI->B p v) (tc-help p v (integer? (car v)) (integer? (cadr v)))]))
+    [(_ IxI->B p v) (tc-help p v (integer? (car v)) (integer? (cadr v)))]
+    [(_ ->U p v)    (tc-help p v)]
+    [(_ FxF->I p v) (tc-help p v (fixnum? (car v)) (fixnum? (cadr v)))]))
+
 
 (define-syntax (tc-help stx)
   (syntax-case stx ()
@@ -225,6 +242,30 @@
            (if (and (? tmp) ...)
                (p tmp ...)
                (error 'cfi-delta "type error ~a" `(p ,e ...)))))]))
+
+(define start-time : Real 0.0)
+(define stop-time  : Real 0.0)
+
+(define timer-started? : Boolean #f)
+(define timer-stopped?  : Boolean #f)
+
+(define (timer-start)
+  (when timer-started? (TODO make an error message that works here))
+  (set! timer-started? #t)
+  (set! start-time (current-inexact-milliseconds))
+  '())
+
+(define (timer-stop)
+  (set! stop-time  (current-inexact-milliseconds))
+  (when (not timer-started?) (TODO make an error message that works here))
+  (when timer-stopped? (TODO make an error message that works here))
+  (set! timer-stopped? #t)
+  '())
+
+(define (timer-report)
+  (when (not timer-started?) (TODO make an error message that works here))
+  (when (not timer-stopped?) (TODO make an error message that works here))
+  '())
 
 ;; The lazy-d parts
 (define c-depth (box 0))

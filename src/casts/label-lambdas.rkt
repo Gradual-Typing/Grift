@@ -125,6 +125,12 @@
          (e* : C4-Expr* <- (ll-expr* e*))
          (e  : C4-Expr  <- (ll-expr  e))
          (return-state (Begin e* e)))]
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State Nat C4-Expr))
+         (e1 : C4-Expr <- (ll-expr e1))
+         (e2 : C4-Expr <- (ll-expr e2))
+         (e3 : C4-Expr <- (ll-expr e3))
+         (return-state (Repeat i e1 e2 e3)))]
     ;; Gaurded Representation
     [(GRep-proxied? e)
      (lift-state (inst GRep-proxied? C4-Expr) (ll-expr e))]

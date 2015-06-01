@@ -58,7 +58,6 @@ Description: This pass create effect, and value contexts
     [(Type-Fn-arg e1 e2) (lift-state (inst Type-Fn-arg C7-Value C7-Value)
                                      (nc-expr->value e1) (nc-expr->value e2))]
     [(Type-Fn-return e) (lift-state (inst Type-Fn-return C7-Value) (nc-expr->value e))]
-
     [(Dyn-tag e)  (lift-state (inst Dyn-tag C7-Value) (nc-expr->value e))]
     [(Dyn-immediate e) (lift-state (inst Dyn-immediate C7-Value) (nc-expr->value e))]
     [(Dyn-type e) (lift-state (inst Dyn-type C7-Value) (nc-expr->value e))]
