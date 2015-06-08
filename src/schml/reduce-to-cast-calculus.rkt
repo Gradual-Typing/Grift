@@ -6,15 +6,15 @@ ast, and finally converts that ast into an equivalent ast
 of the cast calculus.
 |#
 (provide (all-defined-out))
-(require schml/src/language)
-(require schml/src/helpers)
+(require "../language.rkt"
+         "../helpers.rkt"
+         "./read.rkt"
+         "./parse.rkt"
+         "./type-check.rkt"
+         "./insert-implicit-casts.rkt")
 
 (: reduce-to-cast-calculus (Path Config . -> . Cast0-Lang))
 (trace-define (reduce-to-cast-calculus path config)
-  (local-require schml/src/schml/read
-		 schml/src/schml/parse
-		 schml/src/schml/type-check
-		 schml/src/schml/insert-implicit-casts)
   (let* ((stx-lang (read path config))
 	 (s0 (parse stx-lang config))
 	 (s1 (type-check s0 config)))

@@ -1,8 +1,8 @@
 #lang typed/racket/base
 
-(require schml/src/compile
-         schml/src/helpers
-         schml/testing/test-compile)
+(require "../src/compile.rkt"
+         "../src/helpers.rkt"
+         "./test-compile.rkt")
 
 (require/typed schml/testing/paths
                [test-tmp-path Path]

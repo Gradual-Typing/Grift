@@ -25,9 +25,9 @@
 |Input Grammar Cast1-Language                                                   |
 |Output Grammar Cast2-Language                                                  |
 +------------------------------------------------------------------------------|#
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide introduce-castable-functions)

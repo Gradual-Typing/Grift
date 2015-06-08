@@ -1,7 +1,7 @@
 #lang typed/racket
 
 (require ;;racket/port
-         schml/src/helpers)
+         "../src/helpers.rkt")
 
 (provide (all-defined-out))
 

@@ -10,7 +10,9 @@ Description: This pass create effect, and value contexts
 | Target Grammar : Lambda0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/helpers schml/src/errors schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 ;; Only the pass is provided by this module
 (provide normalize-context)
 

@@ -1,6 +1,6 @@
 #lang typed/racket
 
-(require schml/src/helpers)
+(require "./helpers.rkt")
 (provide (all-defined-out))
 
 ;; Exceptions Thrown should all be subtypes of exn:schml

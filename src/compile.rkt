@@ -1,12 +1,11 @@
 #lang typed/racket
 
-(require schml/src/language
-         schml/src/helpers)
-(require schml/src/schml/reduce-to-cast-calculus
-         schml/src/casts/impose-cast-semantics
-         schml/src/data/convert-representation
-         schml/src/backend-c/code-generator)
-
+(require "./language.rkt"
+         "./helpers.rkt")
+(require "./schml/reduce-to-cast-calculus.rkt"
+         "./casts/impose-cast-semantics.rkt"
+         "./data/convert-representation.rkt"
+         "./backend-c/code-generator.rkt")
 (provide (all-defined-out))
 (provide (struct-out Config))
 
@@ -24,7 +23,7 @@
   (when (trace? 'Source 'All 'Vomit)
     (logf "Source:\n~a\n\n" (file->string path #:mode 'text)))
   (let* (;; read(lex), parse, typecheck, insert casts
-         [c0  : Cast0-Lang (pass/log (Cast0 All)  
+         [c0  : Cast0-Lang (pass/log (Cast0 All)
                             (reduce-to-cast-calculus path config))]
          ;; lower casts into a weakly typed language with lexical closures
          [d0  : Data0-Lang (impose-cast-semantics c0 config)]

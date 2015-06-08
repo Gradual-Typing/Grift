@@ -4,18 +4,18 @@
 ;; an expected value. The real compiler is then invoked. And the result once again checked.
 
 (require typed/rackunit
-         schml/src/language
-         schml/src/errors
-         schml/src/compile
+         "../src/language.rkt"
+         "../src/errors.rkt"
+         "../src/helpers.rkt"
+         "../src/compile.rkt"
          "./values.rkt"
-         "./paths.rkt"
-         schml/src/helpers)
+         "./paths.rkt")
 
 (require ;; The passes
-         schml/src/schml/reduce-to-cast-calculus
-         schml/src/casts/impose-cast-semantics
-         schml/src/data/convert-representation
-         schml/src/backend-c/code-generator
+         "../src/schml/reduce-to-cast-calculus.rkt"
+         "../src/casts/impose-cast-semantics.rkt"
+         "../src/data/convert-representation.rkt"
+         "../src/backend-c/code-generator.rkt"
          ;; The interpreters
          "./ast-interps/cast-lang-interp.rkt")
 

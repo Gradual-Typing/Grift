@@ -12,9 +12,9 @@ exposed as the effects that they truelly are.
 | Target Grammar : Lambda0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 ;; Only the pass is provided by this module
 (provide specify-representation)
 

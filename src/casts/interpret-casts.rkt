@@ -18,9 +18,9 @@
 |Output Grammar Cast3-Language                                                 |
 +-----------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide interpret-casts)

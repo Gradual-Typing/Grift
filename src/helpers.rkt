@@ -159,8 +159,8 @@ This allows me to make very desciptive grammars via types later on.
       syntax-void))
 
 (if-in-construction
- (provide exn:todo)
- (struct exn:todo exn ()))
+ (struct exn:todo exn ())
+ (provide exn:todo))
 
 
 (define-syntax TODO

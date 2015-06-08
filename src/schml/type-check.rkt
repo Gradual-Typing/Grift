@@ -20,9 +20,9 @@
 |                                                                               |
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
-(require schml/src/errors
-	 schml/src/helpers
-	 schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide type-check)

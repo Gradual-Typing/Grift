@@ -11,9 +11,9 @@
 +-------------------------------------------------------------------------------+
 |Input Grammar
 +------------------------------------------------------------------------------|#
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide insert-implicit-casts)
@@ -40,7 +40,7 @@
        [(Let bnd* (and (Ann _ (cons src type^)) body))
 	(Let (map iic-bnd bnd*) (mk-cast (mk-label "let" src) (iic-expr body) type^ type))]
        [(Letrec bnd* (and (Ann _ (cons src type^)) body))
-	(Letrec (map iic-bnd bnd*) 
+	(Letrec (map iic-bnd bnd*)
                 (mk-cast (mk-label "letrec" src) (iic-expr body) type^ type))]
        [(App rator rand*) (iic-application rator rand* src type)]
        [(Op (Ann prim rand-ty*) rand*)

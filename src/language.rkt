@@ -1,6 +1,6 @@
 #lang typed/racket
 
-(require schml/src/helpers)
+(require "./helpers.rkt")
 (provide (all-defined-out))
 
 #|

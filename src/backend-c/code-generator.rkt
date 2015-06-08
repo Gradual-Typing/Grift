@@ -1,8 +1,8 @@
 #lang typed/racket
 
-(require schml/src/language
-         schml/src/helpers
-         schml/src/backend-c/generate-c)
+(require "../language.rkt"
+         "../helpers.rkt"
+         "./generate-c.rkt")
 
 (provide (all-defined-out))
 

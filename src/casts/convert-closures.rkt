@@ -9,9 +9,9 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/helpers
-         schml/src/errors
-         schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 (provide convert-closures)
 

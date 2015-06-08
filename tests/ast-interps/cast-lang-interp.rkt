@@ -1,8 +1,8 @@
 #lang typed/racket
 
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language
+(require "../../src/helpers.rkt"
+         "../../src/errors.rkt"
+	 "../../src/language.rkt"
 	 "../values.rkt"
          racket/fixnum)
 

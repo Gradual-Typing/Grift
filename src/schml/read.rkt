@@ -8,8 +8,9 @@
 |the function read-syntax so that the source locations may be lifted from the
 |syntax-objects as we convert them to core forms.
 +------------------------------------------------------------------------------|#
-(require schml/src/language
-         schml/src/errors)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 (provide read)
 
 #|

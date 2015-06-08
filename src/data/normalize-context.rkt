@@ -10,9 +10,9 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide normalize-context)
@@ -133,7 +133,7 @@
 
 (: nc-pred (-> D0-Expr (State D1-Bnd-Code* D1-Pred)))
 (define (nc-pred exp)
-  (logging nc-pref ('Vomit) "~v" exp) 
+  (logging nc-pref ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-pred exp)))]

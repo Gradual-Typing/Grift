@@ -9,9 +9,9 @@
 | non lexical lambdas
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/language
-         schml/src/helpers
-         schml/src/errors)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-free)

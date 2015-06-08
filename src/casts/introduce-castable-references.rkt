@@ -34,9 +34,9 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
 ;; gref-cast can do proxy collapsing via threesomes or by moving to coercions
 |#
 
-(require schml/src/helpers
-         schml/src/errors
-         schml/src/language)
+(require "../helpers.rkt"
+         "../errors.rkt"
+         "../language.rkt")
 
 ;; Only the pass is provided by this module
 (provide introduce-castable-references)

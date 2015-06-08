@@ -2,7 +2,7 @@
 
 (require typed/rackunit
          typed/rackunit/text-ui
-         schml/src/helpers
+         "../src/helpers.rkt"
          "./test-compile.rkt"
          "./paths.rkt")
 
