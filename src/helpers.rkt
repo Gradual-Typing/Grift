@@ -113,18 +113,6 @@ This allows me to make very desciptive grammars via types later on.
   (when (trace? s ...)
     (logf fmt a ...)))
 
-;; allows for conditional compilation
-(define-for-syntax under-construction?
-  (and (getenv "schmlUnderConstruction") #t))
-
-(define-for-syntax syntax-id
-  (syntax-rules ()
-    [(_ x ...) (begin x ...)]))
-
-(define-for-syntax syntax-void
-  (syntax-rules ()
-    [(_ x ...) (void)]))
-
 (define-syntax-rule (trace-define (f a ...) e ... b)
   (define (f a ...)
     (define t? (trace? 'All 'f))
@@ -143,14 +131,17 @@ This allows me to make very desciptive grammars via types later on.
           (set-box! n (+ (unbox n) 1)))
         out))))
 
-;; An error a syntax tranformer that reports the current macro is undefined
-(define-for-syntax syntax-undefined-if-used
-  (lambda (stx)
-    (syntax-case stx ()
-      [(a x ...) (raise-syntax-error 'if-in-construction
-                                     "debug macro left in code"
-                                     #'(a x ...)
-                                     #'a)])))
+;; allows for conditional compilation
+(define-for-syntax under-construction?
+  (and (getenv "schmlUnderConstruction") #t))
+
+(define-for-syntax syntax-id
+  (syntax-rules ()
+    [(_ x ...) (begin x ...)]))
+
+(define-for-syntax syntax-void
+  (syntax-rules ()
+    [(_ x ...) (void)]))
 
 ;; only run this code if we are working on schml
 (define-syntax if-in-construction
@@ -158,10 +149,8 @@ This allows me to make very desciptive grammars via types later on.
       syntax-id
       syntax-void))
 
-(if-in-construction
- (struct exn:todo exn ())
- (provide exn:todo))
-
+(struct exn:todo exn ())
+(begin-for-syntax (struct exn:todo exn ()))
 
 (define-syntax TODO
   (if under-construction?
@@ -171,7 +160,14 @@ This allows me to make very desciptive grammars via types later on.
           (exn:todo
            (format "TODO: ~a" '(x ...))
            (current-continuation-marks)))])
-      syntax-undefined-if-used))
+      (lambda (x)
+        (define loc-string
+          (srcloc->string
+           (srcloc (syntax-source x) (syntax-line x) (syntax-column x)
+                   (syntax-position x) (syntax-span x))))
+        (raise-syntax-error
+         'Unfinished-TODO
+         (format "~a: ~a" loc-string (syntax->datum x))))))
 
 (define-syntax do
   (syntax-rules (<- : let let* let-values let*-values match-let)
