@@ -264,13 +264,15 @@ be usefull for optimizations or keeping state.
     (-> D2-Effect* D2-Value  D2-Value)
     (-> D2-Effect* D2-Pred D2-Pred)
     (-> D2-Effect* No-Op D2-Effect)
-    ))
+    (-> D3-Effect* D3-Trivial D3-Value)
+    (-> D3-Effect* No-Op D3-Effect)))
 (define (make-begin eff* res)
   (: splice-eff (case->
                  (-> C7-Effect C7-Effect* C7-Effect*)
                  ;; Since D2 effect is a strict subset of D1-effect
                  ;; It must come before D1 because the first type to
                  ;; match is used
+                 (-> D3-Effect D3-Effect* D3-Effect*)
                  (-> D2-Effect D2-Effect* D2-Effect*)
                  (-> D1-Effect D1-Effect* D1-Effect*)))
   (define (splice-eff eff rest)
@@ -1076,7 +1078,7 @@ We are going to UIL
 (define-type Data-Literal (U Integer String))
 
 #|-----------------------------------------------------------------------------+
-| Data0-Language created by make-closures-explicit                             |
+| Data0-Language created by impose-cast-semantics                              |
 +-----------------------------------------------------------------------------|#
 (define-type Data0-Lang
   (Prog (List String Natural Schml-Type) D0-Expr))
@@ -1122,7 +1124,13 @@ We are going to UIL
    (U (Let D1-Bnd* T)
       (If D1-Pred T T)
       (Begin D1-Effect* T)
-      D1-Value)))
+      (App D1-Value D1-Value*)
+      (Op (U IxI->I-Prim Array-Prim) (Listof T))
+      (Var Uid)
+      Halt
+      (Var Uid)
+      (Code-Label Uid)
+      (Quote D1-Literal))))
 
 (define-type D1-Value
  (Rec V
@@ -1148,7 +1156,7 @@ We are going to UIL
   (U (Let D1-Bnd* E)
      (If D1-Pred E E)
      (Begin D1-Effect* No-Op)
-     (Repeat Uid E E E)
+     (Repeat Uid D1-Value D1-Value E)
      (App D1-Value D1-Value*)
      (UIL-Op! D1-Value)
      No-Op)))
@@ -1199,14 +1207,13 @@ We are going to UIL
  (Rec P
   (U (If D2-Pred P P)
      (Begin D2-Effect* P)
-     (App D2-Value D2-Value*)
      (Relop IxI->B-Prim D2-Value D2-Value))))
 
 (define-type D2-Effect
  (Rec E
   (U (If D2-Pred E E)
      (Begin D2-Effect* No-Op)
-     (Repeat Uid E E E)
+     (Repeat Uid D2-Value D2-Value E)
      (App D2-Value D2-Value*)
      (UIL-Op! D2-Value)
      (Assign Uid D2-Value)
@@ -1240,19 +1247,16 @@ We are going to UIL
       (Begin D3-Effect* T)
       (App D3-Trivial D3-Trivial*)
       (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-      Halt
       D3-Trivial)))
-
 
 (define-type D3-Value
  (Rec V
-  (U Halt
+  (U
      (If D3-Pred V V)
      (Begin D3-Effect* V)
      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-     Halt
-     D3-Trivial
-     (App D3-Trivial D3-Trivial*))))
+     (App D3-Trivial D3-Trivial*)
+     D3-Trivial)))
 
 (define-type D3-Pred
  (Rec P
@@ -1270,8 +1274,11 @@ We are going to UIL
      (Assign Uid D3-Value)
      No-Op)))
 
+;; (TODO halt is not trivial though because we are targeting c it may be treated so)
+;; remove Halt earlier
 (define-type D3-Trivial
-  (U (Code-Label Uid)
+  (U Halt
+     (Code-Label Uid)
      (Var Uid)
      (Quote D3-Literal)))
 
@@ -1379,4 +1386,3 @@ We are going to UIL
 (define-type D5-Effect* (Listof D5-Effect))
 
 (define-type D5-Literal Data-Literal)
-

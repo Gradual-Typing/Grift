@@ -45,9 +45,28 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (tail : D1-Tail    <- (nc-tail exp))
          (return-state (Begin eff* tail)))]
-    [other (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-               (val : D1-Value <- (nc-value other))
-               (return-state (Return val)))]))
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
+         (e1 : D1-Value <- (nc-value e1))
+         (e2 : D1-Value <- (nc-value e2))
+         (e3 : D1-Effect <- (nc-effect e3))
+         (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote 0))))]
+    [(App exp exp*)
+     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
+         (val  : D1-Value  <- (nc-value  exp))
+         (val* : D1-Value* <- (nc-value* exp*))
+         (return-state (App val val*)))]
+    [(Op p exp*)
+     ;; Filter effects into errors until I can fix this
+     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
+         (val* : D1-Value* <- (nc-value* exp*))
+         (if (uil-prim-effect? p)
+             (TODO do something appropriate here (Perform effect and return 0))
+             (return-state (nc-value-op p val*))))]
+    [(Halt) (return-state (Halt))]
+    [(Var i) (return-state (Var i))]
+    [(Code-Label i) (return-state (Code-Label i))]
+    [(Quote k) (return-state (Quote k))]))
 
 (: nc-value (-> D0-Expr (State D1-Bnd-Code* D1-Value)))
 (define (nc-value exp)
@@ -72,11 +91,11 @@
          (val  : D1-Value   <- (nc-value exp))
          (return-state (Begin eff* val)))]
     [(Repeat i e1 e2 e3)
-     (do (bind-state : (State D1-Bnd-Code* D1-Effect))
-         (e1 : D1-Value <- (nc-value e1))
-         (e2 : D1-Value <- (nc-value e2))
+     (do (bind-state : (State D1-Bnd-Code* D1-Value))
+         (e1 : D1-Value  <- (nc-value e1))
+         (e2 : D1-Value  <- (nc-value e2))
          (e3 : D1-Effect <- (nc-effect e3))
-         (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote '()))))]
+         (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote 0))))]
     [(App exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
          (val  : D1-Value  <- (nc-value  exp))
@@ -165,11 +184,6 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (val  : D1-Pred   <- (nc-pred exp))
          (return-state (Begin eff* val)))]
-    [(App exp exp*)
-     (do (bind-state : (State D1-Bnd-Code* D1-Pred))
-         (val  : D1-Value  <- (nc-value  exp))
-         (val* : D1-Value* <- (nc-value* exp*))
-         (return-state (App val val*)))]
     [(Op p exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Pred))
          ;; for some reason I am enforcing this wierd constrain about

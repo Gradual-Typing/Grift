@@ -11,3 +11,6 @@
 gradual-dynamic callee dyn caller dyn  unwrapped
 static ...
 hybrid 
+
+Automate Benchmarking
+Standard deviation

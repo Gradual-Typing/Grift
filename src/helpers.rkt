@@ -186,6 +186,13 @@ This allows me to make very desciptive grammars via types later on.
     [(_ bind (match-let (b ...) e e* ...))
      (match-let (b ...) (do bind e e* ...))]
     [(_ (bind : T) e) (ann e : T)]
+    [(_ (bind : (C m b)) ((p ...) : a <- e0) e e* ...)
+     (bind (ann e0 (C m a))
+           (lambda ((tmp : a)) : (C m b)
+            (match tmp
+              [(p ...) (do (bind : (C m b)) e e* ...)]
+              [otherwise
+               (error 'do "pattern ~a didn't match ~a" '(p ...) tmp)])))]
     [(_ (bind : (C m b)) (v : a <- e0) e e* ...)
      (bind (ann e0 (C m a)) (lambda ((v : a)) : (C m b) (do (bind : (C m b)) e e* ...)))]
     [(_ (bind : (C m b)) (e0 : T) e e* ...)
