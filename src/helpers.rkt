@@ -58,6 +58,14 @@ This allows me to make very desciptive grammars via types later on.
 		   (cdr l0)
 		   (cdr l1))))
 
+
+(: snoc (All (A B) (Listof A) B -> (Listof (U A B))))
+(define (snoc l e)
+  (match l
+    [(cons a d) (cons a (snoc d e))]
+    ['() (list e)]))
+
+
 #| Some helpers for debuging |#
 
 (: traces (Parameter (Option (Listof Symbol))))

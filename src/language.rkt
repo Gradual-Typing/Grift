@@ -261,17 +261,22 @@ be usefull for optimizations or keeping state.
     (-> C7-Effect* No-Op C7-Effect)
     (-> D1-Effect* D1-Value  D1-Value)
     (-> D1-Effect* No-Op D1-Effect)
+    (-> D3-Effect* D3-Trivial D3-Value)
+    (-> D3-Effect* No-Op D3-Effect)
     (-> D2-Effect* D2-Value  D2-Value)
     (-> D2-Effect* D2-Pred D2-Pred)
     (-> D2-Effect* No-Op D2-Effect)
-    (-> D3-Effect* D3-Trivial D3-Value)
-    (-> D3-Effect* No-Op D3-Effect)))
+    (-> D4-Effect* D4-Tail D4-Tail)
+    (-> D4-Effect* No-Op D4-Effect)
+    (-> D5-Effect* D5-Tail D5-Tail)))
 (define (make-begin eff* res)
   (: splice-eff (case->
                  (-> C7-Effect C7-Effect* C7-Effect*)
                  ;; Since D2 effect is a strict subset of D1-effect
                  ;; It must come before D1 because the first type to
                  ;; match is used
+                 (-> D5-Effect D5-Effect* D5-Effect*)
+                 (-> D4-Effect D4-Effect* D4-Effect*)
                  (-> D3-Effect D3-Effect* D3-Effect*)
                  (-> D2-Effect D2-Effect* D2-Effect*)
                  (-> D1-Effect D1-Effect* D1-Effect*)))
@@ -1245,18 +1250,16 @@ We are going to UIL
   (Rec T
    (U (If D3-Pred T T)
       (Begin D3-Effect* T)
-      (App D3-Trivial D3-Trivial*)
-      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-      D3-Trivial)))
+      (Return D3-Value))))
 
 (define-type D3-Value
  (Rec V
-  (U
+  (U D3-Trivial
+     Halt
      (If D3-Pred V V)
      (Begin D3-Effect* V)
      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-     (App D3-Trivial D3-Trivial*)
-     D3-Trivial)))
+     (App D3-Trivial D3-Trivial*))))
 
 (define-type D3-Pred
  (Rec P
@@ -1268,7 +1271,7 @@ We are going to UIL
  (Rec E
   (U (If D3-Pred E E)
      (Begin D3-Effect* No-Op)
-     (Repeat Uid Uid Uid E)
+     (Repeat Uid D3-Trivial D3-Trivial E)
      (App D3-Trivial D3-Trivial*)
      (UIL-Op! D3-Trivial)
      (Assign Uid D3-Value)
@@ -1277,8 +1280,7 @@ We are going to UIL
 ;; (TODO halt is not trivial though because we are targeting c it may be treated so)
 ;; remove Halt earlier
 (define-type D3-Trivial
-  (U Halt
-     (Code-Label Uid)
+  (U (Code-Label Uid)
      (Var Uid)
      (Quote D3-Literal)))
 
@@ -1306,12 +1308,9 @@ We are going to UIL
 
 (define-type D4-Tail
   (Rec T
-   (U (If D3-Pred T T)
-      (Begin D3-Effect* T)
-      (App D3-Trivial D3-Trivial*)
-      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-      Halt
-      D3-Trivial)))
+   (U (If D4-Pred T T)
+      (Begin D4-Effect* T)
+      (Return D4-Value))))
 
 (define-type D4-Pred
  (Rec P
@@ -1325,10 +1324,14 @@ We are going to UIL
      (Begin D4-Effect* No-Op)
      (Repeat Uid D4-Trivial D4-Trivial E)
      (UIL-Op! D4-Trivial)
-     (Assign Uid D4-Trivial)
-     (Assign Uid (UIL-Op D4-Trivial))
-     (Assign Uid (App D4-Trivial D4-Trivial*))
+     (Assign Uid D4-Value)
      No-Op)))
+
+(define-type D4-Value
+  (U D4-Trivial
+     Halt
+     (UIL-Op D4-Trivial)
+     (App D5-Trivial D5-Trivial*)))
 
 (define-type D4-Trivial
   (U (Code-Label Uid)
@@ -1343,7 +1346,7 @@ We are going to UIL
 
 
 #|-----------------------------------------------------------------------------+
-| Data5-Language created by flatten-assignments                                |
+| Data5-Language created by simplify-predicate                                 |
 +-----------------------------------------------------------------------------|#
 
 (define-type Data5-Lang
@@ -1358,24 +1361,26 @@ We are going to UIL
 
 (define-type D5-Tail
   (Rec T
-   (U (If D3-Pred T T)
-      (Begin D3-Effect* T)
-      (App D3-Trivial D3-Trivial*)
-      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-      Halt
-      D3-Trivial)))
+   (U (If D5-Pred T T)
+      (Begin D5-Effect* T)
+      (Return D5-Value))))
 
 (define-type D5-Pred (Relop IxI->B-Prim D5-Trivial D5-Trivial))
 
 (define-type D5-Effect
  (Rec E
   (U (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
-     (Repeat Uid D5-Trivial D5-Trivial E)
+     (Repeat Uid D5-Trivial D5-Trivial (Begin D5-Effect* No-Op))
      (UIL-Op! D5-Trivial)
-     (Assign Uid D5-Trivial)
-     (Assign Uid (UIL-Op D5-Trivial))
-     (Assign Uid (App D5-Trivial D5-Trivial*))
+     (Assign Uid D5-Value)
      No-Op)))
+
+(define-type D5-Value
+  (U D5-Trivial
+     Halt
+     (UIL-Op D5-Trivial)
+     (App D5-Trivial D5-Trivial*)
+     (If D5-Pred D5-Trivial D5-Trivial)))
 
 (define-type D5-Trivial
   (U (Code-Label Uid)
@@ -1384,5 +1389,6 @@ We are going to UIL
 
 (define-type D5-Trivial* (Listof D5-Trivial))
 (define-type D5-Effect* (Listof D5-Effect))
+(define-type D5-Value* (Listof D5-Value))
 
 (define-type D5-Literal Data-Literal)

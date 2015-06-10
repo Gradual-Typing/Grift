@@ -34,16 +34,13 @@
   (match tail
     [(If t c a)
      (do (bind-state : (State Nat (Pair D3-Tail Uid*)))
-         (t : (Pair D3-Pred Uid*) <- (rco-pred t))
-         (c : (Pair D3-Tail Uid*) <- (rco-tail c))
-         (a : (Pair D3-Tail Uid*) <- (rco-tail a))
-         (match-let ([(cons t ti*) t]
-                     [(cons c ci*) c]
-                     [(cons a ai*) a])
-           (let* ([t : D3-Tail (If t c a)]
+         ((cons t ti*) : (Pair D3-Pred Uid*) <- (rco-pred t))
+         ((cons c ci*) : (Pair D3-Tail Uid*) <- (rco-tail c))
+         ((cons a ai*) : (Pair D3-Tail Uid*) <- (rco-tail a))
+         (let* ([t : D3-Tail (If t c a)]
                   [i : Uid* (append ti* ci* ai*)]
                   [r : (Pair D3-Tail Uid*) (cons t i)])
-             (return-state r))))]
+             (return-state r)))]
       [(Begin e* v)
        (do (bind-state : (State Nat (Pair D3-Tail Uid*)))
            (e* : (Pair D3-Effect* Uid*) <- (rco-effect* e*))
@@ -60,7 +57,7 @@
            (t* : Triv-Value* <- (trivialize-value* v*))
            (match-let ([(list s* t i*) t]
                        [(list s*^ t* i*^) t*])
-             (let* ([v : D3-Tail (Begin (append s* s*^) (App t t*))]
+             (let* ([v : D3-Tail (Return (Begin (append s* s*^) (App t t*)))]
                     [i : Uid* (append i* i*^)]
                     [r : (Pair D3-Tail Uid*) (cons v i)])
                (return-state r))))]
@@ -68,12 +65,12 @@
        (do (bind-state : (State Nat (Pair D3-Tail Uid*)))
            (t* : Triv-Value* <- (trivialize-value* v*))
            (match-let ([(list s* t* i*) t*])
-             (let* ([v : D3-Tail (Begin s* (Op p t*))]
+             (let* ([v : D3-Tail (Begin s* (Return (Op p t*)))]
                     [r : (Pair D3-Tail Uid*) (cons v i*)])
                (return-state r))))]
-      [(Halt) (return-state (ann (cons (Halt) '()) (Pair D3-Tail Uid*)))]
-      [(Var i) (return-state (ann (cons (Var i) '()) (Pair D3-Tail Uid*)))]
-      [(Quote k) (return-state (ann (cons (Quote k) '()) (Pair D3-Tail Uid*)))]))
+      [(Halt) (return-state (ann (cons (Return (Halt)) '()) (Pair D3-Tail Uid*)))]
+      [(Var i) (return-state (ann (cons (Return (Var i)) '()) (Pair D3-Tail Uid*)))]
+      [(Quote k) (return-state (ann (cons (Return (Quote k)) '()) (Pair D3-Tail Uid*)))]))
 
 (: rco-pred (D2-Pred -> (State Nat (Pair D3-Pred Uid*))))
 (define (rco-pred pred)
@@ -141,33 +138,27 @@
            (return-state r))))]
     [(Repeat i v1 v2 e)
      (do (bind-state : (State Nat (Pair D3-Effect Uid*)))
-         (t1 : Triv-Value <- (trivialize-value v1))
-         (t2 : Triv-Value <- (trivialize-value v2))
-         (e  : (Pair D3-Effect Uid*) <- (rco-effect e))
-         (match-let ([(list s1* t1 i1*) t1]
-                     [(list s2* t2 i2*) t2]
-                     [(cons e      i3*) e])
-           (i1 : Uid <- (uid-state "start"))
-           (i2 : Uid <- (uid-state "stop"))
-           (let* ([s1 : D3-Effect (Assign i1 t1)]
-                  [s2 : D3-Effect (Assign i2 t2)]
-                  [r : D3-Effect* (list s1 s2 (Repeat i i1 i2 e))]
-                  [e : D3-Effect (Begin (append s1* s2* r) NO-OP)]
-                  [i* : Uid* (cons i1 (cons i2 (append i1* i2* i3*)))]
-                  [r : (Pair D3-Effect Uid*) (cons e i*)])
-             (return-state r))))]
+         ((list s1* t1 i1*) : Triv-Value <- (trivialize-value v1))
+         ((list s2* t2 i2*) : Triv-Value <- (trivialize-value v2))
+         ((cons e i3*) : (Pair D3-Effect Uid*) <- (rco-effect e))
+         (i1 : Uid <- (uid-state "start"))
+         (i2 : Uid <- (uid-state "stop"))
+         (let* ([s1 : D3-Effect (Assign i1 t1)]
+                [s2 : D3-Effect (Assign i2 t2)]
+                [r : D3-Effect* (list s1 s2 (Repeat i (Var i1) (Var i2) e))]
+                [e : D3-Effect (Begin (append s1* s2* r) NO-OP)]
+                [i* : Uid* (cons i1 (cons i2 (append i1* i2* i3*)))]
+                [r : (Pair D3-Effect Uid*) (cons e i*)])
+           (return-state r)))]
       [(App v v*)
        (do (bind-state : (State Nat (Pair D3-Effect Uid*)))
-           (t  : Triv-Value  <- (trivialize-value v))
-           (t* : Triv-Value* <- (trivialize-value* v*))
-           (match-let ([(list s* t i*) t]
-                       [(list s*^ t* i*^) t*])
-             (i : Uid <- (uid-state "effectCall"))
-             (let* ([a : D3-Effect* (list (Assign i (App t t*)))]
-                    [v : D3-Effect  (make-begin (append s* s*^ a) NO-OP)]
-                    [i* : Uid* (cons i (append i* i*^))]
-                    [r : (Pair D3-Effect Uid*) (cons v i*)])
-               (return-state r))))]
+           ((list s* t i*)    : Triv-Value  <- (trivialize-value v))
+           ((list s*^ t* i*^) : Triv-Value* <- (trivialize-value* v*))
+           (let* ([e* : D3-Effect* (list (App t t*))]
+                  [e* : D3-Effect* (append s* s*^ e*)]
+                  [e  : D3-Effect  (make-begin e* NO-OP)]
+                  [i* : Uid*       (append i* i*^)])
+             (return-state (ann (cons e i*) (Pair D3-Effect Uid*)))))]
       [(Op p v*)
        (do (bind-state : (State Nat (Pair D3-Effect Uid*)))
            (t* : Triv-Value* <- (trivialize-value* v*))
@@ -181,15 +172,15 @@
 
 (: rco-effect* (D2-Effect* -> (State Nat (Pair D3-Effect* Uid*))))
 (define (rco-effect* effect*)
-  (do (bind-state : (State Nat (Pair D3-Effect* Uid*)))
-      (e : (Pair D3-Effect Uid*) <- (rco-effect (car effect*)))
-      (e* : (Pair D3-Effect* Uid*) <- (rco-effect* (cdr effect*)))
-      (match-let ([(cons e i*) e]
-                  [(cons e* i*^) e*])
-        (let ([e* : D3-Effect* (cons e e*)]
-              [i* : Uid* (append i* i*^)]
-              [r  : (Pair D3-Effect* Uid*) (cons e* i*)])
-          (return-state r)))))
+  (if (null? effect*)
+      (return-state '(()))
+      (do (bind-state : (State Nat (Pair D3-Effect* Uid*)))
+          ((cons e  i*)  : (Pair D3-Effect Uid*) <- (rco-effect (car effect*)))
+          ((cons e* i*^) : (Pair D3-Effect* Uid*) <- (rco-effect* (cdr effect*)))
+          (let ([e* : D3-Effect* (cons e e*)]
+                [i* : Uid* (append i* i*^)]
+                [r  : (Pair D3-Effect* Uid*) (cons e* i*)])
+            (return-state r)))))
 
 
 (: rco-value (D2-Value -> (State Nat (Pair D3-Value Uid*))))
@@ -284,16 +275,22 @@
            (let ([s (Assign i (Op p t*))])
              (return-state
               (list (append s* (list s)) (Var i) (cons i i*))))))]
-    [(Halt) (return-state (list '() (Halt) '()))]
+    [(Halt)
+     (do (bind-state : (State Nat Triv-Value))
+         (i : Uid <- (uid-state "tmp"))
+         (return-state
+          (list (list (Assign i (Halt))) (Var i) (list i))))]
     [(Var i) (return-state (list '() (Var i) '()))]
     [(Quote k) (return-state (list '() (Quote k) '()))]))
 
 (: trivialize-value* (D2-Value* -> (State Nat Triv-Value*)))
 (define (trivialize-value* value*)
-  (do (bind-state : (State Nat Triv-Value*))
-      (t  : Triv-Value  <- (trivialize-value  (car value*)))
-      (t* : Triv-Value* <- (trivialize-value* (cdr value*)))
-      (match-let ([(list s t i) t]
-                  [(list s* t* i*) t*])
-        (return-state
-         (list (append s s*) (cons t t*) (append i i*))))))
+  (if (pair? value*)
+      (do (bind-state : (State Nat Triv-Value*))
+          (t  : Triv-Value  <- (trivialize-value  (car value*)))
+        (t* : Triv-Value* <- (trivialize-value* (cdr value*)))
+        (match-let ([(list s t i) t]
+                    [(list s* t* i*) t*])
+          (return-state
+           (list (append s s*) (cons t t*) (append i i*)))))
+      (return-state (list '() '() '()))))

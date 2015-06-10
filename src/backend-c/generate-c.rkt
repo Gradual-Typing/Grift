@@ -28,14 +28,13 @@
 
 (: generate-c (-> Data5-Lang Config Void))
 (define (generate-c prgm config)
-  #|(match-let ([(Prog (list name count type) (Labels lbl* exp)) prgm])
+  (match-let ([(Prog (list name count type) (Labels lbl* exp)) prgm])
      (call-with-output-file (Config-c-path config) #:exists 'replace #:mode 'text
       (lambda ([p : Output-Port])
        (parameterize ([current-output-port p])
-        (emit-program name type lbl* exp)))))
-  |# (TODO finish generate-c))
+        (emit-program name type lbl* exp))))))
 
-(: emit-program (-> String Schml-Type D2-Bnd-Code* D2-Body Void))
+(: emit-program (-> String Schml-Type D5-Bnd-Code* D5-Body Void))
 (define (emit-program name type code* body)
   (emit-source-comment name type)
   (emit-boiler-plate)
@@ -61,23 +60,23 @@
   (display "bool timer_stopped;")
   (newline))
 
-(: emit-declarations (-> D2-Bnd-Code* Void))
+(: emit-declarations (-> D5-Bnd-Code* Void))
 (define (emit-declarations code*)
   (display "\n//These are the declarations\n")
-  (for : Void ([bnd : D2-Bnd-Code code*])
+  (for : Void ([bnd : D5-Bnd-Code code*])
     (match-let ([(cons lbl (Code var* exp)) bnd])
       (emit-function-prototype IMDT-C-TYPE (uid->string lbl) (map uid->string var*))
       (display ";\n"))))
 
-(: emit-main (-> D2-Body Void))
+(: emit-main (-> D5-Body Void))
 (define (emit-main b)
   (display "\n//Obviously this is the main function\n")
   (emit-function "int" "main" '() b))
 
-(: emit-subroutines (-> D2-Bnd-Code* Void))
+(: emit-subroutines (-> D5-Bnd-Code* Void))
 (define (emit-subroutines code*)
     (display "\n//Here are all the definitions for Subroutines\n")
-  (for : Void ([bnd : D2-Bnd-Code code*])
+  (for : Void ([bnd : D5-Bnd-Code code*])
    (match-let ([(cons lbl (Code var* body)) bnd])
      (emit-function IMDT-C-TYPE (uid->string lbl) var* body))))
 
@@ -88,7 +87,7 @@
   (display name)
   (display-seq vars "( " (string-append IMDT-C-TYPE " ") "," " " ")"))
 
-(: emit-function (-> String String Uid* D2-Body Void))
+(: emit-function (-> String String Uid* D5-Body Void))
 (define (emit-function returns name args body)
   (match-let ([(Locals local-var* tail) body])
     (emit-function-prototype returns name (map uid->string args))
@@ -96,7 +95,7 @@
     (newline)
     (newline)))
 
-(: emit-block (-> Uid* D2-Tail Void))
+(: emit-block (-> Uid* D5-Tail Void))
 (define (emit-block local-var* tail)
   (let ([local-var* (map uid->string local-var*)])
     (display "{\n")
@@ -104,61 +103,72 @@
     (emit-tail tail)
     (display "}")))
 
-(: emit-tail (-> D2-Tail Void))
+(: emit-tail (-> D5-Tail Void))
 (define (emit-tail tail)
   (match tail
-    [(Begin s* t) (begin (for ([s : D2-Effect s*])
-                           (emit-effect s)
-                           (display ";\n"))
-                         (emit-tail t))]
-    [(If t c a) (begin (display "if ")
-                       (emit-pred t)
-                       (emit-block '() c)
-                       (display " else ")
-                       (emit-block '() a)
-                       (newline))]
-    [(Return e) (begin (display "return ")
-                       (emit-value e)
-                       (display ";\n"))]))
+    [(Begin s* t)
+     (begin (for ([s : D5-Effect s*])
+              (emit-effect s)
+              (display ";\n"))
+            (emit-tail t))]
+    [(If t c a)
+     (begin (display "if ")
+            (emit-pred t)
+            (emit-block '() c)
+            (display " else ")
+            (emit-block '() a)
+            (newline))]
+    [(Return e)
+     (begin (display "return ")
+            (emit-value e)
+            (display ";\n"))]))
 
-(: emit-pred (-> D2-Pred Void))
+(: emit-pred (-> D5-Pred Void))
 (define (emit-pred r)
   (match r
-    [(If t c a) (emit-ternary (emit-pred t) (emit-pred c) (emit-pred a))]
-    [(Begin stm* pred) (emit-begin stm* (emit-pred pred))]
-    [(App v v*) (emit-function-call v v*)]
+    #;[(If t c a) (emit-ternary (emit-pred t) (emit-pred c) (emit-pred a))]
+    #;[(Begin stm* pred) (emit-begin stm* (emit-pred pred))]
+    #;[(App v v*) (emit-function-call v v*)]
     [(Relop p e1 e2) (emit-op p (list e1 e2))]))
 
-(: emit-value (-> D2-Value Void))
+(: emit-value (-> D5-Value Void))
 (define (emit-value e)
   (match e
     [(If t c a)       (emit-ternary (emit-pred t) (emit-value c) (emit-value a))]
-    [(Begin stm* exp) (emit-begin stm* (emit-value exp))]
+    #;[(Begin stm* exp) (emit-begin stm* (emit-value exp))]
     [(App v v*)       (emit-function-call v v*)]
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Quote k)        (print k)]
     [(Halt)           (display "C-EXIT")]
     [(Code-Label i)  (begin
-                        (display "((")
-                        (display "long)")
-                        (display (uid->string i))
-                        (display ")"))]
-    [other   (error 'gc-emit-value-match)]))
+                       (display "((")
+                       (display "long)")
+                       (display (uid->string i))
+                       (display ")"))]
+    [other   (error 'generate-c-emit-value-match)]))
 
-(: emit-effect (-> D2-Effect Void))
+
+
+(: emit-effect (-> D5-Effect Void))
 (define (emit-effect s)
   (match s
-    [(If t c a) (emit-ternary (emit-pred t) (emit-effect c) (emit-effect a))]
-    [(Begin e* _) (emit-begin e* (display " 0 "))]
-    [(App v v*)  (emit-function-call v v*)]
-    [(Op p exp*) (emit-op p exp*)]
-    [(Assign uid exp) (begin (display (uid->string uid))
-                             (display " = ")
-                             (emit-value exp))]
-    [(No-Op)     (display " 0 ")]))
+    [(If t (Begin c _) (Begin a _))
+     (begin (display "if ")
+            (emit-pred t)
+            (emit-begin c (void))
+            (display " else ")
+            (emit-begin a (void))
+            (newline))]
+    [(Op p exp*)
+     (emit-op p exp*)]
+    [(Assign uid exp)
+     (begin (display (uid->string uid))
+            (display " = ")
+            (emit-value exp))]
+    [(No-Op) (display " 0 ")]))
 
-(: emit-op (-> Symbol D2-Value* Void))
+(: emit-op (-> Symbol D5-Value* Void))
 (define (emit-op p exp*)
   (match* (p exp*)
    ;;[('Exit '()) (display C-EXIT)]
@@ -208,7 +218,7 @@
 (define (emit-primitive-value p exp*) (error 'emit-primitive-value-undefined))
 (define (emit-primitive-pred p e1 e2) (error 'emit-primitive-pred-undefined))
 
-(: emit-function-call (-> D2-Value D2-Value* Void))
+(: emit-function-call (-> D5-Value D5-Value* Void))
 (define (emit-function-call val val*)
   (emit-wrap
    (emit-cast->fn val val*)
@@ -243,10 +253,12 @@
   (loop f seq))
 
 ;; common c syntax constructs
-(define-syntax-rule (emit-begin stm* exp)
-  (emit-wrap
-   (sequence emit-effect stm* display "" "" "" ", " "")
-   exp))
+(define-syntax-rule (emit-begin s* emit-res)
+  (begin
+    (for ([s : D5-Effect s*])
+      (emit-effect s)
+      (display ";\n"))
+    emit-res))
 
 (define-syntax-rule (emit-ternary a b c)
   (emit-wrap a (display " ? ") b (display " : ") c))
@@ -258,7 +270,7 @@
 
 (define-syntax-rule (emit-imdt-cast) (error 'emit-imdt-cast))
 
-(: emit-cast->fn (-> D2-Value D2-Value* Void))
+(: emit-cast->fn (-> D5-Value D5-Value* Void))
 (define (emit-cast->fn exp args)
    (emit-wrap
     (emit-wrap
