@@ -57,7 +57,14 @@
        [(Var id) (Var id)]
        [(Quote lit) (Quote lit)]
        [(Begin e* e) (Begin (map iic-expr e*) (iic-expr e))]
-       ;; These rules are a rough translation of the coercion semantics that
+       [(Repeat id (and (Ann _ (cons s1 t1)) (app iic-expr e1))
+                   (and (Ann _ (cons s2 t2)) (app iic-expr e2))
+                   (app iic-expr e3))
+        (Repeat id
+                (mk-cast (mk-label "Repeat" s1) e1 t1 INT-TYPE)
+                (mk-cast (mk-label "Repeat" s2) e2 t2 INT-TYPE)
+                e3)]
+      ;; These rules are a rough translation of the coercion semantics that
        ;; are presented in space-efficient gradual typing figure 4
        ;; Their system was using lazy-ud and this system is lazy-d
        [(Gbox e) (Gbox (iic-expr e))]

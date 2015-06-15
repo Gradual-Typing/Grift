@@ -31,6 +31,7 @@
     (most . ,most-tests)
     (core . ,core-tests)
     (boxes . ,boxes-tests)
+    (tools . ,tool-tests)
     (program . ,program-tests)
     (large . ,large-tests)))
 

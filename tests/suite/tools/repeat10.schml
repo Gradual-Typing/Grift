@@ -1,0 +1,4 @@
+(let ([a (gbox #f)])
+ (begin
+  (repeat (i 0 9) (if (= i 8) (gbox-set! a #t) ()))
+  (gunbox a)))

@@ -47,7 +47,7 @@
 
 (: rl-tail (-> D1-Tail (values D2-Tail Uid*)))
 (define (rl-tail tail)
-  (logf "rl-tail ~v\n\n" tail)
+  (logging rl-tail (Vomit) "~v" tail)
   (match tail
     [(Let bnd* tail)
      (let*-values ([(tail lv*) (rl-tail tail)]
@@ -60,16 +60,24 @@
        (values  (If t c a) (append t-lv* c-lv* a-lv*)))]
     [(Begin stm* tail)
      (let*-values ([(tail lv*) (rl-tail tail)]
-                  [(stm* lv*)  (rl-effect* stm* lv*)])
+                   [(stm* lv*)  (rl-effect* stm* lv*)])
        (values (Begin stm* tail) lv*))]
-    [(Return exp)
-     (let-values ([(exp lv*) (rl-value exp)])
-       (values (Return exp) lv*))]
+    [(App exp exp*)
+     (let*-values ([(exp lv*) (rl-value exp)]
+                   [(exp* lv*^) (rl-value* exp*)])
+       (values (App exp exp*) (append lv* lv*^)))]
+    [(Op p exp*)
+     (let*-values ([(exp* lv*) (rl-value* exp*)])
+       (values (Op p exp*) lv*))]
+    [(Halt) (values (Halt) '())]
+    [(Var i) (values (Var i) '())]
+    [(Code-Label i) (values (Code-Label i) '())]
+    [(Quote k) (values (Quote k) '())]
     [other (error 'remove-let/rl-tail "~a" other)]))
 
 (: rl-value (-> D1-Value (values D2-Value Uid*)))
 (define (rl-value exp)
-  (logf "rl-value ~v\n\n" exp)
+  (logging rl-value (Vomit) "~v" exp)
   (match exp
     [(Let bnd* exp)
      (let*-values ([(exp lv*) (rl-value exp)]
@@ -99,7 +107,7 @@
 
 (: rl-pred (-> D1-Pred (values D2-Pred Uid*)))
 (define (rl-pred exp)
-  (logf "rl-pred ~v\n\n" exp)
+  (logging rl-pred (Vomit) "~v" exp)
   (match exp
     [(Let bnd* exp)
      (let*-values ([(pred lv*) (rl-pred exp)]
@@ -149,14 +157,12 @@
                     [(a* lv*) (rl-bnd* d lv*)])
         (values (cons a a*) lv*))))
 
-(: rl-effect (-> D1-Effect Uid* (values D2-Effect Uid*)))
+(: rl-effect (D1-Effect Uid* -> (values D2-Effect Uid*)))
 (define (rl-effect eff lv*)
-  (logf "rl-effect ~v\n\n" eff)
   (match eff
     [(Let bnd* exp)
      (let*-values ([(exp lv*)  (rl-effect exp lv*)]
                    [(stm* lv*) (rl-bnd* bnd* lv*)])
-       (logf "rl-effect/let\n stm* ~a\n exp ~a\n\n" stm* exp)
        (values (make-begin (append stm* (list exp)) NO-OP) lv*))]
     [(If t c a)
      (let*-values ([(t p-lv*) (rl-pred t)]
@@ -166,6 +172,11 @@
     [(Begin stm* _)
      (let*-values ([(stm* lv*) (rl-effect* stm* lv*)])
        (values (make-begin stm* NO-OP) lv*))]
+    [(Repeat i e1 e2 e3)
+     (let*-values ([(e1 l1) (rl-value e1)]
+                   [(e2 l2) (rl-value e2)]
+                   [(e3 lv*) (rl-effect e3 lv*)])
+       (values (Repeat i e1 e2 e3) (cons i (append l1 l2 lv*))))]
     [(App exp exp*)
      (let*-values ([(exp lv*^)   (rl-value exp)]
                    [(exp* lv*^^) (rl-value* exp*)])

@@ -27,7 +27,7 @@
 ;; Only the pass is provided by this module
 (provide type-check)
 
-(: type-check (Schml0-Lang Config . -> . Schml1-Lang)) 
+(: type-check (Schml0-Lang Config . -> . Schml1-Lang))
 (define (type-check prgm config)
   (match-let ([(Prog (list name next-uid) exp) prgm])
     (let-values ([(exp type) (tc-expr exp (hash))])
@@ -48,7 +48,7 @@
 ;; The type of a lambda that is annotated is the type of the annotation
 ;; as long as the annotation is consistent with the type of the
 ;; body
-(: lambda-type-rule (-> Src Schml-Type* Schml-Type Schml-Type? 
+(: lambda-type-rule (-> Src Schml-Type* Schml-Type Schml-Type?
 			(Fn Index Schml-Type* Schml-Type)))
 (define (lambda-type-rule src ty* t-body t-ann)
   (cond
@@ -67,7 +67,7 @@
 
 ;; The type of a cast is the cast-type if the expression type and
 ;; the cast type are consistent.
-(: ascription-type-rule (-> Schml-Type Schml-Type Src (Option String) 
+(: ascription-type-rule (-> Schml-Type Schml-Type Src (Option String)
 			    Schml-Type))
 (define (ascription-type-rule ty-exp ty-cast src label)
   (if (not (consistent? ty-exp ty-cast))
@@ -90,11 +90,12 @@
    [else (join t-csq t-alt)]))
 
 ;; The type of literal constants are staticly known
-(: const-type-rule (Schml-Literal . -> . (U Bool Int)))
+(: const-type-rule (Schml-Literal . -> . (U Bool Int Unit)))
 (define (const-type-rule c)
-  (if (boolean? c)
-      BOOL-TYPE
-      INT-TYPE))
+  (cond
+    [(boolean? c) BOOL-TYPE]
+    [(integer? c) INT-TYPE]
+    [(null? c) UNIT-TYPE]))
 
 ;; The type of an application is the return type of the applied
 ;; procedure given that the arguments are consistent with the
@@ -116,6 +117,13 @@
 ;; of it's final argument
 (: begin-type-rule (-> Schml-Type* Schml-Type Schml-Type))
 (define (begin-type-rule t* ty) ty)
+
+(: repeat-type-rule (Schml-Type Schml-Type Schml-Type -> Schml-Type))
+(define (repeat-type-rule tstart tstop teffect)
+  (cond
+    [(not (consistent? tstart INT-TYPE)) (TODO error message we tstart not int)]
+    [(not (consistent? tstop INT-TYPE)) (TODO error message when tstop not INT)]
+    [else UNIT-TYPE]))
 
 ;; The type of wrapping a value in a gaurded box is a
 ;; Gref of the value's type
@@ -250,8 +258,8 @@
   (define (recur e)
     (let ((src (Ann-data e)))
       (match (Ann-value e)
-	[(Lambda fmls (Ann body ty-ret)) 
-	 (tc-lambda fmls ty-ret body src env)] 
+	[(Lambda fmls (Ann body ty-ret))
+	 (tc-lambda fmls ty-ret body src env)]
 	[(Letrec bnd body) (tc-letrec bnd body src env)]
 	[(Let bnd body) (tc-let bnd body src env recur)]
 	[(App rator rand*)
@@ -260,7 +268,7 @@
 		       [(ty) (application-type-rule ty-rator ty-rand* src)])
 	   (values (Ann (App rator rand*) (cons src ty)) ty))]
 	[(Op prim rand*)
-	 (let*-values ([(ty-prim) (schml-prim->type prim)]
+	 (let*-values ([(ty-prim) (schml-primitive->type prim)]
 		       [(rand* ty-rand*) (map-recur rand*)]
 		       [(ty) (application-type-rule ty-prim ty-rand* src)])
 	   (values (Ann (Op (Ann prim (Fn-fmls ty-prim)) rand*)
@@ -280,16 +288,22 @@
 		    (values (Ann (Var id) (cons src ty)) ty))]
 	[(Quote lit) (let* ([ty (const-type-rule lit)])
 		       (values (Ann (Quote lit) (cons src ty)) ty))]
-        [(Begin e* e) 
+        [(Repeat id start stop eff)
+         (let*-values ([(start tstart) (recur start)]
+                       [(stop  tstop)  (recur stop)]
+                       [(eff   teff)   (tc-expr eff (hash-set env id INT-TYPE))]
+                       [(ty) (repeat-type-rule tstart tstop teff)])
+           (values (Ann (Repeat id start stop eff) (cons src ty)) ty))]
+        [(Begin e* e)
          (let*-values ([(e  t1) (recur e)]
                        [(e* t*) (map-recur e*)]
                        [(ty)    (begin-type-rule t* t1)])
            (values (Ann (Begin e* e) (cons src ty)) ty))]
-        [(Gbox e) 
+        [(Gbox e)
          (let*-values ([(e ty) (recur e)]
                        [(ty)   (gbox-type-rule ty)])
            (values (Ann (Gbox e) (cons src ty)) ty))]
-        [(Gunbox e)          
+        [(Gunbox e)
          (let*-values ([(e ty) (recur e)]
                        [(ty)   (gunbox-type-rule ty)])
            (values (Ann (Gunbox e) (cons src ty)) ty))]
@@ -298,11 +312,11 @@
                        [(e2 t2) (recur e2)]
                        [(ty)    (gbox-set!-type-rule t1 t2)])
            (values (Ann (Gbox-set! e1 e2) (cons src ty)) ty))]
-        [(Mbox e) 
+        [(Mbox e)
          (let*-values ([(e ty) (recur e)]
                        [(ty)   (mbox-type-rule ty)])
            (values (Ann (Mbox e) (cons src ty)) ty))]
-        [(Munbox e)          
+        [(Munbox e)
          (let*-values ([(e ty) (recur e)]
                        [(ty)   (munbox-type-rule ty)])
            (values (Ann (Munbox e) (cons src ty)) ty))]
@@ -311,7 +325,7 @@
                        [(e2 t2) (recur e2)]
                        [(ty)    (mbox-set!-type-rule t1 t2)])
            (values (Ann (Mbox-set! e1 e2) (cons src ty)) ty))]
-        [(Gvector e1 e2)  
+        [(Gvector e1 e2)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(ty)    (gvector-type-rule t1 t2)])
@@ -321,13 +335,13 @@
                        [(e2 t2) (recur e2)]
                        [(ty)    (gvector-ref-type-rule t1 t2)])
            (values (Ann (Gvector-ref e1 e2) (cons src ty)) ty))]
-        [(Gvector-set! e1 e2 e3) 
+        [(Gvector-set! e1 e2 e3)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(e3 t3) (recur e3)]
                        [(ty)    (gvector-set!-type-rule t1 t2 t3)])
            (values (Ann (Gvector-set! e1 e2 e3) (cons src ty)) ty))]
-        [(Mvector e1 e2)  
+        [(Mvector e1 e2)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(ty)    (mvector-type-rule t1 t2)])
@@ -337,7 +351,7 @@
                        [(e2 t2) (recur e2)]
                        [(ty)    (mvector-ref-type-rule t1 t2)])
            (values (Ann (Mvector-ref e1 e2) (cons src ty)) ty))]
-        [(Mvector-set! e1 e2 e3) 
+        [(Mvector-set! e1 e2 e3)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(e3 t3) (recur e3)]
@@ -350,7 +364,7 @@
 (define (tc-lambda fml* ty-ret body src env)
   (let*-values ([(id* ty*) (unzip-formals fml*)]
 		[(body ty-body) (tc-expr body (env-extend* env id* ty*))]
-		[(ty-lambda) (lambda-type-rule src ty* ty-body ty-ret)]) 
+		[(ty-lambda) (lambda-type-rule src ty* ty-body ty-ret)])
     (values (Ann (Lambda fml* body) (cons src ty-lambda))
 	    ty-lambda)))
 
@@ -361,7 +375,7 @@
     (values (Fml-identifier f) (Fml-type f))))
 
 
-(: tc-letrec (-> S0-Bnd* S0-Expr Src Env 
+(: tc-letrec (-> S0-Bnd* S0-Expr Src Env
 		 (values S1-Expr Schml-Type)))
 (define (tc-letrec bnd* body src env)
     (: fold-env-extend/bnd (S0-Bnd* Env . -> . (values S0-Bnd* Env)))
@@ -389,14 +403,14 @@
                   ;;             (hash-set env i (Fn (length args) args t^))
                   ;;             (hash-set env i (Fn (length args) args DYN-TYPE)))))]
                 [else (raise-letrec-restrict src)])))
-  (let*-values 
-      ([(bnd* env) (fold-env-extend/bnd bnd* env)] 
+  (let*-values
+      ([(bnd* env) (fold-env-extend/bnd bnd* env)]
        [(recur/env) (lambda ([e : S0-Expr]) (tc-expr e env))]
-       [(bnd*) (map (mk-tc-binding src recur/env) bnd*)] 
+       [(bnd*) (map (mk-tc-binding src recur/env) bnd*)]
        [(body ty-body) (tc-expr body env)])
     (values (Ann (Letrec bnd* body) (cons src ty-body)) ty-body)))
 
-(: tc-let (-> S0-Bnd* S0-Expr Src Env (-> S0-Expr (values S1-Expr Schml-Type)) 
+(: tc-let (-> S0-Bnd* S0-Expr Src Env (-> S0-Expr (values S1-Expr Schml-Type))
 	      (values S1-Expr Schml-Type)))
 (define (tc-let bnd* body src env recur)
   (: env-extend/bnd (S1-Bnd Env . -> . Env))
@@ -410,13 +424,12 @@
 
 ;; Type checks the rhs to be consistent with type annotation if
 ;; provided the resulting type is the type of the annotation.
-(: mk-tc-binding (-> Src (-> S0-Expr (values S1-Expr Schml-Type)) 
+(: mk-tc-binding (-> Src (-> S0-Expr (values S1-Expr Schml-Type))
 		     (-> S0-Bnd S1-Bnd)))
 (define (mk-tc-binding src tc-expr)
   (lambda ([bnd : S0-Bnd]) : S1-Bnd
     (match-let ([(Bnd id type rhs) bnd])
       (let-values ([(rhs type-rhs) (tc-expr rhs)])
-	(Bnd id 
+	(Bnd id
 	     (let-binding-type-rule type type-rhs id src)
 	     rhs)))))
-

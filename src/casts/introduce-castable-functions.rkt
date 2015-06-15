@@ -85,6 +85,12 @@
          (e* : C1-Expr* <- (icf-expr* e*))
          (e  : C1-Expr  <- (icf-expr  e))
          (return-state (Begin e* e)))]
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State Casters C1-Expr))
+         (e1 : C1-Expr <- (icf-expr e1))
+         (e2 : C1-Expr <- (icf-expr e2))
+         (e3 : C1-Expr <- (icf-expr e3))
+         (return-state (Repeat i e1 e2 e3)))]
     [(Gbox e) (lift-state (inst Gbox C1-Expr) (icf-expr e))]
     [(Gunbox e) (lift-state (inst Gunbox C1-Expr) (icf-expr e))]
     [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! C1-Expr C1-Expr)

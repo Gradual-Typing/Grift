@@ -165,6 +165,12 @@
            (exp* : C3-Expr* <- (map-state recur exp*))
            (exp  : C3-Expr  <- (recur exp))
            (return-state (Begin exp* exp)))]
+      [(Repeat i e1 e2 e3)
+       (do (bind-state : (State Nat C3-Expr))
+           (e1 : C3-Expr <- (recur e1))
+           (e2 : C3-Expr <- (recur e2))
+           (e3 : C3-Expr <- (recur e3))
+           (return-state (Repeat i e1 e2 e3)))]
       [(UGbox exp)
        (do (bind-state : (State Nat C3-Expr))
            (exp  : C3-Expr  <- (recur exp))

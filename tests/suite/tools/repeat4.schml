@@ -1,0 +1,4 @@
+(let ([a (gbox 0)])
+ (begin
+  (repeat (n 0 42) (gbox-set! a (+ (gunbox a) 1)))
+  (gunbox a)))

@@ -1,10 +1,11 @@
 #lang typed/racket/base
 
+
 (require "../src/compile.rkt"
          "../src/helpers.rkt"
          "./test-compile.rkt")
 
-(require/typed schml/testing/paths
+(require/typed "./paths.rkt"
                [test-tmp-path Path]
                [test-suite-path Path])
 
@@ -15,7 +16,7 @@
 (define (cc path)
   (let ([path (build-path path)])
     (parameterize ([current-log-port log]
-                   [traces '(All Vomit)])
+                   [traces '(All)])
       (test-compile "debug" path (debug))
       #t)))
 

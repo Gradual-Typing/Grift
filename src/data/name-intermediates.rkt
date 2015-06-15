@@ -10,70 +10,57 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../helpers.rkt"
-         "../errors.rkt"
-         "../language.rkt")
+(require schml/src/helpers
+         schml/src/errors
+	 schml/src/language)
 
 ;; Only the pass is provided by this module
-(provide normalize-context)
+(provide name-intermediates)
 
-(: normalize-context (-> Data0-Lang Config Data1-Lang))
-(trace-define (normalize-context prgm comp-config)
-  (match-let ([(Prog (list name count type) exp) prgm])
-    (let-values ([(tail bnd-code*) (run-state (nc-tail exp) '())])
-      (Prog (list name count type) (Labels bnd-code* tail)))))
+(: name-intermediates (-> Data1-Lang Config Data2-Lang))
+(trace-define (name-intermediates prgm comp-config)
+  (match-let ([(Prog (list name count type) exp) (Labels bnd* tail)])
+    (let*-values ([(tail count) (run-state (ni-tail tail) count)]
+                  [(bnd* count) (run-state (map-state ni-bnd-code bnd*) count)])
+      (Prog (list name count type)
+       (Labels bnd* tail)))))
 
-(: nc-tail (-> D0-Expr (State D1-Bnd-Code* D1-Tail)))
-(define (nc-tail exp)
-  (logging nc-tail (Vomit) "~v" exp)
-  (match exp
-    [(Labels bnd* exp)
-     (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-tail exp)))]
-    [(Let bnd* exp)
-     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-         (bnd* : D1-Bnd* <- (nc-bnd* bnd*))
-         (tail : D1-Tail <- (nc-tail exp))
-         (return-state (Let bnd* tail)))]
+(: build-let* ((Listof (Pair D2-Bnd* D2-Bnd)) D1-Tail -> D2-Tail))
+(define (build-let* b*.b t)
+  (match b*.b
+    ['() t]
+    [(cons (cons '() bnd) b*.b)
+     (Let bnd (build-let* b*.b t))]
+    [(cons (cons bnd* bnd) b*.b)
+     (Let bnd* (Let (list bnd) (build-let* b*.b t)))]))
+
+(: nc-tail (-> D1-Expr (State Nat D2-Tail)))
+(define (nc-tail t)
+  (match t
+    [(Let b* t)
+     (do (bind-state : (State Nat D2-Tail))
+         (b*.b : (Listof (Pair D2-Eff* D2-Bnd* D2-Bnd)) <- (map-state ni-bnd b*))
+         (t    : D2-Tail <- (nc-tail t))
+         (return-state (build-let* b*.b t)))]
     [(If t c a)
-     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
+     (do (bind-state : (State Nat D2-Tail))
          (t : D1-Pred <- (nc-pred t))
          (c : D1-Tail <- (nc-tail c))
          (a : D1-Tail <- (nc-tail a))
          (return-state (If t c a)))]
     [(Begin eff* exp)
-     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-         (eff* : D1-Effect* <- (nc-effect* eff*))
-         (tail : D1-Tail    <- (nc-tail exp))
+     (do (bind-state : (State Nat D2-Tail))
+         (eff* : D2-Effect* <- (nc-effect* eff*))
+         (tail : D2-Tail    <- (nc-tail exp))
          (return-state (Begin eff* tail)))]
-    [(Repeat i e1 e2 e3)
-     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-         (e1 : D1-Value <- (nc-value e1))
-         (e2 : D1-Value <- (nc-value e2))
-         (e3 : D1-Effect <- (nc-effect e3))
-         (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote 0))))]
-    [(App exp exp*)
-     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-         (val  : D1-Value  <- (nc-value  exp))
-         (val* : D1-Value* <- (nc-value* exp*))
-         (return-state (App val val*)))]
-    [(Op p exp*)
-     ;; Filter effects into errors until I can fix this
-     (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-         (v* : D1-Value* <- (nc-value* exp*))
-         (if (uil-prim-effect? p)
-             (return-state (Begin (list (Op p v*)) (Quote UNIT-IMDT)))
-             (return-state (nc-value-op p v*))))]
-    [(Halt) (return-state (Halt))]
-    [(Var i) (return-state (Var i))]
-    [(Code-Label i) (return-state (Code-Label i))]
-    [(Quote k) (return-state (Quote k))]))
+    [other 
+     (do (bind-state : (State Nat D2-Tail))
+         (val : D2-Value <- (nc-value other))
+         (return-state (Return val)))]))
 
-(: nc-value (-> D0-Expr (State D1-Bnd-Code* D1-Value)))
-(define (nc-value exp)
-  (logging nc-value (Vomit) "~v" exp)
-  (match exp
-    [(Labels bnd* exp)
-     (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-value exp)))]
+(: nc-value (-> D1-Value (State Nat D1-Expr)))
+(define (nc-value val)
+  (match val
     [(Let bnd* exp)
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
          (bnd* : D1-Bnd* <- (nc-bnd* bnd*))
@@ -90,12 +77,10 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (val  : D1-Value   <- (nc-value exp))
          (return-state (Begin eff* val)))]
-    [(Repeat i e1 e2 e3)
-     (do (bind-state : (State D1-Bnd-Code* D1-Value))
-         (e1 : D1-Value  <- (nc-value e1))
-         (e2 : D1-Value  <- (nc-value e2))
-         (e3 : D1-Effect <- (nc-effect e3))
-         (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote 0))))]
+    [(Repeat i st sp e)
+     (do (bind-state : (State Casters D1-Expr))
+         (e : D1-Effect <- (nc-effect e1))
+         (return-state (Begin (list (Repeat i st sp e)) (Quote '()))))]
     [(App exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
          (val  : D1-Value  <- (nc-value  exp))
@@ -104,10 +89,10 @@
     [(Op p exp*)
      ;; Filter effects into errors until I can fix this
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
-         (v* : D1-Value* <- (nc-value* exp*))
+         (val* : D1-Value* <- (nc-value* exp*))
          (if (uil-prim-effect? p)
-             (return-state (Begin (list (Op p v*)) (Quote UNIT-IMDT)))
-             (return-state (nc-value-op p v*))))]
+             (TODO do something appropriate here)
+             (return-state (nc-value-op p val*))))]
     [(Halt) (return-state (Halt))]
     [(Var i) (return-state (Var i))]
     [(Code-Label i) (return-state (Code-Label i))]
@@ -115,7 +100,7 @@
 
 (: nc-effect (-> D0-Expr (State D1-Bnd-Code* D1-Effect)))
 (define (nc-effect exp)
-#;  (logging nc-effect ('Vomit) "~v" exp)
+  (logging nc-effect ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-effect exp)))]
@@ -135,12 +120,10 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (eff  : D1-Effect  <- (nc-effect eff))
          (return-state (make-begin (append eff* (list eff)) NO-OP)))]
-    [(Repeat i e1 e2 e3)
-     (do (bind-state : (State D1-Bnd-Code* D1-Effect))
-         (e1 : D1-Value <- (nc-value e1))
-         (e2 : D1-Value <- (nc-value e2))
-         (e3 : D1-Effect <- (nc-effect e3))
-         (return-state (Repeat i e1 e2 e3)))]
+    [(Repeat i st sp e)
+     (do (bind-state : (State Casters D1-Expr))
+         (e : D1-Effect <- (nc-effect e))
+         (return-state (Repeat i st sp e3)))]
     [(App exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (val  : D1-Value  <- (nc-value  exp))
@@ -164,8 +147,7 @@
 
 (: nc-pred (-> D0-Expr (State D1-Bnd-Code* D1-Pred)))
 (define (nc-pred exp)
-
-  (logging nc-pref (Vomit) "~v" exp)
+  (logging nc-pref ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-pred exp)))]
@@ -185,6 +167,11 @@
          (eff* : D1-Effect* <- (nc-effect* eff*))
          (val  : D1-Pred   <- (nc-pred exp))
          (return-state (Begin eff* val)))]
+    [(App exp exp*)
+     (do (bind-state : (State D1-Bnd-Code* D1-Pred))
+         (val  : D1-Value  <- (nc-value  exp))
+         (val* : D1-Value* <- (nc-value* exp*))
+         (return-state (App val val*)))]
     [(Op p exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Pred))
          ;; for some reason I am enforcing this wierd constrain about

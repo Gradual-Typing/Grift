@@ -46,7 +46,7 @@
                           (cast-lang-interp c0 config)
                           "cast lang semantics")]
               [d0  : Data0-Lang (impose-cast-semantics c0 config)]
-              [u0  : Data2-Lang (convert-representation d0 config)]
+              [u0  : Data5-Lang (convert-representation d0 config)]
               [_   : Boolean    (c-backend-generate-code u0 config)])
          (check value=?
                 expected

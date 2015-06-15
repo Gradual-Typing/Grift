@@ -35,7 +35,7 @@
        |#
          ;; change how the language is representated in order to make
          ;;    the conversion to c easy
-         [uil : Data2-Lang (convert-representation d0 config)]
+         [uil : Data5-Lang (convert-representation d0 config)]
          [_   (when (trace? 'UIL0 'All 'Vomit) (logf "UIL0:\n~v\n\n" uil))])
     (c-backend-generate-code uil config)))
 

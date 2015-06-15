@@ -5,13 +5,15 @@
 
 (require "core/tests.rkt"
          "boxes/tests.rkt"
+         "tools/tests.rkt"
          "program/tests.rkt"
          "large/tests.rkt")
 
 (provide (all-defined-out)
-         (all-from-out 
+         (all-from-out
           "core/tests.rkt"
           "boxes/tests.rkt"
+          "tools/tests.rkt"
           "program/tests.rkt"
           "large/tests.rkt"))
 
@@ -19,6 +21,7 @@
   (test-suite "most tests"
     core-tests
     boxes-tests
+    tool-tests
     program-tests))
 
 (define all-tests : Test
