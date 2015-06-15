@@ -15,7 +15,7 @@
 (define (cc path)
   (let ([path (build-path path)])
     (parameterize ([current-log-port log]
-                   [traces '(All Vomit)])
+                   [traces '(All)])
       (test-compile "debug" path (debug))
       #t)))
 

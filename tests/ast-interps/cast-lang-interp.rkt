@@ -130,6 +130,7 @@
 
 (: cast-lang-interp (-> Cast0-Lang Config Test-Value))
 (trace-define (cast-lang-interp prgm comp-config)
+  (initialize-state)
   (let ([eval (interp-expr apply-cast-ld (apply-lazy apply-cast-ld))]
 	[observe observe-lazy])
     (match-let ([(Prog _ exp) prgm])
@@ -243,6 +244,12 @@
                (p tmp ...)
                (error 'cfi-delta "type error ~a" `(p ,e ...)))))]))
 
+(define (initialize-state)
+  (set! timer-started? #f)
+  (set! timer-stopped? #f)
+  (set! start-time 0.0)
+  (set! stop-time 0.0))
+
 (define start-time : Real 0.0)
 (define stop-time  : Real 0.0)
 
@@ -250,21 +257,25 @@
 (define timer-stopped?  : Boolean #f)
 
 (define (timer-start)
-  (when timer-started? (TODO make an error message that works here))
   (set! timer-started? #t)
   (set! start-time (current-inexact-milliseconds))
   '())
 
 (define (timer-stop)
   (set! stop-time  (current-inexact-milliseconds))
-  (when (not timer-started?) (TODO make an error message that works here))
-  (when timer-stopped? (TODO make an error message that works here))
   (set! timer-stopped? #t)
   '())
 
 (define (timer-report)
-  (when (not timer-started?) (TODO make an error message that works here))
-  (when (not timer-stopped?) (TODO make an error message that works here))
+  (when (not timer-started?)
+    (raise (exn:schml:type:dynamic
+            "timer not started"
+            (current-continuation-marks))))
+  (when (not timer-stopped?)
+    (raise (exn:schml:type:dynamic
+            "timer not stopped"
+            (current-continuation-marks))))
+  (printf "time (sec): ~a\n" (- stop-time start-time))
   '())
 
 ;; The lazy-d parts

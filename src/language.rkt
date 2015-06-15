@@ -257,12 +257,15 @@ be usefull for optimizations or keeping state.
 
 (: make-begin
    (case->
+    (-> D3-Effect* No-Op D3-Effect)
+    (-> D3-Effect* D3-Value D3-Value)
+    (-> D3-Effect* D3-Tail  D3-Tail)
+    (-> D3-Effect* D3-Pred  D3-Pred)
     (-> C7-Effect* C7-Value  C7-Value)
     (-> C7-Effect* No-Op C7-Effect)
     (-> D1-Effect* D1-Value  D1-Value)
     (-> D1-Effect* No-Op D1-Effect)
-    (-> D3-Effect* D3-Trivial D3-Value)
-    (-> D3-Effect* No-Op D3-Effect)
+#;    (-> D3-Effect* D3-Trivial D3-Value)
     (-> D2-Effect* D2-Value  D2-Value)
     (-> D2-Effect* D2-Pred D2-Pred)
     (-> D2-Effect* No-Op D2-Effect)
@@ -271,13 +274,13 @@ be usefull for optimizations or keeping state.
     (-> D5-Effect* D5-Tail D5-Tail)))
 (define (make-begin eff* res)
   (: splice-eff (case->
-                 (-> C7-Effect C7-Effect* C7-Effect*)
                  ;; Since D2 effect is a strict subset of D1-effect
                  ;; It must come before D1 because the first type to
                  ;; match is used
                  (-> D5-Effect D5-Effect* D5-Effect*)
                  (-> D4-Effect D4-Effect* D4-Effect*)
                  (-> D3-Effect D3-Effect* D3-Effect*)
+                 (-> C7-Effect C7-Effect* C7-Effect*)
                  (-> D2-Effect D2-Effect* D2-Effect*)
                  (-> D1-Effect D1-Effect* D1-Effect*)))
   (define (splice-eff eff rest)

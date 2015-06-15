@@ -23,7 +23,7 @@
 
 (provide flatten-values)
 (: flatten-values (Data3-Lang Config -> Data4-Lang))
-(define (flatten-values prog config)
+(trace-define (flatten-values prog config)
   (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
     (let*-values ([(body count) (run-state (fv-body body) count)]
                   [(bnd* count) (run-state (map-state fv-bnd-code bnd*) count)])
@@ -63,6 +63,7 @@
 
 (: fv-tail (D3-Tail -> (State Locs D4-Tail)))
 (define (fv-tail tail)
+  (logging fv-tail (Vomit) "~v" tail)
   (match tail
     [(If t c a)
      (do (bind-state : (State Locs D4-Tail))
@@ -82,6 +83,7 @@
 
 (: fv-value (D3-Value -> (State Locs (E* D4-Value))))
 (define (fv-value v)
+  (logging fv-value (Vomit) "~v" v)
   (match v
     [(If t c a)
      (do (bind-state : (State Locs (E* D4-Value)))
@@ -119,6 +121,7 @@
 
 (: fv-pred (D3-Pred -> (State Locs D4-Pred)))
 (define (fv-pred pred)
+  (logging fv-pred (Vomit) "~v" pred)
   (match pred
     [(If t c a)
      (do (bind-state : (State Locs D4-Pred))
@@ -139,6 +142,7 @@
 
 (: fv-effect (D3-Effect -> (State Locs D4-Effect)))
 (define (fv-effect effect)
+  (logging fv-effect (Vomit) "~v" effect)
   (match effect
     [(Assign i v) (simplify-assignment i v)]
     [(If t c a)
@@ -187,6 +191,7 @@
 
 (: simplify-assignment (Uid D3-Value -> (State Locs D4-Effect)))
 (define (simplify-assignment var val)
+  (logging simplify-assignment () "\n~v\n~v" var val)
   (define (sa [val : D3-Value]) (simplify-assignment var val))
   (match val
     [(Var u) (return-state (Assign var (Var u)))]
@@ -206,7 +211,9 @@
          (t : D4-Pred <- (fv-pred t))
          (c : D4-Effect <- (simplify-assignment var c))
          (a : D4-Effect <- (simplify-assignment var a))
-         (return-state (if t c a)))]
+         (begin
+           (logging fv-sa-if () "t ~v\nc ~v\na ~v" t c a)
+           (return-state (If t c a))))]
     [(Begin e* v)
      (do (bind-state : (State Locs D4-Effect))
          (e* : D4-Effect* <- (fv-effect* e*))

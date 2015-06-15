@@ -5,7 +5,7 @@
 
 (provide simplify-predicates)
 (: simplify-predicates (Data4-Lang Config -> Data5-Lang))
-(define (simplify-predicates prog config)
+(trace-define (simplify-predicates prog config)
   (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
     (let*-values ([(body count) (run-state (sp-body body) count)]
                   [(bnd* count) (run-state (map-state sp-bnd-code bnd*) count)])

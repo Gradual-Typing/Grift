@@ -68,20 +68,19 @@ This allows me to make very desciptive grammars via types later on.
 
 #| Some helpers for debuging |#
 
-(: traces (Parameter (Option (Listof Symbol))))
-(define traces (make-parameter #f))
+(: traces (Parameter (Listof Symbol)))
+(define traces (make-parameter '()))
 
 (: trace (-> (U Symbol (Listof Symbol)) Void))
 (define (trace t)
-  (let* ((t* (traces))
-         (t* (if t* t* '())))
+  (let* ((t* (traces)))
     (if (symbol? t)
         (traces (cons t t*))
         (traces (append t t*)))))
 
 (define-syntax-rule (trace? s ...)
   (let ([t*? (traces)])
-    (and t*? (if (or (memq s t*?) ...) #t #f))))
+    (or (memq s t*?) ...)))
 
 (: current-log-port (Parameter Output-Port))
 (define current-log-port (make-parameter (current-error-port)))
@@ -94,15 +93,18 @@ This allows me to make very desciptive grammars via types later on.
 
 (define-syntax-rule (pass/log (o ...) (p in c ...))
   (let ([t? (trace? 'p 'All 'o ...)])
-    (when t? (logf "~a input:\n~a\n\n" 'p in))
-    (let ([out (p  in c ...)])
-      (when t? (logf "~a output:\n~a\n\n" 'p in))
+    (when t? (logf "~v input:\n~v\n\n" 'p in))
+    (let ([out (p in c ...)])
+      (when t? (logf "~v output:\n~v\n\n" 'p in))
       out)))
 
 
-(define-syntax-rule (logging n (o ...) f a ...)
-  (let ([t? (trace? 'n 'All 'o ...)])
-    (when t? (logf (format "~a: ~a\n\n" 'n f) a ...))))
+(define-syntax logging
+  (syntax-rules ()
+    [(logging n () f a ...) (logging n (All) f a ...)]
+    [(logging n (o0 o* ...) f a ...)
+     (let ([t? (trace? 'n 'o0 'o* ...)])
+       (when t? (logf (format "~v: ~v\n\n" 'n f) a ...)))]))
 
 (define-syntax-rule (log-body n (v ...) e ... b)
   (let ([t? (trace? 'n 'All)])
@@ -182,7 +184,9 @@ This allows me to make very desciptive grammars via types later on.
       syntax-undefined-if-used))
 
 (define-syntax do
-  (syntax-rules (<- : let let* let-values let*-values match-let)
+  (syntax-rules (<- :
+                 let let* let-values let*-values
+                 match-let match-let-values)
     [(_ bind (let (b ...) e e* ...))
      (let (b ...) (do bind e e* ...))]
     [(_ bind (let* (b ...) e e* ...))
@@ -193,6 +197,8 @@ This allows me to make very desciptive grammars via types later on.
      (let*-values (b ...) (do bind e e* ...))]
     [(_ bind (match-let (b ...) e e* ...))
      (match-let (b ...) (do bind e e* ...))]
+    [(_ bind (match-let-values (b ...) e e* ...))
+     (match-let-values (b ...) (do bind e e* ...))]
     [(_ (bind : T) e) (ann e : T)]
     [(_ (bind : (C m b)) ((p ...) : a <- e0) e e* ...)
      (bind (ann e0 (C m a))
@@ -247,13 +253,14 @@ This allows me to make very desciptive grammars via types later on.
                      (return-state (cons a d)))))])
       (loop l)))
 
-(: foldr-state (All (M A B) (-> (A B -> (State M B)) B (Listof A) (State M B))))
-(define (foldr-state f a l)
-  (if (null? l)
-      (return-state (ann a B))
+(: foldr-state (All (M A B) ((A B -> (State M B)) B (Listof A) -> (State M B))))
+(define (foldr-state fn acc ls)
+  (if (null? ls)
+      (return-state (ann acc B))
       (do (bind-state : (State M B))
-          (a : B <- (foldr-state f a (cdr l)))
-          (f (car l) a))))
+          (match-let ([(cons a d) ls])
+            (acc : B <- (foldr-state fn acc d))
+            (fn a acc)))))
 
 (: lift-state (All (M A B C D)
                (case-> [(A -> B) (State M A) -> (State M B)]

@@ -47,7 +47,7 @@
 
 (: rl-tail (-> D1-Tail (values D2-Tail Uid*)))
 (define (rl-tail tail)
-  (logf "rl-tail ~v\n\n" tail)
+  (logging rl-tail (Vomit) "~v" tail)
   (match tail
     [(Let bnd* tail)
      (let*-values ([(tail lv*) (rl-tail tail)]
@@ -77,7 +77,7 @@
 
 (: rl-value (-> D1-Value (values D2-Value Uid*)))
 (define (rl-value exp)
-  (logf "rl-value ~v\n\n" exp)
+  (logging rl-value (Vomit) "~v" exp)
   (match exp
     [(Let bnd* exp)
      (let*-values ([(exp lv*) (rl-value exp)]
@@ -107,7 +107,7 @@
 
 (: rl-pred (-> D1-Pred (values D2-Pred Uid*)))
 (define (rl-pred exp)
-  (logf "rl-pred ~v\n\n" exp)
+  (logging rl-pred (Vomit) "~v" exp)
   (match exp
     [(Let bnd* exp)
      (let*-values ([(pred lv*) (rl-pred exp)]
@@ -176,7 +176,7 @@
      (let*-values ([(e1 l1) (rl-value e1)]
                    [(e2 l2) (rl-value e2)]
                    [(e3 lv*) (rl-effect e3 lv*)])
-       (values (Repeat i e1 e2 e3) (append l1 l2 lv*)))]
+       (values (Repeat i e1 e2 e3) (cons i (append l1 l2 lv*))))]
     [(App exp exp*)
      (let*-values ([(exp lv*^)   (rl-value exp)]
                    [(exp* lv*^^) (rl-value* exp*)])

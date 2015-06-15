@@ -25,7 +25,7 @@
 
 (: nc-tail (-> D0-Expr (State D1-Bnd-Code* D1-Tail)))
 (define (nc-tail exp)
-  (logging nc-tail ('Vomit) "~v" exp)
+  (logging nc-tail (Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-tail exp)))]
@@ -59,10 +59,10 @@
     [(Op p exp*)
      ;; Filter effects into errors until I can fix this
      (do (bind-state : (State D1-Bnd-Code* D1-Tail))
-         (val* : D1-Value* <- (nc-value* exp*))
+         (v* : D1-Value* <- (nc-value* exp*))
          (if (uil-prim-effect? p)
-             (TODO do something appropriate here (Perform effect and return 0))
-             (return-state (nc-value-op p val*))))]
+             (return-state (Begin (list (Op p v*)) (Quote UNIT-IMDT)))
+             (return-state (nc-value-op p v*))))]
     [(Halt) (return-state (Halt))]
     [(Var i) (return-state (Var i))]
     [(Code-Label i) (return-state (Code-Label i))]
@@ -70,7 +70,7 @@
 
 (: nc-value (-> D0-Expr (State D1-Bnd-Code* D1-Value)))
 (define (nc-value exp)
-  (logging nc-value ('Vomit) "~v" exp)
+  (logging nc-value (Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-value exp)))]
@@ -104,10 +104,10 @@
     [(Op p exp*)
      ;; Filter effects into errors until I can fix this
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
-         (val* : D1-Value* <- (nc-value* exp*))
+         (v* : D1-Value* <- (nc-value* exp*))
          (if (uil-prim-effect? p)
-             (TODO do something appropriate here)
-             (return-state (nc-value-op p val*))))]
+             (return-state (Begin (list (Op p v*)) (Quote UNIT-IMDT)))
+             (return-state (nc-value-op p v*))))]
     [(Halt) (return-state (Halt))]
     [(Var i) (return-state (Var i))]
     [(Code-Label i) (return-state (Code-Label i))]
@@ -115,7 +115,7 @@
 
 (: nc-effect (-> D0-Expr (State D1-Bnd-Code* D1-Effect)))
 (define (nc-effect exp)
-  (logging nc-effect ('Vomit) "~v" exp)
+#;  (logging nc-effect ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-effect exp)))]
@@ -164,7 +164,7 @@
 
 (: nc-pred (-> D0-Expr (State D1-Bnd-Code* D1-Pred)))
 (define (nc-pred exp)
-  (logging nc-pref ('Vomit) "~v" exp)
+  #;(logging nc-pref ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-pred exp)))]

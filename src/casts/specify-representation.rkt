@@ -250,8 +250,9 @@ exposed as the effects that they truelly are.
        (do (bind-state : (State Nat D0-Expr))
            (e1 : D0-Expr <- (recur e1))
            (e2 : D0-Expr <- (recur e2))
-           (e3 : D0-Expr <- (recur e3))
-           (return-state (Repeat i e1 e2 e3)))]
+           (let ([env (extend env i (Var i))])
+             (e3 : D0-Expr <- ((sr-expr env cenv) e3))
+             (return-state (Repeat i e1 e2 e3))))]
       ;; Guarded
       [(UGbox e)
        (do (bind-state : (State Nat D0-Expr))

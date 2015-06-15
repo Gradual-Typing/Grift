@@ -1,0 +1,8 @@
+(letrec ([fn : (Int -> Int)
+          (lambda (n)
+            n)])
+ (begin
+  (timer-start)
+  (repeat (i 0 99999) (fn 5))
+  (timer-stop)
+  (timer-report)))
