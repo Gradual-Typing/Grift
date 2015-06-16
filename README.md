@@ -61,6 +61,11 @@ one shot timer. Calling (timer-report) will print out the time in seconds
 between the calls (timer-start) and (timer-stop). If no such calls have occured
 there will be a runtime error.
 
+### Getting the most out of typed racket
+
+```bash
+export PLTSTDERR="error debug@tr-timing"
+```
 
 ### For more information:
 - compiler/README.md : information about how the compiler is constructed
