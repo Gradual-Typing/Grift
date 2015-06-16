@@ -18,9 +18,6 @@ git clone git@github.com:akuhlens/schml
 cd schml
 raco pkg install
 ```
-This package utilizes Typed Racket which will give better performancs for the compiler itself at the cost of
-a much longer compile time for the compiler during install. Perhaps it may be better to install in a unused
-tab.
 
 ## Use as a Library
 ```racket
@@ -32,27 +29,38 @@ tab.
 
 Comming soon
 
-## The Language supported
+## The Gradually Typed Lambda Calculus
 ```bnf
-Program        ::= Expression
-Lambda         ::= (lambda (Formal ...) Maybe-Type Expression)
-Expression     ::= Lambda
-               |   (let ([ID Maybe-Type Expression] ...) Expression)
-               |   (letrec ([ID Maybe-Type Lambda] ...) Expression)
-               |   (Expresion ...)
-               |   (: Expression Type Maybe-String)
-               |   (if Expression Expression Expression)
-               |   (Primitive Expression Expression)
-               |   (unbox expression)
+Lambda         ::= (lambda (Formal ...) [: Type] Expression)
+Application    ::= (Expression ...)
+Ascription     ::= (: Expression Type [String])
+Conditional    ::= (if Expression Expression Expression)
+Primitives     ::= (Primitive Expression ...)
+References     ::= (unbox expression)
                |   (box expression)
-               |   (set expression expression)
+               |   (box-set! expression expression)
+Binding        ::= (let ((ID [: Type] Expression) ...) Expression)
+               |   (letrec ((ID [: Type] Lambda) ...) Expression)
+Iteration      ::= (repeat (ID Expression Expression) Expression)
 Primitive      ::= + | -  | * | binary-and | binary-or
                |   < | <= | = | >= | >
-Type           ::= Dyn | Int | Bool | (-> Type ...)
-Maybe-type     ::=    | : type
-Maybe-String   ::=    | "[.^"]*"
+               | timer-start | timer-stop | timer-report
+Type           ::= Dyn | Int | Bool | Unit | (-> Type ...) | (Ref Type)
+Maybe-[A]      ::=    | A
 Formal         ::= ID | [ID : Type]
 ```
+In order to support more accurate benchmarking we have added the repeat
+special form which is guaranteed to be the equivalent of a for loop in
+C. The loop ```(repeat (id start stop) exp)``` is the equivalent of
+the for loop ```for(id = start; id < stop; id += 1) exp;```. It always
+results in a unit value.
+
+Further support for benchmarking has been added with the timer primitives.
+All of which take no arguments and return unit. This is a global
+one shot timer. Calling (timer-report) will print out the time in seconds
+between the calls (timer-start) and (timer-stop). If no such calls have occured
+there will be a runtime error.
+
 
 ### For more information:
 - compiler/README.md : information about how the compiler is constructed

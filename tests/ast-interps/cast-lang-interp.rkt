@@ -155,7 +155,7 @@
         (lambda ([env : (Env CL-Value)]): CL-Value
                 (recur exp env)))
       (map curry-recur exp*))
-    (define res
+    (define res : CL-Value
       (match exp
       [(Lambda id* body)
        (CL-Proc (lambda ([arg* : CL-Value*]) (recur body (env-extend* env id* arg*))))]

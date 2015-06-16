@@ -33,10 +33,11 @@
     (match exp
       [(Lambda fml* (and (Ann _ (cons body-src body-type))
                          (app iic-expr body)))
+       (unless (Fn? type) (TODO error really big here))
        (let* ([lbl-th (mk-label "lambda" body-src)]
-              [body (mk-cast lbl-th body body-type (ann (Fn-ret type) Schml-Type))]
-              [fml* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
-	  (Lambda fml* body))]
+                  [body (mk-cast lbl-th body body-type (ann (Fn-ret type) Schml-Type))]
+                  [fml* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
+             (Lambda fml* body))]
        [(Let bnd* (and (Ann _ (cons src type^)) body))
 	(Let (map iic-bnd bnd*) (mk-cast (mk-label "let" src) (iic-expr body) type^ type))]
        [(Letrec bnd* (and (Ann _ (cons src type^)) body))

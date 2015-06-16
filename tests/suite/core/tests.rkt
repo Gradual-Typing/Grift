@@ -1,7 +1,6 @@
 #lang typed/racket
 
-(require typed/rackunit
-         typed/rackunit/text-ui
+(require "../../rackunit.rkt"
          "../../test-compile.rkt")
 
 (provide (all-defined-out))

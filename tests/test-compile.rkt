@@ -3,7 +3,7 @@
 ;; Once the file is finished compiling the program is run and the value checked against
 ;; an expected value. The real compiler is then invoked. And the result once again checked.
 
-(require typed/rackunit
+(require "./rackunit.rkt"
          "../src/language.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
@@ -32,8 +32,8 @@
 
 (define-syntax-rule (test-compile name path expected)
   (test-case name
-   (let ([config (compiler-config)])
-     (with-handlers ([exn:schml:type:static?
+    (let ([config (compiler-config)])
+      (with-handlers ([exn:schml:type:static?
                       (lambda ([e : exn:schml:type:static])
                         (begin
                           (check value=?

@@ -499,22 +499,28 @@ be usefull for optimizations or keeping state.
    [(IntxInt->Int-primitive? p)  INTxINT->INT-TYPE]
    [(timer-primitive? p)         ->UNIT-TYPE]))
 
-(: consistent? (Schml-Type Schml-Type . -> . Boolean))
+(define-type binary-schml-type-predicate (Schml-Type Schml-Type . -> . Boolean))
+(: consistent? binary-schml-type-predicate)
 (define (consistent? t g)
   (or (Dyn? t) (Dyn? g)
       (and (Unit? t) (Unit? g))
-      (and (Int? t) (Int? g))
       (and (Bool? t) (Bool? g))
+      (and (Int? t) (Int? g))
       (and (Fn? t) (Fn? g)
 	   (= (Fn-arity t) (Fn-arity g))
 	   (andmap consistent? (Fn-fmls t) (Fn-fmls g))
 	   (consistent? (Fn-ret t) (Fn-ret g)))
       (and (GRef? t) (GRef? g)
            (consistent? (GRef-arg t) (GRef-arg g)))
+      ;; These will need to be added back but were adding
+      ;; considerable type checking time.
+      #;
       (and (GVect? t) (GVect? g)
            (consistent? (GVect-arg t) (GVect-arg g)))
+      #;
       (and (MRef? t) (MRef? g)
            (consistent? (MRef-arg t) (MRef-arg g)))
+      #;
       (and (MVect? t) (MVect? g)
            (consistent? (MVect-arg t) (MVect-arg g)))))
 
