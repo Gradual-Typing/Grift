@@ -73,7 +73,7 @@
 |#
 (define-syntax-rule (observe exp)
   (let ([s (with-output-to-string (lambda () exp))])
-    (when (trace? 'Out 'All 'Vomit) (logf "program output:\n ~a\n" s))
+    (logging observe () "~v" s)
     (cond
      [(regexp-match #rx".*Int : ([0-9]+)" s) =>
       (lambda (r)

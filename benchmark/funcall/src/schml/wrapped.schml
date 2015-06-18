@@ -1,0 +1,7 @@
+(letrec ([f : (Int -> Int) (lambda (n) n)])
+ (let ([w : (Dyn -> Dyn) f])
+  (begin
+   (timer-start)
+   (repeat (i 0 1000000) (w 1))
+   (timer-stop)
+   (timer-report))))

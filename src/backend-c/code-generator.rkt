@@ -7,22 +7,32 @@
 (provide (all-defined-out))
 
 ;; Basic driver for the entire backend
-(: c-backend-generate-code (Data5-Lang Config . -> . Boolean))
+(: c-backend-generate-code (Data5-Lang Config . -> . Path))
 (define (c-backend-generate-code uil config)
+  (define c-path (Config-c-path config))
   ;; Write the C code to a file
-  (when (trace? 'Vomit)
-    (logf "Wrote C Output to ~a" (path->string (Config-c-path config))))
-  (with-output-to-file
-      (Config-c-path config) #:mode 'text #:exists 'replace
-      (lambda ()
-        (generate-c uil config)))
+  (logging c-backend-generate-code (Vomit) "~v" c-path)
+  (with-output-to-file c-path #:mode 'text #:exists 'replace
+    (lambda ()
+      (generate-c uil config)))
+  ;; if clang-format is present and we keep c then clean up
+  ;; the file
+  (parameterize ([current-error-port (open-output-string)]
+                 [current-output-port (open-output-string)])
+         ;; TODO I think that I need to close this port
+    (cond
+      [(system "which clang-format")
+       ;; There is an error message that doesn't mean anything
+       (system (format "clang-format -i ~a" (path->string c-path)))]))
+  
   ;; Invoke the system cc compiler on the file
   (invoke-c-compiler config))
 
 ;; call the host system's cc function
-(: invoke-c-compiler (-> Config Boolean))
+(: invoke-c-compiler (-> Config Path))
 (define (invoke-c-compiler config)
-  (let* ([out (path->string (Config-exec-path config))]
+  (let* ([out-path (Config-exec-path config)]
+         [out (path->string out-path)]
          [in  (path->string (Config-c-path config))]
          [flags (append-flags (Config-c-flags config))]
          [cmd (format "cc -o ~a ~a ~a" out in flags)])
@@ -35,7 +45,12 @@
         ([current-error-port (if (trace? 'CC-Errors 'All 'Vomit)
                                  (current-log-port)
                                  (current-error-port))])
-      (system cmd))))
+      (let ([asm? (Config-asm-path config)])
+        (when asm?
+          (system (format "cc ~a -S -o ~a ~a" in (path->string asm?) flags))))
+      (unless (system cmd)
+        (TODO raise appropriate error here))
+      out-path)))
 
 (: append-flags : (Listof String) -> String)
 (define (append-flags s)

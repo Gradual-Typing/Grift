@@ -104,7 +104,7 @@ This allows me to make very desciptive grammars via types later on.
     [(logging n () f a ...) (logging n (All) f a ...)]
     [(logging n (o0 o* ...) f a ...)
      (let ([t? (trace? 'n 'o0 'o* ...)])
-       (when t? (logf (format "~v: ~v\n\n" 'n f) a ...)))]))
+       (when t? (logf (format "~a: ~a\n\n" 'n f) a ...)))]))
 
 (define-syntax-rule (log-body n (v ...) e ... b)
   (let ([t? (trace? 'n 'All)])
@@ -123,23 +123,28 @@ This allows me to make very desciptive grammars via types later on.
   (when (trace? s ...)
     (logf fmt a ...)))
 
-(define-syntax-rule (trace-define (f a ...) e ... b)
-  (define (f a ...)
-    (define t? (trace? 'All 'f))
-    (define n (box 0))
-    (when t?
-      (logf "~v ~v input:\n" 'f (unbox n))
-      (logf "\t~v : ~v\n" 'a a) ...
-      (logf "\n")
-      (flush-output (current-log-port)))
-    (let ()
-      e ...
-      (let ([out b])
-        (when t?
-          (logf "~v ~v output: ~v" 'f n out)
-          (flush-output (current-log-port))
-          (set-box! n (+ (unbox n) 1)))
-        out))))
+(define-syntax trace-define
+  (syntax-rules (->)
+    [(_ (f i ...) -> (r ...) e ... b)
+     (begin
+       (define n (box 0))
+       (define (f i ...)
+         (define t? (trace? 'All 'f))
+         (set-box! n (+ (unbox n) 1))
+         (when t?
+           (logf "~a@~a:~a=~v\n" 'f (unbox n) 'i i) ...
+           (logf "\n")
+           (flush-output (current-log-port)))
+         e ...
+         (let-values ([(r ...) b])
+           (set-box! n (- (unbox n) 1))
+           (when t?
+             (logf "~a@~a:~a=~v\n" 'f (unbox n) 'r r) ...
+             (logf "\n")
+             (flush-output (current-log-port)))
+           (values r ...))))]
+    [(_ (f i ...) e ... b)
+     (trace-define (f i ...) -> (out) e ... b)]))
 
 ;; allows for conditional compilation
 (define-for-syntax under-construction?

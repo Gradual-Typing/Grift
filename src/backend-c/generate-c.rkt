@@ -207,8 +207,8 @@
             (emit-value sp)
             (display " ; ")
             (display (uid->string i))
-            (display "+= 1 ) {\n")
-            (emit-begin e* (void))
+            (display " += 1 ) {\n")
+            (emit-begin e* (display "__asm__(\"\");"))
             (display "}\n"))]
     [(Op p exp*)
      (emit-op p exp*)]

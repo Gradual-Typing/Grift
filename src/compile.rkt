@@ -9,76 +9,71 @@
 (provide (all-defined-out))
 (provide (struct-out Config))
 
-(: default-exec-path-string String)
-(define default-exec-path-string "a.out")
-(: default-c-path-string String)
-(define default-c-path-string "a.c")
+;; Default places for everything, but there is no default source
+(define c-path : (Parameterof Path)
+  (make-parameter (build-path "a.c")))
+(define keep-c? : (Parameterof Boolean)
+  (make-parameter #f))
+(define asm-path : (Parameterof (Option Path))
+  (make-parameter #f))
+(define target-path : (Parameterof Path)
+  (make-parameter (build-path "a.out")))
+(define log-path : (Parameterof (Option Path))
+  (make-parameter #f))
 
-#;(TODO move logging to the individual and meta passes)
+;; Semantic Option
+(define semantics : (Parameterof Semantics)
+  (make-parameter 'Lazy-D))
+
+;; Interaction with the c compiler
+(define c-flags : (Parameterof (Listof String))
+  (make-parameter '()))
 
 ;; This is the main compiler it is composed of several micro
 ;; compilers for successivly lower level languages.
-(: compile/conf (Path Config . -> . Boolean))
-(define (compile/conf path config)
-  (when (trace? 'Source 'All 'Vomit)
-    (logf "Source:\n~a\n\n" (file->string path #:mode 'text)))
+(: compile/conf (Path Config . -> . Path))
+(trace-define (compile/conf path config)
   (let* (;; read(lex), parse, typecheck, insert casts
-         [c0  : Cast0-Lang (pass/log (Cast0 All)
-                            (reduce-to-cast-calculus path config))]
-         ;; lower casts into a weakly typed language with lexical closures
+         [c0  : Cast0-Lang  (reduce-to-cast-calculus path config)]
+         ;; specify behavior/representation of casts, and all language constructs
          [d0  : Data0-Lang (impose-cast-semantics c0 config)]
-         [_   (when (trace? 'Data0 'All 'Vomit) (logf "Data0:\n~a\n\n" d0))]
-
-      #| ;; convert lambdas to flat functions and closure data structures
-         [d0  : Data0-Lang (make-closures-explicit l0 config)]
-         [_   (when (trace? 'Data0 'All 'Vomit) (logf "Data0:\n~v\n\n" d0))]
-       |#
-         ;; change how the language is representated in order to make
-         ;;    the conversion to c easy
-         [uil : Data5-Lang (convert-representation d0 config)]
-         [_   (when (trace? 'UIL0 'All 'Vomit) (logf "UIL0:\n~v\n\n" uil))])
+         ;; change how the language represents expressions to get a c like ast
+         [uil : Data5-Lang (convert-representation d0 config)])
+    ;; generate c code and compile it
     (c-backend-generate-code uil config)))
 
 ;; compile file at path
 ;; exec-path = path/name of final executable
-(: compile (->* ((U String Path))
-                (#:exec-path Path
-                 #:c-path Path
-                 #:semantics Semantics
-                 #:log-path (Option Path)
-                 #:c-flags (Listof String))
-                Boolean))
-(define (compile path
-     #:exec-path [exec-path (string->path default-exec-path-string)]
-     #:c-path    [c-path    (string->path default-c-path-string)]
-     #:log-path  [log-path  #f]
-     #:semantics [semantics 'Lazy-D]
-     #:c-flags   [cflags    '()])
+(: compile (-> (U String Path) Path))
+(trace-define (compile path)
   (let* ([path  (simple-form-path (if (string? path) (string->path path) path))])
-    (let ([th (lambda () (compile/conf path (Config semantics exec-path c-path cflags)))])
-      (if log-path
-          (call-with-output-file
-              log-path #:exists 'replace #:mode 'text
-              (lambda ([log : Output-Port])
-                (parameterize ([current-log-port log]
-                               [print-as-expression #t]
-                               [print-graph #t]
-                               [print-struct #t])
-                  (th))))
-          (th)))))
-
+    (let ([log-path (log-path)])
+      (when log-path
+        (current-log-port (open-output-file log-path #:exists 'replace #:mode 'text)))
+      (parameterize ([print-as-expression #t]
+                     [print-graph #t]
+                     [print-struct #t])
+        (compile/conf path
+                      (Config path
+                              (semantics)
+                              (target-path)
+                              (c-path)
+                              (keep-c?)
+                              (c-flags)
+                              (asm-path)))))))
 
 (: envoke-compiled-program (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))
 (define (envoke-compiled-program #:exec-path [path #f] #:config [config #f])
   (cond
    [config (system (path->string (Config-exec-path config)))]
    [path   (system (path->string path))]
-   [else   (system default-exec-path-string)]))
+   [else   (system (path->string (target-path)))]))
 
+#;
 (module+ main
   (let ([args (current-command-line-arguments)])
     (cond
-     [(= 0 (vector-length args)) (display "please specify what file to run!\n")]
-     [(< 1 (vector-length args)) (display "please only specify one file to run!\n")]
-     [(compile (vector-ref args 0)) (display "success :)\n")]
-     [else (display "success :)\n")])))
+      [(= 0 (vector-length args)) (display "please specify what file to run!\n")]
+      [(< 1 (vector-length args)) (display "please only specify one file to run!\n")]
+      [(compile (vector-ref args 0)) (display "success :)\n")]
+      [else (display "success :)\n")])))

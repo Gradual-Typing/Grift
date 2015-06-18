@@ -86,7 +86,7 @@
         (Castable #f full-cast-tree)))))
 
 (: ic-expr (-> Cast-Rule (-> C2-Expr (State Nat C3-Expr))))
-(define (ic-expr mk-cast)
+(define ((ic-expr mk-cast) exp)
   (: ic-bnd (-> C2-Bnd (State Nat C3-Bnd)))
   (define (ic-bnd b)
     (do (bind-state : (State Nat C3-Bnd))
@@ -94,124 +94,123 @@
           (e : C3-Expr <- (recur e))
           (return-state (cons u e)))))
   (: recur (-> C2-Expr (State Nat C3-Expr)))
-  (define (recur exp)
-    (match exp
-      [(Lambda f* (Castable ctr exp))
-       (do (bind-state : (State Nat C3-Expr))
-           (exp : C3-Expr <- (recur exp))
-           (return-state (Lambda f* (Castable ctr exp))))]
-      [(Letrec b* exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (b*  : C3-Bnd* <- (map-state ic-bnd b*))
-           (exp : C3-Expr <- (recur exp))
-           (return-state (Letrec b* exp)))]
-      [(Let b* exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (b*  : C3-Bnd* <- (map-state ic-bnd b*))
-           (exp : C3-Expr <- (recur exp))
-           (return-state (Let b* exp)))]
-      [(App exp exp*)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (exp* : C3-Expr* <- (map-state recur exp*))
-           (return-state (App exp exp*)))]
-      [(Op p exp*)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp* : C3-Expr* <- (map-state recur exp*))
-           (return-state (Op p exp*)))]
-      [(Runtime-Cast v t1 t2 l)
-       (do (bind-state : (State Nat C3-Expr))
-           (v  : C3-Expr <- (recur v))
-           (t1 : C3-Expr <- (recur t1))
-           (t2 : C3-Expr <- (recur t2))
-           (l  : C3-Expr <- (recur l))
-           (mk-cast v t1 t2 l))]
-      [(Cast v t1 t2 l)
-       (do (bind-state : (State Nat C3-Expr))
-           (v  : C3-Expr <- (recur v))
-           (mk-cast v (Type t1) (Type t2) (Quote l)))]
-      [(Fn-Cast e t1 t2 l)
-       (do (bind-state : (State Nat C3-Expr))
-           (e  : C3-Expr <- (recur e))
-           (cast-fn e (Type t1) (Type t2) (Quote l)))]
-      [(Type-Fn-arg e i)
-       (do (bind-state : (State Nat C3-Expr))
-           (e  : C3-Expr <- (recur e))
-           (i  : C3-Expr <- (recur i))
-           (return-state (Type-Fn-arg e i)))]
-      [(Type-Fn-return e)
-       (do (bind-state : (State Nat C3-Expr))
-           (e  : C3-Expr <- (recur e))
-           (return-state (Type-Fn-return e)))]
-      [(Type-Fn-arity e)
-       (do (bind-state : (State Nat C3-Expr))
-           (e  : C3-Expr <- (recur e))
-           (return-state (Type-Fn-arity e)))]
-      [(Blame e)
-       (do (bind-state : (State Nat C3-Expr))
-           (e  : C3-Expr <- (recur e))
-           (return-state (Blame e)))]
-      [(If tst csq alt)
-       (do (bind-state : (State Nat C3-Expr))
-           (tst  : C3-Expr <- (recur tst))
-           (csq  : C3-Expr <- (recur csq))
-           (alt  : C3-Expr <- (recur alt))
-           (return-state (If tst csq alt)))]
-      [(Var i) (return-state (Var i))]
-      [(Type t) (return-state (Type t))]
-      [(Quote k) (return-state (Quote k))]
-      [(Begin exp* exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp* : C3-Expr* <- (map-state recur exp*))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (Begin exp* exp)))]
-      [(Repeat i e1 e2 e3)
-       (do (bind-state : (State Nat C3-Expr))
-           (e1 : C3-Expr <- (recur e1))
-           (e2 : C3-Expr <- (recur e2))
-           (e3 : C3-Expr <- (recur e3))
-           (return-state (Repeat i e1 e2 e3)))]
-      [(UGbox exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (UGbox exp)))]
-      [(UGbox-ref exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (UGbox-ref exp)))]
-      [(UGbox-set! exp1 exp2)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp1 : C3-Expr  <- (recur exp1))
-           (exp2 : C3-Expr  <- (recur exp2))
-           (return-state (UGbox-set! exp1 exp2)))]
-      [(GRep-proxied? exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (GRep-proxied? exp)))]
-      [(Gproxy e1 e2 e3 e4)
-       (do (bind-state : (State Nat C3-Expr))
-           (e1 : C3-Expr  <- (recur e1))
-           (e2 : C3-Expr  <- (recur e2))
-           (e3 : C3-Expr  <- (recur e3))
-           (e4 : C3-Expr  <- (recur e4))
-           (return-state (Gproxy e1 e2 e3 e4)))]
-      [(Gproxy-for exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (Gproxy-for exp)))]
-      [(Gproxy-from exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (Gproxy-from exp)))]
-      [(Gproxy-to exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (Gproxy-to exp)))]
-      [(Gproxy-blames exp)
-       (do (bind-state : (State Nat C3-Expr))
-           (exp  : C3-Expr  <- (recur exp))
-           (return-state (Gproxy-blames exp)))]))
-  recur)
+  (define recur (ic-expr mk-cast))
+  (match exp
+    [(Lambda f* (Castable ctr exp))
+     (do (bind-state : (State Nat C3-Expr))
+         (exp : C3-Expr <- (recur exp))
+         (return-state (Lambda f* (Castable ctr exp))))]
+    [(Letrec b* exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (b*  : C3-Bnd* <- (map-state ic-bnd b*))
+         (exp : C3-Expr <- (recur exp))
+         (return-state (Letrec b* exp)))]
+    [(Let b* exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (b*  : C3-Bnd* <- (map-state ic-bnd b*))
+         (exp : C3-Expr <- (recur exp))
+         (return-state (Let b* exp)))]
+    [(App exp exp*)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (exp* : C3-Expr* <- (map-state recur exp*))
+         (return-state (App exp exp*)))]
+    [(Op p exp*)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp* : C3-Expr* <- (map-state recur exp*))
+         (return-state (Op p exp*)))]
+    [(Runtime-Cast v t1 t2 l)
+     (do (bind-state : (State Nat C3-Expr))
+         (v  : C3-Expr <- (recur v))
+         (t1 : C3-Expr <- (recur t1))
+         (t2 : C3-Expr <- (recur t2))
+         (l  : C3-Expr <- (recur l))
+         (mk-cast v t1 t2 l))]
+    [(Cast v t1 t2 l)
+     (do (bind-state : (State Nat C3-Expr))
+         (v  : C3-Expr <- (recur v))
+         (mk-cast v (Type t1) (Type t2) (Quote l)))]
+    [(Fn-Cast e t1 t2 l)
+     (do (bind-state : (State Nat C3-Expr))
+         (e  : C3-Expr <- (recur e))
+         (cast-fn e (Type t1) (Type t2) (Quote l)))]
+    [(Type-Fn-arg e i)
+     (do (bind-state : (State Nat C3-Expr))
+         (e  : C3-Expr <- (recur e))
+         (i  : C3-Expr <- (recur i))
+         (return-state (Type-Fn-arg e i)))]
+    [(Type-Fn-return e)
+     (do (bind-state : (State Nat C3-Expr))
+         (e  : C3-Expr <- (recur e))
+         (return-state (Type-Fn-return e)))]
+    [(Type-Fn-arity e)
+     (do (bind-state : (State Nat C3-Expr))
+         (e  : C3-Expr <- (recur e))
+         (return-state (Type-Fn-arity e)))]
+    [(Blame e)
+     (do (bind-state : (State Nat C3-Expr))
+         (e  : C3-Expr <- (recur e))
+         (return-state (Blame e)))]
+    [(If tst csq alt)
+     (do (bind-state : (State Nat C3-Expr))
+         (tst  : C3-Expr <- (recur tst))
+         (csq  : C3-Expr <- (recur csq))
+         (alt  : C3-Expr <- (recur alt))
+         (return-state (If tst csq alt)))]
+    [(Var i) (return-state (Var i))]
+    [(Type t) (return-state (Type t))]
+    [(Quote k) (return-state (Quote k))]
+    [(Begin exp* exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp* : C3-Expr* <- (map-state recur exp*))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (Begin exp* exp)))]
+    [(Repeat i e1 e2 e3)
+     (do (bind-state : (State Nat C3-Expr))
+         (e1 : C3-Expr <- (recur e1))
+         (e2 : C3-Expr <- (recur e2))
+         (e3 : C3-Expr <- (recur e3))
+         (return-state (Repeat i e1 e2 e3)))]
+    [(UGbox exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (UGbox exp)))]
+    [(UGbox-ref exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (UGbox-ref exp)))]
+    [(UGbox-set! exp1 exp2)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp1 : C3-Expr  <- (recur exp1))
+         (exp2 : C3-Expr  <- (recur exp2))
+         (return-state (UGbox-set! exp1 exp2)))]
+    [(GRep-proxied? exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (GRep-proxied? exp)))]
+    [(Gproxy e1 e2 e3 e4)
+     (do (bind-state : (State Nat C3-Expr))
+         (e1 : C3-Expr  <- (recur e1))
+         (e2 : C3-Expr  <- (recur e2))
+         (e3 : C3-Expr  <- (recur e3))
+         (e4 : C3-Expr  <- (recur e4))
+         (return-state (Gproxy e1 e2 e3 e4)))]
+    [(Gproxy-for exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (Gproxy-for exp)))]
+    [(Gproxy-from exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (Gproxy-from exp)))]
+    [(Gproxy-to exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (Gproxy-to exp)))]
+    [(Gproxy-blames exp)
+     (do (bind-state : (State Nat C3-Expr))
+         (exp  : C3-Expr  <- (recur exp))
+         (return-state (Gproxy-blames exp)))]))
 
 ;; A Cast rule is part of the decision tree for allowed versus
 ;; not allowed casts. They use a few macros that keep invariants
@@ -312,14 +311,39 @@
     [(_ (t c) (t* c*) ...)
      (if$ t c (cond$ (t* c*) ...))]))
 
-;; make sure that t is a terminal expression
-;; expects to be used in the store passing style expressions
+
+
+;; make sure that t is a trivial expression
+(define (c3-trivial? exp)
+  (or (Quote? exp) (Tag? exp) (Type? exp) (Var? exp)))
+
+
+
+
+;; only create let binding for non-trivial expressions
 (define-syntax let$*
   (syntax-rules ()
     [(_ () b) b]
     [(_ ([t v] [t* v*] ...) b)
-     (let ((tmp : C3-Expr v))
-       (if (or (Quote? tmp) (Tag? tmp) (Type? tmp) (Var? tmp))
+     ;; I have had some major typechecking problems with sites that
+     ;; have multiple cases of this code. On way around this would be
+     ;; to stop this nonsense and to make sure that every expression
+     ;; is fully evaluated before casting. The thought would then be
+     ;; that some uneeded evaluations wouldn't be remove by eliminating
+     ;; uneeded results later.
+     ;; Another way would be to always allocate the uvar and just throw
+     ;; it away if it turns out that the thing is already a trivial value.
+     (let ([tmp : C3-Expr v])
+       (do (bind-state : (State Nat C3-Expr))
+           (u : Uid <- (uid-state (~a 't)))
+           (let* ([triv? (c3-trivial? tmp)]
+                  [t : C3-Expr (if triv? tmp (Var u))])
+             (body : C3-Expr <- (let$* ([t* v*] ...) b))
+             (if triv?
+                 (return-state body)
+                 (return-state (Let (list (cons u tmp)) body))))))
+     #;(let ((tmp : C3-Expr v))
+       (if (c3-trivial? tmp)
            ;;if the expression is a terminal then just update the binding
            (let ((t : C3-Expr tmp)) (let$* ([t* v*] ...) b))
            ;;if the expression is non terminal bind a var and bind the
@@ -424,15 +448,18 @@
     (match t
       [(Type (GRef a)) (Type a)]
       [other (Type-GRef-to t)]))
+  (: proxy-gref Cast-Aux-Rule)
+  (define (proxy-gref val type1 type2 lbl)
+    (let$* ([tag_gref (type-tag type2)])
+      (if$ (op=? tag_gref (Tag 'GRef))
+           (let$* ([g1 (gref-arg type1)]
+                   [g2 (gref-arg type2)])
+             (return-state (Gproxy val g1 g2 lbl)))
+           (return-state (Blame lbl)))))
   (let$* ([val v] [type1 t1] [type2 t2])
    (if$ (op=? (Type DYN-TYPE) type2)
         (return-state (Dyn-make val t1))
-        (let$* ([tag_gref (type-tag type2)])
-         (if$ (op=? tag_gref (Tag 'GRef))
-              (let$* ([g1 (gref-arg type1)]
-                      [g2 (gref-arg type2)])
-               (return-state (Gproxy val g1 g2 lbl)))
-              (return-state (Blame lbl)))))))
+        (proxy-gref val type1 type2 lbl))))
 
 (: cast-fn Cast-Aux-Rule)
 (define (cast-fn v t1 t2 lbl)

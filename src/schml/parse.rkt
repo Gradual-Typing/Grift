@@ -450,6 +450,7 @@ represents types in the schml abstract syntax tree.
     ['Int INT-TYPE]
     ['Bool BOOL-TYPE]
     ['Dyn  DYN-TYPE]
+    ['()   UNIT-TYPE]
     [(list (app syntax-unroll fst) stx* ...)
      (match* (fst stx*)
        #| References and Vectors are the same in a general sense |#

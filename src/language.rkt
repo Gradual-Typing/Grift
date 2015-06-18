@@ -10,10 +10,13 @@
 |#
 
 (define-type Semantics (U 'Lazy-D))
-(struct Config ([semantics : Semantics]
+(struct Config ([source-path : Path]
+                [semantics : Semantics]
                 [exec-path : Path]
                 [c-path : Path]
-                [c-flags : (Listof String)]))
+                [keep-c : Boolean]
+                [c-flags : (Listof String)]
+                [asm-path : (Option Path)]))
 
 
 #|
@@ -272,7 +275,7 @@ be usefull for optimizations or keeping state.
     (-> D4-Effect* D4-Tail D4-Tail)
     (-> D4-Effect* No-Op D4-Effect)
     (-> D5-Effect* D5-Tail D5-Tail)))
-(define (make-begin eff* res)
+(trace-define (make-begin eff* res)
   (: splice-eff (case->
                  ;; Since D2 effect is a strict subset of D1-effect
                  ;; It must come before D1 because the first type to
@@ -286,15 +289,18 @@ be usefull for optimizations or keeping state.
   (define (splice-eff eff rest)
     (cond
       [(No-Op? eff) rest]
-      [(Begin? eff) (append (Begin-effects eff) rest)]
+      [(Begin? eff) (foldr splice-eff rest (Begin-effects eff))]
       [else (cons eff rest)]))
-  (logging make-begin ('Vomit) "eff*: ~v\nres: ~v" eff* res)
   (let ([eff* (foldr splice-eff '() eff*)])
     (cond
       [(null? eff*) res]
-      [(Begin? res) (Begin (append eff* (Begin-effects res))
-                           (Begin-value res))]
+      ;; In effect position a begin of one effect is the
+      ;; same as the effect alone
       [(and (No-Op? res) (null? (cdr eff*))) (car eff*)]
+      ;; If the result is a begin I assume that the begin
+      ;; was made with make-begin.
+      [(Begin? res)
+       (Begin (append eff* (Begin-effects res)) (Begin-value res))]
       [else (Begin eff* res)])))
 
 #|-----------------------------------------------------------------------------+
@@ -499,19 +505,33 @@ be usefull for optimizations or keeping state.
    [(IntxInt->Int-primitive? p)  INTxINT->INT-TYPE]
    [(timer-primitive? p)         ->UNIT-TYPE]))
 
-(define-type binary-schml-type-predicate (Schml-Type Schml-Type . -> . Boolean))
-(: consistent? binary-schml-type-predicate)
+(define-type ConsistentT (Schml-Type Schml-Type . -> . Boolean))
+(: consistent? ConsistentT)
 (define (consistent? t g)
+  (: unit? ConsistentT)
+  (define (unit? t g) (and (Unit? t) (Unit? g)))
+  (: bool? ConsistentT)
+  (define (bool? t g) (and (Bool? t) (Bool? g)))
+  (: int? ConsistentT)
+  (define (int? t g) (and (Int? t) (Int? g)))
+  (: fn? ConsistentT)
+  (define (fn? t g)
+    (and (Fn? t) (Fn? g)
+         (= (Fn-arity t) (Fn-arity g))
+         (andmap consistent? (Fn-fmls t) (Fn-fmls g))
+         (consistent? (Fn-ret t) (Fn-ret g))))
+  (: gref? ConsistentT)
+  (define (gref? t g)
+    (and (GRef? t) (GRef? g)
+         (consistent? (GRef-arg t) (GRef-arg g))))
   (or (Dyn? t) (Dyn? g)
-      (and (Unit? t) (Unit? g))
-      (and (Bool? t) (Bool? g))
-      (and (Int? t) (Int? g))
-      (and (Fn? t) (Fn? g)
-	   (= (Fn-arity t) (Fn-arity g))
-	   (andmap consistent? (Fn-fmls t) (Fn-fmls g))
-	   (consistent? (Fn-ret t) (Fn-ret g)))
-      (and (GRef? t) (GRef? g)
-           (consistent? (GRef-arg t) (GRef-arg g)))
+      (unit? t g)
+      (bool? t g)
+      (int? t g)
+      (fn? t g)
+      (gref? t g)
+
+
       ;; These will need to be added back but were adding
       ;; considerable type checking time.
       #;
@@ -545,24 +565,26 @@ Dyn --> Int Int --> Dyn
 (: join (Schml-Type Schml-Type . -> . Schml-Type))
 (define (join t g)
   (cond
-   [(Dyn? t) g]
-   [(Dyn? g) t]
-   [(and (Unit? t) (Unit? g)) UNIT-TYPE]
-   [(and (Int? t) (Int? g)) INT-TYPE]
-   [(and (Bool? t) (Bool? g)) BOOL-TYPE]
-   [(and (Fn? t) (Fn? g) (= (Fn-arity t) (Fn-arity g)))
-    (Fn (Fn-arity t)
-	(map join (Fn-fmls t) (Fn-fmls g))
-	(join (Fn-ret t) (Fn-ret g)))]
-   [(and (GRef? t) (GRef? g))
-    (join (GRef-arg t) (GRef-arg g))]
-   [(and (GVect? t) (GVect? g))
+    [(Dyn? t) g] [(Dyn? g) t]
+    [(and (Unit? t) (Unit? g)) UNIT-TYPE]
+    [(and (Int? t) (Int? g)) INT-TYPE]
+    [(and (Bool? t) (Bool? g)) BOOL-TYPE]
+    [(and (Fn? t) (Fn? g) (= (Fn-arity t) (Fn-arity g)))
+     (Fn (Fn-arity t)
+         (map join (Fn-fmls t) (Fn-fmls g))
+         (join (Fn-ret t) (Fn-ret g)))]
+    [(and (GRef? t) (GRef? g))
+     (GRef (join (GRef-arg t) (GRef-arg g)))]
+    #;
+    [(and (GVect? t) (GVect? g))
     (join (GVect-arg t) (GVect-arg g))]
-   [(and (MRef? t) (MRef? g))
+    #;
+    [(and (MRef? t) (MRef? g))
     (join (MRef-arg t) (MRef-arg g))]
-   [(and (MVect? t) (MVect? g))
+    #;
+    [(and (MVect? t) (MVect? g))
     (join (MVect-arg t) (MVect-arg g))]
-   [else (error 'join "Types are not consistent")]))
+    [else (error 'join "Types are not consistent")]))
 
 #|-----------------------------------------------------------------------------
 We are going to UIL

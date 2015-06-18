@@ -25,10 +25,13 @@
 
 (define compiler-config : (Parameter Config)
   (make-parameter
-   (Config 'Lazy-D
+   (Config (build-path "test")
+           'Lazy-D
            (build-path test-tmp-path "t.out")
            (build-path test-tmp-path "t.c")
-           '())))
+           #f
+           '()
+           #f)))
 
 (define-syntax-rule (test-compile name path expected)
   (test-case name
@@ -47,7 +50,7 @@
                           "cast lang semantics")]
               [d0  : Data0-Lang (impose-cast-semantics c0 config)]
               [u0  : Data5-Lang (convert-representation d0 config)]
-              [_   : Boolean    (c-backend-generate-code u0 config)])
+              [_   : Path       (c-backend-generate-code u0 config)])
          (check value=?
                 expected
                 (observe (envoke-compiled-program #:config config))
