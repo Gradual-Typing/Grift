@@ -8,7 +8,7 @@
 
 (provide cast-lang-interp)
 
-(define-type CL-Value (U Boolean Integer Null CL-Proc CL-Dyn CL-GRef Blame-Label))
+(define-type CL-Value (U Boolean Integer Null CL-Proc CL-Dyn CL-GRef CL-GVect Blame-Label))
 (define-type CL-Value* (Listof CL-Value))
 
 ;; This is a common idiom because typed-racket has a glitch concerning functions and
@@ -43,12 +43,6 @@
 (define (write-gbox b v)
   (begin (set-CL-GBox-value! b v) '()))
 
-(: unproxied-gref? (-> CL-GRef Boolean : CL-GBox))
-(define unproxied-gref? CL-GBox?)
-
-(: proxied-gref? (-> CL-GRef Boolean : CL-GProxy))
-(define proxied-gref? CL-GProxy?)
-
 (define-predicate gref? CL-GRef)
 
 (: cast-gref (-> CL-GRef Schml-Type Schml-Type Blame-Label CL-GRef))
@@ -76,6 +70,44 @@
                         (CL-GProxy-t2 r)
                         (CL-GProxy-t1 r)
                         (CL-GProxy-label r)))]))
+
+(define-type CL-GVect (U CL-GVectProxy (Vectorof CL-Value)))
+
+(struct CL-GVectProxy  ([value : CL-GVect]
+                        [t1 : Schml-Type]
+                        [t2 : Schml-Type]
+                        [label : Blame-Label])
+  #:transparent)
+
+(: make-gvect (-> Integer CL-Value (Vectorof CL-Value)))
+(define make-gvect make-vector)
+
+(: write-gvect (-> Cast-Type CL-GVect Integer CL-Value CL-Value))
+(define (write-gvect cast vect pos val)
+  (cond
+    [(vector? vect) (begin (vector-set! vect pos val) '())] ;; because vector-set! returns #void not '()
+    [(CL-GVectProxy? vect)
+     (write-gvect cast
+                  (CL-GVectProxy-value vect)
+                  pos
+                  (cast val
+                        (CL-GVectProxy-t2 vect)
+                        (CL-GVectProxy-t1 vect)
+                        (CL-GVectProxy-label vect)))]))
+
+(: cast-gvect (-> CL-GVect Schml-Type Schml-Type Blame-Label CL-GVect))
+(define cast-gvect CL-GVectProxy)
+
+(: read-gvect (-> Cast-Type Integer CL-GVect CL-Value))
+(define (read-gvect cast i r)
+  (cond
+    [(vector? r) (vector-ref r i)]
+    [(CL-GVectProxy? r)
+     (cast (read-gvect cast i (CL-GVectProxy-value r))
+           (CL-GVectProxy-t1 r)
+           (CL-GVectProxy-t2 r)
+           (CL-GVectProxy-label r))]
+    #;[else (TODO ERROR about vilation of the adt invarient)]))
 
 (define-type (Env a) (HashTable Uid (Boxof (U 'undefined a))))
 
@@ -143,7 +175,7 @@
 
 (define-type eval-expr-type (-> C0-Expr (Env CL-Value) CL-Value))
 (: interp-expr (-> Cast-Type apply-type eval-expr-type))
-(define (interp-expr cast apply)
+(define (interp-expr cst apply)
   (: recur eval-expr-type)
   (define (recur exp env)
     (inc i-depth)
@@ -172,7 +204,7 @@
       [(App e e*) (apply (recur/env e) (map recur/env e*))]
       [(Op p e*) (delta p (map recur/env e*))]
       [(Cast (app recur/env val) t-exp t-cast label)
-       (cast val t-exp t-cast label)]
+       (cst val t-exp t-cast label)]
       [(Var id) (env-lookup env id)]
       [(Quote k) k]
       [(Begin e* e) (begin (for-each recur/env e*) (recur/env e))]
@@ -191,13 +223,18 @@
       ;; Guarded references
       [(Gbox e)    (make-gbox (recur/env e))]
       [(Gunbox (app recur/env e))
-       (if (gref? e)
-           (read-gref cast e)
-           (TODO raise an error about type invarients being broken))]
+       (read-gref cst (assert e gref?))]
       [(Gbox-set! (app recur/env e1) e2)
        (if (gref? e1)
-           (write-gref cast e1 (recur/env e2))
+           (write-gref cst e1 (recur/env e2))
            (TODO raise an error here about the type system being broken))]
+      ;; guarded arrays
+      [(Gvector (app recur/env e) (app recur/env size))
+       (make-gvect (assert size integer?) e)]
+      [(Gvector-ref (app recur/env e) (app recur/env i))
+       (read-gvect cst (assert i integer?) (cast e CL-GVect))]
+      [(Gvector-set! (app recur/env e1) (app recur/env i) (app recur/env e2))
+       (write-gvect cst (cast e1 CL-GVect) (assert i integer?) e2)]
       [e (error 'interp "Umatched expression ~a" e)]))
     (logging cast/interp-res (all) "~a > ~v" (get i-depth) res)
     (dec i-depth)
@@ -335,6 +372,8 @@
       [(boolean? v) (bool v)]
       [(null? v)    (unit)]
       [(gref? v)    (gbox)]
+      [(vector? v) (gvect)]
+      [(CL-GVectProxy? v) (gvect)]
       [(CL-Proc? v) (function)]
       [(CL-Dyn? v) (if (Fn? (CL-Dyn-type2 v)) (function) (dyn))]
       [else (error "returned unexpected value")]))))

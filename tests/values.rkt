@@ -5,7 +5,7 @@
 
 (provide (all-defined-out))
 
-(define-type Test-Value (U blame bool int unit dyn gbox function debug))
+(define-type Test-Value (U blame bool int unit dyn gbox gvect function debug))
 
 (struct not-lbl ([value : String])
   #:transparent)
@@ -21,6 +21,8 @@
 (struct function ()
   #:transparent)
 (struct gbox ()
+  #:transparent)
+(struct gvect ()
   #:transparent)
 (struct unit ()
   #:transparent)
@@ -38,6 +40,7 @@
       (and (bool? x) (bool? y) (bool=? x y))
       (and (int? x) (int? y) (int=? x y))
       (and (gbox? x) (gbox? y))
+      (and (gvect? x) (gvect? y))
       (and (dyn? x) (dyn? y))
       (and (function? x) (function? y))))
 
@@ -84,5 +87,6 @@
      [(regexp-match #rx".*Function : \\?" s) (function)]
      [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
      [(regexp-match #rx".*GReference : \\?" s) (gbox)]
+     [(regexp-match #rx".*GArray : \\?" s) (gvect)]
      [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
      [else (blame #f s)])))
