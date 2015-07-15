@@ -1,0 +1,7 @@
+(begin
+  (timer-start)
+  (repeat (i 0 99999999)
+    (let ([x : Dyn (gbox 1)])
+     (gbox-set! x (+ (gunbox x) 1))))
+  (timer-stop)  
+  (timer-report))
