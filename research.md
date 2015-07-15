@@ -35,8 +35,8 @@ as we gain experience and wisdom. Weeks are dated be the Monday
 starting each week.
 
 0.  (20/07/15) Preliminary Framework Setup
-   + [] Tidy up current benchmarks according to Jeremy's Feedback. (impl / artifact)
-      + [] Standardize Graphing Using gnuplot
+   + [ ] Tidy up current benchmarks according to Jeremy's Feedback. 
+      + [ ] Standardize Graphing Using gnuplot
       + [ ] Some Way of Measuring the Accuracy of the timer?
       + [ ] Loop overhead mesurements
          + [ ] C for loop
