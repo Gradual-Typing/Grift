@@ -26,13 +26,9 @@ void timer_report() {
     exit(-1);
   }
 
-  // subtract the two times in order to get result
-  timersub(&timer_stop_time, &timer_start_time, &timer_result_time);
-
-  // print out the result
-  printf("time (sec): %f\n",
-         ((double)timer_result_time.tv_sec) +
-             (((double)timer_result_time.tv_usec) / 1000000.0));
+  double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);
+  double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);
+  printf("time (sec): %lf\n", t2 - t1);
 }
 
 // These are the declarations
@@ -88,10 +84,10 @@ int main() {
       "Implicit cast in binding on expression at static.schml::28"));
   timer_started = gettimeofday(&timer_start_time, NULL);
   u78_start = 0;
-  u79_stop = 10000000;
+  u79_stop = 1000000;
   for (u2_i = u78_start; u2_i < u79_stop; u2_i += 1) {
     u77_tmp_value = ((long *)u0_f)[0];
-    u114_unused_return = (((long (*)(long, long))u77_tmp_value)(u0_f, 1));
+    u114_unused_return = (((long (*)(long, long))u77_tmp_value)(u0_f, 0));
     __asm__("");
   };
   timer_stopped = gettimeofday(&timer_stop_time, NULL);
@@ -120,11 +116,11 @@ long u3_cast_fn1(long u47_cast_fn1_clos, long u4_f, long u5_t1, long u6_t2,
     ((long *)u50_annon_clos)[0] = ((long)u38_annon);
     u82_tmp_value = ((long *)u47_cast_fn1_clos)[3];
     ((long *)u50_annon_clos)[1] = u82_tmp_value;
+    ((long *)u50_annon_clos)[2] = u6_t2;
     u83_tmp_value = ((long *)u47_cast_fn1_clos)[2];
-    ((long *)u50_annon_clos)[2] = u83_tmp_value;
-    ((long *)u50_annon_clos)[3] = u7_lbl;
-    ((long *)u50_annon_clos)[4] = u5_t1;
-    ((long *)u50_annon_clos)[5] = u6_t2;
+    ((long *)u50_annon_clos)[3] = u83_tmp_value;
+    ((long *)u50_annon_clos)[4] = u7_lbl;
+    ((long *)u50_annon_clos)[5] = u5_t1;
     ((long *)u50_annon_clos)[6] = u4_f;
     return u50_annon_clos;
   } else {
@@ -164,26 +160,26 @@ long u38_annon(long u49_annon_clos, long u8_v) {
   long u53_tmp_clos;
   long u52_tmp_clos;
   long u51_tmp_clos;
-  u53_tmp_clos = ((long *)u49_annon_clos)[2];
+  u53_tmp_clos = ((long *)u49_annon_clos)[3];
   u86_tmp_value = ((long *)u53_tmp_clos)[0];
   u52_tmp_clos = ((long *)u49_annon_clos)[6];
   u87_tmp_value = ((long *)u52_tmp_clos)[0];
-  u51_tmp_clos = ((long *)u49_annon_clos)[2];
+  u51_tmp_clos = ((long *)u49_annon_clos)[3];
   u88_tmp_value = ((long *)u51_tmp_clos)[0];
-  u89_tmp_value = ((long *)u49_annon_clos)[5];
+  u89_tmp_value = ((long *)u49_annon_clos)[2];
   u90_tmp_value = ((long *)u89_tmp_value)[2];
-  u91_tmp_value = ((long *)u49_annon_clos)[4];
+  u91_tmp_value = ((long *)u49_annon_clos)[5];
   u92_tmp_value = ((long *)u91_tmp_value)[2];
-  u93_tmp_value = ((long *)u49_annon_clos)[3];
+  u93_tmp_value = ((long *)u49_annon_clos)[4];
   u94_tmp_value = (((long (*)(long, long, long, long, long))u88_tmp_value)(
       u51_tmp_clos, u8_v, u90_tmp_value, u92_tmp_value, u93_tmp_value));
   u95_tmp_value =
       (((long (*)(long, long))u87_tmp_value)(u52_tmp_clos, u94_tmp_value));
-  u96_tmp_value = ((long *)u49_annon_clos)[4];
+  u96_tmp_value = ((long *)u49_annon_clos)[5];
   u97_tmp_value = ((long *)u96_tmp_value)[1];
-  u98_tmp_value = ((long *)u49_annon_clos)[5];
+  u98_tmp_value = ((long *)u49_annon_clos)[2];
   u99_tmp_value = ((long *)u98_tmp_value)[1];
-  u100_tmp_value = ((long *)u49_annon_clos)[3];
+  u100_tmp_value = ((long *)u49_annon_clos)[4];
   return (((long (*)(long, long, long, long, long))u86_tmp_value)(
       u53_tmp_clos, u95_tmp_value, u97_tmp_value, u99_tmp_value,
       u100_tmp_value));

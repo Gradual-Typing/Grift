@@ -26,13 +26,9 @@ void timer_report() {
     exit(-1);
   }
 
-  // subtract the two times in order to get result
-  timersub(&timer_stop_time, &timer_start_time, &timer_result_time);
-
-  // print out the result
-  printf("time (sec): %f\n",
-         ((double)timer_result_time.tv_sec) +
-             (((double)timer_result_time.tv_usec) / 1000000.0));
+  double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);
+  double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);
+  printf("time (sec): %lf\n", t2 - t1);
 }
 
 // These are the declarations
@@ -72,8 +68,8 @@ int main() {
   u49_cast_fn1_clos = (long)(posix_memalign(&alloc_ptr, 8, 8 * 4), alloc_ptr);
   ((long *)u49_cast_fn1_clos)[0] = ((long)u4_cast_fn1);
   ((long *)u49_cast_fn1_clos)[1] = 0;
-  ((long *)u49_cast_fn1_clos)[2] = u42_interp_cast_clos;
-  ((long *)u49_cast_fn1_clos)[3] = u49_cast_fn1_clos;
+  ((long *)u49_cast_fn1_clos)[2] = u49_cast_fn1_clos;
+  ((long *)u49_cast_fn1_clos)[3] = u42_interp_cast_clos;
   u58_value_clos = (long)(posix_memalign(&alloc_ptr, 8, 8 * 2), alloc_ptr);
   ((long *)u58_value_clos)[0] = ((long)u38_value);
   ((long *)u58_value_clos)[1] = u49_cast_fn1_clos;
@@ -112,7 +108,7 @@ int main() {
             "at dynamic.schml::117"));
     u81_tmp_value = ((long *)u60_tmp_clos)[0];
     u118_unused_return =
-        (((long (*)(long, long))u81_tmp_value)(u60_tmp_clos, 1));
+        (((long (*)(long, long))u81_tmp_value)(u60_tmp_clos, 0));
     __asm__("");
   };
   timer_stopped = gettimeofday(&timer_stop_time, NULL);
@@ -139,19 +135,19 @@ long u4_cast_fn1(long u48_cast_fn1_clos, long u5_f, long u6_t1, long u7_t2,
   if (u84_tmp_value == u85_tmp_value) {
     u51_annon_clos = (long)(posix_memalign(&alloc_ptr, 8, 8 * 7), alloc_ptr);
     ((long *)u51_annon_clos)[0] = ((long)u39_annon);
-    u86_tmp_value = ((long *)u48_cast_fn1_clos)[3];
+    u86_tmp_value = ((long *)u48_cast_fn1_clos)[2];
     ((long *)u51_annon_clos)[1] = u86_tmp_value;
-    u87_tmp_value = ((long *)u48_cast_fn1_clos)[2];
-    ((long *)u51_annon_clos)[2] = u87_tmp_value;
-    ((long *)u51_annon_clos)[3] = u8_lbl;
-    ((long *)u51_annon_clos)[4] = u7_t2;
-    ((long *)u51_annon_clos)[5] = u6_t1;
-    ((long *)u51_annon_clos)[6] = u5_f;
+    ((long *)u51_annon_clos)[2] = u8_lbl;
+    ((long *)u51_annon_clos)[3] = u6_t1;
+    ((long *)u51_annon_clos)[4] = u5_f;
+    ((long *)u51_annon_clos)[5] = u7_t2;
+    u87_tmp_value = ((long *)u48_cast_fn1_clos)[3];
+    ((long *)u51_annon_clos)[6] = u87_tmp_value;
     return u51_annon_clos;
   } else {
     u56_annon_clos = (long)(posix_memalign(&alloc_ptr, 8, 8 * 3), alloc_ptr);
     ((long *)u56_annon_clos)[0] = ((long)u40_annon);
-    u88_tmp_value = ((long *)u48_cast_fn1_clos)[3];
+    u88_tmp_value = ((long *)u48_cast_fn1_clos)[2];
     ((long *)u56_annon_clos)[1] = u88_tmp_value;
     ((long *)u56_annon_clos)[2] = u8_lbl;
     return u56_annon_clos;
@@ -185,26 +181,26 @@ long u39_annon(long u50_annon_clos, long u9_v) {
   long u54_tmp_clos;
   long u53_tmp_clos;
   long u52_tmp_clos;
-  u54_tmp_clos = ((long *)u50_annon_clos)[2];
+  u54_tmp_clos = ((long *)u50_annon_clos)[6];
   u90_tmp_value = ((long *)u54_tmp_clos)[0];
-  u53_tmp_clos = ((long *)u50_annon_clos)[6];
+  u53_tmp_clos = ((long *)u50_annon_clos)[4];
   u91_tmp_value = ((long *)u53_tmp_clos)[0];
-  u52_tmp_clos = ((long *)u50_annon_clos)[2];
+  u52_tmp_clos = ((long *)u50_annon_clos)[6];
   u92_tmp_value = ((long *)u52_tmp_clos)[0];
-  u93_tmp_value = ((long *)u50_annon_clos)[4];
+  u93_tmp_value = ((long *)u50_annon_clos)[5];
   u94_tmp_value = ((long *)u93_tmp_value)[2];
-  u95_tmp_value = ((long *)u50_annon_clos)[5];
+  u95_tmp_value = ((long *)u50_annon_clos)[3];
   u96_tmp_value = ((long *)u95_tmp_value)[2];
-  u97_tmp_value = ((long *)u50_annon_clos)[3];
+  u97_tmp_value = ((long *)u50_annon_clos)[2];
   u98_tmp_value = (((long (*)(long, long, long, long, long))u92_tmp_value)(
       u52_tmp_clos, u9_v, u94_tmp_value, u96_tmp_value, u97_tmp_value));
   u99_tmp_value =
       (((long (*)(long, long))u91_tmp_value)(u53_tmp_clos, u98_tmp_value));
-  u100_tmp_value = ((long *)u50_annon_clos)[5];
+  u100_tmp_value = ((long *)u50_annon_clos)[3];
   u101_tmp_value = ((long *)u100_tmp_value)[1];
-  u102_tmp_value = ((long *)u50_annon_clos)[4];
+  u102_tmp_value = ((long *)u50_annon_clos)[5];
   u103_tmp_value = ((long *)u102_tmp_value)[1];
-  u104_tmp_value = ((long *)u50_annon_clos)[3];
+  u104_tmp_value = ((long *)u50_annon_clos)[2];
   return (((long (*)(long, long, long, long, long))u90_tmp_value)(
       u54_tmp_clos, u99_tmp_value, u101_tmp_value, u103_tmp_value,
       u104_tmp_value));

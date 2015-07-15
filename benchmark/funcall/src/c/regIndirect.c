@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-void __attribute__((noinline)) fun () {
+long __attribute__((noinline)) fun (long x) {
   __asm__("");
-  return;
+  return x;
 }
 
 /*
@@ -40,7 +40,7 @@ int main (int argc, char* argv[]) {
 
   // run test
   for(long i = 0; i < iters; i++){
-    ifun();
+    ifun(0);
   }
 
   // clock out

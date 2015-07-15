@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-void __attribute__((noinline)) fun () {
+long __attribute__((noinline)) fun (long x) {
   __asm__("");
-  return;
+  return x;
 }
 
 /*
@@ -17,9 +17,9 @@ void __attribute__((noinline)) fun () {
 
 int main (int argc, char* argv[]) {
 
-  // The problem with this test is that ifun will allways be
-  // in the cache, and that page will always be in memory.
-  void (* volatile ifun)() = &fun;
+  volatile long * clos = (long*) malloc(sizeof(long));
+
+  *clos = (long) &fun;
   
   // get the number of iterations
   unsigned long iters;
@@ -39,7 +39,7 @@ int main (int argc, char* argv[]) {
 
   // run test
   for(long i = 0; i < iters; i++){
-    ifun();
+    ((long(*)(long))(*clos))(0);
   }
 
   // clock out

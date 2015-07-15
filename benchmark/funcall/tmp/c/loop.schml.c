@@ -26,13 +26,9 @@ void timer_report() {
     exit(-1);
   }
 
-  // subtract the two times in order to get result
-  timersub(&timer_stop_time, &timer_start_time, &timer_result_time);
-
-  // print out the result
-  printf("time (sec): %f\n",
-         ((double)timer_result_time.tv_sec) +
-             (((double)timer_result_time.tv_usec) / 1000000.0));
+  double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);
+  double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);
+  printf("time (sec): %lf\n", t2 - t1);
 }
 
 // These are the declarations

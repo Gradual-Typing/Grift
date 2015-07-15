@@ -2,6 +2,6 @@
  (let ([w : (Dyn -> Dyn) f])
   (begin
    (timer-start)
-   (repeat (i 0 1000000) (w 1))
+   (repeat (i 0 1000000) (w 0))
    (timer-stop)
    (timer-report))))

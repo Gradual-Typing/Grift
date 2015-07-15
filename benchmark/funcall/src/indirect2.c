@@ -2,16 +2,27 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-long __attribute__((noinline)) fun (long x) {
+void __attribute__((noinline)) fun () {
   __asm__("");
-  return x;
+  return;
 }
+
+/*
+  This test is suppose to measure the time that it takes to
+  make to load a pointer from memory, and call the function
+  at that pointer. This is roughly a c-indirect call as I
+  understand it.
+ 
+*/
 
 int main (int argc, char* argv[]) {
 
-  unsigned long iters;
- 
+  // The problem with this test is that ifun will allways be
+  // in the cache, and that page will always be in memory.
+  void (* register rfun)() = &fun;
+  
   // get the number of iterations
+  unsigned long iters;
   if (2 != argc || 1 != sscanf(argv[1], "%lu", &iters)){
     printf("The test expects the number of iterations\n");
     exit(-1);
@@ -28,7 +39,7 @@ int main (int argc, char* argv[]) {
 
   // run test
   for(long i = 0; i < iters; i++){
-    fun(0);
+    rfun();
   }
 
   // clock out
@@ -40,8 +51,8 @@ int main (int argc, char* argv[]) {
   // find the difference
   struct timeval result;
   timersub(&stop, &start, &result);
-  printf("time (sec): %f\n", ((double) result.tv_sec) +
-         (((double) result.tv_usec) / 1000000.0)); 
+  
+  printf("time: %ld.%d\n", result.tv_sec, result.tv_usec); 
   
   return 0;
 }
