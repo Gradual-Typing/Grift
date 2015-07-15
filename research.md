@@ -22,12 +22,14 @@ The goals for the submission are as follow:
       + Arrays
 + Understanding of Where Future Research is Heading
       
-
 The following is a rough time line subject to extensive modification
-as we gain experiance and wisdom. Weeks are dated be the Monday
+as we gain experience and wisdom. Weeks are dated be the Monday
 starting each week.
 
-0.  (20/07/15)
+0.  (20/07/15) Preliminary Framework Setup
+   + Write Outline of Paper
+   + Finish a general benchmarking framework that keeps track of results
+      indexed by commits.
 1.  (27/07/15)
 2.  (20/07/15)
 3.  (03/08/15)
