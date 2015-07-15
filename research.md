@@ -12,6 +12,7 @@ The goals for the submission are as follow:
    + Data Representation of Function Casts (DRFC) / Not Space Efficient (NSE)
    + DRFC / Space Efficient (SE)
    + Hybrid Representation of Function Casts (HRFC)
++ Analysis Of Cost and Benefit of Space Efficiency
 + Thorough Analysis of Mutable References
    + Guarded Semantics for Mutable References (GSMR)
       + SE / NSE
@@ -29,7 +30,9 @@ The goals for the submission are as follow:
    + New Semantics that Enable More Efficient Compilation
    + Interplay With Standard Language Features
       + Parametric Polymorphism / Type Case
-   
+   + Structural Vs Nominal Objects in Gradual Typing 
+
+
 The following is a rough time line subject to extensive modification
 as we gain experience and wisdom. Weeks are dated be the Monday
 starting each week.
