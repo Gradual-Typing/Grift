@@ -24,6 +24,12 @@
    (test-file "tools" "time2.schml"  (unit))
    (test-file "tools" "time3.schml"  (blame #f #f))
    (test-file "tools" "time4.schml"  (unit))
+
+   (test-file "tools" "both.schml" (unit))
+   (test-file "tools" "both1.schml" (unit))
+   ;(test-file "tools" "both2.schml" (unit))
+   ;(test-file "tools" "both3.schml" (unit))
+
    ;;(test-file "tools" "time5.schml"  (unit))
    ;; (test-file "tools" "time6.schml"  (unit))
    ;; (test-file "tools" "time7.schml"  (unit))

@@ -1,23 +1,5 @@
 #lang typed/racket
 
-(require schml/src/compile)
-
-(define (c-compile [f : String])
-  (system (format "cc src/c/~a -O3 -o tmp/bin/~a" f f))
-  #;(system (format "mv tmp/bin/tmp tmp/bin/~a" f))
-  (system (format "cc src/c/~a -O3 -S -o tmp/asm/~a.s" f f)))
-
-(define (schml-compile [f : String])
-  (let ([p (build-path (format "src/schml/~a" f))])
-    (compile/conf p
-                  (Config p
-                          'Lazy-D
-                          (build-path (format "tmp/bin/~a" f))
-                          (build-path (format "tmp/c/~a.c" f))
-                          #t
-                          '()
-                          (build-path (format "tmp/asm/~a.s" f))))))
-
 
 ;; freshly compile the c tests
 (c-compile "direct.c")

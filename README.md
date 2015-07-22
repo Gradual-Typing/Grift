@@ -13,6 +13,10 @@ The package is known to install correctly with:
 + Racket 6.1
 + Racket 6.1.1
 
+There Are Known issues with
++ Racket 6.2 (bug with contract generation)
+
+
 ```bash
 git clone git@github.com:akuhlens/schml
 cd schml

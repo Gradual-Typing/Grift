@@ -24,7 +24,7 @@
       [(system "which clang-format")
        ;; There is an error message that doesn't mean anything
        (system (format "clang-format -i ~a" (path->string c-path)))]))
-  
+
   ;; Invoke the system cc compiler on the file
   (invoke-c-compiler config))
 
@@ -55,7 +55,7 @@
 (: append-flags : (Listof String) -> String)
 (define (append-flags s)
   (if (null? s)
-      (warning-flags)
+      (default-flags)
       (with-output-to-string
         (lambda ()
           (let loop ([s s])
@@ -91,9 +91,13 @@
     (display flag)
     (display " ")))
 
-(define (warning-flags)
+(define (emit-optimize-c)
+  (display " -O3 "))
+
+(define (default-flags)
   (with-output-to-string
     (lambda ()
+      (emit-optimize-c)
       (emit-opt-warning warn-format)
       (emit-opt-warning warn-int-conversion)
       (emit-opt-warning warn-unused-value))))

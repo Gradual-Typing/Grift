@@ -71,12 +71,17 @@
    "        printf(\"error stopping timer\");\n"
    "        exit(-1);\n"
    "    }\n\n"
+   "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);\n"
+   "double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);\n"
+   "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+   "}\n"
+   #;(
    "    // subtract the two times in order to get result \n"
    "    timersub(&timer_stop_time, &timer_start_time, &timer_result_time);\n\n"
    "    // print out the result \n"
    "    printf(\"time (sec): %f\\n\", ((double) timer_result_time.tv_sec) +\n"
    "            (((double) timer_result_time.tv_usec) / 1000000.0));\n"
-   "}\n"))
+   "}\n")))
 
 
 (define (emit-source-comment name type)

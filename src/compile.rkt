@@ -9,6 +9,8 @@
 (provide (all-defined-out))
 (provide (struct-out Config))
 
+(display 'compile)
+
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof Path)
   (make-parameter (build-path "a.c")))
@@ -44,25 +46,34 @@
 
 ;; compile file at path
 ;; exec-path = path/name of final executable
-(: compile (-> (U String Path) Path))
-(trace-define (compile path)
-  (let* ([path  (simple-form-path (if (string? path) (string->path path) path))])
-    (let ([log-path (log-path)])
-      (when log-path
-        (current-log-port (open-output-file log-path #:exists 'replace #:mode 'text)))
-      (parameterize ([print-as-expression #t]
-                     [print-graph #t]
-                     [print-struct #t])
-        (compile/conf path
-                      (Config path
-                              (semantics)
-                              (target-path)
-                              (c-path)
-                              (keep-c?)
-                              (c-flags)
-                              (asm-path)))))))
+(: compile (->* ((U String Path))
+                (#:semantics Semantics
+                 #:output Path
+                 #:keep-c Path
+                 #:keep-a Path
+                 #:cc-opt (U String (Listof String))
+                 #:log    Path)
+                Path))
+(define (compile path
+                 #:semantics [smtc (semantics)]
+                 #:output    [outp (target-path)]
+                 #:keep-c    [kp-c : (Option Path) (if (keep-c?) (c-path) #f)]
+                 #:keep-a    [kp-a : (Option Path) (asm-path)]
+                 #:cc-opt    [opts : (U String (Listof String)) (c-flags)]
+                 #:log       [logp : (Option Path) (log-path)])
+  (let* ([path  (simple-form-path (if (string? path)
+                                      (string->path path)
+                                      path))]
+         [opts (if (string? opts) (list opts) opts)]
+         [cpth (or kp-c (c-path))]
+         [kp-c (true? kp-c)])
+    (when logp
+      (current-log-port (open-output-file logp #:exists 'replace #:mode 'text)))
+    (parameterize ([print-as-expression #t] [print-graph #t] [print-struct #t])
+      (compile/conf path (Config path smtc outp cpth kp-c opts kp-a)))))
 
-(: envoke-compiled-program (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))
+(: envoke-compiled-program
+   (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))
 (define (envoke-compiled-program #:exec-path [path #f] #:config [config #f])
   (cond
    [config (system (path->string (Config-exec-path config)))]

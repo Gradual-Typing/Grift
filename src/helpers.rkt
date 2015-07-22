@@ -2,6 +2,7 @@
 
 (provide (all-defined-out))
 
+
 #| Environments are persistent hash tables |#
 
 #| Source locations always return a string even if it is empty |#
@@ -285,8 +286,11 @@ This allows me to make very desciptive grammars via types later on.
          (c : C <- mc)
          (return-state (f a b c)))]))
 
-;; extended conditional macros
 
+
+#| Utilities Not Provided by Racket |#
+
+;; Binding While Branching!
 (define-syntax-rule (lif (t p) c a)
   (let ((t p)) (if t c a)))
 
@@ -304,3 +308,7 @@ This allows me to make very desciptive grammars via types later on.
      (lif (t p) (e t) (ex-cond c c* ...))]
     [(_ (p e* ... e) c c* ...)
      (lif (t p) (begin e* ... e) (ex-cond c c* ...))]))
+
+;; Cast to Boolean
+(define (true? [x : Any]) : Boolean
+  (if x #t #f))
