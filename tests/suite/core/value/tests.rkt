@@ -12,6 +12,9 @@
 (define core-tests : Test
   (test-suite
    "core tests"
+   #:before (lambda () (display "value tests running ... "))
+   #:after (lambda () (display "done\n"))
+
    ;; Bools
    (test-file "true.schml"  (bool #t))
    (test-file "false.schml" (bool #f))

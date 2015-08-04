@@ -48,11 +48,13 @@
      (do (bind-state : (State Casters C1-Expr))
          (uid : Uid     <- (get-caster (length f*)))
          (exp : C1-Expr <- (icf-expr exp))
+         ;; TODO we
          (return-state (Lambda f* (Castable uid exp))))]
     [(Cast exp t1 t2 lbl)
      (do (bind-state : (State Casters C1-Expr))
          (exp : C1-Expr <- (icf-expr exp))
          (if (and (Fn? t1) (Fn? t2))
+             ;; TODO maybe this should be (App (Fn-Caster exp) exp t1 t2 lbl)
              (return-state (Fn-Cast exp t1 t2 lbl))
              (return-state (Cast exp t1 t2 lbl))))]
     [(Letrec bnd* exp)

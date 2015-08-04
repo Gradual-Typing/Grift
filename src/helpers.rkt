@@ -185,14 +185,32 @@ This allows me to make very desciptive grammars via types later on.
          'Unfinished-TODO
          (format "~a: ~a" loc-string (syntax->datum x))))))
 
+;; Do syntax gives an imperative style syntax to monadic code
+;; This particular implementation extends this were useful allowing
+;; the user to use other binding an branching form while
+;; maintaining the "do syntax" in the sytactic conclusions of the forms.
+;; The common form:
+#;(do (bind-operation : (Monad-name Impure-Type Pure-Type)
+    ;; Monadic Statements
+    (pattern : Pure-Type <- monadic-expression))
+    ;; Or discarding the pure value
+    (monadic-expression : Monadic-Type)
+    ...
+    monadic-expression)
+;; TODO syntax case may allow for more parametricity over other
+;; binding forms
 (define-syntax do
-  (syntax-rules (<- :
-                 let let* let-values let*-values
-                 match-let match-let-values)
-    [(_ bind (let (b ...) e e* ...))
-     (let (b ...) (do bind e e* ...))]
-    [(_ bind (let* (b ...) e e* ...))
-     (let* (b ...) (do bind e e* ...))]
+  (syntax-rules (<- : doing
+                 let let* let-values let*-values match-let match-let-values
+                 match match*
+                 begin if
+                 )
+    ;; let let* let-values let*-values match-let match-let-values
+    ;; all work in do expression with the bodies of the let implicitly
+    ;; acting as a do expression
+    [(_ ann (let (b ...) e e* ...))
+     (let (b ...) (do ann e e* ...))]
+    [(_ bind (let* (b ...) e e* ...)) (let* (b ...) (do bind e e* ...))]
     [(_ bind (let-values (b ...) e e* ...))
      (let-values (b ...) (do bind e e* ...))]
     [(_ bind (let*-values (b ...) e e* ...))
@@ -201,18 +219,49 @@ This allows me to make very desciptive grammars via types later on.
      (match-let (b ...) (do bind e e* ...))]
     [(_ bind (match-let-values (b ...) e e* ...))
      (match-let-values (b ...) (do bind e e* ...))]
-    [(_ (bind : T) e) (ann e : T)]
-    [(_ (bind : (C m b)) ((p ...) : a <- e0) e e* ...)
+    ;; match and match* also work in do-expressions
+    ;; the right hand side of each match clause is implicitly
+    ;; a do expression
+    [(_ ann (match  e [p0 s0 s0* ...] [p s s* ...] ...))
+     (match  e  [p0 (do ann s0 s0* ...)] [p (do ann s s* ...)] ...)]
+    [(_ ann (match* vs [p0 s0 s0* ...] [p s s* ...] ...))
+     (match* vs [p0 (do ann s0 s0* ...)] [p (do ann s s* ...)] ...)]
+    ;; Facilitate faster type-checking around ifs (maybe) and
+    ;; allow for un-annotate do-syntax in if branches with the help
+    ;; of the "Infer" rule below.
+    [(_ ann (if t c a)) (if t (do ann c) (do ann a))]
+    ;; Allow begin to escape to real effects
+    ;; Useful for printing because the IO monad would be too much
+    [(_ ann (begin s! ... s) s* ...) (begin s! ... (do ann s s* ...))]
+    ;; "Infer" the type of unannotated do expressions
+    ;; by copying the current bind-operation and type annotation.
+    [(_ (bind : T) (doing (p : t <- rhs) s* ...))
+     (do (bind : T) (p : t <- rhs) s* ...)]
+    ;; Left hand side of each do statement is actually a pattern
+    ;; TODO amk find a way to give this better error messages
+    ;; like below but more abstract
+    [(_ ann ((p ...) : a <- e0) s s* ...)
+     (do ann (tmp : a <- e0) (match-let ([(p ...) tmp]) s s* ...))
+     #|
      (bind (ann e0 (C m a))
-           (lambda ((tmp : a)) : (C m b)
-            (match tmp
-              [(p ...) (do (bind : (C m b)) e e* ...)]
-              [otherwise
-               (error 'do "pattern ~a didn't match ~a" '(p ...) tmp)])))]
-    [(_ (bind : (C m b)) (v : a <- e0) e e* ...)
-     (bind (ann e0 (C m a)) (lambda ((v : a)) : (C m b) (do (bind : (C m b)) e e* ...)))]
-    [(_ (bind : (C m b)) (e0 : T) e e* ...)
-     (bind (ann e0 T) (lambda (_) (do (bind : (C m b)) e e* ...)))]))
+     (lambda ((tmp : a)) : (C m b)
+     (match tmp
+       [(p ...) (do (bind : (C m b)) e e* ...)]
+       [otherwise
+        (error 'do "pattern ~a didn't match ~a" '(p ...) tmp)])))
+     |#]
+    ;; Hint the type of do expressions by annotating the return value
+    [(_ (bind : T) e) (ann e : T)]
+    ;; Normal definition of do but propogating types to help the
+    ;; type checker.
+    [(_ (bind : (C m b)) (v : a <- e0) s s* ...)
+     (bind (ann e0 (C m a))
+       (lambda ([v : a])
+         : (C m b)
+         (do (bind : (C m b)) s s* ...)))]
+    ;; More concise syntax for throwing away the pure value.
+    [(_ (bind : (C m b)) (e0 : T) s s* ...)
+     (bind (ann e0 T) (lambda (_) (do (bind : (C m b)) s s* ...)))]))
 
 
 #| The state monad |#

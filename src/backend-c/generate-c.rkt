@@ -11,7 +11,8 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../language.rkt"
+         "../macros.rkt")
 
 
 ;; Only the pass is provided by this module
@@ -42,16 +43,6 @@
   (emit-declarations code*)
   (emit-main body)
   (emit-subroutines code*))
-
-(require (for-syntax racket/port))
-(define-syntax (concat-string-literal stx)
-  (syntax-case stx ()
-    [(_ s* ...)
-     (datum->syntax stx
-      (with-output-to-string
-        (lambda ()
-          (for ([s (in-list (syntax->datum #'(s* ...)))])
-            (display s)))))]))
 
 (define timer-boiler-plate
   (concat-string-literal

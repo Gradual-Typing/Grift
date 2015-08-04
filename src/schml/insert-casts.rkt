@@ -16,6 +16,7 @@
          "../language.rkt")
 
 ;; Only the pass is provided by this module
+;; TODO rename to insert-casts
 (provide insert-implicit-casts)
 
 (: insert-implicit-casts (Schml1-Lang Config . -> . Cast0-Lang))
@@ -35,8 +36,8 @@
                          (app iic-expr body)))
        (unless (Fn? type) (TODO error really big here))
        (let* ([lbl-th (mk-label "lambda" body-src)]
-                  [body (mk-cast lbl-th body body-type (ann (Fn-ret type) Schml-Type))]
-                  [fml* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
+              [body (mk-cast lbl-th body body-type (ann (Fn-ret type) Schml-Type))]
+              [fml* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
              (Lambda fml* body))]
        [(Let bnd* (and (Ann _ (cons src type^)) body))
 	(Let (map iic-bnd bnd*) (mk-cast (mk-label "let" src) (iic-expr body) type^ type))]
@@ -120,6 +121,7 @@
 (define (iic-application rator rand* src type)
   (match-let ([(Ann _ (cons rator-src rator-type)) rator])
     (cond
+      ;; TODO patch to cast DYN -> (Dyn * -> Dyn) 
       [(Dyn? rator-type)
        (let*-values ([(exp* ty*) (iic-operands rand*)]
                      [(needed-rator-type) (Fn (length ty*) ty* DYN-TYPE)]

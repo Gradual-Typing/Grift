@@ -8,7 +8,8 @@
 
 (define core-tests : Test
   (test-suite
-   "control"
+   #:before (lambda () (display "control tests running ... "))
+   #:after (lambda () (display "done\n"))
    (test-file "begin.schml" (int 7))
    (test-file "letBegin.schml" (int 5))
    ))

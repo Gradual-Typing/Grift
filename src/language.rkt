@@ -3,6 +3,9 @@
 (require "./helpers.rkt")
 (provide (all-defined-out))
 
+;; TODO Comment on the the structure of this file
+;; data structure defs versus actual type defs
+
 #|
    This is the structure that is passed to the compiler in order
    to store state about which options are enabled. This really shouldn't be here.
@@ -26,6 +29,10 @@ change but I do allow the types and *syntax* of forms to
 change. In general any field named annotation is not really
 a usefull field but allows me to store information that may
 be usefull for optimizations or keeping state.
+
+This is creating records.
+name - constructor
+name-field1 - accessor
 |#
 
 (define-forms
@@ -62,8 +69,9 @@ be usefull for optimizations or keeping state.
   (Gvector-set! vector offset value)
   (Gvector-ref vector offset)
   ;; various imediates markers
-  (Quote literal)    ;; imediate data in general
-  (Code-Label value) ;; marks a uid as refering to a uid
+  (Quote literal)    ;; immediate data in general
+  ;; Node that references a piece of code identified by the UID value
+  (Code-Label value)
   (Tag bits)         ;; an tag for an imediate value
   (Type type)        ;; an atomic type
   ;; Effectfull expressions
@@ -72,6 +80,7 @@ be usefull for optimizations or keeping state.
   (Bnd identifier type expression)
   ;; Different casts
   (Cast expression type-exp type-cast label)
+  ;; TODO Interpreted-Cast
   (Runtime-Cast expression type-exp type-cast label)
   (Fn-Cast expressiong type-exp type-cast label)
   ;;Type Operations
@@ -425,40 +434,42 @@ be usefull for optimizations or keeping state.
 +-----------------------------------------------------------------------------|#
 (define-type Schml0-Lang (Prog (List String Natural) S0-Expr))
 
+(define-type (S0-Form E)
+  (U (Lambda Schml-Fml* (Ann E (Option Schml-Type)))
+     (Letrec S0-Bnd* E)
+     (Let S0-Bnd* E)
+     (App E (Listof E))
+     (Op Schml-Primitive (Listof E))
+     (If E E E)
+     (Ascribe E Schml-Type (Option Blame-Label))
+     (Var Uid)
+     (Quote Schml-Literal)
+     (Begin (Listof E) E)
+     (Repeat Uid E E E)
+     ;; Monotonic effects
+     (Mbox E)
+     (Munbox E)
+     (Mbox-set! E E)
+     (Mvector E E)
+     (Mvector-set! E E E)
+     (Mvector-ref E E)
+     ;; Guarded effects
+     (Gbox E)
+     (Gunbox E)
+     (Gbox-set! E E)
+     (Gvector E E)
+     (Gvector-set! E E E)
+     (Gvector-ref E E)))
+
 (define-type S0-Expr
-  (Rec E (Ann (U (Lambda Schml-Fml* (Ann E (Option Schml-Type)))
-		 (Letrec S0-Bnd* E)
-		 (Let S0-Bnd* E)
-		 (App E (Listof E))
-		 (Op Schml-Primitive (Listof E))
-		 (If E E E)
-		 (Ascribe E Schml-Type (Option Blame-Label))
-		 (Var Uid)
-		 (Quote Schml-Literal)
-                 (Begin (Listof E) E)
-                 (Repeat Uid E E E)
-                 ;; Monotonic effects
-                 (Mbox E)
-                 (Munbox E)
-                 (Mbox-set! E E)
-                 (Mvector E E)
-                 (Mvector-set! E E E)
-                 (Mvector-ref E E)
-                 ;; Guarded effects
-                 (Gbox E)
-                 (Gunbox E)
-                 (Gbox-set! E E)
-                 (Gvector E E)
-                 (Gvector-set! E E E)
-                 (Gvector-ref E E))
-              Src)))
+  (Rec E (Ann (S0-Form E) Src)))
 
 (define-type S0-Expr* (Listof S0-Expr))
 (define-type S0-Bnd (Bnd Uid Schml-Type? S0-Expr))
 (define-type S0-Bnd* (Listof S0-Bnd))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml1
+| Language/Schml1 created by type-check
 +-----------------------------------------------------------------------------|#
 (define-type Schml1-Lang
   (Prog (List String Natural Schml-Type) S1-Expr))
@@ -508,6 +519,8 @@ be usefull for optimizations or keeping state.
 (define-type ConsistentT (Schml-Type Schml-Type . -> . Boolean))
 (: consistent? ConsistentT)
 (define (consistent? t g)
+  ;; Typed racket made me structure the code this way.
+  ;; TODO change the names to be both-unit? ...
   (: unit? ConsistentT)
   (define (unit? t g) (and (Unit? t) (Unit? g)))
   (: bool? ConsistentT)

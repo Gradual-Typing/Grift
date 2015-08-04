@@ -8,6 +8,8 @@
 (define core-tests : Test
   (test-suite
    "core tests"
+   #:before (lambda () (display "core test running ... "))
+   #:after (lambda () (display "done\n"))
    (test-file "core" "const-unit.schml" (unit))
    ;; Bools
    (test-file "core" "const-false.schml" (bool #f))

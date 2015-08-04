@@ -9,8 +9,6 @@
 (provide (all-defined-out))
 (provide (struct-out Config))
 
-(display 'compile)
-
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof Path)
   (make-parameter (build-path "a.c")))
@@ -35,7 +33,7 @@
 ;; compilers for successivly lower level languages.
 (: compile/conf (Path Config . -> . Path))
 (trace-define (compile/conf path config)
-  (let* (;; read(lex), parse, typecheck, insert casts
+  (let* (;; read(lex), parse, typecheck, insert-implicit-casts
          [c0  : Cast0-Lang  (reduce-to-cast-calculus path config)]
          ;; specify behavior/representation of casts, and all language constructs
          [d0  : Data0-Lang (impose-cast-semantics c0 config)]

@@ -1,5 +1,0 @@
-(begin
-   (timer-start)
-   (repeat (i 0 64) ())
-   (timer-stop)
-   (timer-report))
