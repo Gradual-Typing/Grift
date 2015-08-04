@@ -16,6 +16,8 @@ of the cast calculus.
 (: reduce-to-cast-calculus (Path Config . -> . Cast0-Lang))
 (trace-define (reduce-to-cast-calculus path config)
   (let* ((stx-lang (read path config))
-	 (s0 (parse stx-lang config))
-	 (s1 (type-check s0 config)))
+	 (s0 (syntax->schml0 stx-lang config))
+         (s1 (type-check s0 config)))
+    ;; MAYBE amk Merge type-check and insert-implicit-casts
+    ;; as type-check&insert-casts
     (insert-implicit-casts s1 config)))

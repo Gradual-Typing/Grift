@@ -2,7 +2,7 @@
 (let ([b (gbox 0)])
   (begin
     (timer-start)
-    (repeat (i 0 10000)
+    (repeat (i 0 100)
      (begin
       (repeat (j 0 i)
        (gbox-set! b (+ (gunbox b) i)))

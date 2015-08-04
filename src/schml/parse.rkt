@@ -15,15 +15,12 @@
 
 (require typed/syntax/stx)
 
-
 (if-in-construction (require typed/rackunit))
 
+(provide syntax->schml0)
 
-
-(provide parse)
-
-(: parse (Syntax-Lang Config . -> . Schml0-Lang))
-(define (parse prgm config)
+(: syntax->schml0 (Syntax-Lang Config . -> . Schml0-Lang))
+(define (syntax->schml0 prgm config)
   (match-let ([(Prog name stx*) prgm])
     (let-values
 	([((exp : S0-Expr) (next : Natural))

@@ -19,6 +19,9 @@
 |      and their sub-structures are consistent.                                 |
 |                                                                               |
 +-------------------------------------------------------------------------------+
+TODO
+Provide a comment for how each pass is layed out in code.
+Provide comments about where to find definitions of types and data
 +------------------------------------------------------------------------------|#
 (require "../helpers.rkt"
          "../errors.rkt"
@@ -44,17 +47,20 @@
 (define-syntax-rule (lookup-failed src id)
   (lambda () (raise-variable-not-found src id)))
 
-;;; The type rules for core forms that have interesting type rules
+#|
+  The type rules for core forms that have interesting type rules
+|#
+
 ;; The type of a lambda that is annotated is the type of the annotation
 ;; as long as the annotation is consistent with the type of the
 ;; body
 (: lambda-type-rule (-> Src Schml-Type* Schml-Type Schml-Type?
 			(Fn Index Schml-Type* Schml-Type)))
-(define (lambda-type-rule src ty* t-body t-ann)
+(define (lambda-type-rule src ty-param* t-body return-ann)
   (cond
-   [(not t-ann) (Fn (length ty*) ty* t-body)]
-   [(consistent? t-body t-ann) (Fn (length ty*) ty* t-ann)]
-   [else  (raise-lambda-inconsistent src t-body t-ann)]))
+   [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
+   [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
+   [else (raise-lambda-inconsistent src t-body return-ann)]))
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
@@ -100,8 +106,7 @@
 ;; The type of an application is the return type of the applied
 ;; procedure given that the arguments are consistent with the
 ;; arguments types of the proceedure.
-(: application-type-rule (-> Schml-Type Schml-Type* Src
-			     Schml-Type))
+(: application-type-rule (-> Schml-Type Schml-Type* Src Schml-Type))
 (define (application-type-rule t-rator t-rand* src)
   (match t-rator
     [(Fn arr t-fml* t-ret)
@@ -375,33 +380,29 @@
     (values (Fml-identifier f) (Fml-type f))))
 
 
-(: tc-letrec (-> S0-Bnd* S0-Expr Src Env
-		 (values S1-Expr Schml-Type)))
+(: tc-letrec (S0-Bnd* S0-Expr Src Env -> (values S1-Expr Schml-Type)))
 (define (tc-letrec bnd* body src env)
-    (: fold-env-extend/bnd (S0-Bnd* Env . -> . (values S0-Bnd* Env)))
+    (: fold-env-extend/bnd (S0-Bnd* Env -> (values S0-Bnd* Env)))
   (define (fold-env-extend/bnd b* env)
     (for/fold : (values S0-Bnd* Env) ([bnd* : S0-Bnd* '()] [env : Env env]) ([bnd : S0-Bnd b*])
               (match bnd
                 [(Bnd id type (Ann (Lambda f* (Ann b t^)) src))
-                 (if type
-                  (values (cons bnd bnd*) (hash-set env id type))
-                  (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
-                         [arity  (length arg-t*)])
-                    (if t^
-                        (values (cons bnd bnd*)
-                                (hash-set env id (Fn arity arg-t* t^)))
-                        (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
-                               [rhs : S0-Expr (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
-                          (values (cons (Bnd id type rhs) bnd*)
-                                  (hash-set env id type))))))]
-                  ;; [t^ (values (cons bnd bnd*) (hash-set env i ))]
-                  ;; []
-                  ;; [else ]) (if t
-                  ;;       (hash-set env i t)
-                  ;;       (let ([args (map (inst Fml-type Uid Schml-Type) f*)])
-                  ;;         (if t^
-                  ;;             (hash-set env i (Fn (length args) args t^))
-                  ;;             (hash-set env i (Fn (length args) args DYN-TYPE)))))]
+                 (cond
+                   [type (values (cons bnd bnd*) (hash-set env id type))]
+                   [else
+                    (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
+                           [arity  (length arg-t*)])
+                       (cond
+                         [t^
+                          (values (cons bnd bnd*)
+                                  (hash-set env id (Fn arity arg-t* t^)))]
+                         [else
+                          ;; Function without return-type annotatin gets dyn return
+                          (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
+                                 [rhs : S0-Expr
+                                      (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
+                            (values (cons (Bnd id type rhs) bnd*)
+                                    (hash-set env id type)))]))])]
                 [else (raise-letrec-restrict src)])))
   (let*-values
       ([(bnd* env) (fold-env-extend/bnd bnd* env)]

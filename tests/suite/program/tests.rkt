@@ -8,6 +8,8 @@
 (define program-tests : Test
   (test-suite
    "Program Tests"
+   #:before (lambda () (display "program tests running ... "))
+   #:after  (lambda () (display "done\n"))
    ;; various factorial functions
    (test-file "program" "fact5.schml" (int 120))
    (test-file "program" "fact7.schml" (int 5040))

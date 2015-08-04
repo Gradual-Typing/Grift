@@ -275,7 +275,7 @@
     (raise (exn:schml:type:dynamic
             "timer not stopped"
             (current-continuation-marks))))
-  (printf "time (sec): ~a\n" (- stop-time start-time))
+  #;(printf "time (sec): ~a\n" (- stop-time start-time))
   '())
 
 ;; The lazy-d parts

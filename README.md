@@ -65,11 +65,15 @@ one shot timer. Calling (timer-report) will print out the time in seconds
 between the calls (timer-start) and (timer-stop). If no such calls have occured
 there will be a runtime error.
 
-### Getting the most out of typed racket
+### Tinkering with the compiler
 
-```bash
-export PLTSTDERR="error debug@tr-timing"
-```
-
-### For more information:
-- compiler/README.md : information about how the compiler is constructed
+- Customizing the editor to indent well
+   - Emacs users
+      - Try racket-mode by Greg Hindershot
+      - Get better highlighting and indentation using our file
+- Getting the most out of typed racket
+   - If typecheck time blows up consider profiling with `export PLTSTDERR="error debug@tr-timing"`
+- View the map of the mountain
+   - src/README.md : information about the overall construction of the compiler
+   - test/model/gtlc-core.rkt : the semantics of the core gradually typed lambda calculus
+   

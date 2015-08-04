@@ -8,6 +8,8 @@
 (define boxes-tests : Test
   (test-suite
    "Guarded References"
+   #:before (lambda () (display "boxes tests running ... "))
+   #:after (lambda () (display "done\n"))
    (test-file "boxes" "gbox0.schml" (gbox))
    (test-file "boxes" "gbox1.schml" (gbox))
    (test-file "boxes" "gbox2.schml" (int 2))

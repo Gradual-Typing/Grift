@@ -8,6 +8,8 @@
 (define tool-tests : Test
   (test-suite
    "tools"
+   #:before (lambda () (display "tool tests running ... "))
+   #:after (lambda () (display "done\n"))
    (test-file "tools" "repeat0.schml"  (unit))
    (test-file "tools" "repeat1.schml"  (unit))
    (test-file "tools" "repeat2.schml"  (bool #f))
