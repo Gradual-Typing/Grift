@@ -1,10 +1,33 @@
 #lang typed/racket
+#|------------------------------------------------------------------------------+
+|File: src/language.rkt                                                         |
++-------------------------------------------------------------------------------+
+|Authors:                                                                       |
+| Andre Kuhlenshmidt (akuhlens@indiana.edu)                                     |
+|                                                                               |
++-------------------------------------------------------------------------------+
+|Description:
+|This file contains the definitions of the various intermediate languages that
+|the compiler uses and helper functions that define some of the semantics of
+|this language. The languages are composed of reusable language forms that are
+|parameterizabe. These language forms are defined by the define-forms macro. The
+|language forms are actually the types created by defining polymorphic racket
+|structs which are the same structs that the compiler manipulates in order to
+|change the AST.
+|
+|Notes:
+|There are many functions, particularly predicates, that are defined in an
+|overly modular fashion. This is because typed-racket's typechecker currently
+|has exponential type-checking behavior for conditionals. Simplifying and
+|deviding the cases dramatically reduces the time needed to typecheck.
+|
+|
++-------------------------------------------------------------------------------+
+TODO
 
++------------------------------------------------------------------------------|#
 (require "./helpers.rkt")
 (provide (all-defined-out))
-
-;; TODO Comment on the the structure of this file
-;; data structure defs versus actual type defs
 
 #|
    This is the structure that is passed to the compiler in order
@@ -23,28 +46,38 @@
 
 
 #|
-Commonly used and recognize language forms
-In general I try to switch structs as the meaning of forms
-change but I do allow the types and *syntax* of forms to
-change. In general any field named annotation is not really
-a usefull field but allows me to store information that may
-be usefull for optimizations or keeping state.
+All language "Forms" are just polymorphic racket structs.
+These are used to define valid ASTs which are passed between
+passes of the compiler. There are many forms because we try
+to switch forms whenever there is any change in the meaning
+of the form.
 
-This is creating records.
-name - constructor
-name-field1 - accessor
+The macro generates a function for each name in the list plus
+an predicate to identify values of this struct.
+So (name field1 field2) would create the following definitions.
+name? - predicate
+name  - constructor
+name-field1 - accessor for field1
+name-field2 - accessor for field2
 |#
 
 (define-forms
+  ;; Top level wrapper for combining compiler
+  ;; state, meta-information, and the program AST
   (Prog annotation expression)
+  ;; Annotations that may be added to other AST nodes
   (Ann value data)
-  ;; Procedural abstraction
+  ;; Function abstraction
   (Lambda formals body)
+  ;; Function application 
   (App operator operands)
+  ;; Variable node
   (Var id)
+  ;; Conditionals
   (If test then else)
+  ;; Type ascription
   (Ascribe expression type label)
-  ;; Primitive operators supported by the language
+  ;; Primitive operators application 
   (Op operator operands)
   ;; recursive binding
   (Letrec bindings body)
@@ -52,6 +85,7 @@ name-field1 - accessor
   (Let bindings body)
   ;; sequence operator
   (Begin effects value)
+  ;; Perform a No Operation
   (No-Op)
   ;; Effect operations
   ;; Monotonic effects
@@ -142,9 +176,12 @@ name-field1 - accessor
   (Gproxy-to expression)
   (Gproxy-blames expression))
 
+(define NO-OP (No-Op))
+
+
 (define-type Blame-Label String)
 
-(define NO-OP (No-Op))
+
 
 #| Types throughout the languages |#
 
@@ -162,6 +199,7 @@ name-field1 - accessor
 
 ;; TODO I am unsure of if these are being used
 ;; find out and act appropriately
+#;
 (define-forms
   (String-Ptr)
   (Any-Value)
@@ -188,36 +226,53 @@ name-field1 - accessor
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
 (define ->UNIT-TYPE (Fn 0 '() UNIT-TYPE))
 
-
+;; Are two types consistent at the top of the types?
+(: shallow-consistent? (Any Any -> Boolean))
 (define (shallow-consistent? t g)
-  (or (Dyn? t) (Dyn? g)
-      (and (Int? t) (Int? g))
-      (and (Bool? t) (Bool? g))
-      (and (Fn? t) (Fn? g))
-      (and (GRef? t) (GRef? g))
-      (and (GVect? t) (GVect? g))
-      (and (MRef? t) (MRef? t))
-      (and (MVect? t) (MVect? t))))
+  ;; Typed racket made me do it
+  ;; This uber modular structure speeds up type checking
+  (define (both-int? t g) : Boolean (and (Int? t)  (Int? g)))
+  (define (both-bool? t g): Boolean (and (Bool? t) (Bool? g)))
+  (define (both-fn? t g)  : Boolean
+    (and (Fn? t)
+         (Fn? g)
+         (equal? (Fn-arity t)
+                 (Fn-arity g))))
+  (define (ref-shallow-consistent? t g) : Boolean
+    (or (and (GRef? t) (GRef? g))
+        (and (GVect? t) (GVect? g))
+        (and (MRef? t) (MRef? t))
+        (and (MVect? t) (MVect? t))))
+  (or (Dyn? t)
+      (Dyn? g)
+      (both-int? t g)
+      (both-bool? t g)
+      (both-fn? t g)
+      (ref-shallow-consistent? t g)))
+
 
 (: completely-static-type? (-> Schml-Type Boolean))
+;; Is the type t devoid of dyn?
 (define (completely-static-type? t)
+  ;; Typed Racket made me do it
+  ;; This uber modular structure speeds up type checking
+  (define (fn-completely-static? [t : Schml-Type]): Boolean
+    (and (Fn? t)
+         (andmap completely-static-type? (Fn-fmls t))
+         (completely-static-type? (Fn-ret t))))
+  (define (ref-completely-static? [t : Schml-Type])
+    (or (and (GRef? t) (completely-static-type? (GRef-arg t)))
+        (and (MRef? t) (completely-static-type? (MRef-arg t)))
+        (and (GVect? t) (completely-static-type? (GVect-arg t)))
+        (and (MVect? t) (completely-static-type? (MVect-arg t)))))
   (or (Int? t)
       (Bool? t)
-      (and (Fn? t)
-           (andmap completely-static-type? (Fn-fmls t))
-           (completely-static-type? (Fn-ret t)))
-      (and (GRef? t)
-           (completely-static-type? (GRef-arg t)))
-      (and (MRef? t)
-           (completely-static-type? (MRef-arg t)))
-      (and (GVect? t)
-           (completely-static-type? (GVect-arg t)))
-      (and (MVect? t)
-           (completely-static-type? (MVect-arg t)))))
+      (fn-completely-static? t)
+      (ref-completely-static? t)))
 
 
-#| Unique Identifier
-   These are currently done using state passing style in passes.
+#|
+   Unique Identifier
 |#
 
 (struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
@@ -239,8 +294,8 @@ name-field1 - accessor
 
 ;; If you are in the state monad you can purely allocate and increment
 (define-type Nat Natural)
+(: uid-state (String -> (State Nat Uid)))
 (define (uid-state (name : String))
-  : (State Nat Uid)
   (lambda ((s : Natural))
     (values (Uid name s) (add1 s))))
 
@@ -262,11 +317,9 @@ name-field1 - accessor
        (let-uid* next ([name* prefix*] ...)
 		 body ...))]))
 
-
-;; Their are a few assumption that are being made here that
-;; ends up assuming that make begin is called at every sight
-;; where a begin in constructed in this recursion tree.
-
+;; Sometimes the order of the types is important but I have
+;; not figured out a good system for figuring out what the
+;; order should be except trial and error.
 (: make-begin
    (case->
     (-> D3-Effect* No-Op D3-Effect)
@@ -277,33 +330,21 @@ name-field1 - accessor
     (-> C7-Effect* No-Op C7-Effect)
     (-> D1-Effect* D1-Value  D1-Value)
     (-> D1-Effect* No-Op D1-Effect)
-#;    (-> D3-Effect* D3-Trivial D3-Value)
+#;  (-> D3-Effect* D3-Trivial D3-Value)
     (-> D2-Effect* D2-Value  D2-Value)
     (-> D2-Effect* D2-Pred D2-Pred)
     (-> D2-Effect* No-Op D2-Effect)
     (-> D4-Effect* D4-Tail D4-Tail)
     (-> D4-Effect* No-Op D4-Effect)
     (-> D5-Effect* D5-Tail D5-Tail)))
-(trace-define (make-begin eff* res)
-  (: splice-eff (case->
-                 ;; Since D2 effect is a strict subset of D1-effect
-                 ;; It must come before D1 because the first type to
-                 ;; match is used
-                 (-> D5-Effect D5-Effect* D5-Effect*)
-                 (-> D4-Effect D4-Effect* D4-Effect*)
-                 (-> D3-Effect D3-Effect* D3-Effect*)
-                 (-> C7-Effect C7-Effect* C7-Effect*)
-                 (-> D2-Effect D2-Effect* D2-Effect*)
-                 (-> D1-Effect D1-Effect* D1-Effect*)))
-  (define (splice-eff eff rest)
-    (cond
-      [(No-Op? eff) rest]
-      [(Begin? eff) (foldr splice-eff rest (Begin-effects eff))]
-      [else (cons eff rest)]))
+
+;; make a begin language form but splice nested begins into the
+;; newly made begin.
+(define (make-begin eff* res)
   (let ([eff* (foldr splice-eff '() eff*)])
     (cond
       [(null? eff*) res]
-      ;; In effect position a begin of one effect is the
+      ;; In effect position a begin of one effect is the ;
       ;; same as the effect alone
       [(and (No-Op? res) (null? (cdr eff*))) (car eff*)]
       ;; If the result is a begin I assume that the begin
@@ -312,8 +353,25 @@ name-field1 - accessor
        (Begin (append eff* (Begin-effects res)) (Begin-value res))]
       [else (Begin eff* res)])))
 
+(: splice-eff
+   (case->
+    ;; Since D2 effect is a strict subset of D1-effect
+    ;; It must come before D1 because the first type to
+    ;; match is used
+    (-> D5-Effect D5-Effect* D5-Effect*)
+    (-> D4-Effect D4-Effect* D4-Effect*)
+    (-> D3-Effect D3-Effect* D3-Effect*)
+    (-> C7-Effect C7-Effect* C7-Effect*)
+    (-> D2-Effect D2-Effect* D2-Effect*)
+    (-> D1-Effect D1-Effect* D1-Effect*)))
+(define (splice-eff eff rest)
+  (cond
+    [(No-Op? eff) rest]
+    [(Begin? eff) (foldr splice-eff rest (Begin-effects eff))]
+    [else (cons eff rest)]))
+
 #|-----------------------------------------------------------------------------+
-| Language/Schml-Syntax
+| Language/Schml-Syntax 
 +-----------------------------------------------------------------------------|#
 #| Maybe type |#
 (define-type Src srcloc)
@@ -330,14 +388,20 @@ name-field1 - accessor
 
 (define-type Schml-Primitive (U Schml-Prim Schml-Prim!))
 
-(: schml-primitive? (-> Any Boolean : Schml-Primitive))
+#;(: schml-primitive? (-> Any Boolean : Schml-Primitive))
+#;
 (define (schml-primitive? x)
   (or (schml-prim? x) (schml-prim!? x)))
+
+(define-predicate schml-primitive? Schml-Primitive)
 
 (define-type Schml-Prim
   (U IntxInt->Int-Primitive IntxInt->Bool-Primitive))
 
-(: schml-prim? (Any -> Boolean : Schml-Prim))
+(define-predicate schml-prim? Schml-Prim)
+
+#;(: schml-prim? (Any -> Boolean : Schml-Prim))
+#;
 (define (schml-prim? x)
   (or (IntxInt->Int-primitive? x)
       (IntxInt->Bool-primitive? x)))
@@ -345,7 +409,9 @@ name-field1 - accessor
 (define-type Schml-Prim!
   (U Timer-Primitive))
 
-(: schml-prim!? (Any -> Boolean : Schml-Prim!))
+(define-predicate schml-prim!? Schml-Prim!)
+#;(: schml-prim!? (Any -> Boolean : Schml-Prim!))
+#;
 (define (schml-prim!? x)
   (or (timer-primitive? x)))
 
@@ -355,21 +421,29 @@ name-field1 - accessor
 
 (define-type IxI->I-Prim IntxInt->Int-Primitive)
 
-(: IntxInt->Int-primitive? (-> Any Boolean : IntxInt->Int-Primitive))
+(define-predicate IntxInt->Int-primitive? IntxInt->Int-Primitive)
+#;(: IntxInt->Int-primitive? (-> Any Boolean : IntxInt->Int-Primitive))
+#;
 (define (IntxInt->Int-primitive? x)
-  (or (eq? '* x) (eq? '+ x) (eq? '- x)
-      (eq? 'binary-and x) (eq? 'binary-or x) (eq? 'binary-xor x)
-      (eq? '%/ x) (eq? '%>> x) (eq? '%<< x)))
+  
+  #;(memq x '(* + - binary-and binary-or binary-xor %/ %>> %<<))
+  )
 
 
 (define-type IntxInt->Bool-Primitive (U '< '<= '= '> '>=))
 (define-type IxI->B-Prim IntxInt->Bool-Primitive)
+(define-predicate IntxInt->Bool-primitive? IntxInt->Bool-Primitive)
 
-(: IntxInt->Bool-primitive? (Any -> Boolean : IntxInt->Bool-Primitive))
+#;(: IntxInt->Bool-primitive? (Any -> Boolean : IntxInt->Bool-Primitive))
+#;
 (define (IntxInt->Bool-primitive? x)
-  (or (eq? '< x) (eq? '<= x)
+  (memq x '(< <= = > >=))
+  #;                     
+  (or (eq? '< x)
+      (eq? '<= x)
       (eq? '= x)
-      (eq? '> x) (eq? '>= x)))
+      (eq? '> x)
+      (eq? '>= x)))
 
 #|
 (define-type IntxNon0->Int-Primitives '/)
@@ -397,8 +471,14 @@ name-field1 - accessor
 (define-type Schml-Literal
   (U Integer Boolean Null))
 
+#;(: platform-integer? (Any -> Boolean : Integer))
+#;
+(define (platform-integer? x)
+  (fixnum? x))
+
+(: schml-literal? (Any -> Boolean : Schml-Literal))
 (define (schml-literal? x)
-  (or (and (integer? x) (>= x 0) (<= x (expt 2 64)))
+  (or (exact-integer? x)
       (boolean? x)
       (null? x)))
 
@@ -411,20 +491,69 @@ name-field1 - accessor
     [else (error 'language/schml-literal->type "~a" x)]))
 
 ;; Types in the schml languages
+(define-type  Base-Type (U Int Bool Unit))
+
+(: base-type? (Any -> Boolean : Base-Type))
+(define (base-type? x)
+  (or (Int? x)
+      (Bool? x)
+      (Unit? x)))
+
 (define-type+ Schml-Type ([Schml-Type* Listof]
 			  [Schml-Type? Option])
-  (Rec ST (U Int Bool Dyn Unit
-             (GRef ST)
-             (GVect ST)
-             (MRef ST)
-             (MVect ST)
-             (Fn Index (Listof ST) ST))))
+  (U Dyn
+     Base-Type
+     Schml-Fn-Type
+     Schml-Ref-Type))
 
-(define-type Schml-Fn-Type (Fn Index Schml-Type* Schml-Type))
+(define-type Schml-Fn-Type
+  (Fn Index Schml-Type* Schml-Type))
+
+(define-type Schml-Ref-Type
+  (U (GRef  Schml-Type)
+     (GVect Schml-Type)
+     (MRef  Schml-Type)
+     (MVect Schml-Type)))
 
 (define-type Atomic-Schml-Type (U Unit Int Bool Dyn))
 
-(define-predicate schml-type? Schml-Type)
+(: schml-type? (Any -> Boolean : Schml-Type))
+(define (schml-type? x)
+  (or (Dyn? x)
+      (base-type? x)
+      (schml-fn? x)
+      (schml-ref? x)))
+      
+
+(define-predicate schml-type*? Schml-Type*)
+#;(: schml-type*? (Any -> Boolean : Schml-Type*))
+#;
+(define (schml-type*? x)
+  (or (null? x)
+      (and (pair? x)
+           (schml-type? (car x))
+           (schml-type*? (cdr x)))))
+
+(define-predicate schml-fn? Schml-Fn-Type)
+#;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
+#;(define (schml-fn? x)
+   (and (Fn? x)
+    (index? (Fn-arity x))
+    (schml-type*? (Fn-fmls x))
+    (schml-type? (Fn-ret x))))
+
+
+(define-predicate schml-ref? Schml-Ref-Type)
+#;(: schml-ref? (Any -> Boolean : Schml-Ref-Type))
+
+#;
+(define (schml-ref? x)
+  (or (and (GRef? x)  (schml-type? (GRef-arg x)))
+      (and (GVect? x) (schml-type? (GVect-arg x)))
+      (and (MRef? x)  (schml-type? (MRef-arg x)))
+      (and (MVect? x) (schml-type? (MVect-arg x)))))
+
+
 
 (define-type+ Schml-Fml ([Schml-Fml* Listof])
   (Fml Uid Schml-Type))
@@ -574,7 +703,6 @@ Dyn --> Int Int --> Dyn
           Dyn
 |#
 
-
 (: join (Schml-Type Schml-Type . -> . Schml-Type))
 (define (join t g)
   (cond
@@ -598,6 +726,7 @@ Dyn --> Int Int --> Dyn
     [(and (MVect? t) (MVect? g))
     (join (MVect-arg t) (MVect-arg g))]
     [else (error 'join "Types are not consistent")]))
+
 
 #|-----------------------------------------------------------------------------
 We are going to UIL

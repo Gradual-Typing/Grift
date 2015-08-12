@@ -1,6 +1,28 @@
 #lang racket
 
 (require redex)
+(provide
+ ;; The syntax of the simply typeded lambda calculus
+ STLC
+ ;; Capture avoiding substitution
+ ;; (subst '((xs es) ...) e) : metafunction
+ ;; subsitute all xs for es in e renaming as needed to avoid capture
+ subst
+ ;; Alpha equivalence
+ ;; (=α t1 t2) : metafunction
+ ;; is t1 alpha equivalent to t2? 
+ =α
+ ;; (=α/racket t1 t2) racket function
+ ;; is t1 alpha equivalent to t2? 
+ =α/racket
+ ;; (⊢ ((xs τs) ...) e τ) : Judgement (⊢ I I O)
+ ;; from the environment, ((xs τs) ...), we can infer that expression
+ ;; e is of type τ.
+ ⊢
+ ;; Reduction relation for the calculus
+ –>β
+ ;; Standard reduction relation for the call-by value semantics
+ s->β)
 
 (define-language STLC
   (x   ::= variable-not-otherwise-mentioned)
