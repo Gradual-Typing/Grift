@@ -5,6 +5,7 @@
 
 (require "core/tests.rkt"
          "boxes/tests.rkt"
+         "vectors/tests.rkt"
          "tools/tests.rkt"
          "program/tests.rkt"
          "large/tests.rkt")
@@ -13,6 +14,7 @@
          (all-from-out
           "core/tests.rkt"
           "boxes/tests.rkt"
+          "vectors/tests.rkt"
           "tools/tests.rkt"
           "program/tests.rkt"
           "large/tests.rkt"))
@@ -22,7 +24,8 @@
     core-tests
     boxes-tests
     tool-tests
-    program-tests))
+    program-tests
+    vectors-tests))
 
 (define all-tests : Test
   (test-suite "all tests"

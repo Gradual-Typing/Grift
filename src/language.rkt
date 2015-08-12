@@ -58,13 +58,13 @@ be usefull for optimizations or keeping state.
   (Gbox value)
   (Gunbox box)
   (Gbox-set! box value)
-  (Gvector value constructor)
+  (Gvector len init-val)
   (Gvector-set! vector offset value)
   (Gvector-ref vector offset)
   ;; various imediates markers
   (Quote literal)    ;; imediate data in general
   (Code-Label value) ;; marks a uid as refering to a uid
-  (Tag bits)         ;; an tag for an imediate value
+  (Tag bits)         ;; a tag for an immediate value
   (Type type)        ;; an atomic type
   ;; Effectfull expressions
   ;; typed bindings annotations
@@ -80,6 +80,7 @@ be usefull for optimizations or keeping state.
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
   (Type-GRef-to expression)
+  (Type-GVect-to expression)
   ;; closure Representation
   (Fn-Caster expression)
   (Closure-Data code caster variables)
@@ -127,6 +128,9 @@ be usefull for optimizations or keeping state.
   (UGbox expression)
   (UGbox-set! expression1 expression2)
   (UGbox-ref expression)
+  (UGvect expression1 expression2)
+  (UGvect-set! expression1 expression2 expression3)
+  (UGvect-ref expression1 expression2)
   (Gproxy for-exp from-exp to-exp blames-exp)
   (Gproxy-for expression)
   (Gproxy-from expression)
@@ -524,12 +528,18 @@ be usefull for optimizations or keeping state.
   (define (gref? t g)
     (and (GRef? t) (GRef? g)
          (consistent? (GRef-arg t) (GRef-arg g))))
+  (: gvect? ConsistentT)
+  (define (gvect? t g)
+    (and (GVect? t) (GVect? g)
+         (consistent? (GVect-arg t) (GVect-arg g))))
   (or (Dyn? t) (Dyn? g)
       (unit? t g)
       (bool? t g)
       (int? t g)
       (fn? t g)
       (gref? t g)
+      (gvect? t g)
+      
 
 
       ;; These will need to be added back but were adding
@@ -575,12 +585,11 @@ Dyn --> Int Int --> Dyn
          (join (Fn-ret t) (Fn-ret g)))]
     [(and (GRef? t) (GRef? g))
      (GRef (join (GRef-arg t) (GRef-arg g)))]
-    #;
     [(and (GVect? t) (GVect? g))
-    (join (GVect-arg t) (GVect-arg g))]
+     (join (GVect-arg t) (GVect-arg g))]
     #;
     [(and (MRef? t) (MRef? g))
-    (join (MRef-arg t) (MRef-arg g))]
+     (join (MRef-arg t) (MRef-arg g))]
     #;
     [(and (MVect? t) (MVect? g))
     (join (MVect-arg t) (MVect-arg g))]
@@ -765,6 +774,8 @@ We are going to UIL
   (U (GRep-proxied? A)
      (UGbox A)
      (UGbox-ref A)
+     (UGvect A A)
+     (UGvect-ref A A)
      (Gproxy A A A A)
      (Gproxy-for A)
      (Gproxy-from A)
@@ -772,7 +783,8 @@ We are going to UIL
      (Gproxy-blames A)))
 
 (define-type (GRep-Effect A)
-  (UGbox-set! A A))
+  (U (UGbox-set! A A)
+     (UGvect-set! A A A)))
 
 
 #|-----------------------------------------------------------------------------+
@@ -801,6 +813,7 @@ We are going to UIL
           (Type-Fn-return E)
           (Type-Fn-arity E)
           (Type-GRef-to E)
+          (Type-GVect-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -821,7 +834,7 @@ We are going to UIL
 (define-type C3-Bnd   (Pair Uid C3-Expr))
 (define-type C3-Bnd*  (Listof C3-Bnd))
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast created by label-lambdas                    |
@@ -847,6 +860,7 @@ We are going to UIL
           (Type-Fn-return E)
           (Type-Fn-arity E)
           (Type-GRef-to E)
+          (Type-GVect-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -895,6 +909,7 @@ We are going to UIL
           (Type-Fn-return E)
           (Type-Fn-arity E)
           (Type-GRef-to E)
+          (Type-GVect-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -945,6 +960,7 @@ We are going to UIL
           (Type-Fn-return E)
           (Type-Fn-arity E)
           (Type-GRef-to E)
+          (Type-GVect-to E)
           ;; Dyn operations
           (Dyn-tag E)
           (Dyn-immediate E)
@@ -1055,6 +1071,7 @@ We are going to UIL
 (define TYPE-TAG-MASK #b111)
 (define TYPE-FN-TAG #b000)
 (define TYPE-GREF-TAG #b001)
+(define TYPE-GVECT-TAG #b010)
 ;; Hypothetical extensions to type tags
 ;; Though more organization could le
 ;;(define TYPE-GVECT-TAG #b010)
@@ -1101,10 +1118,18 @@ We are going to UIL
 (define GPROXY-FROM-INDEX 1)
 (define GPROXY-TO-INDEX 2)
 (define GPROXY-BLAMES-INDEX 3)
+(define UGVECT-SIZE #f)
+(define UGVECT-TAG #b000)
+(define UGVECT-SIZE-INDEX 0)
+(define UGVECT-OFFSET 1)
 
 ;; GREF Type Representation
 (define TYPE-GREF-SIZE  1)
 (define GREF-TO-INDEX 0)
+
+;; GVECT Type Representation
+(define TYPE-GVECT-SIZE  1)
+(define GVECT-TO-INDEX 0)
 
 ;; Closure representation
 (define CLOS-CODE-INDEX 0)

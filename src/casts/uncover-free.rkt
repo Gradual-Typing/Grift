@@ -51,6 +51,7 @@
     [(Type t) (values (Type t) (set))]
     [(Type-tag (app uf-expr e e-fvars)) (values (Type-tag e) e-fvars)]
     [(Type-GRef-to (app uf-expr e f*)) (values (Type-GRef-to e) f*)]
+    [(Type-GVect-to (app uf-expr e f*)) (values (Type-GVect-to e) f*)]
     [(Type-Fn-arg (app uf-expr e e-fvars) (app uf-expr i i-fvars))
      (values (Type-Fn-arg e i) (set-union e-fvars i-fvars))]
     [(Type-Fn-return (app uf-expr e e-fvars))
@@ -80,6 +81,16 @@
     [(UGbox-set! (app uf-expr e1 e1-fvars)
                  (app uf-expr e2 e2-fvars))
      (values (UGbox-set! e1 e2) (set-union e1-fvars e2-fvars))]
+    [(UGvect (app uf-expr e1 e1-fvars)
+             (app uf-expr e2 e2-fvars))
+     (values (UGvect e1 e2) (set-union e1-fvars e2-fvars))]
+    [(UGvect-ref (app uf-expr e1 e1-fvars)
+                 (app uf-expr e2 e2-fvars))
+     (values (UGvect-ref e1 e2) (set-union e1-fvars e2-fvars))]
+    [(UGvect-set! (app uf-expr e1 e1-fvars)
+                  (app uf-expr e2 e2-fvars)
+                  (app uf-expr e3 e3-fvars))
+     (values (UGvect-set! e1 e2 e3) (set-union e1-fvars e2-fvars e3-fvars))]
     [(Gproxy (app uf-expr e1 e1-fvars)
              (app uf-expr e2 e2-fvars)
              (app uf-expr e3 e3-fvars)

@@ -87,6 +87,7 @@
      [(regexp-match #rx".*Function : \\?" s) (function)]
      [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
      [(regexp-match #rx".*GReference : \\?" s) (gbox)]
+     [(regexp-match #rx".*GVector : \\?" s) (gvect)]
      [(regexp-match #rx".*GArray : \\?" s) (gvect)]
      [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
      [else (blame #f s)])))

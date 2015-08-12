@@ -1,0 +1,7 @@
+(let ([r : (GVect Dyn) (gvector 1 (: 41 Dyn))])
+  (begin
+    (if (= (gvector-ref r 0) 8)
+        (gvector-set! r 0 #t)
+        (gvector-set! r 0 #f))
+    (: (gvector-ref r 0) Bool)))
+        

@@ -95,6 +95,10 @@
     [(Gunbox e) (lift-state (inst Gunbox C1-Expr) (icf-expr e))]
     [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! C1-Expr C1-Expr)
                                    (icf-expr e1) (icf-expr e2))]
+    [(Gvector n e) (lift-state (inst Gvector C1-Expr C1-Expr) (icf-expr n) (icf-expr e))]
+    [(Gvector-ref e index) (lift-state (inst Gvector-ref C1-Expr C1-Expr) (icf-expr e) (icf-expr index))]
+    [(Gvector-set! e1 index e2) (lift-state (inst Gvector-set! C1-Expr C1-Expr C1-Expr)
+                                            (icf-expr e1) (icf-expr index) (icf-expr e2))]
     [(Var id)    (return-state (Var id))]
     [(Quote lit) (return-state (Quote lit))]))
 

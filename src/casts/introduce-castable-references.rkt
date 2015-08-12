@@ -9,10 +9,10 @@
 ;; {} denote implicit information that
 
 Type (GRep A) where
-  ;; Unguarded Boxes
-  UGbox  A : {A : Set} -> A -> GRep A
-  ;;xies for Guarded Representations
-  Gproxy A : GRep B -> (B : Type) -> (A : Type) -> Blame-Label -> GRep A
+;; Unguarded Boxes
+UGbox  A : {A : Set} -> A -> GRep A
+;;xies for Guarded Representations
+Gproxy A : GRep B -> (B : Type) -> (A : Type) -> Blame-Label -> GRep A
 
 ;; The only two things that you can do with an GRep A are proxy it
 ;; and look to see if it is proxied.
@@ -44,10 +44,10 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
 ;; The entry point for this pass it is called by impose-casting semantics
 (: introduce-castable-references (Cast1-Lang Config . -> . Cast2-Lang))
 (trace-define (introduce-castable-references prgm config)
-  (match-let (((Prog (list name next type) expression) prgm))
-    (let-values ([([e : C2-Expr] [n : Natural])
-                  (run-state (icr-expr expression) next)])
-      (Prog (list name n type) e))))
+              (match-let (((Prog (list name next type) expression) prgm))
+                (let-values ([([e : C2-Expr] [n : Natural])
+                              (run-state (icr-expr expression) next)])
+                  (Prog (list name n type) e))))
 
 (: icr-expr (-> C1-Expr (State Natural C2-Expr)))
 (define (icr-expr exp)
@@ -55,134 +55,197 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
     [(Lambda f* (Castable fn e))
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (return-state (Lambda f* (Castable fn e))))]
+       (return-state (Lambda f* (Castable fn e))))]
     [(Cast e t1 t2 l)
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (if (and (GRef? t1) (GRef? t2))
-             (let ([t1^ : Schml-Type (GRef-arg t1)]
-                   [t2^ : Schml-Type (GRef-arg t2)])
-               (return-state
-                (Gproxy e (Type t1^) (Type t2^) (Quote l))))
-             (return-state (Cast e t1 t2 l))))]
+       (cond
+         [(and (GRef? t1) (GRef? t2))
+          (let ([t1^ : Schml-Type (GRef-arg t1)]
+                [t2^ : Schml-Type (GRef-arg t2)])
+            (return-state
+             (Gproxy e (Type t1^) (Type t2^) (Quote l))))]
+         [(and (GVect? t1) (GVect? t2))
+          (let ([t1^ : Schml-Type (GVect-arg t1)]
+                [t2^ : Schml-Type (GVect-arg t2)])
+            (return-state
+             (Gproxy e (Type t1^) (Type t2^) (Quote l))))]
+         [else (return-state (Cast e t1 t2 l))]))]
     [(Letrec b* e)
      (do (bind-state : (State Natural C2-Expr))
          (b* : C2-Bnd* <- (icr-bnd* b*))
-         (e  : C2-Expr <- (icr-expr e))
-         (return-state (Letrec b* e)))]
+       (e  : C2-Expr <- (icr-expr e))
+       (return-state (Letrec b* e)))]
     [(Let b* e)
      (do (bind-state : (State Natural C2-Expr))
          (b* : C2-Bnd* <- (icr-bnd* b*))
-         (e  : C2-Expr <- (icr-expr e))
-         (return-state (Let b* e)))]
+       (e  : C2-Expr <- (icr-expr e))
+       (return-state (Let b* e)))]
     [(App e e*)
      (do (bind-state : (State Natural C2-Expr))
          (e  : C2-Expr  <- (icr-expr e))
-         (e* : C2-Expr* <- (icr-expr* e*))
-         (return-state (App e e*)))]
+       (e* : C2-Expr* <- (icr-expr* e*))
+       (return-state (App e e*)))]
     [(Op p e*)
      (do (bind-state : (State Natural C2-Expr))
          (e* : C2-Expr* <- (icr-expr* e*))
-         (return-state (Op p e*)))]
+       (return-state (Op p e*)))]
     [(If t c a)
      (do (bind-state : (State Natural C2-Expr))
          (t : C2-Expr <- (icr-expr t))
-         (c : C2-Expr <- (icr-expr c))
-         (a : C2-Expr <- (icr-expr a))
-         (return-state (If t c a)))]
+       (c : C2-Expr <- (icr-expr c))
+       (a : C2-Expr <- (icr-expr a))
+       (return-state (If t c a)))]
     [(Begin e* e)
      (do (bind-state : (State Natural C2-Expr))
          (e* : C2-Expr* <- (icr-expr* e*))
-         (e  : C2-Expr  <- (icr-expr  e))
-         (return-state (Begin e* e)))]
+       (e  : C2-Expr  <- (icr-expr  e))
+       (return-state (Begin e* e)))]
     [(Repeat i e1 e2 e3)
      (do (bind-state : (State Natural C2-Expr))
          (e1 : C2-Expr <- (icr-expr e1))
-         (e2 : C2-Expr <- (icr-expr e2))
-         (e3 : C2-Expr <- (icr-expr e3))
-         (return-state (Repeat i e1 e2 e3)))]
+       (e2 : C2-Expr <- (icr-expr e2))
+       (e3 : C2-Expr <- (icr-expr e3))
+       (return-state (Repeat i e1 e2 e3)))]
     [(Gbox e)
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (return-state (UGbox e)))]
+       (return-state (UGbox e)))]
     [(Gunbox e)
      ;; I decided to inline here because in this context letrec ; ; ; ;
      ;; can be made into a simple loop; ; ; ;
      (do (bind-state : (State Natural C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (loop : Uid <- (uid-state "loop"))
-         (ref : Uid <- (uid-state "gref"))
-         (let* ([l-var  (Var loop)]
-                [r-var  (Var ref)]
-                [r-var^ (Gproxy-for r-var)]
-                [t1     (Gproxy-from r-var)]
-                [t2     (Gproxy-to r-var)]
-                [lbl    (Gproxy-blames r-var)]
-                [recur  (App l-var (list r-var^))]
-                [lexp   (Lambda (list ref)
-                         (Castable #f
-                          (If (GRep-proxied? r-var)
-                              (Runtime-Cast recur t1 t2 lbl)
-                              (UGbox-ref r-var))))])
-           (return-state
-            (Letrec (list (cons loop lexp))
-              (App l-var (list e))))))]
+       (loop : Uid <- (uid-state "loop"))
+       (ref : Uid <- (uid-state "gref"))
+       (let* ([l-var  (Var loop)]
+              [r-var  (Var ref)]
+              [r-var^ (Gproxy-for r-var)]
+              [t1     (Gproxy-from r-var)]
+              [t2     (Gproxy-to r-var)]
+              [lbl    (Gproxy-blames r-var)]
+              [recur  (App l-var (list r-var^))]
+              [lexp   (Lambda (list ref)
+                              (Castable #f
+                                        (If (GRep-proxied? r-var)
+                                            (Runtime-Cast recur t1 t2 lbl)
+                                            (UGbox-ref r-var))))])
+         (return-state
+          (Letrec (list (cons loop lexp))
+                  (App l-var (list e))))))]
     [(Gbox-set! e1 e2)
      (do (bind-state : (State Natural C2-Expr))
          (e1 : C2-Expr <- (icr-expr e1))
-         (e2 : C2-Expr <- (icr-expr e2))
-         (loop : Uid <- (uid-state "loop"))
-         (ref : Uid <- (uid-state "gref"))
-         (val  : Uid <- (uid-state "val"))
-         (let* ([l-var : C2-Expr (Var loop)]
-                [r-var : C2-Expr (Var ref)]
-                [v-var : C2-Expr (Var val)]
-                [t1  : C2-Expr (Gproxy-from r-var)]
-                [t2  : C2-Expr (Gproxy-to r-var)]
-                [lbl : C2-Expr (Gproxy-blames r-var)]
-                [r-var^ : C2-Expr (Gproxy-for r-var)]
-                ;; Switched t1 t2 for a check
-                [cast-val : C2-Expr (Runtime-Cast v-var t2 t1 lbl)]
-                [lexp : C2-Expr (Lambda (list ref val)
-                                 (Castable #f
-                                  (If (GRep-proxied? r-var)
-                                      (App l-var (list r-var^ cast-val))
-                                      (Begin
-                                        (list (UGbox-set! r-var v-var))
-                                        (Quote '())))))])
-           (return-state
-            (Letrec (list (cons loop lexp))
-              (App l-var (list e1 e2))))))]
+       (e2 : C2-Expr <- (icr-expr e2))
+       (loop : Uid <- (uid-state "loop"))
+       (ref : Uid <- (uid-state "gref"))
+       (val  : Uid <- (uid-state "val"))
+       (let* ([l-var : C2-Expr (Var loop)]
+              [r-var : C2-Expr (Var ref)]
+              [v-var : C2-Expr (Var val)]
+              [t1  : C2-Expr (Gproxy-from r-var)]
+              [t2  : C2-Expr (Gproxy-to r-var)]
+              [lbl : C2-Expr (Gproxy-blames r-var)]
+              [r-var^ : C2-Expr (Gproxy-for r-var)]
+              ;; Switched t1 t2 for a check
+              [cast-val : C2-Expr (Runtime-Cast v-var t2 t1 lbl)]
+              [lexp : C2-Expr (Lambda (list ref val)
+                                      (Castable #f
+                                                (If (GRep-proxied? r-var)
+                                                    (App l-var (list r-var^ cast-val))
+                                                    (Begin
+                                                      (list (UGbox-set! r-var v-var))
+                                                      (Quote '())))))])
+         (return-state
+          (Letrec (list (cons loop lexp))
+                  (App l-var (list e1 e2))))))]
+    [(Gvector n e)
+     (do (bind-state : (State Natural C2-Expr))
+         (e : C2-Expr <- (icr-expr e))
+       (n : C2-Expr <- (icr-expr n))
+       (return-state (UGvect n e)))]
+    [(Gvector-ref e i)
+     (do (bind-state : (State Natural C2-Expr))
+         (e : C2-Expr <- (icr-expr e))
+       (i : C2-Expr <- (icr-expr i))
+       (loop : Uid <- (uid-state "loop"))
+       (vect : Uid <- (uid-state "gref"))
+       (ind : Uid <- (uid-state "index"))
+       (let* ([l-var  (Var loop)]
+              [v-var  (Var vect)]
+              [i-var  (Var ind)]
+              [v-var^ (Gproxy-for v-var)]
+              [t1     (Gproxy-from v-var)]
+              [t2     (Gproxy-to v-var)]
+              [lbl    (Gproxy-blames v-var)]
+              [recur  (App l-var (list v-var^ i-var))]
+              [lexp   (Lambda (list vect ind)
+                              (Castable #f
+                                        (If (GRep-proxied? v-var)
+                                            (Runtime-Cast recur t1 t2 lbl)
+                                            (UGvect-ref v-var i-var))))])
+         (return-state
+          (Letrec (list (cons loop lexp))
+                  (App l-var (list e i))))))]
+    [(Gvector-set! e1 i e2)
+     (do (bind-state : (State Natural C2-Expr))
+         (e1 : C2-Expr <- (icr-expr e1))
+       (i : C2-Expr <- (icr-expr i))
+       (e2 : C2-Expr <- (icr-expr e2))
+       (loop : Uid <- (uid-state "loop"))
+       (vect : Uid <- (uid-state "gvect"))
+       (val  : Uid <- (uid-state "val"))
+       (ind : Uid <- (uid-state "index"))
+       (let* ([l-var : C2-Expr (Var loop)]
+              [vt-var : C2-Expr (Var vect)]
+              [i-var : C2-Expr (Var ind)]
+              [v-var : C2-Expr (Var val)]
+              [t1  : C2-Expr (Gproxy-from vt-var)]
+              [t2  : C2-Expr (Gproxy-to vt-var)]
+              [lbl : C2-Expr (Gproxy-blames vt-var)]
+              [vt-var^ : C2-Expr (Gproxy-for vt-var)]
+              ;; Switched t1 t2 for a check
+              [cast-val : C2-Expr (Runtime-Cast v-var t2 t1 lbl)]
+              [lexp : C2-Expr (Lambda (list vect ind val)
+                                      (Castable #f
+                                                (If (GRep-proxied? vt-var)
+                                                    (App l-var (list vt-var^ i-var cast-val))
+                                                    (Begin
+                                                      (list (UGvect-set! vt-var i-var v-var))
+                                                      (Quote '())))))])
+         (return-state
+          (Letrec (list (cons loop lexp))
+                  (App l-var (list e1 i e2))))))]
     [(Var i) (return-state (Var i))]
     [(Quote lit) (return-state (Quote lit))]
     [(Type-Fn-arity e)
      (do (bind-state : (State Nat C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (return-state (Type-Fn-arity e)))]
+       (return-state (Type-Fn-arity e)))]
     [(Type-Fn-return e)
      (do (bind-state : (State Nat C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (return-state (Type-Fn-return e)))]
+       (return-state (Type-Fn-return e)))]
     [(Type-Fn-arg e i)
      (do (bind-state : (State Nat C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (i : C2-Expr <- (icr-expr i))
-         (return-state (Type-Fn-arg e i)))]
+       (i : C2-Expr <- (icr-expr i))
+       (return-state (Type-Fn-arg e i)))]
     [(Fn-Cast e t1 t2 lbl)
      (do (bind-state : (State Nat C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (return-state (Fn-Cast e t1 t2 lbl)))]
+       (return-state (Fn-Cast e t1 t2 lbl)))]
     [(Runtime-Cast e1 e2 e3 e4)
      (do (bind-state : (State Nat C2-Expr))
          (e1 : C2-Expr <- (icr-expr e1))
-         (e2 : C2-Expr <- (icr-expr e2))
-         (e3 : C2-Expr <- (icr-expr e3))
-         (e4 : C2-Expr <- (icr-expr e4))
-         (return-state (Runtime-Cast e1 e2 e3 e4)))]
+       (e2 : C2-Expr <- (icr-expr e2))
+       (e3 : C2-Expr <- (icr-expr e3))
+       (e4 : C2-Expr <- (icr-expr e4))
+       (return-state (Runtime-Cast e1 e2 e3 e4)))]
     [(Blame e)
      (do (bind-state : (State Nat C2-Expr))
          (e : C2-Expr <- (icr-expr e))
-         (return-state (Blame e)))]))
+       (return-state (Blame e)))]))
 
 (: icr-expr* (-> C1-Expr* (State Natural C2-Expr*)))
 (define (icr-expr* e*) (map-state icr-expr e*))

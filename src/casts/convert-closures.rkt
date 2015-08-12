@@ -120,7 +120,11 @@
       [(Type-GRef-to e)
        (do (bind-state : (State Nat C6-Expr))
            (e  : C6-Expr <- (cc-expr/env  e))
-           (return-state (Type-GRef-to e)))]
+         (return-state (Type-GRef-to e)))]
+      [(Type-GVect-to e)
+       (do (bind-state : (State Nat C6-Expr))
+           (e  : C6-Expr <- (cc-expr/env  e))
+         (return-state (Type-GVect-to e)))]
       [(Type-Fn-arg e i)
        (do (bind-state : (State Nat C6-Expr))
            (e : C6-Expr <- (cc-expr/env e))
@@ -180,6 +184,18 @@
            (e1 : C6-Expr <- (cc-expr/env e1))
            (e2 : C6-Expr <- (cc-expr/env e2))
            (return-state (UGbox-set! e1 e2)))]
+      [(UGvect e1 e2)
+       (lift-state (inst UGvect C6-Expr C6-Expr)
+                   (cc-expr/env e1) (cc-expr/env e2))]
+      [(UGvect-ref e1 e2)
+       (lift-state (inst UGvect-ref C6-Expr C6-Expr)
+                   (cc-expr/env e1) (cc-expr/env e2))]
+      [(UGvect-set! e1 e2 e3)
+       (do (bind-state : (State Nat C6-Expr))
+           (e1 : C6-Expr <- (cc-expr/env e1))
+           (e2 : C6-Expr <- (cc-expr/env e2))
+           (e3 : C6-Expr <- (cc-expr/env e3))
+           (return-state (UGvect-set! e1 e2 e3)))]
       [(Gproxy e1 e2 e3 e4)
        (do (bind-state : (State Nat C6-Expr))
            (e1 : C6-Expr <- (cc-expr/env e1))

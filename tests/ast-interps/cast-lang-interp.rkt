@@ -1,3 +1,5 @@
+;; when we update to racket 6.2, get rid off racket casts (e.g. for vectors)
+
 #lang typed/racket
 
 (require "../../src/helpers.rkt"
@@ -35,34 +37,12 @@
   #:mutable
   #:transparent)
 
-(: make-gbox (-> CL-Value CL-GBox))
-(define (make-gbox val)
-  (CL-GBox val))
-
-(: write-gbox (-> CL-GBox CL-Value CL-Value))
-(define (write-gbox b v)
-  (begin (set-CL-GBox-value! b v) '()))
-
 (define-predicate gref? CL-GRef)
-
-(: cast-gref (-> CL-GRef Schml-Type Schml-Type Blame-Label CL-GRef))
-(define cast-gref CL-GProxy)
-
-(: read-gref (-> Cast-Type CL-GRef CL-Value))
-(define (read-gref cast r)
-  (cond
-    [(CL-GBox? r) (CL-GBox-value r)]
-    [(CL-GProxy? r)
-     (cast (read-gref cast (CL-GProxy-value r))
-           (CL-GProxy-t1 r)
-           (CL-GProxy-t2 r)
-           (CL-GProxy-label r))]
-    [else (TODO ERROR about vilation of the adt invarient)]))
 
 (: write-gref (-> Cast-Type CL-GRef CL-Value CL-Value))
 (define (write-gref cast r v)
   (cond
-    [(CL-GBox? r) (write-gbox r v)]
+    [(CL-GBox? r) (begin (set-CL-GBox-value! r v) '())]
     [(CL-GProxy? r)
       (write-gref cast
                   (CL-GProxy-value r)
@@ -78,9 +58,6 @@
                         [t2 : Schml-Type]
                         [label : Blame-Label])
   #:transparent)
-
-(: make-gvect (-> Integer CL-Value (Vectorof CL-Value)))
-(define make-gvect make-vector)
 
 (: write-gvect (-> Cast-Type CL-GVect Integer CL-Value CL-Value))
 (define (write-gvect cast vect pos val)
@@ -98,16 +75,27 @@
 (: cast-gvect (-> CL-GVect Schml-Type Schml-Type Blame-Label CL-GVect))
 (define cast-gvect CL-GVectProxy)
 
+(: read-gref (-> Cast-Type CL-GRef CL-Value))
+(define (read-gref cst r)
+  (cond
+    [(CL-GBox? r) (CL-GBox-value r)]
+    [(CL-GProxy? r)
+     (cst (read-gref cst (CL-GProxy-value r))
+           (CL-GProxy-t1 r)
+           (CL-GProxy-t2 r)
+           (CL-GProxy-label r))]
+    [else (TODO ERROR about vilation of the adt invarient)]))
+
 (: read-gvect (-> Cast-Type Integer CL-GVect CL-Value))
-(define (read-gvect cast i r)
+(define (read-gvect cst i r)
   (cond
     [(vector? r) (vector-ref r i)]
     [(CL-GVectProxy? r)
-     (cast (read-gvect cast i (CL-GVectProxy-value r))
+     (cst (read-gvect cst i (CL-GVectProxy-value r))
            (CL-GVectProxy-t1 r)
            (CL-GVectProxy-t2 r)
            (CL-GVectProxy-label r))]
-    #;[else (TODO ERROR about vilation of the adt invarient)]))
+    [else (TODO ERROR about vilation of the adt invarient)]))
 
 (define-type (Env a) (HashTable Uid (Boxof (U 'undefined a))))
 
@@ -221,7 +209,7 @@
                    (loop start stop)
                    (TODO come up with an error message for start not an integer))))]
       ;; Guarded references
-      [(Gbox e)    (make-gbox (recur/env e))]
+      [(Gbox e)    (CL-GBox (recur/env e))]
       [(Gunbox (app recur/env e))
        (read-gref cst (assert e gref?))]
       [(Gbox-set! (app recur/env e1) e2)
@@ -229,10 +217,14 @@
            (write-gref cst e1 (recur/env e2))
            (TODO raise an error here about the type system being broken))]
       ;; guarded arrays
-      [(Gvector (app recur/env e) (app recur/env size))
-       (make-gvect (assert size integer?) e)]
+      [(Gvector (app recur/env size) (app recur/env e))
+       (if (integer? size)
+           (make-vector size e)
+           (TODO raise an error here))]
       [(Gvector-ref (app recur/env e) (app recur/env i))
-       (read-gvect cst (assert i integer?) (cast e CL-GVect))]
+       (if (integer? i)
+           (read-gvect cst i (cast e CL-GVect))
+           (TODO raise an error here))]
       [(Gvector-set! (app recur/env e1) (app recur/env i) (app recur/env e2))
        (write-gvect cst (cast e1 CL-GVect) (assert i integer?) e2)]
       [e (error 'interp "Umatched expression ~a" e)]))
@@ -243,7 +235,7 @@
 
 (: delta (-> Symbol CL-Value* CL-Value))
 (define (delta p v*)
-  (when (trace? 'Vomit)
+  (when (trace? 'All)
     (logf "cl-delta:\n~v\n\n" p))
   (case p
     [(+) (tc IxI->I + v*)]
@@ -331,8 +323,10 @@
              [o (error 'cast-lang-interp "Unexpected value in apply-cast-ld match ~a" o)])]
           [(and (GRef? t1) (GRef? t2))
            (if (gref? v1)
-               (cast-gref v1 (GRef-arg t1) (GRef-arg t2) l1)
+               (CL-GProxy v1 (GRef-arg t1) (GRef-arg t2) l1)
                (error 'cast-lang-interp "language invarient broken"))]
+          [(and (GVect? t1) (GVect? t2))
+           (CL-GVectProxy (cast v1 CL-GVect) (GVect-arg t1) (GVect-arg t2) l1)]
           [else (mk-cast v1 t1 t2 l1)])
         (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
   (logging apply-cast-res (All) "~a > ~v" (get c-depth) res)
