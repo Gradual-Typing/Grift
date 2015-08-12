@@ -1,0 +1,2 @@
+# ignore everything in this directory but let git remember that this directory exists
+*
