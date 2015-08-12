@@ -9,10 +9,10 @@
 ;; {} denote implicit information that
 
 Type (GRep A) where
-  ;; Unguarded Boxes
-  UGbox  A : {A : Set} -> A -> GRep A
-  ;;xies for Guarded Representations
-  Gproxy A : GRep B -> (B : Type) -> (A : Type) -> Blame-Label -> GRep A
+;; Unguarded Boxes
+UGbox  A : {A : Set} -> A -> GRep A
+;;proxies for Guarded Representations
+Gproxy A : GRep B -> (B : Type) -> (A : Type) -> Blame-Label -> GRep A
 
 ;; The only two things that you can do with an GRep A are proxy it
 ;; and look to see if it is proxied.
@@ -135,16 +135,17 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
     ;; Identifiers expect match clauses to look like [pat Mexp ... Mexp0]
     (do (bind-state : (State Nat C2-Expr))
         (match exp
-          ;; Interesting Cases
+          ;; Interesting Cases -----------------------------------------------
           ;; Casts from Guarded Reference to Guarded References are represented
           ;; as a data structure proxying the Original Reference.
           [(Cast e t1 t2 l)
            (e : C2-Expr <- (recur e))
-           (if (and (GRef? t1) (GRef? t2))
-               (let ([t1^ : Schml-Type (GRef-arg t1)]
-                     [t2^ : Schml-Type (GRef-arg t2)])
-                 (return-state (Gproxy e (Type t1^) (Type t2^) (Quote l))))
-               (return-state (Cast e t1 t2 l)))]
+           (match* (t1 t2)
+             [((GRef t1) (GRef t2))
+              (return-state (Gproxy e (Type t1) (Type t2) (Quote l)))]
+             [((GVect t1) (GVect t2))
+              (return-state (Gproxy e (Type t1) (Type t2) (Quote l)))]
+             [(_ _) (return-state (Cast e t1 t2 l))])]
           ;; Every Guarded Reference Starts As an Unguarded (Normal) box
           [(Gbox e)
            (e : C2-Expr <- (recur e))
@@ -179,7 +180,61 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
                             (UGbox-set! gref val)
                             (App gbox-set! `(,gref ,val)))))))
                (return-state (App gbox-set! `(,e1 ,e2))))]
-          ;; Boring Recursion Cases for the rest of recur
+          [(Gvector n e)
+           (e : C2-Expr <- (recur e))
+           (n : C2-Expr <- (recur n))
+           (return-state (UGvect n e))]
+          [(Gvector-ref e i)
+           (e : C2-Expr <- (recur e))
+           (i : C2-Expr <- (recur i))
+           (loop : Uid <- (uid-state "loop"))
+           (vect : Uid <- (uid-state "gref"))
+           (ind : Uid <- (uid-state "index"))
+           (let* ([l-var  (Var loop)]
+                  [v-var  (Var vect)]
+                  [i-var  (Var ind)]
+                  [v-var^ (Gproxy-for v-var)]
+                  [t1     (Gproxy-from v-var)]
+                  [t2     (Gproxy-to v-var)]
+                  [lbl    (Gproxy-blames v-var)]
+                  [recur  (App l-var (list v-var^ i-var))]
+                  [lexp   (Lambda (list vect ind)
+                           (Castable #f
+                                     (If (GRep-proxied? v-var)
+                                         (Runtime-Cast recur t1 t2 lbl)
+                                         (UGvect-ref v-var i-var))))])
+             (return-state
+              (Letrec (list (cons loop lexp))
+                      (App l-var (list e i)))))]
+          [(Gvector-set! e1 i e2)
+           (e1 : C2-Expr <- (recur e1))
+           (i : C2-Expr <- (recur i))
+           (e2 : C2-Expr <- (recur e2))
+           (loop : Uid <- (uid-state "loop"))
+           (vect : Uid <- (uid-state "gvect"))
+           (val  : Uid <- (uid-state "val"))
+           (ind : Uid <- (uid-state "index"))
+           (let* ([l-var : C2-Expr (Var loop)]
+                  [vt-var : C2-Expr (Var vect)]
+                  [i-var : C2-Expr (Var ind)]
+                  [v-var : C2-Expr (Var val)]
+                  [t1  : C2-Expr (Gproxy-from vt-var)]
+                  [t2  : C2-Expr (Gproxy-to vt-var)]
+                  [lbl : C2-Expr (Gproxy-blames vt-var)]
+                  [vt-var^ : C2-Expr (Gproxy-for vt-var)]
+                  ;; Switched t1 t2 for a check
+                  [cast-val : C2-Expr (Runtime-Cast v-var t2 t1 lbl)]
+                  [lexp : C2-Expr (Lambda (list vect ind val)
+                                          (Castable #f
+                                                    (If (GRep-proxied? vt-var)
+                                                        (App l-var (list vt-var^ i-var cast-val))
+                                                        (Begin
+                                                          (list (UGvect-set! vt-var i-var v-var))
+                                                          (Quote '())))))])
+             (return-state
+              (Letrec (list (cons loop lexp))
+                      (App l-var (list e1 i e2)))))]
+          ;; Boring Recursion Cases --------------------------------
           [(Lambda f* (Castable fn e))
            (e : C2-Expr <- (recur e))
            (return-state (Lambda f* (Castable fn e)))]

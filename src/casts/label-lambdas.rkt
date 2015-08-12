@@ -90,8 +90,12 @@
          (return-state (Type-Fn-arity e)))]
     [(Type-GRef-to e)
      (do (bind-state : (State Nat C4-Expr))
-         (e  : C4-Expr <- (ll-expr  e))
-         (return-state (Type-GRef-to e)))]
+         (e  : C4-Expr <- (ll-expr e))
+       (return-state (Type-GRef-to e)))]
+    [(Type-GVect-to e)
+     (do (bind-state : (State Nat C4-Expr))
+         (e : C4-Expr <- (ll-expr e))
+       (return-state (Type-GVect-to e)))]
     ;; Dynamic Representation
     [(Dyn-tag e)
      (do (bind-state : (State Nat C4-Expr))
@@ -143,6 +147,16 @@
          (e1 : C4-Expr <- (ll-expr e1))
          (e2 : C4-Expr <- (ll-expr e2))
          (return-state (UGbox-set! e1 e2)))]
+    [(UGvect e1 e2)
+     (lift-state (inst UGvect C4-Expr C4-Expr) (ll-expr e1) (ll-expr e2))]
+    [(UGvect-ref e1 e2)
+     (lift-state (inst UGvect-ref C4-Expr C4-Expr) (ll-expr e1) (ll-expr e2))]
+    [(UGvect-set! e1 e2 e3)
+     (do (bind-state : (State Nat C4-Expr))
+         (e1 : C4-Expr <- (ll-expr e1))
+         (e2 : C4-Expr <- (ll-expr e2))
+         (e3 : C4-Expr <- (ll-expr e3))
+         (return-state (UGvect-set! e1 e2 e3)))]
     [(Gproxy e1 e2 e3 e4)
      (do (bind-state : (State Nat C4-Expr))
          (e1 : C4-Expr <- (ll-expr e1))

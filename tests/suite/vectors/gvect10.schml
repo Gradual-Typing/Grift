@@ -1,0 +1,2 @@
+(let ((boolref : (GVect Bool) (: (gvector 2 (: #f Dyn)) (GVect Dyn))))
+boolref)

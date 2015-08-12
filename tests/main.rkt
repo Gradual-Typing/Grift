@@ -30,6 +30,7 @@
     (most . ,most-tests)
     (core . ,core-tests)
     (boxes . ,boxes-tests)
+    (vectors . ,vectors-tests)
     (tools . ,tool-tests)
     (program . ,program-tests)
     (large . ,large-tests)))

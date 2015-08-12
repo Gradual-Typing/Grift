@@ -16,6 +16,7 @@
    (test-file "core" "const-true.schml"  (bool #t))
    ;; Ints
    (test-file "core" "const-one.schml"   (int 1))
+   (test-file "core" "const-negative.schml" (int -5))
    (test-file "core" "const-ninetynine.schml" (int 99))
    (test-file "core" "const-larg-int.schml" (int 123456))
    ;; Primitive operators TODO (should add more to test corners)

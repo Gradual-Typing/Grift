@@ -205,6 +205,8 @@ Provide comments about where to find definitions of types and data
 ;; The new value as long as the new value is consistent with the old value
 ;; The type of setting a Dyn is Dyn
 ;; The indice must be consistent with int
+
+;; FIXME: return unit after setting a vector cell
 (: gvector-set!-type-rule (-> Schml-Type Schml-Type Schml-Type Schml-Type))
 (define (gvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
