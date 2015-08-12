@@ -21,11 +21,7 @@
 
 (define most-tests : Test
   (test-suite "most tests"
-    core-tests
-    boxes-tests
-    tool-tests
-    program-tests
-    vectors-tests))
+    core-tests box-tests vector-tests tool-tests program-tests))
 
 (define all-tests : Test
   (test-suite "all tests"

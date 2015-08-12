@@ -26,14 +26,14 @@
   (make-parameter most-tests))
 
 (define suite-choices : (Listof (Pair Symbol Test))
-  `((all . ,all-tests)
-    (most . ,most-tests)
-    (core . ,core-tests)
-    (boxes . ,boxes-tests)
-    (vectors . ,vectors-tests)
-    (tools . ,tool-tests)
+  `((all     . ,all-tests)
+    (most    . ,most-tests)
+    (core    . ,core-tests)
+    (box     . ,box-tests)
+    (vector  . ,vector-tests)
+    (tool    . ,tool-tests)
     (program . ,program-tests)
-    (large . ,large-tests)))
+    (large   . ,large-tests)))
 
 
 (define (to-symbol a) : Symbol

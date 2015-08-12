@@ -5,10 +5,10 @@
 
 (provide (all-defined-out))
 
-(define boxes-tests : Test
+(define box-tests : Test
   (test-suite
    "Guarded References"
-   #:before (lambda () (display "boxes tests running ... "))
+   #:before (lambda () (display "box tests running ... "))
    #:after (lambda () (display "done\n"))
    (test-file "boxes" "gbox0.schml" (gbox))
    (test-file "boxes" "gbox1.schml" (gbox))

@@ -5,9 +5,11 @@
 
 (provide (all-defined-out))
 
-(define vectors-tests : Test
+(define vector-tests : Test
   (test-suite
    "Guarded Vectors"
+   #:before (lambda () (display "vector tests running ... "))
+   #:after (lambda () (display "done\n"))
    (test-file "vectors" "gvect0.schml" (gvect))
    (test-file "vectors" "gvect1.schml" (gvect))
    (test-file "vectors" "gvect2.schml" (int 2))
