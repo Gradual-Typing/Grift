@@ -1,6 +1,7 @@
 #lang racket
 
-(require redex)
+(require redex "helpers.rkt")
+
 (provide
  ;; The syntax of the simply typeded lambda calculus
  STLC
@@ -20,24 +21,29 @@
  ;; e is of type τ.
  ⊢
  ;; Reduction relation for the calculus
- –>β
+ -->β
  ;; Standard reduction relation for the call-by value semantics
- s->β)
+ s->βv)
 
 (define-language STLC
+  ;; Things that should definately not be included in the grammar
+  ;; if produced as a pic or pdf
   (x   ::= variable-not-otherwise-mentioned)
-  (e   ::= () b i x l
-           (letrec ([x_!_ : τ l] ...) e)
+  ;; End things that must not be named 
+  (e   ::= () b i x f
+           (letrec ([x_!_ : τ f] ...) e)
            (let ([x_!_ : τ e] ...) e)
            (e e ...)
            (if e e e)
            (o e ...))
   (o ::= + - * =)
-  (l ::= (lambda ([x_!_ : τ] ...) e))
+  (f ::= (lambda ([x_!_ : τ] ...) e))
   (b ::= boolean)
   (i ::= integer)
-  (f ::= x (x : τ))
-  (τ ::= () Int Bool (τ ... -> τ)))
+
+  ;; Types
+  (ι ::= () Int Bool)
+  (τ ::= ι (τ ... -> τ)))
 
 ;; Example programs to test fvs, bvs, and =α
 (define xfree0  (term (lambda ([y : ()]) (lambda ([z : ()]) x))))
@@ -131,9 +137,9 @@
   (τ ::= any)
   (e ::= any)
   (m ::= e (K n n)
-         (letrec ([τ l] ...) m)
+         (letrec ([τ f] ...) m)
          (let ([τ m] ...) m))
-  (l ::= (lambda (τ ...) m))
+  (f ::= (lambda (τ ...) m))
   (n ::= natural)
   (Γ ::= ((x ...) ...)))
 
@@ -152,8 +158,8 @@
   [(sd/env x _) x]
   [(sd/env (lambda ([x_n : τ_n] ...) m) ((x ...) ...))
    (lambda (τ_n ...) (sd/env m ((x_n ...) (x ...) ...)))]
-  [(sd/env (letrec ([x : τ l] ...) e) (any_1 ...))
-   (letrec ([τ (sd/env l ((x ...) any_1 ...))] ...)
+  [(sd/env (letrec ([x : τ f] ...) e) (any_1 ...))
+   (letrec ([τ (sd/env f ((x ...) any_1 ...))] ...)
      (sd/env e ((x ...) any_1 ...)))]
   [(sd/env (let ([x : τ m_rhs] ...) m_body) (any_1 ...))
    (let([τ (sd/env m_rhs ((x ...) any_1 ...))] ...)
@@ -317,9 +323,9 @@
 
   [(where Γ_new (extend Γ (x_n ...) (τ_n ...)))
    (⊢ Γ_new e_body τ_body)
-   (⊢ Γ_new l_n τ_n) ...
+   (⊢ Γ_new f_n τ_n) ...
    ------------------------ "λletrec"
-   (⊢ Γ (letrec ([x_n : τ_n l_n] ...) e_body) τ_body)]
+   (⊢ Γ (letrec ([x_n : τ_n f_n] ...) e_body) τ_body)]
   
   [(where Γ_new (extend Γ (x_n ...) (τ_n ...)))
    (⊢ Γ_new e_body τ_body)
@@ -413,9 +419,9 @@
          (if C e e)
          (if e C e)
          (if e e C)
-         (letrec ([x_1 : τ_1 l_1] ...
+         (letrec ([x_1 : τ_1 f_1] ...
                   [x : τ (lambda ([x_l : τ_l]) C)]
-                  [x_2 : τ_2 l_2] ...)
+                  [x_2 : τ_2 f_2] ...)
            e)
          (letrec ([x : τ l] ...) C)
          (let ([x_1 : τ_1 e_1] ... [x : τ C] [x_2 : τ_2 e_1] ...) e)
@@ -452,8 +458,8 @@
         (in-hole C (δ o v ...))
         δ)
    ;; Letrecs get unrolled by one loop
-   (--> (in-hole C (letrec ([x : τ l] ...) e))
-        (in-hole C (subst ([x (letrec ([x : τ l] ...) l)] ...) e))
+   (--> (in-hole C (letrec ([x : τ f] ...) e))
+        (in-hole C (subst ([x (letrec ([x : τ f] ...) f)] ...) e))
         μ)
    ;; Branching conditionals
    (--> (in-hole C (if #t e_c e_a))
@@ -477,7 +483,7 @@
 ;; call by value semantics for the simply typed lambda calculus
 
 (define-extended-language STLC->cbv STLC->
-  (v ::= () i b l)
+  (v ::= () i b f)
   (E ::= hole (v ... E e ...) (if E e e) (o v ... E e ...)))
 
 (define s->βv
@@ -493,11 +499,11 @@
         δ)
    ;; Letrecs get unrolled by one loop
    (--> (in-hole E (letrec ([x : (τ_1 ...n -> τ_2)
-                               (lambda ([x_a : τ_1] ...n) e_l)] ...)
+                               (lambda ([x_a : τ_1] ...n) e_f)] ...)
                      e_b))
         (in-hole E (subst ([x (letrec ([x : (τ_1 ... -> τ_2)
-                                          (lambda ([x_a : τ_1] ...) e_l)] ...)
-                                (lambda ([x_a : τ_1] ...) e_l))] ...)
+                                          (lambda ([x_a : τ_1] ...) e_f)] ...)
+                                (lambda ([x_a : τ_1] ...) e_f))] ...)
                           e_b))
         μ)
    ;; Branching conditionals
@@ -529,10 +535,4 @@
        [(> (length t) 1) (printf "~a : Failed to find one type ~a\n" e t)]
        [else (printf "~a : ~a\n" e (car t))]))))
        
-
-(define-syntax-rule (test-true e)
-  (test-equal e #t))
-
-(define-syntax-rule (test-false e)
-  (test-equal e #f))
 
