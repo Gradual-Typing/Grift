@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require redex "./helpers.rkt")
+(require redex "stlc.rkt" "./helpers.rkt")
 
 (provide
  ;; The syntax of the gradually typed lambda calculus
@@ -8,61 +8,45 @@
  ;; Capture avoiding substitution
  ;; (subst '((xs es) ...) e) : metafunction
  ;; subsitute all xs for es in e renaming as needed to avoid capture
- subst
+ ;; subst
  ;; Alpha equivalence
  ;; (=α t1 t2) : metafunction
  ;; is t1 alpha equivalent to t2? 
- =α
- ;; (=α/racket t1 t2) racket function
- ;; is t1 alpha equivalent to t2? 
- =α/racket
+ ;; =α/racket
  ;; (⊢ ((xs Ts) ...) e T) : Judgement (⊢ I I O)
  ;; from the environment, ((xs Ts) ...), we can infer that expression
  ;; e is of type T.
- ⊢
+ ⊢_?
  ;; (≈ T G) is T consistent with G
  ≈
- )
+ ;; (≤ τ_1 τ_2 τ_3) The meet of τ₁ and τ₂ is τ₃ in the gradual lattice
+ ≤ 
+  )
 
-(define-language GTLC
-  (x   ::= variable-not-otherwise-mentioned)
-  ;; Expression
-  (e   ::= () b i x f
-       (letrec ([x_!_ : T f] ...) e)
-       (let ([x_!_ : T e] ...) e)
-       (e e ...)
-       (if e e e)
-       (o e ...)
-       (: e T))
-  (o ::= + - * =)
-  (f ::= (lambda ([x_!_ : T] ...) e))
-  (b   ::= boolean)
-  (i   ::= integer)
-  (fun-fml    ::=  x    (x : T))
-  (let-bnd    ::= (x e) (x : T e))
-  (letrec-bnd ::= (x f) (x : T f))
-  (lsym       ::= lambda λ)
-  ;; Labels
-  (l       ::= string)
-  ;; Optional Labels
-  (p q     ::= ε l)
-  ;; GTLC Types
-  (B       ::= () Int Bool)
-  (?       ::= Dyn)
-  (R S T U ::= B (T ... -> T) ?)
-  ;; Labeled Types
-  (P Q     ::= p))
+(check-redudancy #t)
+
+(define-extended-language GTLC STLC
+  ;; Expressions now allow ascription
+  (e   ::= .... (: e τ))
+  ;; Types now include the dynamic type
+  (?   ::= Dyn)
+  (τ   ::= .... ?)
+  ;; Begin extra patterns for pattern matching
+  (fun-fml    ::=  x    (x : τ))
+  (let-bnd    ::= (x e) (x : τ e))
+  (letrec-bnd ::= (x f) (x : τ f)))
 
 ;; λ is just syntax sugar that allows you to omit type annotations
 ;; if you actually mean dynamic.
 (define-metafunction GTLC
-  λ : (fun-fml ...) any any ... -> (lambda ([x : T] ...) any)
-  [(λ ((x_1 : S_1) ... x any_2 ...) any ...)
-   (λ ((x_1 : S_1) ... (x : Dyn) any_2 ...) any ...)]
-  [(λ ((x : S) ...) any_e)
-   (lambda ((x : S) ...) any_e)]
-  [(λ ((x : S) ...) : T any_e)
-   (lambda ((x : S) ...) (: any_e T))])
+  λ : (fun-fml ...) any any ... -> (lambda ([x : τ] ...) any)
+  [(λ ((x_1 : τ_1) ... x any_2 ...) any ...)
+   (λ ((x_1 : τ_1) ... (x : Dyn) any_2 ...) any ...)]
+  [(λ ((x : τ) ...) any_e)
+   (lambda ((x : τ) ...) any_e)]
+  [(λ ((x : τ_a) ...) : τ_r any_e)
+   (lambda ((x : τ_a) ...) (: any_e τ_r))])
+
 
 (module+ test
   (test-true (term (=α (λ (x) x) (lambda ([x : Dyn]) x))))
@@ -71,57 +55,56 @@
   (test-true (term (=α (λ (x [y : ()] z) y)
                        (lambda ([x : Dyn] [y : ()] [z : Dyn]) y)))))
 
-;; return T is the expression is an ascription otherwise Dyn
+;; return τ is the expression is an ascription otherwise Dyn
 (define-metafunction GTLC
-  ascription-or-dyn : e -> T
-  [(ascription-or-dyn (: _ T)) T]
+  ascription-or-dyn : e -> τ
+  [(ascription-or-dyn (: _ τ)) τ]
   [(ascription-or-dyn _)       Dyn])
 
 ;; Don't stack consistent ascriptions 
 (define-metafunction GTLC
-  ascribe : e T -> e
-  [(ascribe (: e S) T) (: e T)
-   (side-condition (term (compat S T)))]
-  [(ascribe e T) (: e T)])
+  ascribe : e τ -> e
+  [(ascribe (: e τ_1) τ_2) (: e τ_2)
+   (side-condition (term (compat τ_1 τ_2)))]
+  [(ascribe e τ) (: e τ)])
 
 ;; Give the least precise compatable type that is more precise
 ;; than either type given. IE greatest lower bound
 (define-metafunction GTLC
-  meet : T T -> T
-  [(meet ? T) T]
-  [(meet T ?) T]
-  [(meet T T) T]
-  [(meet (S_1 ..._n -> T_1)
-         (S_2 ..._n -> T_2))
-   ((meet S_1 S_2) ... -> (meet T_1 T_2))])
+  meet : τ τ -> τ
+  [(meet ? τ) τ]
+  [(meet τ ?) τ]
+  [(meet τ τ) τ]
+  [(meet (τ_1a ..._n -> τ_1r)
+         (τ_2a ..._n -> τ_2r))
+   ((meet τ_1a τ_2a) ... -> (meet τ_1r τ_2r))])
 
 (define (id x) x)
 
 (define-metafunction GTLC
-  compat : S T -> boolean
-  [(compat T T) #t]
-  [(compat T ?) #t]
-  [(compat ? T) #t]
-  [(compat (S_1 ..._n -> T_1) (S_2 ..._n -> T_2))
-   ,(andmap id (term ((compat T_1 T_2) (compat S_1 S_2) ...)))]
+  compat : τ τ -> boolean
+  [(compat τ τ) #t]
+  [(compat τ ?) #t]
+  [(compat ? τ) #t]
+  [(compat (τ_1a ..._n -> τ_1r) (τ_2a ..._n -> τ_2r))
+   ,(andmap id (term ((compat τ_1r τ_2r) (compat τ_1a τ_2) ...)))]
   [(compat _ _) #f])
 
 ;; ltr-fun->type build a function type from the type annotations
 ;; on a lambda.
 (define-metafunction GTLC
-  ltr-fun->type : f -> (S ... -> T)
-  [(ltr-fun->type (lambda ([x : S] ...) (: e T))) (S ... -> T)]
-  [(ltr-fun->type (lambda ([x : S] ...) e)) (S ... -> Dyn)])
+  ltr-fun->type : f -> (τ ... -> τ)
+  [(ltr-fun->type (lambda ([x : τ_a] ...) (: e τ_r))) (τ_a ... -> τ_r)]
+  [(ltr-fun->type (lambda ([x : τ_a] ...) e)) (τ_a ... -> Dyn)])
 
 (define-metafunction GTLC
-  ltr-meet-type : x T f -> [x : T f]
-  [(ltr-meet-type x (S_ann ... -> T_ann) (lambda ([x_fun : S_fun] ...) e))
-   [x : (S_meet ... -> T_meet)
-      (lambda ([x_fun : S_meet] ...)
-        (ascribe e T_meet))]
-   (where T_fun (ascription-or-dyn e))
-   (where (S_meet ... -> T_meet) (meet (S_ann ... -> T_ann)
-                                       (S_fun ... -> T_fun)))]
+  ltr-meet-type : x τ f -> [x : τ f]
+  [(ltr-meet-type x (τ_1a ... -> τ_1r) (lambda ([x_2 : τ_2a] ...) e))
+   [x : (τ_3a ... -> τ_3r)
+      (lambda ([x_2 : τ_3a] ...)
+        (ascribe e τ_3r))]
+   (where τ_2r (ascription-or-dyn e))
+   (where (τ_3a ... -> τ_3r) (meet (τ_1a ... -> τ_1r) (τ_2a ... -> τ_2r)))]
   ;; If inconsistent or so such just leave the types alone
   [(ltr-meet-type any_x any_t any_f) [any_x : any_t any_f]])
 
@@ -131,14 +114,14 @@
 ;; the annotations included in both the variable annotation and the
 ;; lambda on the right hand side.
 (define-metafunction GTLC
-  ltr : (letrec-bnd ...) e -> (letrec ([x : T f] ...) e)
-  [(ltr ([x_1 : T_1 f_1] ... [x f] any_2 ...) e)
-   (ltr ([x_1 : T_1 f_1] ...
+  ltr : (letrec-bnd ...) e -> (letrec ([x : τ f] ...) e)
+  [(ltr ([x_1 : τ_1 f_1] ... [x f] any_2 ...) e)
+   (ltr ([x_1 : τ_1 f_1] ...
          [x : (ltr-fun->type f) f]
          any_2 ...)
     e)]
-  [(ltr ([x : T f] ...) e)
-   (letrec ([ltr-meet-type x T f] ...)  e)])
+  [(ltr ([x : τ f] ...) e)
+   (letrec ([ltr-meet-type x τ f] ...)  e)])
 
 (define ns0 (term (ltr ([f (λ (x) x)]) (f f))))
 (define ns1
@@ -236,47 +219,51 @@
   (test-false (term (bv? x ,x!bound1))))
 
 ;; =α : are two expression alpha equivalent?
+#;
 (define-metafunction GTLC
   =α : any any -> boolean
   [(=α any_1 any_2) ,(equal? (term (sd any_1))
                              (term (sd any_2)))])
 
-(define (=α/racket t1 t2) (term (=α ,t1 ,t2)))
+#;(define (=α/racket t1 t2) (term (=α ,t1 ,t2)))
 
 ;; sd convert regular bindings
-(define-extended-language GTLCΔ GTLC
-  (T ::= any)
-  (e ::= any)
-  (m ::= e (K n n)
-         (letrec ([T l] ...) m)
-         (let ([T m] ...) m))
-  (l ::= (lambda (T ...) m))
-  (n ::= natural)
-  (Γ ::= ((x ...) ...)))
+#;
+  (define-extended-language GTLCΔ GTLC
+    (T ::= any)
+    (e ::= any)
+    (m ::= e (K n n)
+       (letrec ([T l] ...) m)
+       (let ([T m] ...) m))
+    (l ::= (lambda (T ...) m))
+    (n ::= natural)
+    (Γ ::= ((x ...) ...)))
 
-(define-metafunction GTLCΔ
-  sd : any -> any
-  [(sd any) (sd/env any ())])
+#;
+  (define-metafunction GTLCΔ
+    sd : any -> any
+    [(sd any) (sd/env any ())])
 
-(define-metafunction GTLCΔ
-  sd/env : m Γ -> m
-  [(sd/env x ((x_1 ...) ...
-              (x_2 ... x x_3 ...)
-              (x_4 ...) ...))
-   (K ,(length (term ((x_1 ...) ...)))
-      ,(length (term (x_2 ...))))
-   (where #f (in x (x_1 ... ...)))]
-  [(sd/env x _) x]
-  [(sd/env (lambda ([x_n : T_n] ...) m) ((x ...) ...))
-   (lambda (T_n ...) (sd/env m ((x_n ...) (x ...) ...)))]
-  [(sd/env (letrec ([x : T l] ...) e) (any_1 ...))
-   (letrec ([T (sd/env l ((x ...) any_1 ...))] ...)
-     (sd/env e ((x ...) any_1 ...)))]
-  [(sd/env (let ([x : T m_rhs] ...) m_body) (any_1 ...))
-   (let([T (sd/env m_rhs ((x ...) any_1 ...))] ...)
-     (sd/env m_body ((x ...) any_1 ...)))]
-  [(sd/env (m ...) Γ) ((sd/env m Γ) ...)]
-  [(sd/env e Γ) e])
+#;
+  (define-metafunction GTLCΔ
+    sd/env : m Γ -> m
+    [(sd/env x ((x_1 ...) ...
+                (x_2 ... x x_3 ...)
+                (x_4 ...) ...))
+     (K ,(length (term ((x_1 ...) ...)))
+        ,(length (term (x_2 ...))))
+     (where #f (in x (x_1 ... ...)))]
+    [(sd/env x _) x]
+    [(sd/env (lambda ([x_n : τ_n] ...) m) ((x ...) ...))
+     (lambda (τ_n ...) (sd/env m ((x_n ...) (x ...) ...)))]
+    [(sd/env (letrec ([x : τ l] ...) e) (any_1 ...))
+     (letrec ([T (sd/env l ((x ...) any_1 ...))] ...)
+       (sd/env e ((x ...) any_1 ...)))]
+    [(sd/env (let ([x : T m_rhs] ...) m_body) (any_1 ...))
+     (let([T (sd/env m_rhs ((x ...) any_1 ...))] ...)
+       (sd/env m_body ((x ...) any_1 ...)))]
+    [(sd/env (m ...) Γ) ((sd/env m Γ) ...)]
+    [(sd/env e Γ) e])
 
 (module+ test
   (test-true (term (=α (lambda ([x : ()]) x)
@@ -292,6 +279,7 @@
                        (lambda ([x : ()]) (lambda ([y : ()]) (x y))))))
   (test-false (term (=α (y x) (a b)))))
 
+#;
 (define-metafunction GTLC
   subst : ((x any) ...) any -> any
   [(subst ((x_0 any_0) ... (x any) (x_1 any_1) ...) x) any]
@@ -303,7 +291,7 @@
    ]
   [(subst ((x_0 any_0) ...) (letrec ([x_1 : any_t any_l] ...) any_e))
    (letrec ([x_new : any_t
-             (subst ((x_0 any_0) ...) (subst-raw ((x_1 x_new) ...) any_l))] ...)
+                   (subst ((x_0 any_0) ...) (subst-raw ((x_1 x_new) ...) any_l))] ...)
      (subst ((x_0 any_0) ...)
             (subst-raw ((x_1 x_new) ...) any_e)))
    (where (x_new ...) ,(variables-not-in (term (any_e x_0 ... any_l ... any_0 ...)) (term (x_1 ...))))]
@@ -312,7 +300,7 @@
      (subst ((x_0 any_0) ...) (subst-raw ((x_1 x_new) ...) any_e)))
    (where (x_new ...) ,(variables-not-in (term (any_e x_0 ... any_0 ...)) (term (x_1 ...))))]
   [(subst [(x_0 any_0) ...] (any ...)) ((subst [(x_0 any_0) ...]  any) ...)]
-  [(subst _ any) any #;,(error 'subst "unmatched term ~a" (term any))
+  [(subst _ any) any #;,(error 'subst "unmatched term ~a" (term any)) ;
    ])
 
 (module+ test
@@ -338,6 +326,7 @@
                          (x1 (z1 ((lambda ([a : Int]) (y a)) 1))))))))
 
 
+#;
 (define-metafunction GTLC
   subst-raw : ((x x) ...) any -> any
   [(subst-raw ((x_o1 x_n1) ... (x_o x_n) (x_o2 x_n2) ...) x_o) x_n]
@@ -401,70 +390,87 @@
 ;; Typing
 
 (define-extended-language GTLC/TC GTLC
-  (Γ  ::= ((x T) ...)))
+  (Γ  ::= ((x τ) ...)))
 
 (define-judgment-form GTLC/TC
   #:mode (≈ I I)
-  #:contract (≈ T T)
+  #:contract (≈ τ τ)
 
   [------------------------ "≈Refl"
-            (≈ T T)]
+            (≈ τ τ)]
 
   [------------------------ "≈Right"
-            (≈ ? T)]
+            (≈ ? τ)]
   [------------------------ "≈Left"
-            (≈ T ?)]
+            (≈ τ ?)]
 
-  [       (≈ S_1 S_2) ... (≈ T_1 T_2)
+  [(≈ τ_1a τ_2a) ... (≈ τ_1r τ_2r)
    ---------------------------------------- "≈Cong"
-   (≈ (S_1 ..._n -> T_1) (S_2 ..._n -> T_2))])
+   (≈ (τ_1a ..._n -> τ_1r) (τ_2a ..._n -> τ_2r))])
+
 
 (define-judgment-form GTLC/TC
-  #:mode (⊢ I I O)
-  #:contract (⊢ Γ e T)
-  [(where (some T) (lookup Γ x))
+  #:mode (≤ I I O)
+  #:contract (≤ τ τ τ)
+
+  [------------------------ "≤Refl"
+   (≤ τ τ τ)]
+
+  [------------------------ "≤Right"
+   (≤ ? τ τ)]
+  [------------------------ "≤Left"
+   (≤ τ ? τ)]
+
+  [(≤ τ_1a τ_2a τ_3a) ... (≤ τ_1r τ_2r τ_3r)
+   ---------------------------------------- "≤Cong"
+   (≤ (τ_1a ..._n -> τ_1r) (τ_2a ..._n -> τ_2r) (τ_3a ... -> τ_3r))])
+
+(define-judgment-form GTLC/TC
+  #:mode (⊢_? I I O)
+  #:contract (⊢_? Γ e τ)
+  [(where (some τ) (lookup Γ x))
    ------------------------ "var"
-          (⊢ Γ x T)]
+          (⊢_? Γ x τ)]
 
-  [------------------------ "⊢()"
-          (⊢ Γ () ())]
+  [------------------------ "⊢_?()"
+          (⊢_? Γ () ())]
 
-  [------------------------ "⊢Int"
-          (⊢ Γ i Int)]
+  [------------------------ "⊢_?Int"
+          (⊢_? Γ i Int)]
 
-  [------------------------ "⊢Bool"
-          (⊢ Γ b Bool)]
+  [------------------------ "⊢_?Bool"
+          (⊢_? Γ b Bool)]
   
-  [(where Γ_ν (extend Γ (x_d T_d) ...))
-                        (⊢ Γ_ν e T_r)
-   ------------------------------------------------------- "⊢lam"
-   (⊢ Γ (lambda ([x_d : T_d] ...) e) (T_d ... -> T_r))]
+  [(where Γ_ν (extend Γ (x_a τ_a) ...)) (⊢_? Γ_ν e τ_r)
+   ------------------------------------------------------- "⊢_?lam"
+   (⊢_? Γ (lambda ([x_a : τ_a] ...) e) (τ_a ... -> τ_r))]
 
-  [(where Γ_ν (extend Γ (x S) ...))
-   (⊢ Γ_ν f S) ... (⊢ Γ_ν e T)
-   ----------------------------------- "⊢letrec"
-   (⊢ Γ (letrec ([x : S f] ...) e) T)]
+  [(where Γ_ν (extend Γ (x_b τ_b) ...))
+   (⊢_? Γ_ν f_b τ_b) ... (⊢_? Γ_ν e τ)
+   ----------------------------------- "⊢_?letrec"
+   (⊢_? Γ (letrec ([x_b : τ_b f_b] ...) e) τ)]
   
-  [(where Γ_new (extend Γ (x S) ...))
-   (⊢ Γ e S_rhs) ... (≈ S S_rhs) ... (⊢ Γ_new e_body T)
-   --------------------------------------- "⊢let"
-   (⊢ Γ (let ([x : S e] ...) e_body) T)]
+  [(where Γ_b (extend Γ (x_b τ_b) ...))
+   (⊢_? Γ e_b τ_e) ... (≈ τ_b τ_e) ... (⊢_? Γ_b e τ)
+   --------------------------------------- "⊢_?let"
+   (⊢_? Γ (let ([x_b : τ_b e_b] ...) e) τ)]
 
-  [(⊢ Γ e_0 (S_n ..._n -> T_r)) (⊢ Γ e_1 T_n) ... (≈ T_n S_n) ...
-   -------------------------------------------------------------- "⊢app-fun"
-   (⊢ Γ (e_0 e_1 ..._n) T_r)]
+  [(⊢_? Γ e_f (τ_1a ..._n -> τ_r)) (⊢_? Γ e_a τ_2a) ... (≈ τ_1a τ_2a) ...
+   -------------------------------------------------------------- "⊢_?app-fun"
+   (⊢_? Γ (e_f e_a ..._n) τ_r)]
 
-  [(⊢ Γ e_0 ?) (⊢ Γ e_1 T_1) ...
-   -------------------------------"⊢app-?"
-   (⊢ Γ (e_0 e_1 ..._n) Dyn)]
+  [(⊢_? Γ e_0 ?) (⊢_? Γ e τ) ...
+   -------------------------------"⊢_?app-?"
+   (⊢_? Γ (e_0 e ..._n) Dyn)]
     
-  [(where (T ..._n -> T_r) (tyop o))
-   (⊢ Γ e T) ...
-   ------------------------ "⊢app-op"
-   (⊢ Γ (o e ..._n) T_r)]
-  [(⊢ Γ e_t T_t) (≈ T_t Bool) (⊢ Γ e_c T) (⊢ Γ e_a S) (≈ S T)
-   ------------------------ "⊢if"
-   (⊢ Γ (if e_t e_c e_a) T)])
+  [(where (τ_a ..._n -> τ_r) (tyop o))
+   (⊢_? Γ e_a τ_a) ...
+   ------------------------ "⊢_?app-op"
+   (⊢_? Γ (o e_a ..._n) τ_r)]
+  [(⊢_? Γ e_t τ_t) (≈ τ_t Bool)
+   (⊢_? Γ e_c τ_c) (⊢_? Γ e_a τ_a) (≤ τ_c τ_a τ_meet)
+   ------------------------ "⊢_?if"
+   (⊢_? Γ (if e_t e_c e_a) τ_meet)])
 
 (define-metafunction GTLC
   tyop : o -> any
@@ -527,30 +533,30 @@
 
 (module+ test
   (test-true (redex-match? GTLC/TC Γ '()))
-  (test-true (redex-match? GTLC/TC (lambda ([x_m : T_n] ...) e) fst0))
-  (test-true (redex-match? GTLC/TC T (term (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ ((x ())) x ())))
-  (test-true (judgment-holds (⊢ () ,fst0  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,fst1  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,fst10 (() () -> ()))))
-  (test-true (judgment-holds (⊢ () ,fst11 (() () -> ()))))
-  (test-true (judgment-holds (⊢ () ,snd0  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,snd1  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,snd10 (() () -> ()))))
+  (test-true (redex-match? GTLC/TC (lambda ([x_m : τ_n] ...) e) fst0))
+  (test-true (redex-match? GTLC/TC τ (term (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢_? ((x ())) x ())))
+  (test-true (judgment-holds (⊢_? () ,fst0  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢_? () ,fst1  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢_? () ,fst10 (() () -> ()))))
+  (test-true (judgment-holds (⊢_? () ,fst11 (() () -> ()))))
+  (test-true (judgment-holds (⊢_? () ,snd0  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢_? () ,snd1  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢_? () ,snd10 (() () -> ()))))
   (redex-let GTLC ([e_g  good]
                    [e_g1 good1]
                    [e_g2 good2]
                    [e_g3 good3])
-             (test-true  (judgment-holds (⊢ () e_g Int)))
-             (test-true  (judgment-holds (⊢ () e_g1 Int)))
-             (test-true  (judgment-holds (⊢ () e_g2 Int)))
-             (test-true  (judgment-holds (⊢ () e_g3 Int))))
+             (test-true  (judgment-holds (⊢_? () e_g Int)))
+             (test-true  (judgment-holds (⊢_? () e_g1 Int)))
+             (test-true  (judgment-holds (⊢_? () e_g2 Int)))
+             (test-true  (judgment-holds (⊢_? () e_g3 Int))))
   
-  (test-false (judgment-holds (⊢ () ,bad Int)))
+  (test-false (judgment-holds (⊢_? () ,bad Int)))
   (redex-let GTLC ([e_f5 fact5]
                 [e_o5 odd5])
-    (test-true (judgment-holds (⊢ () e_f5 Int)))
-    (test-true (judgment-holds (⊢ () e_o5 Bool)))))
+    (test-true (judgment-holds (⊢_? () e_f5 Int)))
+    (test-true (judgment-holds (⊢_? () e_o5 Bool)))))
 
 ;; TODO I could show at this point that all well typed stlc programs
 ;; are well typed in gtlc.

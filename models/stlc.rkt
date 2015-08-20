@@ -28,19 +28,19 @@
 (define-language STLC
   ;; Things that should definately not be included in the grammar
   ;; if produced as a pic or pdf
-  (x   ::= variable-not-otherwise-mentioned)
+  (x ::= variable-not-otherwise-mentioned)
+  (b ::= boolean)
+  (i ::= integer)
   ;; End things that must not be named 
   (e   ::= () b i x f
            (letrec ([x_!_ : τ f] ...) e)
            (let ([x_!_ : τ e] ...) e)
+           (o e ...)
            (e e ...)
-           (if e e e)
-           (o e ...))
-  (o ::= + - * =)
+           (if e e e))
   (f ::= (lambda ([x_!_ : τ] ...) e))
-  (b ::= boolean)
-  (i ::= integer)
-
+  ;;
+  (o ::= + - * =)
   ;; Types
   (ι ::= () Int Bool)
   (τ ::= ι (τ ... -> τ)))

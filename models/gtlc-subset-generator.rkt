@@ -1,275 +1,350 @@
 #lang racket/base
 
-(require redex "gtlc.rkt")
+(require redex "gtlc.rkt" "helpers.rkt")
 
-(define-language GTLC/GEN
-  (x   ::= variable-not-otherwise-mentioned)
+;; Since languages and rules must be free of ellipsis, unquote, and contexts
+;; We are doing a more verbose estimate of the original language
+(define-language Estimate-GTLC
   ;; Expression
-  (e   ::= b i x f
-       (letrec ([x : T f]) e)
-       (letrec ([x : T f]
-                [x : T f])
+  (e   ::= app (if e e e) (: e τ) b i x f lt ltr)
+  (lt ::=
+      (let () e)
+      (let ([x : τ e]) e)
+      (let ([x_!_ : τ e]
+            [x_!_ : τ e])
+        e)
+      (let ([x_!_ : τ e]
+            [x_!_ : τ e]
+            [x_!_ : τ e])
+        e))
+  (ltr ::=
+       (letrec () e)
+       (letrec ([x : τ f]) e)
+       (letrec ([x_!_ : τ f]
+                [x_!_ : τ f])
          e)
-       (let ([x : T e]) e)
-       (let ([x : T e]
-             [x : T e])
-         e)
+       (letrec ([x_!_ : τ f]
+                [x_!_ : τ f]
+                [x_!_ : τ f])
+         e))
+  (app ::=
        ()
        (e)
        (e e)
        (e e e)
        (e e e e)
-       (if e e e)
-       (o e e)
-       (: e T))
-  (o ::= + - * =)
+       (o e e))
   (f ::= (lambda () e)
-         (lambda ([x : T]) e)
-         (lambda ([x : T] [x : T]) e)
-         (lambda ([x : T] [x : T] [x : T]) e))
-  (b   ::= boolean)
-  (i   ::= integer)
-  ;; Labels
-  (l       ::= string)
-  ;; Optional Labels
-  (p q     ::= ε l)
+         (lambda ([x_!_ : τ]) e)
+         (lambda ([x_!_ : τ] [x_!_ : τ]) e)
+         (lambda ([x_!_ : τ] [x_!_ : τ] [x_!_ : τ]) e))
   ;; GTLC Types
-  (B       ::= () Int Bool)
-  (?       ::= Dyn)
-  (A       ::= (-> T) (T -> T) (T T -> T) (T T T -> T))
-  (R S T U ::= B A ?)
-  ;; Labeled Types
-  (P Q     ::= p)
-  (Γ ::= () (Γ x T)))
+  (ι ::= () Int Bool)
+  (? ::= Dyn)
+  (A ::= (-> τ) (τ -> τ) (τ τ -> τ) (τ τ τ -> τ))
+  (τ ::= ι A ?)
+  ;; Patterns that are necissary but unimportant
+  (b ::= boolean)
+  (i ::= integer)
+  (o ::= + - * =)
+  (x ::= variable-not-otherwise-mentioned)
+  (Γ ::= · (x τ Γ)))
 
-(define-metafunction GTLC/GEN
-  tyop/gen : o -> T
-  [(tyop/gen +) (Int Int -> Int)]
-  [(tyop/gen -) (Int Int -> Int)]
-  [(tyop/gen *) (Int Int -> Int)]
-  [(tyop/gen =) (Int Int -> Bool)])
+(define-lang-lookupo Estimate-GTLC (lookupo lookup Γ x τ))
+(define-lang-extendo Estimate-GTLC (extendo extend Γ x τ))
 
-(define-judgment-form GTLC/GEN
-  #:mode (≈/gen I I)
-  #:contract (≈/gen T T)
+(define-metafunction Estimate-GTLC
+  tyop : o -> τ
+  [(tyop +) (Int Int -> Int)]
+  [(tyop -) (Int Int -> Int)]
+  [(tyop *) (Int Int -> Int)]
+  [(tyop =) (Int Int -> Bool)])
+
+
+(define-judgment-form Estimate-GTLC
+  #:mode (~≈ I I)
+  #:contract (~≈ τ τ)
   [------------------------ "≈Refl"
-            (≈/gen T T)]
+            (~≈ τ τ)]
 
   [------------------------ "≈Right"
-            (≈/gen ? T)]
+            (~≈ ? τ)]
   [------------------------ "≈Left"
-            (≈/gen T ?)]
-  [(≈/gen T_1 T_2)
+            (~≈ τ ?)]
+  [(~≈ τ_1 τ_2)
    ---------------------------------------- "≈Cong0"
-   (≈/gen (-> T_1) (-> T_2))]
-  [(≈/gen T_1 T_2)
-   (≈/gen S_11 S_21)
+   (~≈ (-> τ_1) (-> τ_2))]
+  [(~≈ τ_1 τ_2)
+   (~≈ τ_11 τ_21)
    ---------------------------------------- "≈Cong1"
-   (≈/gen (S_11 -> T_1) (S_21 -> T_2))]
-  [(≈/gen T_1 T_2)
-   (≈/gen S_11 S_21)
-   (≈/gen S_12 S_22)
+   (~≈ (τ_11 -> τ_1) (τ_21 -> τ_2))]
+  [(~≈ τ_1 τ_2)
+   (~≈ τ_11 τ_21)
+   (~≈ τ_12 τ_22)
    ---------------------------------------- "≈Cong2"
-   (≈/gen (S_11 S_12 -> T_1) (S_21 S_22 -> T_2))]
-  [(≈/gen T_1 T_2)
-   (≈/gen S_11 S_21)
-   (≈/gen S_12 S_22)
-   (≈/gen S_13 S_23)
+   (~≈ (τ_11 τ_12 -> τ_1) (τ_21 τ_22 -> τ_2))]
+  [(~≈ τ_1 τ_2)
+   (~≈ τ_11 τ_21)
+   (~≈ τ_12 τ_22)
+   (~≈ τ_13 τ_23)
    ---------------------------------------- "≈Cong3"
-   (≈/gen (S_11 S_12 S_13 -> T_1) (S_21 S_22 S_23 -> T_2))])
+   (~≈ (τ_11 τ_12 τ_13 -> τ_1) (τ_21 τ_22 τ_23 -> τ_2))])
 
 (module+ test
-  (redex-check GTLC/GEN #:satisfying (≈/gen T_1 T_2)
-               (judgment-holds (≈ T_1 T_2))
+  (redex-check Estimate-GTLC #:satisfying (~≈ τ_1 τ_2)
+               (judgment-holds (≈ τ_1 τ_2))
                #:attempts 20))
 
-(define-judgment-form GTLC/GEN
-  #:mode (≤/gen I I O)
-  #:contract (≤/gen T T T)
+(define-judgment-form Estimate-GTLC
+  #:mode (~≤ I I O)
+  #:contract (~≤ τ τ τ)
   [------------------------ "≤Refl"
-            (≤/gen T T T)]
+            (~≤ τ τ τ)]
 
   [------------------------ "≤Right"
-            (≤/gen ? T T)]
+            (~≤ ? τ τ)]
   [------------------------ "≤Left"
-            (≤/gen T ? T)]
-  [(≤/gen T_1 T_2 T_3)
+            (~≤ τ ? τ)]
+  [(~≤ τ_1 τ_2 τ_3)
    ---------------------------------------- "≤Cong0"
-   (≤/gen (-> T_1) (-> T_2) (-> T_3))]
-  [(≤/gen T_1 T_2 T_3)
-   (≤/gen S_11 S_21 S_31)
+   (~≤ (-> τ_1) (-> τ_2) (-> τ_3))]
+  [(~≤ τ_1 τ_2 τ_3)
+   (~≤ τ_11 τ_21 τ_31)
    ---------------------------------------- "≤Cong1"
-   (≤/gen (S_11 -> T_1) (S_21 -> T_2) (S_31 -> T_3))]
-  [(≤/gen T_1 T_2 T_3)
-   (≤/gen S_11 S_21 S_31)
-   (≤/gen S_12 S_22 S_32)
+   (~≤ (τ_11 -> τ_1) (τ_21 -> τ_2) (τ_31 -> τ_3))]
+  [(~≤ τ_1 τ_2 τ_3)
+   (~≤ τ_11 τ_21 τ_31)
+   (~≤ τ_12 τ_22 τ_32)
    ---------------------------------------- "≤Cong2"
-   (≤/gen (S_11 S_12 -> T_1) (S_21 S_22 -> T_2) (S_31 S_32 -> T_3))]
-  [(≤/gen T_1 T_2 T_3)
-   (≤/gen S_11 S_21 S_31)
-   (≤/gen S_12 S_22 S_32)
-   (≤/gen S_13 S_23 S_33)
+   (~≤ (τ_11 τ_12 -> τ_1) (τ_21 τ_22 -> τ_2) (τ_31 τ_32 -> τ_3))]
+  [(~≤ τ_1 τ_2 τ_3)
+   (~≤ τ_11 τ_21 τ_31)
+   (~≤ τ_12 τ_22 τ_32)
+   (~≤ τ_13 τ_23 τ_33)
    ---------------------------------------- "≤Cong3"
-   (≤/gen (S_11 S_12 S_13 -> T_1) (S_21 S_22 S_23 -> T_2) (S_31 S_32 S_33 -> T_3))])
+   (~≤ (τ_11 τ_12 τ_13 -> τ_1) (τ_21 τ_22 τ_23 -> τ_2) (τ_31 τ_32 τ_33 -> τ_3))])
 
 
 (module+ test
-  (redex-check GTLC/GEN #:satisfying (≤/gen T_1 T_2 T_3)
-               (and (judgment-holds (≈ T_1 T_2))
-                    (judgment-holds (≈ T_1 T_3))
-                    (judgment-holds (≈ T_2 T_3)))
+  (redex-check Estimate-GTLC #:satisfying (~≤ τ_1 τ_2 τ_3)
+               (and (judgment-holds (≈ τ_1 τ_2))
+                    (judgment-holds (≈ τ_1 τ_3))
+                    (judgment-holds (≈ τ_2 τ_3)))
                #:attempts 20))
 
+(define-judgment-form Estimate-GTLC
+  #:mode (wt I O)
+  #:contract (wt e τ)
+  [   (wt/env · e τ)
+   --------------------- "Well Typed"
+        (wt e τ)])
 
-(define-judgment-form GTLC/GEN
-  #:mode (extendo I I I O)
-  #:contract (extendo Γ x T Γ)
-  [----------------------------- "Γ Cons"
-    (extendo Γ x T (Γ x T))])
-
-(define-judgment-form GTLC/GEN
-  #:mode (lookupo I I O)
-  #:contract (lookupo Γ x T)
-  [----------------------------- "Γ head"
-   (lookupo (Γ x T) x T)]
-  [(where #f (same? x_1 x_2))
-   (lookupo Γ x_2 T)
-   ----------------------------- "Γ tail"
-   (lookupo (Γ x_1 _) x_2 T)])
-
-(module+ test
-  (redex-check GTLC/GEN #:satisfying (extendo Γ x T Γ_new)
-               (judgment-holds (lookupo Γ_new x T))
-               #:attempts 20))
-
-
-(define-metafunction GTLC/GEN
-  same? : any any -> boolean
-  [(same? any_1 any_1) #t]
-  [(same? _ _) #f])
-
-(define-judgment-form GTLC/GEN
-  #:mode (⊢/gen I I O)
-  #:contract (⊢/gen Γ e T)
-  [     (lookupo Γ x T)
-   ------------------------ "var"
-        (⊢/gen Γ x T)]
+(define-judgment-form Estimate-GTLC
+  #:mode (wt/env I I O)
+  #:contract (wt/env Γ e τ)
+  [(where (some τ) (lookup Γ x))
+   ------------------------"~var"
+   (wt/env Γ x τ)]
 
   [------------------------ "genInt"
-        (⊢/gen Γ i Int)]
+                            (wt/env Γ i Int)]
 
   [------------------------ "genBool"
-        (⊢/gen Γ b Bool)]
-  
-  [(⊢/gen Γ e T_r)          
+                            (wt/env Γ b Bool)]
+
+  ;;lambda ----------------------------------------------------------------------
+  [(wt/env Γ e τ_r)          
    ------------------------------------------------------- "genlam0"
-   (⊢/gen Γ (lambda () e) (-> T_r))]
+   (wt/env Γ (lambda () e) (-> τ_r))]
 
-  [(extendo Γ x_1 T_1 Γ_1)
-   (⊢/gen Γ_1 e T_r)
+  [(where Γ_1 (extend Γ x_1 τ_1))
+   (wt/env Γ_1 e τ_r)
    ------------------------------------------------------- "genlam1"
-   (⊢/gen Γ (lambda ([x_1 : T_1]) e) (T_1 -> T_r))]
+   (wt/env Γ (lambda ([x_1 : τ_1]) e) (τ_1 -> τ_r))]
 
-  [(where #f (same? x_1 x_2))
-   (extendo Γ   x_1 T_1 Γ_1)
-   (extendo Γ_1 x_2 T_2 Γ_2)
-   (⊢/gen Γ_2 e T_r)
+  [(where Γ_1 (extend Γ   x_1 τ_1))
+   (where Γ_2 (extend Γ_1 x_2 τ_2))
+   (wt/env Γ_2 e τ_r)
    ------------------------------------------------------- "genlam2"
-   (⊢/gen Γ (lambda ([x_1 : T_1] [x_2 : T_2]) e) (T_1 T_2 -> T_r))]
+   (wt/env Γ (lambda ([x_1 : τ_1] [x_2 : τ_2]) e) (τ_1 τ_2 -> τ_r))]
 
-  [(where #f (same? x_1 x_2))
-   (where #f (same? x_1 x_3))
-   (where #f (same? x_2 x_3))
-   (extendo Γ   x_1 T_1 Γ_1)
-   (extendo Γ_1 x_2 T_2 Γ_2)
-   (extendo Γ_2 x_3 T_3 Γ_3)
-   (⊢/gen Γ_3 e T_r)
+  [(where Γ_1 (extend Γ   x_1 τ_1))
+   (where Γ_2 (extend Γ_1 x_2 τ_2))
+   (where Γ_3 (extend Γ_2 x_3 τ_3))
+   (wt/env Γ_3 e τ_r)
    ------------------------------------------------------- "genlam3"
-   (⊢/gen Γ (lambda ([x_1 : T_1] [x_2 : T_2] [x_3 : T_3]) e) (T_1 T_2 T_3 -> T_r))]
+   (wt/env Γ (lambda ([x_1 : τ_1] [x_2 : τ_2] [x_3 : τ_3]) e) (τ_1 τ_2 τ_3 -> τ_r))]
 
-  [(extendo Γ x S Γ_1) (⊢/gen Γ_1 f S) (⊢/gen Γ_1 e T)
-   ----------------------------------- "genletrec1"
-   (⊢/gen Γ (letrec ([x : S f]) e) T)]
-  [(where #f (same? x_1 x_2))
-   (extendo Γ   x_1 S_1 Γ_1)
-   (extendo Γ_1 x_2 S_2 Γ_2)
-   (⊢/gen Γ_2 f_1 S_1)
-   (⊢/gen Γ_2 f_2 S_2)
-   (⊢/gen Γ_2 e T)
-   ----------------------------------- "genletrec2"
-   (⊢/gen Γ (letrec ([x_1 : S_1 f_1]
-                     [x_2 : S_2 f_2])
-              e) T)]
-
-  [(extendo Γ x_1 S_1 Γ_1)
-   (⊢/gen Γ e_1 S_1)
-   (⊢/gen Γ_1 e T)
-   ----------------------------------- "genlet2"
-   (⊢/gen Γ (let ([x_1 : S_1 e_1])
-              e) T)]
+  ;;let ----------------------------------------------------------------------
+  [(wt/env Γ e τ)
+   ----------------------------------- "wt-let0"
+   (wt/env Γ (let () e) τ)]
   
-  [(where #f (same? x_1 x_2))
-   (extendo Γ   x_1 S_1 Γ_1)
-   (extendo Γ_1 x_2 S_2 Γ_2)
-   (⊢/gen Γ e_1 S_1)
-   (⊢/gen Γ e_2 S_2)
-   (⊢/gen Γ_2 e T)
-   ----------------------------------- "genlet1"
-   (⊢/gen Γ (let ([x_1 : S_1 e_1]
-                  [x_2 : S_2 e_2])
-              e) T)]
+  [(where Γ_1 (extend Γ x_1 τ_1))
+   (wt/env Γ e_1 τ_e1) (~≈ τ_e1 τ_1)
+   (wt/env Γ_1 e τ)
+   ----------------------------------- "wt-let1"
+   (wt/env Γ (let ([x_1 : τ_1 e_1])
+               e) τ)]
+  
+  [(where Γ_1 (extend Γ   x_1 τ_1))
+   (where Γ_2 (extend Γ_1 x_2 τ_2))
+   (wt/env Γ e_1 τ_e1) (~≈ τ_e1 τ_1)
+   (wt/env Γ e_2 τ_e2) (~≈ τ_e2 τ_2)
+   (wt/env Γ_2 e τ)
+   ----------------------------------- "wt-let2"
+   (wt/env Γ (let ([x_1 : τ_1 e_1]
+                   [x_2 : τ_2 e_2])
+               e) τ)]
 
+  [(where Γ_1 (extend Γ   x_1 τ_1))
+   (where Γ_2 (extend Γ_1 x_2 τ_2))
+   (where Γ_3 (extend Γ_2 x_3 τ_3))
+   (wt/env Γ    e_1 τ_e1) (~≈ τ_e1 τ_1)
+   (wt/env Γ    e_2 τ_e2) (~≈ τ_e2 τ_2)
+   (wt/env Γ    e_3 τ_e3) (~≈ τ_e3 τ_3)
+   (wt/env Γ_3 e   τ)
+   ----------------------------------- "wt-let3"
+   (wt/env Γ (let ([x_1 : τ_1 e_1]
+                   [x_2 : τ_2 e_2]
+                   [x_3 : τ_3 e_3])
+               e) τ)]
+  
+  ;;letrec ----------------------------------------------------------------------
+  [(wt/env Γ e τ)
+   ----------------------------------- "genletrec0"
+   (wt/env Γ (letrec () e) τ)]
+  
+  [(where Γ_1 (extend Γ x S))
+   (wt/env Γ_1 f S)
+   (wt/env Γ_1 e τ)
+   ----------------------------------- "genletrec1"
+   (wt/env Γ (letrec ([x : S f]) e) τ)]
+
+  [(where Γ_1 (extend Γ   x_1 τ_1))
+   (where Γ_2 (extend Γ_1 x_2 τ_2))
+   (wt/env Γ_2 f_1 τ_1)
+   (wt/env Γ_2 f_2 τ_2)
+   (wt/env Γ_2 e   τ)
+   ----------------------------------- "genletrec2"
+   (wt/env Γ (letrec ([x_1 : τ_1 f_1]
+                      [x_2 : τ_2 f_2])
+               e) τ)]
+
+  [(where Γ_1 (extend Γ   x_1 τ_1))
+   (where Γ_2 (extend Γ_1 x_2 τ_2))
+   (where Γ_3 (extend Γ_2 x_3 τ_3))
+   (wt/env Γ_3 f_1 τ_1)
+   (wt/env Γ_3 f_2 τ_2)
+   (wt/env Γ_3 f_3 τ_3)
+   (wt/env Γ_3 e   τ)
+   ----------------------------------- "genletrec3"
+   (wt/env Γ (letrec ([x_1 : τ_1 f_1]
+                      [x_2 : τ_2 f_2]
+                      [x_3 : τ_3 f_3])
+               e) τ)]
+
+  ;; application ----------------------------------------------------------------------
   [------------------------ "gen()"
-      (⊢/gen Γ () ())]
-  [(⊢/gen Γ e_0 (-> T_r))
+                            (wt/env Γ () ())]
+
+  [(wt/env Γ e_0 (-> τ_r))
    -------------------------------------------------------------- "genapp0-fun"
-   (⊢/gen Γ (e_0) T_r)]
-  [(⊢/gen Γ e_0 (S_1 -> T_r)) (⊢/gen Γ e_1 T_1) (≈/gen T_1 S_1)
+   (wt/env Γ (e_0) τ_r)]
+
+  [(wt/env Γ e_0 (τ_f1 -> τ_fr))
+   (wt/env Γ e_1 τ_1)
+   (~≈ τ_1 τ_f1)
    -------------------------------------------------------------- "genapp1-fun"
-   (⊢/gen Γ (e_0 e_1) T_r)]
-  [(⊢/gen Γ e_0 (S_1 S_2 -> T_r))
-   (⊢/gen Γ e_1 T_1) (≈/gen T_1 S_1) (⊢/gen Γ e_2 T_2) (≈/gen T_2 S_2)
+   (wt/env Γ (e_0 e_1) τ_fr)]
+
+  [(wt/env Γ e_0 (τ_f1 τ_f2 -> τ_fr))
+   (wt/env Γ e_1 τ_1) (~≈ τ_1 τ_f1)
+   (wt/env Γ e_2 τ_2) (~≈ τ_2 τ_f2)
    -------------------------------------------------------------- "genapp2-fun"
-   (⊢/gen Γ (e_0 e_1 e_2) T_r)]
-  [(⊢/gen Γ e_0 (S_1 S_2 S_3 -> T_r))
-   (⊢/gen Γ e_1 T_1) (≈/gen T_1 S_1) (⊢/gen Γ e_2 T_2) (≈/gen T_2 S_2) (⊢/gen Γ e_3 T_3) (≈/gen T_3 S_3)
+   (wt/env Γ (e_0 e_1 e_2) τ_fr)]
+
+  [(wt/env Γ e_0 (τ_f1 τ_f2 τ_f3 -> τ_fr))
+   (wt/env Γ e_1 τ_1) (~≈ τ_1 τ_f1)
+   (wt/env Γ e_2 τ_2) (~≈ τ_2 τ_f2)
+   (wt/env Γ e_3 τ_3) (~≈ τ_3 τ_f3)
    -------------------------------------------------------------- "genapp3-fun"
-   (⊢/gen Γ (e_0 e_1 e_2 e_3) T_r)]
+   (wt/env Γ (e_0 e_1 e_2 e_3) τ_fr)]
 
-  [(⊢/gen Γ e_0 Dyn)
+  [(wt/env Γ e_0 Dyn)
    -------------------------------------------------------------- "genapp?0-fun"
-   (⊢/gen Γ (e_0) Dyn)]
-  [(⊢/gen Γ e_0 Dyn)
-   (⊢/gen Γ e_1 T_1)
-   -------------------------------------------------------------- "genapp?1-fun"
-   (⊢/gen Γ (e_0 e_1) Dyn)]
-  [(⊢/gen Γ e_0 Dyn)
-   (⊢/gen Γ e_1 T_1) 
-   (⊢/gen Γ e_2 T_2)
-   -------------------------------------------------------------- "genapp?2-fun"
-   (⊢/gen Γ (e_0 e_1 e_2) Dyn)]
-  [(⊢/gen Γ e_0 Dyn)
-   (⊢/gen Γ e_1 T_1) 
-   (⊢/gen Γ e_2 T_2) 
-   (⊢/gen Γ e_3 T_3) 
-   -------------------------------------------------------------- "genapp?3-fun"
-   (⊢/gen Γ (e_0 e_1 e_2 e_3) Dyn)]
+   (wt/env Γ (e_0) Dyn)]
 
-  [(where (T_1 T_2 -> T_r) (tyop/gen o))
-   (⊢/gen Γ e_1 T_1)
-   (⊢/gen Γ e_2 T_2)
+  [(wt/env Γ e_0 Dyn)
+   (wt/env Γ e_1 τ_1)
+   -------------------------------------------------------------- "genapp?1-fun"
+   (wt/env Γ (e_0 e_1) Dyn)]
+
+  [(wt/env Γ e_0 Dyn)
+   (wt/env Γ e_1 τ_1) 
+   (wt/env Γ e_2 τ_2)
+   -------------------------------------------------------------- "genapp?2-fun"
+   (wt/env Γ (e_0 e_1 e_2) Dyn)]
+
+  [(wt/env Γ e_0 Dyn)
+   (wt/env Γ e_1 τ_1) 
+   (wt/env Γ e_2 τ_2) 
+   (wt/env Γ e_3 τ_3) 
+   -------------------------------------------------------------- "genapp?3-fun"
+   (wt/env Γ (e_0 e_1 e_2 e_3) Dyn)]
+
+  [(where (τ_f1 τ_f2 -> τ_fr) (tyop o))
+   (wt/env Γ e_1 τ_1) (~≈ τ_1 τ_f1) 
+   (wt/env Γ e_2 τ_2) (~≈ τ_2 τ_f2) 
    ------------------------ "genapp-op"
-   (⊢/gen Γ (o e_1 e_2) T_r)]
-  [(⊢/gen Γ e_t T_t)
-   (≈/gen T_t Bool)
-   (⊢/gen Γ e_c T_c)
-   (⊢/gen Γ e_a T_a)
-   (≈/gen T_c T_a)
-   (≤/gen T_c T_a T_meet)
+   (wt/env Γ (o e_1 e_2) τ_fr)]
+
+  [(wt/env Γ e_t τ_t) (~≈ τ_t Bool)
+   (wt/env Γ e_c τ_c)
+   (wt/env Γ e_a τ_a) (~≤ τ_c τ_a τ_meet)
    ------------------------ "gENIF"
-   (⊢/gen Γ (if e_t e_c e_a) T_meet)])
+   (wt/env Γ (if e_t e_c e_a) τ_meet)])
 
 (module+ test
-  (redex-check GTLC/GEN #:satisfying (⊢/gen () e T)
-               (judgment-holds (⊢ () e T))
-               #:attempts 10000))
+  (redex-check Estimate-GTLC #:satisfying (wt e ())
+               (begin
+                 (printf "\n() : ~a\n" (term e))
+                 (judgment-holds (⊢_? () e ())))
+               #:attempts 100
+               #:attempt-size (lambda a 1))
+
+  (redex-check Estimate-GTLC #:satisfying (wt e ι)
+               (begin
+                 (printf "\n~a : ~a\n" (term ι) (term e))
+                 (judgment-holds (⊢_? () e ι)))
+               #:attempts 100
+               #:attempt-size (lambda a 1))
+
+  (redex-check Estimate-GTLC #:satisfying (wt e any)
+               (begin
+                 (printf "\n~a : ~a\n" (term any) (term e))
+                 (flush-output)
+                 (judgment-holds (⊢_? () e any)))
+               #:attempts 100
+               #:attempt-size (lambda a 1))
+  (redex-check Estimate-GTLC #:satisfying (wt e any)
+               (begin
+                 (printf "\n~a : ~a\n" (term any) (term e))
+                 (flush-output)
+                 (judgment-holds (⊢_? () e any)))
+               #:attempts 100
+               #:attempt-size (lambda a 2))
+  (redex-check Estimate-GTLC #:satisfying (wt e any)
+               (begin
+                 (printf "\n~a : ~a\n" (term any) (term e))
+                 (flush-output)
+                 (judgment-holds (⊢_? () e any)))
+               #:attempts 1000
+               #:attempt-size (lambda a 3))
+  (redex-check Estimate-GTLC #:satisfying (wt e any)
+               (begin
+                 (printf "\n~a : ~a\n" (term any) (term e))
+                 (flush-output)
+                 (judgment-holds (⊢_? () e any)))
+               #:attempts 10000
+               #:attempt-size (lambda a 4)))
