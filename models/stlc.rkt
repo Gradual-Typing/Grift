@@ -1,10 +1,16 @@
 #lang racket
 
-(require redex "helpers.rkt")
+(require redex
+         "helpers.rkt"
+         "base.rkt")
+
+(module+ test
+  ;; Make sure that we test the entire stack of languages
+  (require (submod "base.rkt" test)))
 
 (provide
  ;; The syntax of the simply typeded lambda calculus
- STLC
+ STLC STLC/tc
  ;; Capture avoiding substitution
  ;; (subst '((xs es) ...) e) : metafunction
  ;; subsitute all xs for es in e renaming as needed to avoid capture
@@ -23,16 +29,16 @@
  ;; Reduction relation for the calculus
  -->β
  ;; Standard reduction relation for the call-by value semantics
- s->βv)
+ s->βv
+ ;; (tyop o) what is the type of o.
+ tyop)
 
-(define-language STLC
+(define-extended-language STLC BASE
   ;; Things that should definately not be included in the grammar
   ;; if produced as a pic or pdf
   (x ::= variable-not-otherwise-mentioned)
-  (b ::= boolean)
-  (i ::= integer)
   ;; End things that must not be named 
-  (e   ::= () b i x f
+  (e   ::= k x f
            (letrec ([x_!_ : τ f] ...) e)
            (let ([x_!_ : τ e] ...) e)
            (o e ...)
@@ -42,30 +48,38 @@
   ;;
   (o ::= + - * =)
   ;; Types
-  (ι ::= () Int Bool)
   (τ ::= ι (τ ... -> τ)))
 
-;; Example programs to test fvs, bvs, and =α
-(define xfree0  (term (lambda ([y : ()]) (lambda ([z : ()]) x))))
-(define xfree1  (term ((lambda ([x : ()]) x) x)))
-(define x!free0 (term (lambda ([x : ()]) x)))
-(define x!free1 (term (lambda ([x : ()]) (x x))))
+;;———————————————————————————————————————————————————–———————————————————–——————
+;; Scope helpers
 
-(define xbound0  (term (lambda ([x : ()]) (x x))))
-(define xbound1  (term ((lambda ([x : ()]) x) x)))
-(define x!bound0 (term (lambda ([y : ()]) (lambda ([z : ()]) x))))
-(define x!bound1 (term ((lambda ([x : ()]) z) x)))
+(define-metafunction STLC
+  in : any (any ...) -> boolean
+  [(in any_1 (any_n ... any_1 any_m ...)) #t]
+  [(in _ _) #f])
 
-(define fst0  (term (lambda ([x : ()]) (lambda ([y : ()]) x))))
-(define fst1  (term (lambda ([n : ()]) (lambda ([m : ()]) n))))
-(define fst10 (term (lambda ([x : ()] [y : ()]) x)))
-(define fst11 (term (lambda ([n : ()] [m : ()]) n)))
-(define snd0  (term (lambda ([x : ()]) (lambda ([y : ()]) y))))
-(define snd1  (term (lambda ([n : ()]) (lambda ([m : ()]) m))))
-(define snd10 (term (lambda ([x : ()] [y : ()]) y)))
-(define snd11 (term (lambda ([n : ()] [m : ()]) m)))
 
 (module+ test
+  ;; Example programs to test fvs, bvs, and =α
+  (define xfree0  (term (lambda ([y : ()]) (lambda ([z : ()]) x))))
+  (define xfree1  (term ((lambda ([x : ()]) x) x)))
+  (define x!free0 (term (lambda ([x : ()]) x)))
+  (define x!free1 (term (lambda ([x : ()]) (x x))))
+
+  (define xbound0  (term (lambda ([x : ()]) (x x))))
+  (define xbound1  (term ((lambda ([x : ()]) x) x)))
+  (define x!bound0 (term (lambda ([y : ()]) (lambda ([z : ()]) x))))
+  (define x!bound1 (term ((lambda ([x : ()]) z) x)))
+
+  (define fst0  (term (lambda ([x : ()]) (lambda ([y : ()]) x))))
+  (define fst1  (term (lambda ([n : ()]) (lambda ([m : ()]) n))))
+  (define fst10 (term (lambda ([x : ()] [y : ()]) x)))
+  (define fst11 (term (lambda ([n : ()] [m : ()]) n)))
+  (define snd0  (term (lambda ([x : ()]) (lambda ([y : ()]) y))))
+  (define snd1  (term (lambda ([n : ()]) (lambda ([m : ()]) m))))
+  (define snd10 (term (lambda ([x : ()] [y : ()]) y)))
+  (define snd11 (term (lambda ([n : ()] [m : ()]) m)))
+
   (test-true (redex-match? STLC e fst0))
   (test-true (redex-match? STLC e fst1))
   (test-true (redex-match? STLC e fst10))
@@ -76,13 +90,6 @@
   (test-true (redex-match? STLC e snd10))
   )
 
-;;———————————————————————————————————————————————————–———————————————————–——————
-;; Scope helpers
-
-(define-metafunction STLC
-  in : any (any ...) -> boolean
-  [(in any_1 (any_n ... any_1 any_m ...)) #t]
-  [(in _ _) #f])
 
 ;; fvs : Collect the unique free variables of a gradual expression
 (define-metafunction STLC
@@ -122,7 +129,9 @@
   (test-true  (term (bv? x ,xbound0)))
   (test-true  (term (bv? x ,xbound1)))
   (test-false (term (bv? x ,x!bound0)))
-  (test-false (term (bv? x ,x!bound1))))
+  (test-false (term (bv? x ,x!bound1)))
+  (get-coverage))
+
 
 ;; =α : are two expression alpha equivalent?
 (define-metafunction STLC
@@ -226,6 +235,13 @@
                                              (y a)) a1)))])
                          (x1 (z1 ((lambda ([a : Int]) (y a)) 1))))))))
 
+(define-environment-helpers STLC lookup extend)
+
+(module+ test
+  (test-equal (term (lookup ((x 1) (y 2) (z 3)) x)) (term (some 1)))
+  (test-equal (term (lookup ((x 1) (y 2) (z 3)) y)) (term (some 2)))
+  (test-equal (term (lookup ((x 1) (y 2) (z 3)) z)) (term (some 3)))
+  (test-equal (term (lookup ((x 1) (y 2) (z 3)) a)) (term (none))))
 
 (define-metafunction STLC
   subst-raw : ((x x) ...) any -> any
@@ -269,65 +285,33 @@
 (module+ test
   (test-true (term (=α ,fst0 (subst ((x a) (y b)) ,fst0)))))
 
-(define-metafunction STLC
-  lookup : ((any any) ...) any -> (none) or (some any)
-  [(lookup () _) (none)]
-  [(lookup ((any_a any_d) (any_a* any_d*) ...) any_a) (some any_d)]
-  [(lookup ((_ _) (any_a* any_d*) ...) any)
-   (lookup ((any_a* any_d*) ...) any)])
-
-(module+ test
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) x)) (term (some 1)))
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) y)) (term (some 2)))
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) z)) (term (some 3)))
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) a)) (term (none))))
-
-(define-metafunction STLC
-  extend : ((any any) ...) (any ..._n) (any ..._n) -> ((any any) ...)
-  [(extend (any_ad* ...) (any_a any_a* ...) (any_d any_d* ...))
-   (extend ((any_a any_d) any_ad* ...) (any_a* ...) (any_d* ...))]
-  [(extend any () ()) any])
-
-(module+ test
-  (test-equal (term (extend () (z y x) (3 2 1)))
-              (term ((x 1) (y 2) (z 3))))
-  (test-equal (term (extend ((z 3)) (y x) (2 1)))
-              (term ((x 1) (y 2) (z 3))))
-  (test-equal (term (extend ((y 2) (z 3)) (x) (1)))
-              (term ((x 1) (y 2) (z 3))))
-  (test-equal (term (extend ((x 1) (y 2) (z 3)) () ()))
-              (term ((x 1) (y 2) (z 3)))))
-
 ;;———————————————————————————————————————————————————–———————————————————–——————
 ;; Typing
 
-(define-extended-language STLCtc STLC
-  (Γ  ::= ((x τ) ...)))
+(define-extended-language STLC/tc STLC
+  (Γ  ::= ((x any) ...)))
 
-(define-judgment-form STLCtc
+(define-judgment-form STLC/tc
   #:mode (⊢ I I O)
-  #:contract (⊢ Γ e τ)
+  ;;#:contract (⊢ Γ e τ)
   [(where (some τ) (lookup Γ x))
    ------------------------ "λvar"
    (⊢ Γ x τ)]
-  [------------------------ "λ()"
-   (⊢ Γ () ())]
-  [------------------------ "λInt"
-   (⊢ Γ i Int)]
-  [------------------------ "λBool"
-   (⊢ Γ b Bool)]
-  [(where Γ_new (extend Γ (x_m ...) (τ_n ...)))
+  [(⊢_k k ι)
+   ------------------------ "⊢base"
+   (⊢ Γ k ι)]
+  [(where Γ_new (extend Γ ((x_m τ_n) ...)))
    (⊢ Γ_new e τ_r)
    ------------------------ "λlam"
    (⊢ Γ (lambda ([x_m : τ_n] ...) e) (τ_n ... -> τ_r))]
 
-  [(where Γ_new (extend Γ (x_n ...) (τ_n ...)))
+  [(where Γ_new (extend Γ ((x_n τ_n) ...)))
    (⊢ Γ_new e_body τ_body)
    (⊢ Γ_new f_n τ_n) ...
    ------------------------ "λletrec"
    (⊢ Γ (letrec ([x_n : τ_n f_n] ...) e_body) τ_body)]
   
-  [(where Γ_new (extend Γ (x_n ...) (τ_n ...)))
+  [(where Γ_new (extend Γ ((x_n τ_n) ...)))
    (⊢ Γ_new e_body τ_body)
    (⊢ Γ e_n τ_n) ...
    ------------------------ "λlet"
@@ -377,6 +361,13 @@
                                     (* x (fact (- x 1)))))])
                       (fact 5))))
 
+(define fact3 (term (letrec ([fact : (Int -> Int)
+                              (lambda ([x : Int])
+                                (if (= x 0)
+                                    1
+                                    (* x (fact (- x 1)))))])
+                      (fact 3))))
+
 (define odd5 (term (letrec ([even? : (Int -> Bool)
                              (lambda ([n : Int])
                                (if (= n 0)
@@ -390,9 +381,10 @@
                       (odd? 5))))
 
 (module+ test
-  (test-true (redex-match? STLCtc Γ '()))
-  (test-true (redex-match? STLCtc (lambda ([x_m : τ_n] ...) e) fst0))
-  (test-true (redex-match? STLCtc τ (term (() -> (() -> ())))))
+
+  (test-true (redex-match? STLC/tc Γ '()))
+  (test-true (redex-match? STLC/tc (lambda ([x_m : τ_n] ...) e) fst0))
+  (test-true (redex-match? STLC/tc τ (term (() -> (() -> ())))))
   (test-true (judgment-holds (⊢ ((x ())) x ())))
   (test-true (judgment-holds (⊢ () ,fst0  (() -> (() -> ())))))
   (test-true (judgment-holds (⊢ () ,fst1  (() -> (() -> ())))))
@@ -404,7 +396,7 @@
   (test-true  (judgment-holds (⊢ () ,good Int)))
   (test-false (judgment-holds (⊢ () ,bad Int)))
   (redex-let STLC ([e_f5 fact5]
-                [e_o5 odd5])
+                   [e_o5 odd5])
    (test-true (judgment-holds (⊢ () e_f5 Int)))
    (test-true (judgment-holds (⊢ () e_o5 Bool)))))
 
@@ -435,6 +427,7 @@
 (define ex3 (term ((,f1 (,f1 ,f0)) ,ex1)))
 
 (module+ test
+
   (test-true (judgment-holds (⊢ () ,ex1 ())))
   (test-true (judgment-holds (⊢ () ,f1 ((() -> ()) -> (() -> ())))))
   (test-true (judgment-holds (⊢ () ,ex2 ())))
@@ -471,13 +464,19 @@
 
 
 (module+ test
+  ;; Way Too long to run every time
+  ;;(test-->>∃ #:steps 10 -->β fact3 6)
+  #|
+  (add-coverage! -->β)
+  
+  (test-->>∃ #:steps 20 -->β odd5 #t)
+  (traces -->β odd5)
+  |#
   (test-->> -->β #:equiv =α/racket ex1 (term ()))
   (test-->> -->β #:equiv =α/racket ex2 (term ()))
   (test-->> -->β #:equiv =α/racket ex3 (term ()))
-  ;; Way Too long to run every time
-  #;(test-->>∃ #:steps 20 -->β fact5 120)
-  #;(test-->>∃ #:steps 20 -->β odd5 #t)
-  #;(traces -->β odd5))
+
+  )
 
 ;; ——————-
 ;; call by value semantics for the simply typed lambda calculus
@@ -516,23 +515,15 @@
    ))
 
 (module+ test
+  (add-coverage! s->βv)
+
   (test-->> s->βv #:equiv =α/racket ex1 (term ()))
   (test-->> s->βv #:equiv =α/racket ex2 (term ()))
   (test-->> s->βv #:equiv =α/racket ex3 (term ()))
-  (test-->> s->βv #:equiv =α/racket fact5 120)
+  (test-->> s->βv #:equiv =α/racket fact3 6)
   (test-->> s->βv #:equiv =α/racket odd5 #t))
 
 
-(module+ test (test-results)
-  (define wt-terms (make-hash))
-  #;  (for ([i (in-range 10)])
-   (let* ([e (generate-term #:source s->βv 2)]
-          [r (redex-match? STLC e e)]
-          [t (and r (judgment-holds (⊢ () ,e t) t))])
-     (cond
-       [(not r)   (printf "~a : Bad Syntax\n" e)]
-       [(null? t) (printf "~a : Fail Type Check\n" e)]
-       [(> (length t) 1) (printf "~a : Failed to find one type ~a\n" e t)]
-       [else (printf "~a : ~a\n" e (car t))]))))
+
        
 

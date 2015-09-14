@@ -2,6 +2,8 @@
 
 (require redex "gtlc.rkt" "helpers.rkt")
 
+(provide Estimate-GTLC wt)
+
 ;; Since languages and rules must be free of ellipsis, unquote, and contexts
 ;; We are doing a more verbose estimate of the original language
 (define-language Estimate-GTLC
@@ -290,20 +292,24 @@
    (wt/env Γ e_1 τ_1) 
    (wt/env Γ e_2 τ_2) 
    (wt/env Γ e_3 τ_3) 
-   -------------------------------------------------------------- "genapp?3-fun"
+   -------------------------------------------------------------- "wtapp?3"
    (wt/env Γ (e_0 e_1 e_2 e_3) Dyn)]
 
   [(where (τ_f1 τ_f2 -> τ_fr) (tyop o))
    (wt/env Γ e_1 τ_1) (~≈ τ_1 τ_f1) 
    (wt/env Γ e_2 τ_2) (~≈ τ_2 τ_f2) 
-   ------------------------ "genapp-op"
+   ------------------------ "wtOp"
    (wt/env Γ (o e_1 e_2) τ_fr)]
 
   [(wt/env Γ e_t τ_t) (~≈ τ_t Bool)
    (wt/env Γ e_c τ_c)
    (wt/env Γ e_a τ_a) (~≤ τ_c τ_a τ_meet)
-   ------------------------ "gENIF"
-   (wt/env Γ (if e_t e_c e_a) τ_meet)])
+   ------------------------ "wtIf"
+   (wt/env Γ (if e_t e_c e_a) τ_meet)]
+
+  [(wt/env Γ e τ_) (~≈ τ τ_)
+   ------------------------ "wt:"
+   (wt/env Γ (: e τ) τ)])
 
 (module+ test
   (redex-check Estimate-GTLC #:satisfying (wt e ())

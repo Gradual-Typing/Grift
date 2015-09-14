@@ -1,6 +1,9 @@
 #lang racket/base
 
-(require redex "stlc.rkt" "./helpers.rkt")
+(require redex
+         "base.rkt"
+         (except-in "stlc.rkt" tyop)
+         "./helpers.rkt")
 
 (provide
  ;; The syntax of the gradually typed lambda calculus
@@ -18,10 +21,20 @@
  ;; e is of type T.
  ⊢_?
  ;; (≈ T G) is T consistent with G
- ≈
+ compat ≈
  ;; (≤ τ_1 τ_2 τ_3) The meet of τ₁ and τ₂ is τ₃ in the gradual lattice
- ≤ 
-  )
+ meet ≤ 
+
+ λ
+ ltr
+ ;; For test programs you must import the test module
+ ;; (submod "gtlc.rkt" test)
+ )
+
+(module+ test
+  ;; terms that may be of use in testing other languages
+  (provide  good good1 good2 good3 odd5))
+
 
 (check-redudancy #t)
 
@@ -47,13 +60,19 @@
   [(λ ((x : τ_a) ...) : τ_r any_e)
    (lambda ((x : τ_a) ...) (: any_e τ_r))])
 
-
 (module+ test
-  (test-true (term (=α (λ (x) x) (lambda ([x : Dyn]) x))))
-  (test-true (term (=α (λ ([x : Int]) : Int x)
-                       (lambda ([x : Int]) (: x Int)))))
-  (test-true (term (=α (λ (x [y : ()] z) y)
-                       (lambda ([x : Dyn] [y : ()] [z : Dyn]) y)))))
+  (test-true
+   (term
+    (=α (λ (x) x)
+        (lambda ([x : Dyn]) x))))
+  (test-true
+   (term
+    (=α (λ ([x : Int]) : Int x)
+        (lambda ([x : Int]) (: x Int)))))
+  (test-true
+   (term
+    (=α (λ (x [y : ()] z) y)
+        (lambda ([x : Dyn] [y : ()] [z : Dyn]) y)))))
 
 ;; return τ is the expression is an ascription otherwise Dyn
 (define-metafunction GTLC
@@ -105,9 +124,9 @@
         (ascribe e τ_3r))]
    (where τ_2r (ascription-or-dyn e))
    (where (τ_3a ... -> τ_3r) (meet (τ_1a ... -> τ_1r) (τ_2a ... -> τ_2r)))]
-  ;; If inconsistent or so such just leave the types alone
   [(ltr-meet-type any_x any_t any_f) [any_x : any_t any_f]])
 
+  ;; If inconsistent or so such just leave the types alone
 ;; ltr is just syntax sugar that allows you to omit type annotations
 ;; in letrecs so that you do not need to duplicate annotations.
 ;; It uses the most precise annotation that can be derived by meeting
@@ -123,20 +142,132 @@
   [(ltr ([x : τ f] ...) e)
    (letrec ([ltr-meet-type x τ f] ...)  e)])
 
-(define ns0 (term (ltr ([f (λ (x) x)]) (f f))))
-(define ns1
-  (term (ltr ([f (λ ([x : Int] [y : Int]) : Bool (= x y))]
-              [l (λ ([x : Int]) : Int
-                    (if (f x x)
-                        (l (- x 1))
-                        0))])
-             (l 10))))
-(define ns2 (term (ltr ([x : (Int -> Dyn) (λ (x) : Int x)]) x)))
+(module+ test
+  ;; Current letrec implementation (with simple inference) ltr
+  ;; Calculate the meet of the annotation on the binding and
+  ;; the lambda to arive at the most specific type.
+  ;; Since letrec bindings are resricted to only lambdas
+  ;; this will overide dynamic with a function type every time.
+  ;; Therefor user type annotations are not considered holy
+  ;; Insufficient in that it infers too much type information makeing
+  ;; it impossible to type (let ([f : Dyn (lambda (x) x)]) f)
+  ;; I think need to double check
+  
+  (define ns0 (term (ltr ([f (λ (x) x)]) (f f))))
+  (define ns1
+    (term (ltr ([f (λ ([x : Int] [y : Int]) : Bool (= x y))]
+                [l (λ ([x : Int]) : Int
+                      (if (f x x)
+                          (l (- x 1))
+                          0))])
+               (l 10))))
+  (define ns2 (term (ltr ([x : (Int -> Dyn) (λ (x) : Int x)]) x)))
+
+  (define odd5 (term (ltr ([even? (λ (n)
+                                    (if (= n 0)
+                                        #t
+                                        (odd? (- n 1))))]
+                           [odd?  : (Int -> Bool)
+                                  (λ ([n : Int])
+                                    (if (= n 0)
+                                        #t
+                                        (even? (- n 1))))])
+                          (odd? 5))))
+  (test-true
+   (term
+    (=α ,ns0
+        (letrec ([f : (Dyn -> Dyn) (λ (x) (: x Dyn))]) (f f)))))
+
+  (test-true (redex-match? GTLC e ns1))
+
+  (test-true (redex-match? GTLC e ns2)))
+
+(define-metafunction GTLC
+  ltr-mdi : (letrec-bnd ...) e -> (letrec ([x : τ f] ...) e)
+  [(ltr-mdi ([x_1 : τ_1 f_1] ... [x f] any_2 ...) e)
+   (ltr-mdi ([x_1 : τ_1 f_1] ...
+             [x : (ltr-fun->type f) f]
+             any_2 ...)
+    e)]
+  [(ltr-mdi ([x : τ f] ...) e)
+   (letrec ([ltr-meet-type x τ f] ...)  e)])
 
 (module+ test
-  (test-true (term (=α ,ns0 (letrec ([f : (Dyn -> Dyn) (λ (x) (: x Dyn))]) (f f)))))
-  (test-true (redex-match? GTLC e ns1))
-  (test-true (redex-match? GTLC e ns2)))
+  
+  ;; Letrec / more dynamic inference
+  ;; In the case of letrec ommiting type assumes the most static
+  ;; type given all the type information that is immediately available.
+  ;; tests showing off how letrec "should" behave.
+  
+  ;; No cast generated because the ltr propogates type information and
+  ;; assumes dynamic where there is a lack of type information.
+  #|
+  (define-term wt-lr-imd1
+  (ltr ([x : (Int -> Int) (λ ([y : Int]): Int (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt-lr1 (Int -> Int))))
+  
+  (define-term wt-lr2
+    (ltr ([x : (Int -> Int) (λ ([y : Int]) (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt-lr2 (Int -> Int))))
+  
+  (define-term wt-lr3
+    (ltr ([x : (Int -> Int) (λ (y) (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt-lr3 (Int -> Int))))
+  
+  (define-term wt-lr4
+    (ltr ([x (λ ([y : Int]): Int (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt-lr4 (Int -> Int))))
+
+  (define-term wt-lr5
+    (ltr ([x (λ ([y : Int]) (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt-lr5 (Int -> Dyn))))
+
+  (define-term wt-lr6
+    (ltr ([x (λ (y) (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt-lr6 (Dyn -> Dyn))))
+  
+  ;; Consistent but unequal annotations lead to casted functions
+  ;; Always taking the type information at the recursive binding/
+  (define-term wt/cst-lr1
+    (ltr ([x : Dyn (λ ([y : Int]): Int (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt/cst-lr1 Dyn)))
+
+  (define-term wt/cst-lr2
+    (ltr ([x : (Dyn -> Dyn) (λ ([y : Int]): Int (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt/cst-lr2 (Dyn -> Dyn))))
+
+  (define-term wt/cst-lr3
+    (ltr ([x : (Int -> Int) (λ ([x : Dyn]): Dyn (x y))]) x))
+  (test-true (judgment-holds (⊢_? () ,wt/cst-lr3 (Int -> Int))))
+  
+  ;; Types annotations that are inconsistent are a static type error
+  (define-term !wt-lr1
+    (ltr ([x : (Int -> Int) (λ ([x : Bool]) (x y))]) x))
+  (test-false (judgment-holds (⊢_? () ,!wt-lr1 any)))
+  ;; End of letrec with simple inference
+  |#
+  )
+
+;; Letrec super simple
+;; Causes you to write too many type annotations
+(define-metafunction GTLC
+  ltr-ss : (letrec-bnd ...) e -> (letrec ([x : τ f] ...) e)
+  [(ltr-ss ([x_1 : τ_1 f_1] ... [x f] any_2 ...) e)
+   (ltr-ss ([x_1 : τ_1 f_1] ... [x : Dyn f] any_2 ...) e)]
+  [(ltr-ss ([x : τ f] ...) e) (letrec ([x : τ f] ...) e)])
+
+(module+ test
+
+  (define wt-lr-ss1
+    (term (ltr-ss ([x (λ (y) (x y))]) x)))
+  (test-true (redex-match? GTLC e wt-lr-ss1))
+  (test-true (judgment-holds (⊢_? () ,wt-lr-ss1 Dyn)))
+
+  (define wt-lr-ss2
+    (term (ltr-ss ([x : (Dyn -> Dyn) (λ ([y : Int]) : Int (x y))]) x)))
+  (test-true (redex-match? GTLC e wt-lr-ss2))
+  (test-true (judgment-holds (⊢_? () ,wt-lr-ss2 (Dyn -> Dyn)))))
+
 
 ;; Example programs to test fvs, bvs, and =α
 (define xfree0  (term (lambda ([y : ()]) (lambda ([z : ()]) x))))
@@ -369,22 +500,13 @@
 (module+ test
   (test-true (term (=α ,fst0 (subst ((x a) (y b)) ,fst0)))))
 
-(define-metafunction GTLC
-  lookup : ((any any) ...) any -> (none) or (some any)
-  [(lookup () _) (none)]
-  [(lookup ((any_a any_d) (any_a* any_d*) ...) any_a) (some any_d)]
-  [(lookup ((_ _) (any_a* any_d*) ...) any)
-   (lookup ((any_a* any_d*) ...) any)])
+(define-environment-helpers GTLC lookup extend)
 
 (module+ test
   (test-equal (term (lookup ((x 1) (y 2) (z 3)) x)) (term (some 1)))
   (test-equal (term (lookup ((x 1) (y 2) (z 3)) y)) (term (some 2)))
   (test-equal (term (lookup ((x 1) (y 2) (z 3)) z)) (term (some 3)))
   (test-equal (term (lookup ((x 1) (y 2) (z 3)) a)) (term (none))))
-
-(define-metafunction GTLC
-  extend : ((any any) ...) (any any) ... -> ((any any) ...)
-  [(extend (any ...) (any_a any_d) ...) ((any_a any_d) ... any ...)])
 
 ;;———————————————————————————————————————————————————–———————————————————–——————
 ;; Typing
@@ -432,25 +554,25 @@
    ------------------------ "var"
           (⊢_? Γ x τ)]
 
-  [------------------------ "⊢_?()"
-          (⊢_? Γ () ())]
-
-  [------------------------ "⊢_?Int"
-          (⊢_? Γ i Int)]
-
-  [------------------------ "⊢_?Bool"
-          (⊢_? Γ b Bool)]
+  [(⊢_k k ι)
+   ------------------------- "⊢_? Base"
+   (⊢_? Γ k ι)]
+  [(⊢_? Γ e τ_) (≈ τ τ_)
+   ------------------------------------------------------- "⊢_?:"
+   (⊢_? Γ (: e τ) τ)]
   
-  [(where Γ_ν (extend Γ (x_a τ_a) ...)) (⊢_? Γ_ν e τ_r)
+  [(where Γ_ν (extend Γ ((x_a τ_a) ...))) (⊢_? Γ_ν e τ_r)
    ------------------------------------------------------- "⊢_?lam"
    (⊢_? Γ (lambda ([x_a : τ_a] ...) e) (τ_a ... -> τ_r))]
 
-  [(where Γ_ν (extend Γ (x_b τ_b) ...))
-   (⊢_? Γ_ν f_b τ_b) ... (⊢_? Γ_ν e τ)
+  [(where Γ_ν (extend Γ ((x_b τ_b) ...)))
+   (⊢_? Γ_ν f_b τ_f) ...
+   (≈ τ_f τ_b) ...
+   (⊢_? Γ_ν e τ)
    ----------------------------------- "⊢_?letrec"
    (⊢_? Γ (letrec ([x_b : τ_b f_b] ...) e) τ)]
   
-  [(where Γ_b (extend Γ (x_b τ_b) ...))
+  [(where Γ_b (extend Γ ((x_b τ_b) ...)))
    (⊢_? Γ e_b τ_e) ... (≈ τ_b τ_e) ... (⊢_? Γ_b e τ)
    --------------------------------------- "⊢_?let"
    (⊢_? Γ (let ([x_b : τ_b e_b] ...) e) τ)]
@@ -464,13 +586,26 @@
    (⊢_? Γ (e_0 e ..._n) Dyn)]
     
   [(where (τ_a ..._n -> τ_r) (tyop o))
-   (⊢_? Γ e_a τ_a) ...
+   (⊢_? Γ e_a τ_e) ...
+   (≈ τ_a τ_e) ...
    ------------------------ "⊢_?app-op"
    (⊢_? Γ (o e_a ..._n) τ_r)]
   [(⊢_? Γ e_t τ_t) (≈ τ_t Bool)
    (⊢_? Γ e_c τ_c) (⊢_? Γ e_a τ_a) (≤ τ_c τ_a τ_meet)
    ------------------------ "⊢_?if"
    (⊢_? Γ (if e_t e_c e_a) τ_meet)])
+
+(module+ test
+  (test-true (judgment-holds (⊢_? ()
+                                  (ltr ([x : (Int -> Int)
+                                           (λ ([y : Int]) y)])
+                                       x)
+                                  τ)))
+  (test-true (judgment-holds (⊢_? ()
+                                  (ltr ([x : (Int -> Int)
+                                           (λ ([y : Dyn]) y)])
+                                       x)
+                                  τ))))
 
 (define-metafunction GTLC
   tyop : o -> any
@@ -519,18 +654,6 @@
                                     (* x (fact (- x 1)))))])
                       (fact 5))))
 
-(define odd5 (term (letrec ([even? : (Int -> Bool)
-                             (lambda ([n : Int])
-                               (if (= n 0)
-                                   #t
-                                   (odd? (- n 1))))]
-                            [odd?  : (Int -> Bool)
-                             (lambda ([n : Int])
-                               (if (= n 0)
-                                   #t
-                                   (even? (- n 1)))) ])
-                      (odd? 5))))
-
 (module+ test
   (test-true (redex-match? GTLC/TC Γ '()))
   (test-true (redex-match? GTLC/TC (lambda ([x_m : τ_n] ...) e) fst0))
@@ -558,12 +681,25 @@
     (test-true (judgment-holds (⊢_? () e_f5 Int)))
     (test-true (judgment-holds (⊢_? () e_o5 Bool)))))
 
-;; TODO I could show at this point that all well typed stlc programs
+;; I can show at this point that all well typed stlc programs
 ;; are well typed in gtlc.
+(module+ test
+  (require "stlc-subset-generator.rkt")
+  (for ((i (in-range 1 6)))
+    ;; The limitation is that only the subset of the STLC is
+    ;; shown to be in the GTLC
+    (add-search
+     (redex-check Estimate-STLC #:satisfying (wt any_e any_t)
+                  (begin (inc-found)
+                         (and (judgment-holds (⊢ () any_e any_t))
+                              (judgment-holds (⊢_? () any_e any_t))))
+                  #:attempts (* 100 i)
+                  #:attempt-size (lambda a i)))))
 
-;; TODO I could show that any well typed program made more dynamic
+;; I can show that any well typed program made more dynamic
 ;; is also well typed.
 
-(module+ test (test-results))
+
+
 
 
