@@ -108,6 +108,7 @@ name-field2 - accessor for field2
   (Code-Label value)
   (Tag bits)         ;; an tag for an imediate value
   (Type type)        ;; an atomic type
+  (TypeId compact-type)  ;; variable refers to the runtime representation of a type
   ;; Effectfull expressions
   ;; typed bindings annotations
   (Fml identifier type)
@@ -130,8 +131,9 @@ name-field2 - accessor for field2
   (Closure-code var)
   (Closure-ref this var)
   (Closure-caster this)
-  (LetP bindings body)
-  (LetC bindings body);; Can create cyclic immutable data
+  (LetP bindings body) ;; binds procedures
+  (LetC bindings body) ;; binds closures; Can create cyclic immutable data
+  (LetT bindings body) ;; binds type ids to type representations; bindings are a DAG
   (Procedure this params code caster bound-vars body)
   ;; represents a set of moves to initialize variables before
   (Code variables body)
@@ -520,6 +522,7 @@ name-field2 - accessor for field2
      (MVect Schml-Type)))
 
 (define-type Atomic-Schml-Type (U Unit Int Bool Dyn))
+
 
 (: schml-type? (Any -> Boolean : Schml-Type))
 (define (schml-type? x)
@@ -977,6 +980,66 @@ We are going to UIL
 (define-type C3-Bnd*  (Listof C3-Bnd))
 
 (define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
+
+#|-----------------------------------------------------------------------------+
+| Language/Cast-with-lifted-types created by hoist-types
+------------------------------------------------------------------------------|#
+
+(define-type Cast-with-hoisted-types
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C/LT-Expr)))
+
+(define-type C/LT-TBnd*
+  (Listof C/LT-TBnd))
+
+(define-type C/LT-TBnd
+  (Pair Uid Compact-Type))
+
+(define-type Compact-Type
+  (U Atomic-Schml-Type (TypeId Uid)
+     (Fn Index (Listof Compact-Type) Compact-Type)
+     (GRef Compact-Type) (MRef Compact-Type)
+     (GVect Compact-Type) (MVect Compact-Type)))
+
+(define-type Prim-Type (U Atomic-Schml-Type (TypeId Uid)))
+
+(define-type C/LT-Expr
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Uid* (Castable (Option Uid) E))
+	  (Letrec C/LT-Bnd* E)
+	  (Let C/LT-Bnd* E)
+	  (App E (Listof E))
+          (Op Schml-Primitive (Listof E))
+	  (If E E E)
+          (Begin C/LT-Expr* E)
+          (Repeat Uid E E E)
+          ;; closure operations
+          (Fn-Caster E)
+          ;; Type operations
+          (Type-tag E)
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
+          (Type-GRef-to E)
+          (Type-GVect-to E)
+          ;; Dyn operations
+          (Dyn-tag E)
+          (Dyn-immediate E)
+          (Dyn-type E)
+          (Dyn-value E)
+          (Dyn-make E E)
+          ;; Observational Operations
+          (Blame E)
+          (Observe E Prim-Type)
+          ;; Terminals
+          (Type Prim-Type)
+          (Tag Tag-Symbol)
+	  (Var Uid)
+          (GRep E)
+	  (Quote Cast-Literal))))
+
+(define-type C/LT-Expr* (Listof C/LT-Expr))
+(define-type C/LT-Bnd   (Pair Uid C/LT-Expr))
+(define-type C/LT-Bnd*  (Listof C/LT-Bnd))
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast created by label-lambdas                    |
