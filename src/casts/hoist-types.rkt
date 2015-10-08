@@ -50,47 +50,46 @@
         (e : C/LT-Expr <- (ht-expr e))
         (return-state (cons u e)))))
 
-(: compact->prim (Compact-Type -> Prim-Type))
-(define (compact->prim t)
+(: schml->prim (Schml-Type -> Prim-Type))
+(define (schml->prim t)
   (match t
     [(Dyn) DYN-TYPE]
     [(Unit) UNIT-TYPE]
     [(Int) INT-TYPE]
-    [(Bool) BOOL-TYPE]
-    [(TypeId x) (TypeId x)]))
+    [(Bool) BOOL-TYPE]))
 
-(: identify-types (Schml-Type -> (State St Compact-Type)))
+(: identify-types (Schml-Type -> (State St Prim-Type)))
 (define (identify-types t)
-  (do (bind-state : (State St Compact-Type))
+  (do (bind-state : (State St Prim-Type))
       (match t
         [(Dyn) (return-state DYN-TYPE)]
-        [(? base-type?) (return-state t)]
+        [(? base-type?) (return-state (schml->prim t))]
         [(Fn ar t* t)
-         (t* : (Listof Compact-Type) <- (map-state identify-types t*))
-         (t : Compact-Type <- (identify-types t))
+         (t* : (Listof Prim-Type) <- (map-state identify-types t*))
+         (t : Prim-Type <- (identify-types t))
          (identify-types-helper (Fn ar t* t))]
         [(GRef t)
-         (t1 : Compact-Type <- (identify-types t))
+         (t1 : Prim-Type <- (identify-types t))
          (identify-types-helper (GRef t1))]
         [(MRef t)
-         (t1 : Compact-Type <- (identify-types t))
+         (t1 : Prim-Type <- (identify-types t))
          (identify-types-helper (MRef t1))]
         [(GVect t)
-         (t1 : Compact-Type <- (identify-types t))
+         (t1 : Prim-Type <- (identify-types t))
          (identify-types-helper (GVect t1))]
         [(MVect t)
-         (t1 : Compact-Type <- (identify-types t))
+         (t1 : Prim-Type <- (identify-types t))
          (identify-types-helper (MVect t1))])))
 
-(: identify-types-helper (Compact-Type -> (State St Compact-Type)))
+(: identify-types-helper (Compact-Type -> (State St Prim-Type)))
 (define (identify-types-helper t)
-  (do (bind-state : (State St Compact-Type))
+  (do (bind-state : (State St Prim-Type))
       (s : St <- get-state)
     (match-let ([(list next ht) s])
       (let ([uid? (hash-ref ht t #f)])
         (if uid?
             (return-state (TypeId uid?))
-            (do (bind-state : (State St Compact-Type))
+            (do (bind-state : (State St Prim-Type))
                 (uid : Uid <- (st-extend t))
                 (return-state (TypeId uid))))))))
 
@@ -173,11 +172,10 @@
          (return-state (Blame e))]
         [(Observe e t)
          (e : C/LT-Expr <- (ht-expr e))
-         (t : Compact-Type <- (identify-types t))
-         (return-state (Observe e (compact->prim t)))]
+         (return-state (Observe e t))]
         [(Type t)
-         (t : Compact-Type <- (identify-types t))
-         (return-state (Type (compact->prim t)))]
+         (t : Prim-Type <- (identify-types t))
+         (return-state (Type t))]
         [(Tag s) (return-state (Tag s))]
         [(Var i) (return-state (Var i))]
         [(Quote k) (return-state (Quote k))]

@@ -73,6 +73,7 @@ name-field2 - accessor for field2
   (App operator operands)
   ;; Variable node
   (Var id)
+  (GlobalDec id)
   ;; Conditionals
   (If test then else)
   ;; Type ascription
@@ -982,7 +983,7 @@ We are going to UIL
 (define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast-with-lifted-types created by hoist-types
+| Language/Cast-with-hoisted-types created by hoist-types
 ------------------------------------------------------------------------------|#
 
 (define-type Cast-with-hoisted-types
@@ -995,10 +996,9 @@ We are going to UIL
   (Pair Uid Compact-Type))
 
 (define-type Compact-Type
-  (U Atomic-Schml-Type (TypeId Uid)
-     (Fn Index (Listof Compact-Type) Compact-Type)
-     (GRef Compact-Type) (MRef Compact-Type)
-     (GVect Compact-Type) (MVect Compact-Type)))
+  (U (Fn Index (Listof Prim-Type) Prim-Type)
+     (GRef Prim-Type) (MRef Prim-Type)
+     (GVect Prim-Type) (MVect Prim-Type)))
 
 (define-type Prim-Type (U Atomic-Schml-Type (TypeId Uid)))
 
@@ -1029,7 +1029,7 @@ We are going to UIL
           (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
-          (Observe E Prim-Type)
+          (Observe E Schml-Type)
           ;; Terminals
           (Type Prim-Type)
           (Tag Tag-Symbol)
@@ -1046,7 +1046,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast4-Lang
-  (Prog (List String Natural Schml-Type) C4-Expr))
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C4-Expr)))
 
 (define-type C4-Expr
   (Rec E (U ;; Non-Terminals
@@ -1076,7 +1076,7 @@ We are going to UIL
           (Blame E)
           (Observe E Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Prim-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -1095,7 +1095,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast5-Lang
-  (Prog (List String Natural Schml-Type) C5-Expr))
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C5-Expr)))
 
 (define-type C5-Expr
   (Rec E (U ;; Non-Terminals
@@ -1125,7 +1125,7 @@ We are going to UIL
           (Blame E)
           (Observe E Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Prim-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -1144,7 +1144,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast6-Lang
-  (Prog (List String Natural Schml-Type) C6-Expr))
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C6-Expr)))
 
 (define-type C6-Expr
   (Rec E (U ;; Non-Terminals
@@ -1176,7 +1176,7 @@ We are going to UIL
           (Blame E)
           (Observe E Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Prim-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -1364,6 +1364,8 @@ We are going to UIL
             (Repeat Uid E E E)
 	    Halt
 	    (Var Uid)
+            (GlobalDec Uid)
+            (Assign Uid E)
 	    (Code-Label Uid)
 	    (Quote D0-Literal))))
 
@@ -1393,6 +1395,7 @@ We are going to UIL
       (App D1-Value D1-Value*)
       (Op (U IxI->I-Prim Array-Prim) (Listof T))
       (Var Uid)
+      (GlobalDec Uid)
       Halt
       (Var Uid)
       (Code-Label Uid)
@@ -1407,6 +1410,7 @@ We are going to UIL
      (Op (U IxI->I-Prim Array-Prim) (Listof V))
      Halt
      (Var Uid)
+     (GlobalDec Uid)
      (Code-Label Uid)
      (Quote D1-Literal))))
 
