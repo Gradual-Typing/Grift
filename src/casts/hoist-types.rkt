@@ -60,6 +60,7 @@
 
 (: identify-types (Schml-Type -> (State St Prim-Type)))
 (define (identify-types t)
+  (logging identify-types (All) "~v" t)
   (do (bind-state : (State St Prim-Type))
       (match t
         [(Dyn) (return-state DYN-TYPE)]

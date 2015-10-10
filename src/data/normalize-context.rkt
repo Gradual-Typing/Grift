@@ -19,16 +19,17 @@
 
 (: normalize-context (-> Data0-Lang Config Data1-Lang))
 (trace-define (normalize-context prgm comp-config)
-  (match-let ([(Prog (list name count type) exp) prgm])
+  (match-let ([(Prog (list name count type) (GlobDecs d* exp)) prgm])
     (let-values ([(tail bnd-code*) (run-state (nc-tail exp) '())])
-      (Prog (list name count type) (Labels bnd-code* tail)))))
+      (Prog (list name count type) (GlobDecs d* (Labels bnd-code* tail))))))
 
 (: nc-tail (-> D0-Expr (State D1-Bnd-Code* D1-Tail)))
 (define (nc-tail exp)
-  (logging nc-tail (Vomit) "~v" exp)
+  ;(logging nc-tail (Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-tail exp)))]
+    [(Assign u e) (TODO error)]
     [(Let bnd* exp)
      (do (bind-state : (State D1-Bnd-Code* D1-Tail))
          (bnd* : D1-Bnd* <- (nc-bnd* bnd*))
@@ -70,10 +71,11 @@
 
 (: nc-value (-> D0-Expr (State D1-Bnd-Code* D1-Value)))
 (define (nc-value exp)
-  (logging nc-value (Vomit) "~v" exp)
+  ;(logging nc-value (Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-value exp)))]
+    [(Assign u e) (TODO error)]
     [(Let bnd* exp)
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
          (bnd* : D1-Bnd* <- (nc-bnd* bnd*))
@@ -115,11 +117,16 @@
 
 (: nc-effect (-> D0-Expr (State D1-Bnd-Code* D1-Effect)))
 (define (nc-effect exp)
-#;  (logging nc-effect ('Vomit) "~v" exp)
+  ;(logging nc-effect ('Vomit) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-effect exp)))]
-    [(Let bnd* exp)
+    [(Assign u e)
+     (do (bind-state : (State D1-Bnd-Code* D1-Effect))
+         (ev  : D1-Value <- (nc-value e))
+       (return-state (Assign u ev)))]
+    [(Halt) (return-state (Halt))]
+     [(Let bnd* exp)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (bnd* : D1-Bnd* <- (nc-bnd* bnd*))
          (eff  : D1-Effect <- (nc-effect exp))
@@ -156,19 +163,17 @@
          (do (bind-state : (State D1-Bnd-Code* D1-Effect))
              (eff* : D1-Effect* <- (nc-effect* exp*))
              (return-state (make-begin eff* NO-OP))))]
-    ;; I am not sure where to put this
-    [(Halt) (TODO halt should always be the logical conclusion)]
     [(Var i) (return-state NO-OP)]
     [(Code-Label i) (return-state NO-OP)]
     [(Quote k) (return-state NO-OP)]))
 
 (: nc-pred (-> D0-Expr (State D1-Bnd-Code* D1-Pred)))
 (define (nc-pred exp)
-
-  (logging nc-pref (Vomit) "~v" exp)
+  ;(logging nc-pred (All) "~v" exp)
   (match exp
     [(Labels bnd* exp)
      (bind-state (nc-bnd-code* bnd*) (lambda (_) (nc-pred exp)))]
+    [(Assign u e) (TODO error)]
     [(Let bnd* exp)
      (do (bind-state : (State D1-Bnd-Code* D1-Pred))
          (bnd* : D1-Bnd*  <- (nc-bnd* bnd*))
@@ -211,7 +216,7 @@
        (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT))]
       [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
    [(uil-prim-value? p) (Op p exp*)]
-   [else (error 'nc-value-op "primitive out of context")]))
+   [else (error 'nc-value-op "primitive out of context ~v ~v" p exp*)]))
 
 (: nc-value* (-> (Listof D0-Expr) (State D1-Bnd-Code* D1-Value*)))
 (define (nc-value* exp*) (map-state nc-value exp*))

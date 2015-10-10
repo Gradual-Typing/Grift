@@ -83,14 +83,10 @@ exposed as the effects that they truelly are.
       (trace-define (specify-representation prgm comp-config)
                     (match-let ([(Prog (list name next type) (LetT tbnd* expr)) prgm])
                       (let ([sr-top-expr (sr-expr (hash) empty-index-map)]
-                            [d* (map dec-var ((inst map Uid C/LT-TBnd) car tbnd*))])
+                            [d* ((inst map Uid C/LT-TBnd) car tbnd*)])
                         (let*-values ([(texp* next) (run-state (map-state sr-type tbnd*) next)]
                                       [(expr next) (run-state (sr-top-expr expr) next)])
-                          (Prog (list name next type) (Begin (append d* texp*) expr))))))
-
-      (: dec-var (Uid -> D0-Expr))
-      (define (dec-var u)
-        (GlobalDec u))
+                          (Prog (list name next type) (GlobDecs d* (Begin texp* expr)))))))
       
       ;; Env must be maintained as a mapping from uids to how to access those
       ;; values. This is important because uid references to variable inside a
@@ -331,8 +327,8 @@ exposed as the effects that they truelly are.
                        (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
                            (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
                                (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET-VALUE))))
-                               (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
-                           (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))))))]
+                               (Begin (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)) (Halt)) (Quote 0)))
+                           (Begin (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)) (Halt)) (Quote 0)))))))]
             [(UGvect-set! e1 i e2)
              (do (bind-state : (State Nat D0-Expr))
                  (e1 : D0-Expr <- (recur e1))
@@ -349,8 +345,8 @@ exposed as the effects that they truelly are.
                            (Let (list (cons tmp1 e1))
                                 (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
                                     (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET-VALUE)) e2))
-                                    (Op 'Printf (list (Quote "index out of bound %l\n") ind-var))))
-                           (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))))))]
+                                    (Begin (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)) (Halt)) (Quote 0))))
+                           (Begin (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)) (Halt)) (Quote 0)))))))]
             [(GRep-proxied? e)
              (do (bind-state : (State Nat D0-Expr))
                  (e : D0-Expr <- (recur e))

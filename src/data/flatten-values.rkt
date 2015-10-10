@@ -24,10 +24,10 @@
 (provide flatten-values)
 (: flatten-values (Data3-Lang Config -> Data4-Lang))
 (trace-define (flatten-values prog config)
-  (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
+  (match-let ([(Prog (list name count ty) (GlobDecs d* (Labels bnd* body))) prog])
     (let*-values ([(body count) (run-state (fv-body body) count)]
                   [(bnd* count) (run-state (map-state fv-bnd-code bnd*) count)])
-      (Prog (list name count ty) (Labels bnd* body)))))
+      (Prog (list name count ty) (GlobDecs d* (Labels bnd* body))))))
 
 ;; Simple recursion into the body of code bindings
 (: fv-bnd-code (D3-Bnd-Code -> (State Nat D4-Bnd-Code)))
@@ -145,6 +145,7 @@
   (logging fv-effect (Vomit) "~v" effect)
   (match effect
     [(Assign i v) (simplify-assignment i v)]
+    [(Halt) (return-state (Halt))]
     [(If t c a)
      (do (bind-state : (State Locs D4-Effect))
          (t : D4-Pred   <- (fv-pred t))

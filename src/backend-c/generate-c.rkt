@@ -30,16 +30,17 @@
 
 (: generate-c (-> Data5-Lang Config Void))
 (define (generate-c prgm config)
-  (match-let ([(Prog (list name count type) (Labels lbl* exp)) prgm])
+  (match-let ([(Prog (list name count type) (GlobDecs d* (Labels lbl* exp))) prgm])
      (call-with-output-file (Config-c-path config) #:exists 'replace #:mode 'text
       (lambda ([p : Output-Port])
        (parameterize ([current-output-port p])
-        (emit-program name type lbl* exp))))))
+        (emit-program name type lbl* d* exp))))))
 
-(: emit-program (-> String Schml-Type D5-Bnd-Code* D5-Body Void))
-(define (emit-program name type code* body)
+(: emit-program (-> String Schml-Type D5-Bnd-Code* (Listof Uid) D5-Body Void))
+(define (emit-program name type code* d* body)
   (emit-source-comment name type)
   (emit-boiler-plate)
+  (emit-var-declarations d*)
   (emit-declarations code*)
   (emit-main body)
   (emit-subroutines code*))
@@ -88,6 +89,11 @@
   (newline)
   (display timer-boiler-plate)
   (newline))
+
+(: emit-var-declarations (-> (Listof Uid) Void))
+(define (emit-var-declarations d*)
+  (display "\n//These are the variable declarations\n")
+  (display-seq (map uid->string d*) "" (string-append IMDT-C-TYPE " ") "" ";\n" ""))
 
 (: emit-declarations (-> D5-Bnd-Code* Void))
 (define (emit-declarations code*)
@@ -170,7 +176,7 @@
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Quote k)        (print k)]
-    [(Halt)           (display "C-EXIT")]
+    [(Halt)           (display C-EXIT)]
     [(Code-Label i)  (begin
                        (display "((")
                        (display "long)")
@@ -208,6 +214,7 @@
             (display "}\n"))]
     [(Op p exp*)
      (emit-op p exp*)]
+    [(Halt) (display C-EXIT)] ;; FIXME: fix that
     [(Assign uid exp)
      (begin (display (uid->string uid))
             (display " = ")

@@ -73,7 +73,6 @@ name-field2 - accessor for field2
   (App operator operands)
   ;; Variable node
   (Var id)
-  (GlobalDec id)
   ;; Conditionals
   (If test then else)
   ;; Type ascription
@@ -134,7 +133,8 @@ name-field2 - accessor for field2
   (Closure-caster this)
   (LetP bindings body) ;; binds procedures
   (LetC bindings body) ;; binds closures; Can create cyclic immutable data
-  (LetT bindings body) ;; binds type ids to type representations; bindings are a DAG
+  (LetT bindings body) ;; binds type ids to type representations
+  (GlobDecs vars body) ;; declaration of global variables
   (Procedure this params code caster bound-vars body)
   ;; represents a set of moves to initialize variables before
   (Code variables body)
@@ -336,11 +336,11 @@ name-field2 - accessor for field2
     (-> C7-Effect* C7-Value  C7-Value)
     (-> C7-Effect* No-Op C7-Effect)
     (-> D1-Effect* D1-Value  D1-Value)
+    (-> D2-Effect* No-Op D2-Effect)
     (-> D1-Effect* No-Op D1-Effect)
 #;  (-> D3-Effect* D3-Trivial D3-Value)
     (-> D2-Effect* D2-Value  D2-Value)
     (-> D2-Effect* D2-Pred D2-Pred)
-    (-> D2-Effect* No-Op D2-Effect)
     (-> D4-Effect* D4-Tail D4-Tail)
     (-> D4-Effect* No-Op D4-Effect)
     (-> D5-Effect* D5-Tail D5-Tail)))
@@ -873,7 +873,7 @@ We are going to UIL
 (define-type C1-Bnd*  (Listof C1-Bnd))
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast2 created by introduce-castable-references                      |
+| Language/Cast2 created by lower-reference-casts                              |
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast2-Lang
@@ -1347,7 +1347,7 @@ We are going to UIL
 | Data0-Language created by impose-cast-semantics                              |
 +-----------------------------------------------------------------------------|#
 (define-type Data0-Lang
-  (Prog (List String Natural Schml-Type) D0-Expr))
+  (Prog (List String Natural Schml-Type) (GlobDecs (Listof Uid) D0-Expr)))
 
 (define-type D0-Bnd-Code* (Listof D0-Bnd-Code))
 (define-type D0-Bnd-Code (Pairof Uid D0-Code))
@@ -1364,7 +1364,6 @@ We are going to UIL
             (Repeat Uid E E E)
 	    Halt
 	    (Var Uid)
-            (GlobalDec Uid)
             (Assign Uid E)
 	    (Code-Label Uid)
 	    (Quote D0-Literal))))
@@ -1373,15 +1372,14 @@ We are going to UIL
 (define-type D0-Bnd* (Listof D0-Bnd))
 (define-type D0-Bnd  (Pairof Uid D0-Expr))
 (define-type D0-Literal Data-Literal)
-
 #|-----------------------------------------------------------------------------+
 | Data1-Language created by normalize-context                                          |
 +-----------------------------------------------------------------------------|#
-
 (define-type Data1-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D1-Bnd-Code*
-		D1-Tail)))
+	(GlobDecs (Listof Uid)
+                  (Labels D1-Bnd-Code*
+                          D1-Tail))))
 
 (define-type D1-Bnd-Code* (Listof D1-Bnd-Code))
 (define-type D1-Bnd-Code (Pairof Uid D1-Code))
@@ -1395,7 +1393,6 @@ We are going to UIL
       (App D1-Value D1-Value*)
       (Op (U IxI->I-Prim Array-Prim) (Listof T))
       (Var Uid)
-      (GlobalDec Uid)
       Halt
       (Var Uid)
       (Code-Label Uid)
@@ -1410,7 +1407,6 @@ We are going to UIL
      (Op (U IxI->I-Prim Array-Prim) (Listof V))
      Halt
      (Var Uid)
-     (GlobalDec Uid)
      (Code-Label Uid)
      (Quote D1-Literal))))
 
@@ -1429,6 +1425,8 @@ We are going to UIL
      (Repeat Uid D1-Value D1-Value E)
      (App D1-Value D1-Value*)
      (UIL-Op! D1-Value)
+     (Assign Uid D1-Value)
+     Halt
      No-Op)))
 
 
@@ -1448,8 +1446,9 @@ We are going to UIL
 
 (define-type Data2-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D2-Bnd-Code*
-		D2-Body)))
+	(GlobDecs (Listof Uid)
+                  (Labels D2-Bnd-Code*
+                          D2-Body))))
 
 (define-type D2-Body (Locals Uid* D2-Tail))
 (define-type D2-Bnd-Code* (Listof D2-Bnd-Code))
@@ -1487,6 +1486,7 @@ We are going to UIL
      (App D2-Value D2-Value*)
      (UIL-Op! D2-Value)
      (Assign Uid D2-Value)
+     Halt
      No-Op)))
 
 
@@ -1503,8 +1503,9 @@ We are going to UIL
 
 (define-type Data3-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D3-Bnd-Code*
-		D3-Body)))
+        (GlobDecs (Listof Uid)
+                  (Labels D3-Bnd-Code*
+                          D3-Body))))
 
 (define-type D3-Body (Locals Uid* D3-Tail))
 (define-type D3-Bnd-Code* (Listof D3-Bnd-Code))
@@ -1540,6 +1541,7 @@ We are going to UIL
      (App D3-Trivial D3-Trivial*)
      (UIL-Op! D3-Trivial)
      (Assign Uid D3-Value)
+     Halt
      No-Op)))
 
 ;; (TODO halt is not trivial though because we are targeting c it may be treated so)
@@ -1563,8 +1565,9 @@ We are going to UIL
 
 (define-type Data4-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D4-Bnd-Code*
-		D4-Body)))
+	(GlobDecs (Listof Uid)
+                  (Labels D4-Bnd-Code*
+                          D4-Body))))
 
 (define-type D4-Body (Locals Uid* D4-Tail))
 (define-type D4-Bnd-Code* (Listof D4-Bnd-Code))
@@ -1590,6 +1593,7 @@ We are going to UIL
      (Repeat Uid D4-Trivial D4-Trivial E)
      (UIL-Op! D4-Trivial)
      (Assign Uid D4-Value)
+     Halt
      No-Op)))
 
 (define-type D4-Value
@@ -1616,8 +1620,9 @@ We are going to UIL
 
 (define-type Data5-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D5-Bnd-Code*
-		D5-Body)))
+        (GlobDecs (Listof Uid)
+                  (Labels D5-Bnd-Code*
+                          D5-Body))))
 
 (define-type D5-Body (Locals Uid* D5-Tail))
 (define-type D5-Bnd-Code* (Listof D5-Bnd-Code))
@@ -1638,6 +1643,7 @@ We are going to UIL
      (Repeat Uid D5-Trivial D5-Trivial (Begin D5-Effect* No-Op))
      (UIL-Op! D5-Trivial)
      (Assign Uid D5-Value)
+     Halt
      No-Op)))
 
 (define-type D5-Value
