@@ -42,7 +42,8 @@ TODO
                 [c-path : Path]
                 [keep-c : Boolean]
                 [c-flags : (Listof String)]
-                [asm-path : (Option Path)]))
+                [asm-path : (Option Path)]
+                [mem-limit : Natural])) ;; memory size in bytes
 
 
 #|

@@ -31,7 +31,8 @@
            (build-path test-tmp-path "t.c")
            #f
            '()
-           #f)))
+           #f
+           100000000)))
 
 (define-syntax-rule (test-compile name path expected)
   (test-case name
