@@ -1,5 +1,7 @@
 #lang racket
 
+(require "../../src/language.rkt")
+
 (define-syntax-rule (undefined who)
   (error 'who "is undefined right now"))
 

@@ -1,9 +1,11 @@
-#lang typed/racket
+#lang typed/racket/base
 
 (require "./rackunit.rkt"
          "../src/helpers.rkt"
          "./test-compile.rkt"
-         "./paths.rkt")
+         "./paths.rkt"
+         racket/cmdline)
+
 
 (provide (all-defined-out))
 
@@ -35,13 +37,6 @@
     (program . ,program-tests)
     (large   . ,large-tests)))
 
-
-(define (to-symbol a) : Symbol
-  (cond
-    [(string? a) (string->symbol a)]
-    [(symbol? a) a]
-    [else 'invalid]))
-
 ;; Parse the command line arguments
 (command-line
  #:program "schml-test-runner"
@@ -52,4 +47,11 @@
     (if s?
         (suite (cdr s?))
         (error 'tests "--suite given invalid argument ~a" choice)))]
+ [("-r" "--cast-representation") crep
+  "specify which cast representation to use (Twosomes or Coercions)"
+  (let ((crep (to-symbol crep)))
+    (if (or (eq? 'Twosomes crep)
+            (eq? 'Coercions crep))
+        (compiler-config-cast-representation crep)
+        (error 'tests "--cast-representation given invalid argument ~a" crep)))]
  #:args () (run-tests (suite)))

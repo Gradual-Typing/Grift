@@ -11,7 +11,8 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt"
+         "../configuration.rkt"
+         "../language/data5.rkt"
          "../macros.rkt")
 
 

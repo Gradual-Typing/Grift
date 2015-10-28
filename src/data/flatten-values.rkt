@@ -18,7 +18,10 @@
 |#
 
 
-(require "../language.rkt"
+(require "../language/data3.rkt"
+         "../language/data4.rkt"
+         "../language/make-begin.rkt"
+         "../configuration.rkt"
          "../helpers.rkt")
 
 (provide flatten-values)

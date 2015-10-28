@@ -20,10 +20,13 @@ form, to the shortest branch of the cast tree that is relevant.
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
-
-;; Only the pass is provided by this module
-(provide interpret-casts)
+         "../configuration.rkt"
+         "../language/cast2.rkt"
+         "../language/cast3.rkt")
+(provide interpret-casts
+         (all-from-out
+          "../language/cast2.rkt"
+          "../language/cast3.rkt"))
 
 (: specialize-casts? (Parameterof Boolean))
 (define specialize-casts?

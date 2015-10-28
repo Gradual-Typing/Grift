@@ -1,0 +1,4 @@
+(let ([b (gbox #t)])
+ (if (gunbox b)
+     42
+     -42))

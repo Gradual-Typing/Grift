@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 
 (require "./helpers.rkt")
 (provide (all-defined-out))

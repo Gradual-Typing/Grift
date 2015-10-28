@@ -16,7 +16,7 @@
    (test-file "tools" "repeat3.schml"  (bool #t))
    (test-file "tools" "repeat4.schml"  (int 42))
    (test-file "tools" "repeat5.schml"  (int 1000))
-   (test-file "tools" "repeat6.schml"  (int 1000000))
+   (test-file "tools" "repeat6.schml"  (int 1000))
    (test-file "tools" "repeat7.schml"  (int 10))
    (test-file "tools" "repeat8.schml"  (int 9))
    (test-file "tools" "repeat9.schml"  (bool #t))

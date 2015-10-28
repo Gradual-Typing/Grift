@@ -1,0 +1,4 @@
+(let ((bool_ref (gvector 1 #t)))
+  (if (gvector-ref bool_ref 0)
+      42
+      -42))

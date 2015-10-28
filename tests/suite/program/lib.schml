@@ -1,0 +1,80 @@
+(letrec ([not (lambda ([x : Bool]) (if x #f #t))]
+         ;; Guarded Vector Library
+         [gvector-map!
+          : ((Dyn -> Dyn) (GVect Dyn) -> ())
+          (lambda (f v)
+            (gvector-slice-map! f v 0 (gvector-length v)))]
+         [gvector-slice-map!
+          : ((Dyn -> Dyn) (GVect Dyn) Int Int -> ())
+          (lambda (f v start stop)
+            (if (= start stop)
+                ()
+                (begin (gvector-set! v start (f (gvector-ref v start)))
+                       (gvector-slice-map! f v (+ start 1) stop))))]
+         [make-gvector
+          : (Int (Int -> Dyn) -> (GVect Dyn))
+          (lambda (size f)
+            (let ([v : (GVect Dyn) (gvector size (: () Dyn))])
+              (letrec ([loop
+                        : (Int -> (GVect Dyn))
+                        (lambda (i)
+                          (if (= i size)
+                              v
+                              (begin (gvector-set! v i (f i))
+                                     (loop (+ i 1)))))])
+                (loop 0))))]
+         [gvector-map
+          : ((Dyn -> Dyn) (GVect Dyn) -> (GVect Dyn))
+          (lambda ([f : (Dyn -> Dyn)] [v : (GVect Dyn)])
+                        (make-gvector
+                         (gvector-length v)
+                         (lambda ([i : Int])
+                           (f (gvector-ref v i)))))]
+         [gvector-double
+          : ((GVect Dyn) -> (GVect Dyn))
+          (lambda (v)
+            (make-gvector
+             (* 2 (gvector-length v))
+             (lambda ([i : Int])
+               (gvector-ref v (+ (%/ i 2) (%% i 2))))))]
+         ;; Variable Size Mutable Containers
+         [make-gvector-list!
+          : (-> (GVect Dyn))
+          (lambda ()
+            (let ([l (gvector 2 (: 0 Dyn))])
+              (begin
+                (gvector-set! l 0 (gvector 2 (: () Dyn)))
+                (gvector-set! l 1 0)
+                l)))]
+         [gvector-list-destruct
+          : ((GVect Dyn) ((GVect Dyn) Int Int -> Dyn) -> Dyn)
+          (lambda (l f)
+            (let ([v : (GVect Dyn) (gvector-ref l 0)]
+                  [i : Int (gvector-ref l 1)])
+              (let ([m : Int (gvector-length v)])
+                (f v i m))))]
+         [gvector-list-check-extend!
+          : ((GVect Dyn) -> ())
+          (lambda (l)
+            (gvector-list-destruct l
+             (lambda ([v : (GVect Dyn)] [i : Int] [s : Int])
+               (if (= i m) 
+                    (gvector-set! l 0 (gvector-double v))
+                    ()))))]
+         [gvector-list-insert!
+          : ((GVect Dyn) Dyn -> ())
+          (lambda (l e)
+            (gvector-list-destruct l
+             (lambda ([v : (GVect Dyn)] [i : Int] [s : Int])
+               (begin
+                 (gvector-list-check-extend! l)
+                 (gvector-set! v i e)
+                 (gvector-set! l 2 (add1 i))
+                 ()))))]
+         
+         [add1 (lambda ([x : Int]) (+ x 1))]
+         [zero? (lambda ([x : Int] (= 0 x)))]
+         [])
+  ())
+         
+                         

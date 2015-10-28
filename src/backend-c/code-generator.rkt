@@ -1,6 +1,7 @@
 #lang typed/racket
 
-(require "../language.rkt"
+(require "../configuration.rkt"
+         "../language/data5.rkt"
          "../helpers.rkt"
          "./generate-c.rkt")
 

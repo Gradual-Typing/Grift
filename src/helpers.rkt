@@ -1,7 +1,8 @@
-#lang typed/racket
+#lang typed/racket/base
 
 (provide (all-defined-out))
-
+(require (for-syntax typed/racket/base)
+         racket/match)
 
 #| Environments are persistent hash tables |#
 
@@ -24,23 +25,7 @@
 (define (file->srcloc n)
   (srcloc n #f #f #f #f))
 
-#|
-A language form ends up just being a polymorphic record.
-This allows me to make very desciptive grammars via types later on.
-|#
 
-(define-syntax (define-forms stx)
-  (syntax-case stx ()
-    [(_ (name fields ...) f* ...)
-     (with-syntax ([(types ...) (generate-temporaries #'(fields ...))])
-       #'(begin
-	   (struct (types ...) name ([fields : types] ...) #:transparent)
-	   (define-forms f* ...)))]
-    [(_) #'(void)]))
-
-(define-syntax-rule (define-type+ id ([id* c*] ...) t)
-  (begin (define-type id t)
-	 (define-type id* (c* id)) ...))
 
 
 #| In order to simulate the ability to pass the wrong
@@ -361,3 +346,10 @@ This allows me to make very desciptive grammars via types later on.
 ;; Cast to Boolean
 (define (true? [x : Any]) : Boolean
   (if x #t #f))
+
+(: to-symbol (Any -> Symbol))
+(define (to-symbol a)
+  (cond
+    [(string? a) (string->symbol a)]
+    [(symbol? a) a]
+    [else (to-symbol (format "~a" a))]))

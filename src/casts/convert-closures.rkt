@@ -8,13 +8,15 @@
 +-------------------------------------------------------------------------------+
 | Grammer:
 +------------------------------------------------------------------------------|#
-;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
-
-(provide convert-closures)
-
+         "../configuration.rkt"
+         "../language/cast5.rkt"
+         "../language/cast6.rkt")
+(provide convert-closures
+         (all-from-out
+          "../language/cast5.rkt"
+          "../language/cast6.rkt"))
 
 (define optimize-self-reference?
   (make-parameter #f))

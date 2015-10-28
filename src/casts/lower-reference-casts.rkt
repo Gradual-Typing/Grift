@@ -36,10 +36,16 @@ Gproxy-blames  : (x : GRep A) -> {GRep-proxied? x} -> Blame-Label
 
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/cast1.rkt"
+         "../language/cast2.rkt")
 
 ;; Only the pass is provided by this module
-(provide lower-reference-casts)
+(provide
+ lower-reference-casts
+ (all-from-out
+  "../language/cast1.rkt"
+  "../language/cast2.rkt"))
 
 ;; The entry point for this pass it is called by impose-casting semantics
 (: lower-reference-casts (Cast1-Lang Config . -> . Cast2-Lang))

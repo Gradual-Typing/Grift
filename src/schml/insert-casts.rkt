@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 #|------------------------------------------------------------------------------+
 |Pass: src/insert-casts                                                         |
 +-------------------------------------------------------------------------------+
@@ -11,12 +11,18 @@
 +-------------------------------------------------------------------------------+
 |Input Grammar
 +------------------------------------------------------------------------------|#
-(require "../helpers.rkt"
+(require racket/match
+         "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/schml1.rkt"
+         "../language/cast0.rkt")
 
 ;; Only the pass is provided by this module
-(provide insert-casts)
+(provide insert-casts
+         (all-from-out
+          "../language/schml1.rkt"
+          "../language/cast0.rkt"))
 
 (: insert-casts (Schml1-Lang Config . -> . Cast0-Lang))
 (define (insert-casts prgm comp-config)

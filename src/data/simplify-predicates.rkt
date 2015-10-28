@@ -1,6 +1,10 @@
 #lang typed/racket
 
-(require "../language.rkt"
+(require "../language/data4.rkt"
+         "../language/data5.rkt"
+         "../language/make-begin.rkt"
+         "../language/data-representation.rkt"
+         "../configuration.rkt"
          "../helpers.rkt")
 
 (provide simplify-predicates)

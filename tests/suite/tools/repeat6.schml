@@ -1,6 +1,6 @@
 (let([b (gbox 0)])
  (begin
-  (repeat (i 0 1000) 
+  (repeat (i 0 100) 
   (let ([a (lambda () (gbox-set! b (+ (gunbox b) 1)))])
-    (repeat (i 0 1000) (a))))
+    (repeat (i 0 10) (a))))
   (gunbox b)))

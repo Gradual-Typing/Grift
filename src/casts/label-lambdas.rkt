@@ -16,13 +16,15 @@
 +-------------------------------------------------------------------------------+
 | Grammer:
 +------------------------------------------------------------------------------|#
-;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
-
-;; Only the pass is provided by this module
-(provide label-lambdas)
+         "../configuration.rkt"
+         "../language/cast3.rkt"
+         "../language/cast4.rkt")
+(provide label-lambdas
+         (all-from-out
+          "../language/cast3.rkt"
+          "../language/cast4.rkt"))
 
 (: label-lambdas (Cast3-Lang Config . -> . Cast4-Lang))
 (define (label-lambdas prgm comp-config)

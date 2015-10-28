@@ -12,10 +12,17 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/data0.rkt"
+         "../language/data1.rkt"
+         "../language/data-representation.rkt"
+         "../language/make-begin.rkt")
 
 ;; Only the pass is provided by this module
-(provide normalize-context)
+(provide normalize-context
+         (all-from-out
+          "../language/data0.rkt"
+          "../language/data1.rkt"))
 
 (: normalize-context (-> Data0-Lang Config Data1-Lang))
 (trace-define (normalize-context prgm comp-config)

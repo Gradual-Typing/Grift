@@ -12,10 +12,16 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/data1.rkt"
+         "../language/data2.rkt"
+         "../language/make-begin.rkt")
 
 ;; Only the pass is provided by this module
-(provide remove-let)
+(provide remove-let
+         (all-from-out
+          "../language/data1.rkt"
+          "../language/data2.rkt"))
 
 #;
 (TODO this pass has a very wierd interface for effects.

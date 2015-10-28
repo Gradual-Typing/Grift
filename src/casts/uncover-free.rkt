@@ -11,7 +11,9 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/cast4.rkt"
+         "../language/cast5.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-free)

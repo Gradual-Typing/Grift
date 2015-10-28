@@ -1,6 +1,9 @@
 #lang typed/racket
 
-(require "../language.rkt"
+(require "../language/data2.rkt"
+         "../language/data3.rkt"
+         "../language/make-begin.rkt"
+         "../configuration.rkt"
          "../helpers.rkt")
 
 (provide remove-complex-opera)

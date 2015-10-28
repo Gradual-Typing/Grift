@@ -1,7 +1,6 @@
 #lang typed/racket/base
-
-
-(require "../src/compile.rkt"
+(require racket/cmdline
+         ;;"../src/compile.rkt"
          "../src/helpers.rkt"
          "./test-compile.rkt")
 
@@ -20,12 +19,21 @@
       (test-compile "debug" path (debug))
       #t)))
 
-(module+ main
-  (unless (directory-exists? test-tmp-path)
+(unless (directory-exists? test-tmp-path)
     (make-directory test-tmp-path))
-  (let ([args (current-command-line-arguments)])
-    (cond
-     [(= 0 (vector-length args)) (display "please specify what file to compile!\n")]
-     [(< 1 (vector-length args)) (display "please only specify one file to compile!\n")]
-     [(cc (vector-ref args 0)) (display "success :)\n")]
-     [else (display "success :)\n")])))
+
+(command-line
+ #:program "schml-test-runner"
+ #:once-each
+ [("-r" "--cast-representation") crep
+  "specify which cast representation to use (Twosomes or Coercions)"
+  (let ((crep (to-symbol crep)))
+    (if (or (eq? 'Twosomes crep)
+            (eq? 'Coercions crep))
+        (compiler-config-cast-representation crep)
+        (error 'tests "--cast-representation given invalid argument ~a" crep)))]
+ #:args (path)
+ (if (string? path)
+     (cc path)
+     (error 'debug-compile "this should never happen")))
+

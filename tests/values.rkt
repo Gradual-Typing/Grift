@@ -1,6 +1,6 @@
-#lang typed/racket
+#lang typed/racket/base
 
-(require ;;racket/port
+(require racket/port
          "../src/helpers.rkt")
 
 (provide (all-defined-out))
@@ -74,6 +74,10 @@
    as if it were returning a value from one of our compiled
    programs.
 |#
+
+
+
+
 (define-syntax-rule (observe exp)
   (let ([s (with-output-to-string (lambda () exp))])
     (logging observe () "~v" s)

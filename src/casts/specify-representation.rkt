@@ -14,9 +14,17 @@ exposed as the effects that they truelly are.
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/cast6.rkt"
+         "../language/data0.rkt"
+         "../language/data-representation.rkt")
+
 ;; Only the pass is provided by this module
-(provide specify-representation)
+(provide
+ (all-from-out
+  "../language/cast6.rkt"
+  "../language/data0.rkt")
+ specify-representation)
 
 #;
 (TODO Rewrite any allocating procedures in this pass.

@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 #|------------------------------------------------------------------------------+
 |Pass: src/schml/parse                                                          |
 +-------------------------------------------------------------------------------+
@@ -9,15 +9,17 @@
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
 
-(require "../helpers.rkt"
+(require racket/match
+         "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/schml0.rkt")
 
 (require typed/syntax/stx)
 
 (if-in-construction (require typed/rackunit))
 
-(provide syntax->schml0)
+(provide (all-from-out "../language/schml0.rkt") syntax->schml0)
 
 (: syntax->schml0 (Syntax-Lang Config . -> . Schml0-Lang))
 (define (syntax->schml0 prgm config)
