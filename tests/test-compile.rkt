@@ -16,7 +16,7 @@
 
 (require ;; The passes
  "../src/schml/reduce-to-cast-calculus.rkt"
- ;;"../src/casts/impose-cast-semantics.rkt"
+ "../src/casts/impose-cast-semantics.rkt"
  "../src/casts/casts-to-coercions.rkt"
  "../src/data/convert-representation.rkt"
  "../src/backend-c/code-generator.rkt"
@@ -45,39 +45,42 @@
   : (Parameterof Cast-Representation)
   (make-parameter 'Twosomes))
 
-
 (define-syntax-rule (test-compile name path expected)
   (test-case name
     (call/cc
      (lambda ([exit : (Any -> Any)])
        (define (exit/success) (exit 'success))
-       (define-syntax-rule (ck t m) (check value=? t expected m))
-       (let ([config (compiler-config)])
-         (with-handlers ([exn:schml:type:static?
+       (define config (compiler-config))
+       (define-syntax-rule (ck t m) (check value=? (interp t config) expected m))
+       (with-handlers ([exn:schml:type:static?
                           (lambda ([e : exn:schml:type:static])
                             (begin
                               (check value=?
                                      expected
                                      (blame #t (exn-message e))
                                      "static type error")))])
-           (define c0 (reduce-to-cast-calculus path config))
-           (ck (cast-lang-interp c0 config) "cast lang semantics")
+           (define ast0 (reduce-to-cast-calculus path config))
+           (check value=? (cast-lang-interp ast0 config) expected "cast-lang interp")
+           (ck ast0 "cast 0")
+           (test-impose-cast-semantics ast0 config ck)
+           
+           #;
            (when (eq? 'Coercions (Config-cast-rep config))
-             (define crcn (casts->coercions c0 config))
-             (ck (interp crcn config) "coercion lang semantics")
-             (exit/success))
-           #|(define d0 (impose-cast-semantics c0 config))
-           (define u0 (convert-representation d0 config))
-           (define p  (c-backend-generate-code u0 config))
-           (check value=?
-                  expected
-                  (observe (envoke-compiled-program #:config config))
-                  "test compiler semantics")
-           (compile/conf path config)
-           (check value=?
-                  expected
-                  (observe (envoke-compiled-program #:config config))
-                  "compiler semantics")|#))))))
+           (define crcn (casts->coercions c0 config))
+           (ck (interp crcn config) "coercion lang semantics")
+           (exit/success))
+         #|(define d0 (impose-cast-semantics c0 config))
+         (define u0 (convert-representation d0 config))
+         (define p  (c-backend-generate-code u0 config))
+         (check value=?
+                expected
+                (observe (envoke-compiled-program #:config config))
+                "test compiler semantics")
+         (compile/conf path config)
+         (check value=?
+                expected
+                (observe (envoke-compiled-program #:config config))
+                "compiler semantics")|#)))))
 
 (define-syntax-rule (test-file p ... n e)
   (test-compile n (simplify-path (build-path test-suite-path p ... n)) e))

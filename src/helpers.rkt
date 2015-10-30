@@ -217,7 +217,7 @@
     [(_ ann (if t c a)) (if t (do ann c) (do ann a))]
     ;; Allow begin to escape to real effects
     ;; Useful for printing because the IO monad would be too much
-    [(_ ann (begin s! ... s) s* ...) (begin s! ... (do ann s s* ...))]
+    [(_ ann (begin s! ...) s s* ...) (begin s! ... (do ann s s* ...))]
     ;; "Infer" the type of unannotated do expressions
     ;; by copying the current bind-operation and type annotation.
     [(_ (bind : T) (doing (p : t <- rhs) s* ...))

@@ -8,27 +8,41 @@
 ------------------------------------------------------------------------------|#
 
 (define-type Cast-or-Coerce1-Lang
-  (Prog (List String Natural Schml-Type)
-        (Labels CoC1-Bnd-Code* E)))
+  (Prog (List String Natural Schml-Type) CoC1-Expr))
 
 (define-type CoC1-Expr
   (Rec E (U ;; Non-Terminals
+          (Labels CoC1-Bnd-Code* E)
 	  (Lambda Uid* (Castable (Option Uid) E))
 	  (Letrec CoC1-Bnd* E)
 	  (Let CoC1-Bnd* E)
-	  (App E (Listof E))
+          (App-Code E (Listof E))
+          (App-Closure E (Listof E))
+          
 	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
           ;; Terminals
           (Begin CoC1-Expr* E)
           (Repeat Uid E E E)
 	  (Var Uid)
+          (Quote-Coercion (Coercion Schml-Type Blame-Label))
+          (Type Schml-Type)
 	  (Quote Cast-Literal)
+          (Code-Label Uid)
           ;; Casts with different ways of getting the same semantics
+          (Fn-Coercion (Listof E) E)
+          (Fn-Coercion-Arg E E)
+          (Fn-Coercion-Return E)
+          (Interpreted-Coerce E E)
           (Coerce (Coercion Schml-Type Blame-Label) E)
-          (Runtime-Cast E E E E)
+          (Interpreted-Cast E E E E)
 	  (Cast E Schml-Type Schml-Type Blame-Label)
-	  (Fn-Cast E Schml-Type Schml-Type Blame-Label)
+	  (Fn-Caster E)
+          ;;
+          (App-Hybrid  E (Listof E))
+          (Hybrid-Proxy E E E)
+          (Hybrid-Proxy-Closure E)
+          (Hybrid-Proxy-Coercion E)
           ;; FN-Type operations
           (Type-Fn-arg E E)
           (Type-Fn-return E)

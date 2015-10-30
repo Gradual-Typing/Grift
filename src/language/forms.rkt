@@ -83,8 +83,8 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Different casts
   (Cast expression type-exp type-cast label)
   ;; TODO Interpreted-Cast
-  (Runtime-Cast expression type-exp type-cast label)
-  (Fn-Cast expressiong type-exp type-cast label)
+  (Interpreted-Cast expression type-exp type-cast label)
+  (Fn-Caster expression)
   ;;Type Operations
   (Type-tag expression)
   (Type-Fn-arity expression)
@@ -93,7 +93,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-GRef-to expression)
   (Type-GVect-to expression)
   ;; closure Representation
-  (Fn-Caster expression)
   (Closure-Data code caster variables)
   (Closure-code var)
   (Closure-ref this var)
@@ -118,6 +117,9 @@ And a type constructor "name" expecting the types of field1 and field2
   (Free caster variables body)
   ;; Static Global Binding
   (Labels bindings body)
+  (App-Code rand rators)
+  (App-Closure rand rators)
+  (App-Hybrid rand rators)
   ;; Benchmarking tools language forms
   ;; low cost repetition
   (Repeat var start end body)
@@ -560,7 +562,10 @@ Dyn --> Int Int --> Dyn
 
 
 (define-forms
+  ;; TODO Come up with a better name for this
+  (Quote-Coercion const)
   (Coerce coercion expression) 
+  (Interpreted-Coerce coercion expression)
   ;; Identity Cast
   ;; "Calculated No Op Cast"
   (Identity type)
@@ -581,9 +586,15 @@ Dyn --> Int Int --> Dyn
   ;; Function Coercion
   ;; "Proxy a function call with args coercions and return coercion"
   (Proxy-Fn arity args return)
+  (Fn-Coercion args return)
+  (Fn-Coercion-Arg coercion index)
+  (Fn-Coercion-Return coercion)
   ;; Guarded Reference Coercion
   ;; "Proxy a Guarded Reference's Reads and writes"
-  (Proxy-Guarded read write))
+  (Proxy-Guarded read write)
+  (Hybrid-Proxy code coercion closure)
+  (Hybrid-Proxy-Coercion expression)
+  (Hybrid-Proxy-Closure expression))
 
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Schml-Type))

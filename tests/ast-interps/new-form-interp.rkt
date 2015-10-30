@@ -90,13 +90,17 @@ currently implemented in several files.
         [(App e e*) (apply (recur/env e) (map recur/env e*))]
         [(Op p e*) (delta p (map recur/env e*))]
         [(Coerce c (app recur/env v))
-         (if (eq? cst apply-coercion-lazy)
-             (cst c v)
-             (error 'interp "cst not for coercions"))]
+         (cond
+           [(eq? cst apply-coercion-lazy) (cst c v)]
+           [else (error 'interp "cst not for coercions")])]
         [(Cast (app recur/env val) t-exp t-cast label)
-         (if (eq? cst apply-cast-ld)
-             (cst val t-exp t-cast label)
-             (error 'interp "cst not for twosomes"))]
+         ;; If we are testing coercions but in a language before
+         ;; they are inserted translate cast to coercions
+         (cond
+           [(eq? cst apply-cast-ld) (cst val t-exp t-cast label)]
+           [(eq? cst apply-coercion-lazy)
+            (cst ((mk-coercion label) t-exp t-cast) val)]
+           [else (error 'interp "cast form without a transaltion rule")])]
         [(Var id) (env-lookup env id)]
         [(Quote k) k]
         [(Begin e* e) (begin (for-each recur/env e*) (recur/env e))]
@@ -234,6 +238,7 @@ currently implemented in several files.
       [(Interp-Proc v)             (function)]
       [(Interp-Dyn _ (list _ _ (Fn _ _ _))) (function)]
       [(Interp-Dyn _ (Proxy-Fn _ _ _)) (function)]
+      [(Interp-Dyn _ (Interp-Twosome _ (Fn _ _ _) _)) (function)]
       [(Interp-Dyn _ _) (dyn)]
       [else (error "returned unexpected value")])))
 

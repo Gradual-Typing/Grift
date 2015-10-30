@@ -13,6 +13,7 @@
    [keep-c : Boolean]
    [c-flags : (Listof String)]
    [asm-path : (Option Path)]
-   [cast-rep : Cast-Representation]))
+   [cast-rep : Cast-Representation])
+  #:transparent)
 
 

@@ -4,7 +4,7 @@
          "../../src/language.rkt"
          "../../src/helpers-untyped.rkt")
 
-(provide (all-defined-out))
+(provide (all-defined-out) mk-coercion)
 
 (module+ test (require rackunit))
 
