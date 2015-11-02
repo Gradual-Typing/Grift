@@ -337,7 +337,7 @@
          (Identity (Fn 1 (list (Bool)) (Bool))))
 )  
 
-(trace-define (compose-se-lud-efficient c1 c2)
+(trace-define (compose-se-ld-efficient c1 c2)
   ;; Preconditions c1 = [[ t1 =>^l t2 ]] and c2 = [[ t2 =>^l t3 ]]
    (unless (and (space-efficient-lud? c1)
                 (space-efficient-lud? c2))
@@ -441,4 +441,4 @@
     [else (Failed lbl)]))
 
 
-(define compose compose-se-lud-efficient)
+(define compose compose-se-ld-efficient)

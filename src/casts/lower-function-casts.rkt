@@ -532,8 +532,34 @@ T?l $ (_  ; )  = what here
 
 (: mk-coerce-code (Index Uid -> (State Nat CoC1-Code)))
 (define (mk-coerce-code arity apply-uid)
-  (error 'todo "mk coerce code"))
+  (: or-help ((Listof CoC1-Expr) -> CoC1-Expr))
+  (define (or-help a)
+    (cond
+      [(null? a) (Quote #t)]
+      [(null? (cdr a)) (car a)]
+      [else (If (car a) (or-help (cdr a)) (Quote #f))]))
+  (do (bind-state : (State Nat CoC1-Code))
+      (u-clos  : Uid <-  (uid-state "unkown_closure"))
+      (crcn    : Uid <-  (uid-state "fn_coercion"))
+      (arg*    : Uid* <-
+               (map-state uid-state (make-list arity "arg_coercion")))
+      (ret    : Uid <- (uid-state "ret_coercion"))
+      (return-state
+       (Code (list crcn u-clos)
+        (If (Hybrid-Proxy? (Var u-clos))
+            (Let `((,crnc2  . ,(Hybrid-Proxy-Coercion (Var u-clos)))
+                   (,r-clos . ,(Hybrid-Proxy-Closure  (Var u-clos))))
+             (Let (for/fold ([b* : CoC1-Bnd
+                              (list (Compose (Fn-Coercion-Return (Var crcn1))
+                                             (Fn-Coercion-Return (Var crcn2))))])
+                            ([a : Uid arg*]
+                             [i : Integer (in-range (- arity 1) -1 -1)])
+                    (cons 
+                       
 
+            
+                 
+              
 
 
 
