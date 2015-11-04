@@ -227,13 +227,13 @@ T?l $ (_  ; )  = what here
   (match-define (Prog (list name next type) exp) prgm)
   (match (Config-cast-rep config)
     ['Twosomes
-     (match-define-values (e (naive-fn-state n a* c*))
-       (run-state (lfc-expr exp) (hybrid-fn-state next '() (hasheq))))
-     (Prog (list name n type) (Labels (append (hash-values c*) a*) e))
+     (match-define-values (e (naive-fn-state n c*))
+       (run-state (lfc-expr exp) (naive-fn-state next (hasheq))))
+     (Prog (list name n type) (Labels (hash-values c*) e))]
     ['Coercions
      (match-define-values (e (hybrid-fn-state n a* c*))
        (run-state (lfc-expr exp) (hybrid-fn-state next '() (hasheq))))
-     (Prog (list name n type) (Labels (append (hash-values c*) a*) e)))]))
+     (Prog (list name n type) (Labels (append (hash-values c*) a*) e))]))
 
 
 
@@ -289,16 +289,15 @@ T?l $ (_  ; )  = what here
                                (list tmp (Type t1) (Type t2) (Quote lbl))))))
              (return-state (Cast exp t1 t2 b-lbl)))]
         ;; Here we must be representing casts as Coercions because the coercion node is present
-        [(Coerce (and (Proxy-Fn n args ret) fn-coercion) exp)
-         (s : LFC-State <- get-state)
-         (begin
-           (unless (hybrid-fn-state? s)
-             (error 'lfc-expr "Coercion with wrong state")))
+        [(Coerce crcn exp)
          (exp : CoC1-Expr  <- (lfc-expr exp))
-         (lbl : Uid <- (get-fn-cast/coerce n))
-         (return-state
-          (App-Code (Code-Label lbl)
-                    (list (Quote-Coercion fn-coercion) exp)))]
+         (if (Proxy-Fn? crcn)
+             (doing
+              (lbl : Uid <- (get-fn-cast/coerce (Proxy-Fn-arity crcn)))
+              (return-state
+               (App-Code (Code-Label lbl)
+                         (list (Quote-Coercion crcn) exp))))
+             (return-state (Coerce crcn exp)))]
         ;; Here we can be doing either casts or coercions
         ;; we could check the state and vary behavior but for now I think
         ;; this still works.
@@ -311,7 +310,7 @@ T?l $ (_  ; )  = what here
          (exp* : CoC1-Expr* <- (lfc-expr* exp*))
          (s : LFC-State <- get-state)
          (match s
-           [(hybrid-fn-state _ _ _) (return-state (App-Hybrid exp exp*))]
+           [(hybrid-fn-state _ _ _) (return-state (App/Fn-Proxy-Huh exp exp*))]
            [(naive-fn-state _ _)    (return-state (App-Closure exp exp*))]
            [else (error 'lfc-expr "this should never happen")])]
         ;; Just Recursion Cases Follow
@@ -479,31 +478,39 @@ T?l $ (_  ; )  = what here
 (define-type BC.BC (Pairof CoC1-Bnd-Code CoC1-Bnd-Code))
 
 (: mk-coercer (Index -> (State hybrid-fn-state Uid)))
+;; TODO this is really ugly because I am about 90% sure that it is
+;; best to implement this code at the specify representation level
+;; once the behavior of closures have been exposed it may also
+;; simplify the impelementation of data structure representation
+;; of fn-proxies
+;; TODO if this works move this code to specify representation
+;; otherwise revert this code
 (define (mk-coercer arity)
   (do (bind-state : (State hybrid-fn-state Uid))
       ((hybrid-fn-state n a* c*) : hybrid-fn-state <- get-state)
-      (let*-values ([(a.c n^)
+      (let*-values ([(c n^)
                     (run-state
-                     (do (bind-state : (State Nat BC.BC))
+                     (do #;(bind-state : (State Nat BC.BC))
+                         (bind-state : (State Nat CoC1-Bnd-Code))
                          (let ([str (number->string arity)])           
-                           (a-u : Uid <-
+                           #;(a-u : Uid <-
                                 (uid-state (string-append "app_coerced" str)))
                            (c-u : Uid <-
                                 (uid-state (string-append "coerce_fn_" str)))
-                           (a-c : CoC1-Code <- (mk-apply-code arity))
-                           (c-c : CoC1-Code <- (mk-coerce-code arity a-u))
-                           (return-state
-                            (cons (cons a-u a-c)
+                           #;(a-c : CoC1-Code <- (mk-apply-code arity))
+                           (c-c : CoC1-Code <- (mk-coerce-code arity #;a-u))
+                           (return-state (cons c-u c-c)
+                            #;(cons (cons a-u a-c)
                                   (cons c-u c-c)))))
                      n)]
-                    [(a c) (values (car a.c) (cdr a.c))])
+                    #;[(a c) (values (car a.c) (cdr a.c))])
         (_ : Null <- (put-state
-                      (hybrid-fn-state n (cons a a*) (hash-set c* arity c))))
+                      (hybrid-fn-state n a* #;(cons a a*) (hash-set c* arity c))))
         (return-state (car c)))))
 
 
-(: mk-apply-code (Index -> (State Nat CoC1-Code)))
-(define (mk-apply-code arity)
+;;(: mk-apply-code (Index -> (State Nat CoC1-Code)))
+#;(define (mk-apply-code arity)
   ;;TODO unfortunately the part exposes the calling conventions for closures
   ;;Think about if there is a better way to do this.
   (do (bind-state : (State Nat CoC1-Code))
@@ -517,11 +524,11 @@ T?l $ (_  ; )  = what here
              [crcn-var  : CoC1-Expr (Var crcn)]
              [code : CoC1-Code
               (Code (cons h-clos uid*)
-               (Let (list (cons crcn (Hybrid-Proxy-Coercion h-clos-var)))
+               (Let (list (cons crcn (Fn-Proxy-Coercion h-clos-var)))
                  (Interpreted-Coerce
                    (Fn-Coercion-Return crcn-var)
                    (App-Closure
-                     (Hybrid-Proxy-Closure h-clos-var)
+                     (Fn-Proxy-Closure h-clos-var)
                      (for/list : (Listof CoC1-Expr)
                                ([u uid*] [i (in-naturals)])
                        (Interpreted-Coerce
@@ -530,57 +537,67 @@ T?l $ (_  ; )  = what here
         (return-state code))))
 
 
-(: mk-coerce-code (Index Uid -> (State Nat CoC1-Code)))
-(define (mk-coerce-code arity apply-uid)
+;;(: mk-coerce-code (Index Uid -> (State Nat CoC1-Code)))
+;;(define (mk-coerce-code arity apply-uid)
+(: mk-coerce-code (Index -> (State Nat CoC1-Code)))
+(define (mk-coerce-code arity)
   (: or-help ((Listof CoC1-Expr) -> CoC1-Expr))
   (define (or-help a)
     (cond
       [(null? a) (Quote #t)]
       [(null? (cdr a)) (car a)]
       [else (If (car a) (or-help (cdr a)) (Quote #f))]))
-  (do (bind-state : (State Nat CoC1-Code))
-      (u-clos  : Uid <-  (uid-state "unkown_closure"))
-      (crcn    : Uid <-  (uid-state "fn_coercion"))
-      (arg*    : Uid* <-
-               (map-state uid-state (make-list arity "arg_coercion")))
-      (ret    : Uid <- (uid-state "ret_coercion"))
+  (: id-c*? (Uid* -> CoC1-Expr*))
+  (define (id-c*? x*)
+    (map (lambda ([x : Uid]) (Id-Coercion-Huh (Var x))) x*))
+  (: new-fn-crcn (Uid* Uid -> CoC1-Expr))
+  (define (new-fn-crcn args ret)
+    (Fn-Coercion (map (inst Var Uid) args) (Var ret)))
+  (: compose-return (Uid Uid Uid -> CoC1-Bnd*))
+  (define (compose-return ret new old)
+    (cons (cons ret (Compose (Fn-Coercion-Return (Var old))
+                             (Fn-Coercion-Return (Var new))))
+          '()))
+  ;; TODO this is likely the wrong definition once this file typechecks
+  ;; make sure the composition is in the correct order
+  (: compose-arg (Uid Uid Uid Index -> CoC1-Bnd))
+  (define (compose-arg arg new old i)
+    (cons arg (Compose (Fn-Coercion-Arg (Var new) (Quote i))
+                       (Fn-Coercion-Arg (Var old) (Quote i)))))
+    (do (bind-state : (State Nat CoC1-Code))
+      (u-clos   : Uid <-  (uid-state "unknown_closure"))
+      (new-crcn : Uid <-  (uid-state "new_fn_coercion"))
+      (arg*     : Uid* <-
+         (map-state uid-state (make-list arity "arg_coercion")))
+      (ret      : Uid <- (uid-state "ret_coercion"))
+      (old-crcn : Uid <-    (uid-state "old_fn_coercion"))
+      (r-clos   : Uid <- (uid-state "raw_closure"))
       (return-state
-       (Code (list crcn u-clos)
-        (If (Hybrid-Proxy? (Var u-clos))
-            (Let `((,crnc2  . ,(Hybrid-Proxy-Coercion (Var u-clos)))
-                   (,r-clos . ,(Hybrid-Proxy-Closure  (Var u-clos))))
-             (Let (for/fold ([b* : CoC1-Bnd
-                              (list (Compose (Fn-Coercion-Return (Var crcn1))
-                                             (Fn-Coercion-Return (Var crcn2))))])
+       (Code (list new-crcn u-clos)
+        ;; Is the closure we are casting a hybrid proxy
+        (If (Fn-Proxy-Huh (Var u-clos))
+            ;; If so we have to compose the old and new fn-coercions
+            ;; First get the old fn-coercion
+            (Let `((,old-crcn  . ,(Fn-Proxy-Coercion (Var u-clos)))
+                   (,r-clos    . ,(Fn-Proxy-Closure  (Var u-clos))))
+             ;; Then compose each sub coercion
+             (Let (for/fold ([b* : CoC1-Bnd*
+                                 (compose-return ret new-crcn old-crcn)])
                             ([a : Uid arg*]
                              [i : Integer (in-range (- arity 1) -1 -1)])
-                    (cons 
-                       
-
-            
-                 
-              
-
-
-
-
-;; Using state passing style with a imutable hashtable that maps the arity of
-;; a function to the untyped binding of a function that can cast that arity.
-
-  
-#;(: get-caster (LFC-Ctr -> (Index -> (State LFC-State Uid))))
-#;
-(define ((get-coercer build) arity)
-  (do (bind-state : (State Coercions Uid))
-      ((cons next table) : LFC-State <- get-state)
-    (let ([bnd? (hash-ref table arity #f)])
-      (if bnd?
-          (return-state (car bnd?))
-          (let-values ([(bnd next) (run-state (build-code arity) next)])
-            (do (bind-state : (State LFC-State Uid))
-                (_ : Null <-
-                   (put-state (cons next (hash-set table arity bnd))))
-              (return-state (car bnd))))))))
+                    (unless (index? i)
+                      (error 'lower-function-casts "bad index made"))
+                    (cons (compose-arg a new-crcn old-crcn i) b*))
+                  ;; Check if all Composes resulted in Id Coercions
+                  (If (or-help (id-c*? (cons ret arg*)))
+                      ;; If so the original closure is the correct type
+                      (Var r-clos)
+                      ;; Otherwise a new proxy is needed
+                      (Fn-Proxy arity
+                                (new-fn-crcn arg* ret)
+                                (Var r-clos)))))
+            ;; Closure is a regular on --> just make a new proxy
+            (Fn-Proxy arity (Var new-crcn) (Var u-clos)))))))
 
 
 

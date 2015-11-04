@@ -1,11 +1,14 @@
 #lang racket/base
 
 (provide
- env
+ empty-env
  env-lookup
  env-extend
  env-cons
- env-extend-rec)
+ env-extend-rec
+ global-env
+ global-env-extend!
+ global-env-lookup)
 
 ;; Create a place holder for locations that are uninitialized
 (define undefined (gensym))
@@ -65,8 +68,11 @@ of an not yet initialized binding.
   rec-env)
 
 ;; Construct an empty-environment
-(define-syntax-rule (env) (hash))
+(define-syntax-rule (empty-env) (hash))
+(define-syntax-rule (global-env) (make-hash))
 
+(define (global-env-extend! env id* code*)
+  (for-each (lambda (id code) (hash-set! env id code)) id* code*))
 
-
-
+(define (global-env-lookup env id)
+  (hash-ref env id (lambda () (error 'global-env-lookup "unbound ~a" id))))

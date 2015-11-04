@@ -119,7 +119,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Labels bindings body)
   (App-Code rand rators)
   (App-Closure rand rators)
-  (App-Hybrid rand rators)
+  (App/Fn-Proxy-Huh rand rators)
   ;; Benchmarking tools language forms
   ;; low cost repetition
   (Repeat var start end body)
@@ -564,11 +564,14 @@ Dyn --> Int Int --> Dyn
 (define-forms
   ;; TODO Come up with a better name for this
   (Quote-Coercion const)
+  (Compose fst snd)
   (Coerce coercion expression) 
   (Interpreted-Coerce coercion expression)
   ;; Identity Cast
   ;; "Calculated No Op Cast"
   (Identity type)
+  (Id-Coercion-Huh E)
+  (Id-Coercion)
   ;; Projection Coercion
   ;; "Project from dynamic at type blaming label if it fails"
   ;; G?ˡ in most papers
@@ -592,9 +595,10 @@ Dyn --> Int Int --> Dyn
   ;; Guarded Reference Coercion
   ;; "Proxy a Guarded Reference's Reads and writes"
   (Proxy-Guarded read write)
-  (Hybrid-Proxy code coercion closure)
-  (Hybrid-Proxy-Coercion expression)
-  (Hybrid-Proxy-Closure expression))
+  (Fn-Proxy arity coercion closure)
+  (Fn-Proxy-Coercion expression)
+  (Fn-Proxy-Closure expression)
+  (Fn-Proxy-Huh expression))
 
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Schml-Type))

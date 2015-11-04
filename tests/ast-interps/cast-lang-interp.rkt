@@ -4,7 +4,7 @@
 
 (require "../../src/helpers.rkt"
          "../../src/errors.rkt"
-	 "../../src/language.rkt"
+	 "../../src/language/cast0.rkt"
          "../../src/configuration.rkt"
 	 "../values.rkt"
          racket/fixnum)

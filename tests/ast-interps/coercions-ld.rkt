@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require racket/match
-         "../../src/language.rkt"
+         "../../src/language/forms.rkt"
          "../../src/helpers-untyped.rkt")
 
 (provide (all-defined-out) mk-coercion)
@@ -323,16 +323,16 @@
 
 (module+ test
   (check eq%id
-         (compose-se-lud-efficient (Sequence (Identity (Fn 0 '() (Int)))
+         (compose-se-ld-efficient (Sequence (Identity (Fn 0 '() (Int)))
                                              (Inject   (Fn 0 '() (Int))))
                                    (Sequence (Project  (Fn 0 '() (Dyn)) "1")
                                              (Identity (Fn 0 '() (Dyn)))))
          (Proxy-Fn 0 '() (Sequence (Identity (Int)) (Inject (Int)))))
 
   (check eq%id
-         (compose-se-lud-efficient (Proxy-Fn 1 (list (Sequence (Project (Bool) "1") (Identity (Bool))))
+         (compose-se-ld-efficient (Proxy-Fn 1 (list (Sequence (Project (Bool) "1") (Identity (Bool))))
                                             (Sequence (Identity (Bool)) (Inject (Bool))))
-                                   (Proxy-Fn 1 (list (Sequence (Identity (Bool)) (Inject (Bool))))
+                                  (Proxy-Fn 1 (list (Sequence (Identity (Bool)) (Inject (Bool))))
                                             (Sequence (Project (Bool) "2") (Identity (Bool)))))
          (Identity (Fn 1 (list (Bool)) (Bool))))
 )  

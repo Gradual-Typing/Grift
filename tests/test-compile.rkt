@@ -5,7 +5,7 @@
 
 (require "./rackunit.rkt"
          "../src/configuration.rkt"
-         "../src/language.rkt"
+         ;;"../src/language.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
          #;
@@ -17,9 +17,9 @@
 (require ;; The passes
  "../src/schml/reduce-to-cast-calculus.rkt"
  "../src/casts/impose-cast-semantics.rkt"
- "../src/casts/casts-to-coercions.rkt"
- "../src/data/convert-representation.rkt"
- "../src/backend-c/code-generator.rkt"
+ ;;"../src/casts/casts-to-coercions.rkt"
+ ;;"../src/data/convert-representation.rkt"
+ ;;"../src/backend-c/code-generator.rkt"
  ;; The interpreters
  "./ast-interps/cast-lang-interp.rkt"
  )

@@ -29,20 +29,24 @@
           (Type Schml-Type)
 	  (Quote Cast-Literal)
           (Code-Label Uid)
-          ;; Casts with different ways of getting the same semantics
+          ;; Coecions Currently Exposed as Expressions
+          (Id-Coercion-Huh E)
           (Fn-Coercion (Listof E) E)
           (Fn-Coercion-Arg E E)
           (Fn-Coercion-Return E)
+          ;; Casts with different ways of getting the same semantics
           (Interpreted-Coerce E E)
           (Coerce (Coercion Schml-Type Blame-Label) E)
           (Interpreted-Cast E E E E)
 	  (Cast E Schml-Type Schml-Type Blame-Label)
 	  (Fn-Caster E)
+          (Compose E E)
           ;;
-          (App-Hybrid  E (Listof E))
-          (Hybrid-Proxy E E E)
-          (Hybrid-Proxy-Closure E)
-          (Hybrid-Proxy-Coercion E)
+          (App/Fn-Proxy-Huh E (Listof E))
+          (Fn-Proxy Index E E)
+          (Fn-Proxy-Huh E)
+          (Fn-Proxy-Closure E)
+          (Fn-Proxy-Coercion E)
           ;; FN-Type operations
           (Type-Fn-arg E E)
           (Type-Fn-return E)

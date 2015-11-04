@@ -1,7 +1,7 @@
 #lang racket
 
 (require "../../src/helpers-untyped.rkt"
-         "../../src/language.rkt")
+         "../../src/language/forms.rkt")
 
 (provide (all-defined-out))
 
