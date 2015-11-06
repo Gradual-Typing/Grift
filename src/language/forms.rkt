@@ -81,17 +81,17 @@ And a type constructor "name" expecting the types of field1 and field2
   (Fml identifier type)
   (Bnd identifier type expression)
   ;; Different casts
-  (Cast expression type-exp type-cast label)
+  (Cast expression instruction)
   ;; TODO Interpreted-Cast
-  (Interpreted-Cast expression type-exp type-cast label)
+  (Interpreted-Cast expression instruction)
   (Fn-Caster expression)
   ;;Type Operations
   (Type-tag expression)
   (Type-Fn-arity expression)
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
-  (Type-GRef-to expression)
-  (Type-GVect-to expression)
+  (Type-GRef-Of expression)
+  (Type-GVect-Of expression)
   ;; closure Representation
   (Closure-Data code caster variables)
   (Closure-code var)
@@ -118,7 +118,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Static Global Binding
   (Labels bindings body)
   (App-Code rand rators)
-  (App-Closure rand rators)
+  (App-Fn rand rators)
   (App/Fn-Proxy-Huh rand rators)
   ;; Benchmarking tools language forms
   ;; low cost repetition
@@ -137,6 +137,20 @@ And a type constructor "name" expecting the types of field1 and field2
   (Print expression)
   (BinOp primitive expression1 expression2)
   ;; Guarded references IL Representation
+  (Unguarded-Box init)
+  (Unguarded-Box-Ref box)
+  (Unguarded-Box-Set! box value)
+  (Unguarded-Vect size value)
+  (Unguarded-Vect-Ref vect index)
+  (Unguarded-Vect-Set! vect index value)
+  (Guarded-Proxy expression representation)
+  (Guarded-Proxy-Ref guarded)
+  (Guarded-Proxy-Source guarded)
+  (Guarded-Proxy-Target guarded)
+  (Guarded-Proxy-Blames guarded)
+  (Guarded-Proxy-Coercion guarded)
+  (Guarded-Proxy-Huh expression)
+  #|
   (GRep-proxied? expression)
   (UGbox expression)
   (UGbox-set! expression1 expression2)
@@ -148,7 +162,9 @@ And a type constructor "name" expecting the types of field1 and field2
   (Gproxy-for expression)
   (Gproxy-from expression)
   (Gproxy-to expression)
-  (Gproxy-blames expression))
+  (Gproxy-blames expression)
+  |#
+)
 
 (define NO-OP (No-Op))
 
@@ -562,14 +578,18 @@ Dyn --> Int Int --> Dyn
 
 
 (define-forms
+  (Coercion coercion)
+  (Twosome type1 type2 lbl)
   ;; TODO Come up with a better name for this
   (Quote-Coercion const)
-  (Compose fst snd)
-  (Coerce coercion expression) 
-  (Interpreted-Coerce coercion expression)
+  (Compose-Coercions fst snd)
+  ;; I am swithing to using the Cast and Interpreted Cast for the following
+  ;; Forms
+  ;(Coerce coercion expression) 
+  ;(Interpreted-Coerce coercion expression)
   ;; Identity Cast
   ;; "Calculated No Op Cast"
-  (Identity type)
+  (Identity)
   (Id-Coercion-Huh E)
   (Id-Coercion)
   ;; Projection Coercion
@@ -588,13 +608,17 @@ Dyn --> Int Int --> Dyn
   (Failed label)
   ;; Function Coercion
   ;; "Proxy a function call with args coercions and return coercion"
-  (Proxy-Fn arity args return)
+  ;; I am switching over to using the Fn form for this
+  #;(Proxy-Fn arity args return)
   (Fn-Coercion args return)
   (Fn-Coercion-Arg coercion index)
   (Fn-Coercion-Return coercion)
   ;; Guarded Reference Coercion
   ;; "Proxy a Guarded Reference's Reads and writes"
-  (Proxy-Guarded read write)
+  (Ref read write)
+  (Ref-Coercion read write)
+  (Ref-Coercion-Read expression)
+  (Ref-Coercion-Write ref)
   (Fn-Proxy arity coercion closure)
   (Fn-Proxy-Coercion expression)
   (Fn-Proxy-Closure expression)
@@ -607,36 +631,15 @@ Dyn --> Int Int --> Dyn
 
 (define-type Src srcloc)
 
-
-(define-type (GRep A)
-  (U (GRep-Value A)
-     (GRep-Effect A)))
-
-(define-type (GRep-Value A)
-  (U (GRep-proxied? A)
-     (UGbox A)
-     (UGbox-ref A)
-     (UGvect A A)
-     (UGvect-ref A A)
-     (Gproxy A A A A)
-     (Gproxy-for A)
-     (Gproxy-from A)
-     (Gproxy-to A)
-     (Gproxy-blames A)))
-
-(define-type (GRep-Effect A)
-  (U (UGbox-set! A A)
-     (UGvect-set! A A A)))
-
 (define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
 
-(define-type (Coercion type label)
-  (Rec C (U (Identity type)
-            (Project type label)
-            (Inject type)
+(define-type Schml-Coercion
+  (Rec C (U Identity
+            (Project Schml-Type Blame-Label)
+            (Inject Schml-Type)
             (Sequence C C)
-            (Failed label)
-            (Proxy-Fn Index (Listof C) C)
-            (Proxy-Guarded C C))))
+            (Failed Blame-Label)
+            (Fn Index (Listof C) C)
+            (Ref C C))))
 
 (define-type Data-Literal (U Integer String))

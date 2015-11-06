@@ -137,7 +137,7 @@ currently implemented in severral files.
            (error 'interp/Fn-Caster "not a code label ~a" lbl?))
          (Code-Label lbl?)]
         [(App e e*) (apply (recur/env e) (map recur/env e*))]
-        [(App-Closure (app recur/env f) (list (app recur/env v*) ...))
+        [(App-Fn (app recur/env f) (list (app recur/env v*) ...))
          (unless (Interp-Proc? f)
            (error 'interp/App-Closure))
          ((Interp-Proc-value f) v*)]
@@ -156,21 +156,21 @@ currently implemented in severral files.
          ;; it is a type error to use it otherwise.
          (cond
            [(Interp-Proc? v) #f]
-           ;; TODO Fix the name of Proxy-Fn to be Fn-Coercion
-           [(and (Interp-Dyn? v) (Proxy-Fn? (Interp-Dyn-mark v))) #t]
+           ;; TODO Fix the name of Fn to be Fn-Coercion
+           [(and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v))) #t]
            [else (error 'interp/Fn-Proxy-Huh "type invalid value ~a" v)])]
         [(Fn-Proxy-Closure (app recur/env v))
-         (unless (and (Interp-Dyn? v) (Proxy-Fn? (Interp-Dyn-mark v)))
+         (unless (and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v)))
            (error 'interp/Fn-Proxy-Closure "type invalid ~a" v))
          (Interp-Dyn-value v)]
         [(Fn-Proxy-Coercion (app recur/env v))
-         (unless (and (Interp-Dyn? v) (Proxy-Fn? (Interp-Dyn-mark v)))
+         (unless (and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v)))
            (error 'interp/Fn-Proxy-Coercion))
          (Interp-Dyn-mark v)]
         [(App/Fn-Proxy-Huh (app recur/env v) (list (app recur/env v*) ...))
          (cond
            [(Interp-Proc? v) ((Interp-Proc-value v) v*)]
-           [(not (and (Interp-Dyn? v) (Proxy-Fn? (Interp-Dyn-mark v))))
+           [(not (and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v))))
             (error 'inter/App/Fn-Proxy-Huh "other value ~a" v)]
            [(not (eq? cast-rep 'Coercions))
             (error 'inter/App/Fn-Proxy-Huh "wrong cast fun ~a" cst)]
@@ -179,8 +179,8 @@ currently implemented in severral files.
                    [f (Interp-Dyn-value v)])
               (unless (Interp-Proc? f)
                 (error 'inter/App/Fn-Proxy-Huh "value in proxy not fun: ~a" f))
-              (cst (Proxy-Fn-return c)
-                   ((Interp-Proc-value f) (map cst (Proxy-Fn-args c) v*))))])]
+              (cst (Fn-ret c)
+                   ((Interp-Proc-value f) (map cst (Fn-fmls c) v*))))])]
         ;; Types as runtime objects
         ;; TODO Rename this
         [(Type t) t]
@@ -200,40 +200,53 @@ currently implemented in severral files.
          (Fn-arity v)]
         ;; Coercions as runtime objects
         [(Quote-Coercion c) c]
-        [(Compose (app recur/env c1) (app recur/env c2))
+        [(Compose-Coercions (app recur/env c1) (app recur/env c2))
          (compose c1 c2)]
         [(Id-Coercion-Huh (app recur/env c)) (Identity? c)]
         [(Fn-Coercion (list (app recur/env c*) ...) (app recur/env c))
-         (Proxy-Fn (length c*) c* c)]
+         (Fn (length c*) c* c)]
         [(Fn-Coercion-Arg (app recur/env c) (app recur/env i))
-         (list-ref (Proxy-Fn-args c) i)]
+         (list-ref (Fn-fmls c) i)]
         [(Fn-Coercion-Return (app recur/env c))
-         (Proxy-Fn-return c)]
+         (Fn-ret c)]
+        [(Ref-Coercion (app recur/env r) (app recur/env w))
+         (Ref r w)]
+        [(Ref-Coercion-Read (app recur/env c))
+         (match c
+           [(Ref r _) r]
+           [other (error 'Ref-Coercion-Read)])]
+        [(Ref-Coercion-Write (app recur/env c))
+         (match c
+           [(Ref _ w) w]
+           [other (error 'Ref-Coercion-Write)])]
         ;; Cast Handling TODO Make it so that there are only two forms here
         ;; Interp-Cast and Cast
-        [(Coerce c (app recur/env v))
-         (cond
-           [(eq? cast-rep 'Coercions) (cst c v)]
-           [else (error 'interp/Coerce)])]
-        [(Interpreted-Coerce (app recur/env c) (app recur/env v))
-         (cond
-           [(eq? cast-rep 'Coercions) (cst c  v)]
-           [else (error 'interp/Interpret-Coerce)])]
-        [(Cast (app recur/env val) t-exp t-cast label)
-         ;; If we are testing coercions but in a language before
-         ;; they are inserted translate cast to coercions
-         (cond
-           [(eq? cast-rep 'Twosomes)
-            (cst val t-exp t-cast label)]
-           [(eq? cast-rep 'Coercions)
-            (cst ((mk-coercion label) t-exp t-cast) val)]
-           [else (error 'interp/Cast)])]
-        [(Interpreted-Cast (app recur/env v)
-                           (app recur/env t1)(app recur/env t2)
-                           (app recur/env l))
-         (cond
-           [(eq? cast-rep 'Twosomes) (cst v t1 t2 l)]
-           [else (error 'interp/Interpret-Cast)])]
+        [(Cast (app recur/env val) rep)
+         (match rep
+           [(Twosome t-exp t-cast label)           
+            (cond
+              [(eq? cast-rep 'Twosomes)
+               (cst val t-exp t-cast label)]
+              ;; If we are testing coercions but in a language before
+              ;; they are inserted translate cast to coercions
+              [(eq? cast-rep 'Coercions)
+               (cst ((mk-coercion label) t-exp t-cast) val)]
+              [else (error 'interp/Cast)])]
+           [(Coercion c)
+            (cond
+              [(eq? cast-rep 'Coercions) (cst c val)]
+              [else (error 'interp/Coerce)])]
+           [other (error 'interp/cast "~a" other)])]
+        [(Interpreted-Cast (app recur/env v) rep)
+         (match rep
+           [(Twosome (app recur/env t1)(app recur/env t2) (app recur/env l))
+            (cond
+              [(eq? cast-rep 'Twosomes) (cst v t1 t2 l)]
+              [else (error 'interp/Interpret-Cast)])]
+           [(Coercion (app recur/env c))
+            (cond
+              [(eq? cast-rep 'Coercions) (cst c  v)]
+              [else (error 'interp/Interpret-Coerce)])])]
         [(Blame (app recur/env lbl)) (raise-blame lbl)]
         ;; Guarded references
         [(Gbox (app recur/env v)) (make-gbox v)]
@@ -241,7 +254,7 @@ currently implemented in severral files.
          (read-grep cst v)]
         [(Gbox-set! (app recur/env e1) (app recur/env e2))
          (write-grep cst e1 e2)]
-        ;; guarded arrays
+        ;; Guarded vectors
         [(Gvector (app recur/env size) (app recur/env v))
          (make-gvect size v)]
         [(Gvector-ref (app recur/env v) (app recur/env i))
@@ -250,6 +263,74 @@ currently implemented in severral files.
                        (app recur/env i)
                        (app recur/env v2))
          (write-grep cst v1 v2 i)]
+        ;; Guarded Runtime Representation
+        ;; TODO Make this Guarded-Proxy-Huh
+        [(Guarded-Proxy-Huh (app recur/env r))
+         (match r
+           [(box _) #f]
+           [(vector _ ...) #f]
+           [(Interp-GProxy _ _ _) #t]
+           [other (error 'interp/GRep-Proxied? "~a" other)])]
+        ;; TODO Make this (Guarded-Proxy v (Twosome t1 t2 l))
+        [(Guarded-Proxy (app recur/env v) rep)
+         (match rep
+           [(Twosome (app recur/env t1) (app recur/env t2) (app recur/env l))
+            (match v
+              [(box _) (Interp-GProxy 'Box v (Twosome t1 t2 l))]
+              [(vector _ ...) (Interp-GProxy 'Vector v (Twosome t1 t2 l))]
+              [(Interp-GProxy t _ _)
+               (Interp-GProxy t v (Twosome t1 t2 l))]
+              [other (error 'interp/Guarded-Proxy/Twosome "~a" other)])]
+           [(Coercion (app recur/env c))
+            (match v
+              [(box _) (Interp-GProxy 'Box v c)]
+              [(vector _ ...) (Interp-GProxy 'Vector v c)] 
+              [other (error 'interp/Guarded-Proxy/Coercion "~a" other)])]
+           [other (error 'interp/Guarded-Proxy "~a" other)])]
+        [(Guarded-Proxy-Ref (app recur/env p))
+         (match p
+           [(Interp-GProxy _ v _) v]
+           [other (error 'interp/Guarded-Proxy-Ref "~a" p)])]
+        [(Guarded-Proxy-Source (app recur/env p))
+         (match p
+           [(Interp-GProxy _ _ (Twosome t1 _ _)) t1]
+           [other (error 'interp/Guarded-Proxy-Source "~a" p)])]
+        [(Guarded-Proxy-Target (app recur/env p))
+         (match p
+           [(Interp-GProxy _ _ (Twosome _ t2 _)) t2]
+           [other (error 'interp/Guarded-Proxy-Target "~a" p)])]
+        [(Guarded-Proxy-Blames (app recur/env p))
+         (match p
+           [(Interp-GProxy _ _ (Twosome _ _ l)) l]
+           [other (error 'interp/Guarded-Proxy-Blames "~a" p)])]
+        [(Guarded-Proxy-Coercion (app recur/env p))
+         (match p
+           [(Interp-GProxy _ _ c) c]
+           [other (error 'interp/Guarded-Proxy-Blames "~a" p)])]
+        ;; UnGuarded references
+        [(Unguarded-Box (app recur/env v)) (box v)]
+        [(Unguarded-Box-Set! (app recur/env b) (app recur/env v))
+         (unless (and (box? b))
+           (error 'interp/Unguarded-Box-Set!))
+         (set-box! b v)]
+        [(Unguarded-Box-Ref (app recur/env b))
+         (unless (box? b)
+           (error 'interp/UGbox-ref))
+         (unbox b)]
+        [(Unguarded-Vect (app recur/env n) (app recur/env v))
+         (unless (exact-nonnegative-integer? n)
+           ;; TODO This should output the same text runtime error message does
+           (error 'interp/UGvect "given invalid size ~a" n))
+         (make-vector n v)]
+        [(Unguarded-Vect-Set!
+          (app recur/env r) (app recur/env i) (app recur/env v))
+         (unless (and (vector? r) (exact-nonnegative-integer? i))
+           (error 'interp/UGvect-set! "invalid input ~a ~a" r i))
+         (vector-set! r i v)]
+        [(Unguarded-Vect-Ref (app recur/env r) (app recur/env i))
+         (unless (and (vector? r) (exact-nonnegative-integer? i))
+           (error 'interp/UGvect-ref "invalid input ~a ~a" r i))
+         (vector-ref r i)]
         [e (error 'interp "Umatched expression ~a" e)]))
     (logging cast/interp-res (all) "~a > ~v" (get i-depth) res)
     (dec i-depth)
@@ -327,7 +408,7 @@ currently implemented in severral files.
              (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))))
        (define result (recur val rands^))
        (cast result t2 t4 lbl)]
-      [(Interp-Dyn val (Proxy-Fn ar args res))
+      [(Interp-Dyn val (Fn ar args res))
        (define rands^ (map apply-coercion-lazy args rands))
        ;; Threats to validity
        (define result (recur val rands^))
@@ -339,9 +420,9 @@ currently implemented in severral files.
 
 (define (mk-cast/coercion v c)
   (match c
-    [(Identity _) v]
+    [(Identity) v]
     [(Failed l) (raise-blame l)]
-    [(Proxy-Guarded _ _)
+    [(Ref _ _)
      (unless (or (vector? v) (box? v))
        (error 'interp "not as space efficient as we believe"))
      (if (box? v)
@@ -366,13 +447,13 @@ currently implemented in severral files.
       [(? null?)      (unit)]
       [(box v)                     (gbox)]
       [(Interp-GProxy 'Box _ _)    (gbox)]
-      [(Interp-Dyn (box _) (Proxy-Guarded _ _)) (gbox)]
+      [(Interp-Dyn (box _) (Ref _ _)) (gbox)]
       [(vector _ ...)              (gvect)]
       [(Interp-GProxy 'Vector _ _) (gvect)]
-      [(Interp-Dyn (vector _ ...) (Proxy-Guarded _ _)) (gvect)]
+      [(Interp-Dyn (vector _ ...) (Ref _ _)) (gvect)]
       [(Interp-Proc _ _)             (function)]
       [(Interp-Dyn _ (list _ _ (Fn _ _ _))) (function)]
-      [(Interp-Dyn _ (Proxy-Fn _ _ _)) (function)]
+      [(Interp-Dyn _ (Fn _ _ _)) (function)]
       [(Interp-Dyn _ (Interp-Twosome _ (Fn _ _ _) _)) (function)]
       [(Interp-Dyn _ _) (dyn)]
       [else (error "returned unexpected value")])))

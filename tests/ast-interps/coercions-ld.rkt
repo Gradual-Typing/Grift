@@ -26,17 +26,13 @@
 ;; c, d ::= id_A | G! | G?ᵖ | c -> d | c ; d | ⊥ᴳᵖᴴ
 
 (define (coercion? x)
-  (or ((id-coercion? schml-type?) x)
+  (or (Identity? x)
       ((inj-coercion? schml-type?) x)
       ((proj-coercion? schml-type? blame-label?) x)
       ((fn-coercion? coercion?) x)
       ((gref-coercion? coercion? coercion?) x)
       ((seq-coercion? coercion? coercion?) x)
       ((failed-coercion? blame-label?) x)))
-
-(define ((id-coercion? type?) x)
-  (and (Identity? x)
-       (type? (Identity-type x))))
 
 (define ((inj-coercion? type?) x)
   (and (Inject? x)
@@ -48,19 +44,19 @@
        (label? (Project-label x))))
 
 (define ((fn-coercion? c?) x)
-  (and (Proxy-Fn? x)
-       (let ([l (Proxy-Fn-arity x)]
-             [a (Proxy-Fn-args x)])
+  (and (Fn? x)
+       (let ([l (Fn-arity x)]
+             [a (Fn-fmls  x)])
          (and (exact-nonnegative-integer? l)
               (list? a)
               (= (length a) l)
               (andmap c? a)))
-       (c? (Proxy-Fn-return x))))
+       (c? (Fn-ret x))))
 
 (define ((gref-coercion? c?) x)
-  (and (Proxy-Guarded? x)
-       (c? (Proxy-Guarded-read x))
-       (c? (Proxy-Guarded-write x))))
+  (and (Ref? x)
+       (c? (Ref-read x))
+       (c? (Ref-write x))))
 
 (define ((seq-coercion? fst? snd?) x)
   (and (Sequence? x)
@@ -70,64 +66,15 @@
 (define ((failed-coercion? label?) x)
   (and (Failed? x) (label? (Failed-label x))))
 
-
-;; These are really bad names that should be fixed
-
-;; Coercions Normal Forms and Possible Specializations of Coercions
-;; space efficient coercions
-;; s, t = id_? | (G?ᵖ ; i) | i
-
-(define (normal-form-coercion? x)
-      ;; An Identity without any type info
-  (or (id-coercion? Dyn?)
-      ;; A projection followed by possible injection
-      (seq-proj-intermediate? x)
-      ;; An possible injection
-      (intermediate-coercion? x)))
-
-;; i ::= (g ; G!) | g | ⊥ᴳᵖᴴ
-(define (intermediate-coercion? x)
-      ;; intermediate coercion followed by injection
-  (or (seq-grnd-injection? x)
-      (grnd-coercion? x)
-      (failed-coercion? x)))
-
-;; ground coercions
-;; g, h ::= id_T | (s -> t) 
-(define (grnd-coercion? x)
-  (or (id-coercion? base-type?)
-      (fn-coercion? normal-form-coercion?)))
-
-
-(define seq-proj-intermediate?
-  (seq-coercion?
-   (proj-coercion? schml-type? blame-label?)
-   intermediate-coercion?))
-
-
-(define seq-grnd-injection?
-  (seq-coercion?
-   grnd-coercion?
-   (inj-coercion? schml-type?)))
-
-
-;; Identity Free Coercions
-;; f ::= (G?ᵖ ; i) | (g ; G!) | ⊥ᴳᵖᴴ | (s -> t)
-(define (id-free-coercion x)
-  (or (seq-proj-intermediate? x)
-      (seq-grnd-injection? x)
-      (failed-coercion? x)
-      ((fn-coercion? normal-form-coercion?) x)))
-
 (define (space-efficient-lud? x)
   (define (recur? x) (space-efficient-lud? x))
   (define (g? x)
     (or (Identity? x)
-        (and (Proxy-Fn? x)
-             (andmap recur? (Proxy-Fn-args x)))
-        (and (Proxy-Guarded? x)
-             (recur? (Proxy-Guarded-read x))
-             (recur? (Proxy-Guarded-write x)))))
+        (and (Fn? x)
+             (andmap recur? (Fn-fmls x)))
+        (and (Ref? x)
+             (recur? (Ref-read x))
+             (recur? (Ref-write x)))))
   (define (i? x)
     (or (g? x)
         (and (Sequence? x)
@@ -151,8 +98,8 @@
        ;; Cases that seem to be needed for Lazy-d
        [((Inject t1) (Project t2 p)) ((mk-coercion p) t1 t2)]
        ;; T? & ⊥ = (T? ; ⊥)
-       [(c1 (Identity _)) c1]
-       [((Identity _) c2) c2]
+       [(c1 (Identity)) c1]
+       [((Identity) c2) c2]
        ;; Not sure about this one
        ;; You could create a special ID-Dyn-checked node to optimize this case
        ;; In the case that the label types are the same perform the extraction
@@ -162,40 +109,33 @@
        
        ;; Compose as presented by 
        ;; Idι & Idι = Idι
-       [((Identity i1) (Identity i2)) #;#:when #;(equal? i1 i2) c2]
+       [((Identity) (Identity)) #;#:when #;(equal? i1 i2) c2]
        ;; Id* & t = t
-       [((Identity (Dyn)) _) c2]
+       [((Identity) _) c2]
        ;; (s -> t) & (s' -> t') = (s' & s) -> (t & t')
        ;; (Id_s -> Id_t) = Id_(s -> t)  
-       [((Proxy-Fn n1 s1* t1) (Proxy-Fn n2 s2* t2))
+       [((Fn n1 s1* t1) (Fn n2 s2* t2))
         (cond
           [(= n1 n2)
            (define-values (s* t)
              (values (map compose s2* s1*) (compose t1 t2)))
            (match* (s* t)
-             [((list (Identity a*) ...) (Identity r*))
+             [((list (Identity) ...) (Identity))
               #:when (proxy-function-identity-contraction?)
-              (Identity (Fn n1 a* r*))]
-             [(s* t*) (Proxy-Fn n1 s* t)])]
+              (Identity)]
+             [(s* t*) (Fn n1 s* t)])]
           [else (error 'TODO "This should fail but I am not sure how")])]
-       [((Proxy-Fn n1 s1* t1) (Inject t)) (Sequence c1 c2)]
+       [((Fn n1 s1* t1) (Inject t)) (Sequence c1 c2)]
        ;; (Ref s t) & (Ref s' t') = (Ref (s' & s) (t & t'))
        ;; (Ref Id_t Id_t) = (Id (Ref t))
-       [((Proxy-Guarded s1 t1) (Proxy-Guarded s2 t2))
+       [((Ref s1 t1) (Ref s2 t2))
         (define-values (s t)
           (values (compose s1 s2) (compose t2 t1)))
         (match* (s t)
-          [((Identity t1) (Identity t2))
-           #:when (and (proxy-guarded-identity-contraction?)
-                       ;; Is this ever not the case?
-                       (equal? t1 t2))
-           ;; This can lead to (Identity (GRef t1)) where
-           ;; it should be (Identity (GVect t1)) but
-           ;; Identity coercions don't actually use the type
-           (Identity (GRef t1))]
-          [(_ _) (Proxy-Guarded s t)])]
+          [((Identity) (Identity)) (Identity)]
+          [(s t) (Ref s t)])]
        ;; (g ; G!) & Id* = (g ; G!)
-       [((Sequence g (Inject G)) (Identity (Dyn))) c1]
+       [((Sequence g (Inject G)) (Identity)) c1]
        ;; (G?ᵖ; i) & t = (G?ᵖ ; (i & t))
        [((Sequence (and fst (Project G p)) i) t)
         ;; no need to check if i is an intermediate
@@ -204,7 +144,7 @@
         (Sequence fst (compose i t))]
        ;; g & (h ; H!) = (g & h) ; H!
        [(g (Sequence h (and snd (Inject H))))
-        #:when (grnd-coercion? g)
+        #:when (not (or (Sequence? g) (Failed? g)))
         (Sequence (compose g h) snd)]
        ;; (g ; G!) & (G?ᵖ ; i) = g & i
        ;; (g; G!) & (H?ᵖ ; i) = ⊥ᴳᵖᴴ
@@ -223,42 +163,32 @@
 
 (trace-define (compose-from-interpretations c1 c2)
  (match* (c1 c2)
-   [((Identity _) c2) c2]
-   [(c1 (Identity _)) c1]
+   [((Identity) c2) c2]
+   [(c1 (Identity)) c1]
    [((Inject t1) (Project t2 lbl)) ((mk-coercion lbl) t1 t2)]
-   [((Proxy-Fn n1 s1* t1) (Proxy-Fn n2 s2* t2))
+   [((Fn n1 s1* t1) (Fn n2 s2* t2))
     (define-values (s* t)
       (values (map compose s2* s1*) (compose t1 t2)))
     (unless (= n1 n2)
       (error 'compose "function types statically enforced at correct arity"))
     (match* (s* t)
-      [((list (Identity a*) ...) (Identity r*))
-       #:when (proxy-function-identity-contraction?)
-       (Identity (Fn n1 a* r*))]
-      [(s* t*) (Proxy-Fn n1 s* t)])]
-   
-   [((Proxy-Guarded s1 t1) (Proxy-Guarded s2 t2))
+      [((list (Identity) ...) (Identity)) (Identity)]
+      [(s* t*) (Fn n1 s* t)])]
+   [((Ref s1 t1) (Ref s2 t2))
     (define-values (s t)
       (values (compose s1 s2) (compose t2 t1)))
     (match* (s t)
-      [((Identity t1) (Identity t2))
-       #:when (and (proxy-guarded-identity-contraction?)
-                   ;; Is this ever not the case?
-                   (equal? t1 t2))
-       ;; This can lead to (Identity (GRef t1)) where
-       ;; it should be (Identity (GVect t1)) but
-       ;; Identity coercions don't actually use the type
-       (Identity (GRef t1))]
-      [(_ _) (Proxy-Guarded s t)])]
+      [((Identity) (Identity)) (Identity)]
+      [(s t) (Ref s t)])]
     [((and fail (Failed _)) _) fail]
     [((Inject _) (and fail (Failed _))) fail]
     [((Sequence c11 c12) c2)
      (compose c11 (compose c12 c2))]
     [((and proj (Project _ _))
-      (and seq (Sequence (Proxy-Fn _ _ _) _)))
+      (and seq (Sequence (Fn _ _ _) _)))
      (Sequence proj seq)]
     [((and proj (Project _ _))
-      (and seq (Sequence (Proxy-Guarded _ _) _)))
+      (and seq (Sequence (Ref _ _) _)))
      (Sequence proj seq)]
     [(c1 (Sequence c21 c22)) (compose (compose c1 c21) c22)]
     [(c1 c2) (Sequence c1 c2)]))
@@ -266,21 +196,22 @@
 
  (define (compose-se-lud c1 c2)
    (define (g? x)
-     (or (Identity? x) (Proxy-Fn? x) (Proxy-Guarded? x)))
+     (or (Identity? x) (Fn? x) (Ref? x)))
    (match* (c1 c2)
-     [(_ (Identity _)) c1]
-     [((Identity _) _) c2]
-     [((Proxy-Fn n1 s1* t1) (Proxy-Fn n2 s2* t2))
-      (define-values (s* t) (values (map compose-se-lud s2* s1*) (compose-se-lud t1 t2)))
+     [(_ (Identity)) c1]
+     [((Identity) _) c2]
+     [((Fn n1 s1* t1) (Fn n2 s2* t2))
+      (define-values (s* t)
+        (values (map compose-se-lud s2* s1*) (compose-se-lud t1 t2)))
       (match* (s* t)
-        [((list (Identity a*) ...) (Identity r)) (Identity (Fn n1 a* r))]
-        [(s* t) (Proxy-Fn n1 s* t)])]
-     [((Proxy-Guarded s1 t1) (Proxy-Guarded s2 t2))
+        [((list (Identity) ...) (Identity)) (Identity)]
+        [(s* t) (Fn n1 s* t)])]
+     [((Ref s1 t1) (Ref s2 t2))
       (define-values (s t)
         (values (compose-se-lud s1 s2) (compose-se-lud t2 t1)))
       (match* (s t)
-        [((Identity t1) (Identity t2)) (Identity (GRef t1))]
-        [(_ _) (Proxy-Guarded s t)])]
+        [((Identity) (Identity)) (Identity)]
+        [(_ _) (Ref s t)])]
      ;;[((Identity (Dyn)) s) s]
      ;;[((Sequence g (Inject _)) (Identity (Dyn))) c1]
      [((Sequence (and I? (Project _ _)) i) s) (Sequence I? (compose-se-lud i s))]
@@ -323,18 +254,19 @@
 
 (module+ test
   (check eq%id
-         (compose-se-ld-efficient (Sequence (Identity (Fn 0 '() (Int)))
+         (compose-se-ld-efficient (Sequence (Identity)
                                              (Inject   (Fn 0 '() (Int))))
                                    (Sequence (Project  (Fn 0 '() (Dyn)) "1")
-                                             (Identity (Fn 0 '() (Dyn)))))
-         (Proxy-Fn 0 '() (Sequence (Identity (Int)) (Inject (Int)))))
+                                             (Identity)))
+         (Fn 0 '() (Sequence (Identity) (Inject (Int)))))
 
   (check eq%id
-         (compose-se-ld-efficient (Proxy-Fn 1 (list (Sequence (Project (Bool) "1") (Identity (Bool))))
-                                            (Sequence (Identity (Bool)) (Inject (Bool))))
-                                  (Proxy-Fn 1 (list (Sequence (Identity (Bool)) (Inject (Bool))))
-                                            (Sequence (Project (Bool) "2") (Identity (Bool)))))
-         (Identity (Fn 1 (list (Bool)) (Bool))))
+         (compose-se-ld-efficient
+          (Fn 1 (list (Sequence (Project (Bool) "1") (Identity)))
+              (Sequence (Identity) (Inject (Bool))))
+          (Fn 1 (list (Sequence (Identity) (Inject (Bool))))
+              (Sequence (Project (Bool) "2") (Identity))))
+         (Identity))
 )  
 
 (trace-define (compose-se-ld-efficient c1 c2)
@@ -364,25 +296,25 @@
          ;; composing a g and an i will result in another i
          (compose t (seq-prj-i c2))))]
     [(seq-inj? c2) (seq-inj (compose c1 (seq-inj-g c2)) (seq-inj-t c2))]
-    [(Proxy-Fn? c1)
+    [(Fn? c1)
      (let* ([s? (box #t)]
             [s* (map (lambda (c1 c2)
                        (let ([c (compose c1 c2)])
                          (unless (Identity? c)
                            (set-box! s? #f))
                          c))
-                     (Proxy-Fn-args c2)
-                     (Proxy-Fn-args c1))]
-            [t (compose (Proxy-Fn-return c1) (Proxy-Fn-return c2))])
+                     (Fn-fmls c2)
+                     (Fn-fmls c1))]
+            [t (compose (Fn-ret c1) (Fn-ret c2))])
        (if (and (Identity? t) (unbox s?))
-           (Identity 'Unkn)
-           (Proxy-Fn (Proxy-Fn-arity c1) s* t)))]
-    [(Proxy-Guarded? c1)
-     (let ([s (compose (Proxy-Guarded-read c1) (Proxy-Guarded-read c2))]
-           [t (compose (Proxy-Guarded-write c2) (Proxy-Guarded-write c1))])
+           (Identity)
+           (Fn (Fn-arity c1) s* t)))]
+    [(Ref? c1)
+     (let ([s (compose (Ref-read c1) (Ref-read c2))]
+           [t (compose (Ref-write c2) (Ref-write c1))])
        (if (and (Identity? s) (Identity? t))
-           (Identity 'Unkn)
-           (Proxy-Guarded s t)))]
+           (Identity)
+           (Ref s t)))]
     [else (error 'compose-se-lud-eff "there shouldn't be anything else ~a ~a" c1 c2)]))
    (define alt-res (compose-se-lud c1 c2))
    (unless (eq%id res alt-res)
@@ -392,15 +324,15 @@
 (define (eq%id x y)
   (or (and (Identity? x)
            (Identity? y))
-      (and (Proxy-Fn? x)
-           (Proxy-Fn? y)
-           (equal? (Proxy-Fn-arity x) (Proxy-Fn-arity y))
-           (andmap eq%id (Proxy-Fn-args x) (Proxy-Fn-args y))
-           (eq%id (Proxy-Fn-return x) (Proxy-Fn-return y)))
-      (and (Proxy-Guarded? x)
-           (Proxy-Guarded? y)
-           (eq%id (Proxy-Guarded-read x) (Proxy-Guarded-read y))
-           (eq%id (Proxy-Guarded-write x) (Proxy-Guarded-write y)))
+      (and (Fn? x)
+           (Fn? y)
+           (equal? (Fn-arity x) (Fn-arity y))
+           (andmap eq%id (Fn-fmls x) (Fn-fmls y))
+           (eq%id (Fn-ret x) (Fn-ret y)))
+      (and (Ref? x)
+           (Ref? y)
+           (eq%id (Ref-read x) (Ref-read y))
+           (eq%id (Ref-write x) (Ref-write y)))
       (and (Project? x)
            (Project? y)
            (equal? (Project-type x) (Project-type y))
@@ -419,25 +351,25 @@
 (define (make-coercion-efficient t1 t2 lbl)
   (cond
     ;; This line only exists to test the theory becuase types are pointer equal in the dev branch
-    [(equal? t1 t2) (Identity (Dyn))] ;; Use eq once types are 
+    [(equal? t1 t2) (Identity)] ;; Use eq once types are 
     [(and (Fn? t1) (Fn? t1) (= (Fn-arity t1) (Fn-arity t2)))
-     (Proxy-Fn (Fn-arity t1)
-               (map (lambda (t2 t1) (make-coercion-efficient t2 t1 lbl))
-                    (Fn-fmls t2)
-                    (Fn-fmls t1))
-               (make-coercion-efficient (Fn-ret t1) (Fn-ret t2) lbl))]
+     (Fn (Fn-arity t1)
+         (map (lambda (t2 t1) (make-coercion-efficient t2 t1 lbl))
+              (Fn-fmls t2)
+              (Fn-fmls t1))
+         (make-coercion-efficient (Fn-ret t1) (Fn-ret t2) lbl))]
     [(and (GRef? t1)  (GRef? t2)) 
      (let ([t1 (GRef-arg t1)]
            [t2 (GRef-arg t2)])
-       (Proxy-Guarded (make-coercion-efficient t1 t2 lbl)
-                      (make-coercion-efficient t2 t1 lbl)))]
+       (Ref (make-coercion-efficient t1 t2 lbl)
+            (make-coercion-efficient t2 t1 lbl)))]
     [(and (GVect? t1) (GVect? t2))
      (let ([t1 (GVect-arg t1)]
            [t2 (GVect-arg t2)])
-       (Proxy-Guarded (make-coercion-efficient t1 t2 lbl)
-                      (make-coercion-efficient t2 t1 lbl)))]
-    [(Dyn? t1) (Sequence (Project t2 lbl) (Identity t2))]
-    [(Dyn? t2) (Sequence (Identity t1) (Inject t1))]
+       (Ref (make-coercion-efficient t1 t2 lbl)
+            (make-coercion-efficient t2 t1 lbl)))]
+    [(Dyn? t1) (Sequence (Project t2 lbl) (Identity))]
+    [(Dyn? t2) (Sequence (Identity) (Inject t1))]
     [else (Failed lbl)]))
 
 

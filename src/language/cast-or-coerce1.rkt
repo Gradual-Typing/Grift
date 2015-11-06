@@ -17,15 +17,14 @@
 	  (Letrec CoC1-Bnd* E)
 	  (Let CoC1-Bnd* E)
           (App-Code E (Listof E))
-          (App-Closure E (Listof E))
-          
+          (App-Fn E (Listof E))
 	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
           ;; Terminals
           (Begin CoC1-Expr* E)
           (Repeat Uid E E E)
 	  (Var Uid)
-          (Quote-Coercion (Coercion Schml-Type Blame-Label))
+          (Quote-Coercion Schml-Coercion)
           (Type Schml-Type)
 	  (Quote Cast-Literal)
           (Code-Label Uid)
@@ -35,12 +34,13 @@
           (Fn-Coercion-Arg E E)
           (Fn-Coercion-Return E)
           ;; Casts with different ways of getting the same semantics
-          (Interpreted-Coerce E E)
-          (Coerce (Coercion Schml-Type Blame-Label) E)
-          (Interpreted-Cast E E E E)
-	  (Cast E Schml-Type Schml-Type Blame-Label)
+
+          (Interpreted-Cast E (Coercion E))
+          (Interpreted-Cast E (Twosome E E E))
+	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
+          (Cast E (Coercion Schml-Coercion))
 	  (Fn-Caster E)
-          (Compose E E)
+          (Compose-Coercions E E)
           ;;
           (App/Fn-Proxy-Huh E (Listof E))
           (Fn-Proxy Index E E)
@@ -53,15 +53,6 @@
           (Type-Fn-arity E)
           ;; Observations
           (Blame E)
-          ;; Monotonic
-          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Munbox E)
-          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
-          (Mbox-set! E E)
-          (Mvector E E)
-          (Mvector-set! E E E)
-          (Mvector-ref E E)
           ;; Guarded Intermediate Representation
           (Gbox E)
           (Gunbox E)

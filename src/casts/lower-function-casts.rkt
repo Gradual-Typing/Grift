@@ -257,47 +257,39 @@ T?l $ (_  ; )  = what here
       (match exp
         ;; Here we must be representing casts as twosomes because the ;
         ;; cast nodes are still in the tree
-        [(Cast exp t1 t2 b-lbl)
-         (s : LFC-State <- get-state)
-         (begin ;; Escape to the world of effects for a hot second
-           (unless (naive-fn-state? s)
-             (error 'lfc-expr "Cast line with hybrid-fn-state")))
-         (exp : CoC1-Expr <- (lfc-expr exp))
-         (uid : Uid <- (uid-lfc "tmp_for_function_cast"))
-         (if (and (Fn? t1) (Fn? t2))
-             ;; TODO We may be able to do better by looking up the caster for this arity
-             ;; there is the small problem that we were relying on functions to know their
-             ;; arity originally. Looking up the code on this side of the application would
-             ;; mean that the generated code would also have to make sure that the function
-             ;; being casted is of the correct arity possibly by checking to see if the
-             ;; casters are eq?
-             ;; The code on this side of the call would look like this:
-             ;; (lbl : Code-Label <- (get-caster (Fn-arity t1)))
-             ;; (App-Code lbl exp (Type t1) (Type t2) (Quote lbl))
-             ;; The code on the other side would have to be modified to be:
-             (doing;; continue with do notation
-              (c-lbl : Uid <- (get-fn-cast/coerce (Fn-arity t1)))
-              (return-state
-               (App-Code (Code-Label c-lbl)
-                         (list exp (Type t1) (Type t2) (Quote b-lbl)))))
-             ;; TODO the above code implements the comment above when it has
-             ;; been tested delete this code.
-             #;(let ([tmp (Var uid)])
-               (return-state
-                (Let (list (cons uid exp))
-                     (App-Code (Fn-Caster tmp)
-                               (list tmp (Type t1) (Type t2) (Quote lbl))))))
-             (return-state (Cast exp t1 t2 b-lbl)))]
-        ;; Here we must be representing casts as Coercions because the coercion node is present
-        [(Coerce crcn exp)
+        [(Cast exp rep)
          (exp : CoC1-Expr  <- (lfc-expr exp))
-         (if (Proxy-Fn? crcn)
-             (doing
-              (lbl : Uid <- (get-fn-cast/coerce (Proxy-Fn-arity crcn)))
-              (return-state
-               (App-Code (Code-Label lbl)
-                         (list (Quote-Coercion crcn) exp))))
-             (return-state (Coerce crcn exp)))]
+         (match rep
+           [(Twosome t1 t2 b-lbl)
+            (s : LFC-State <- get-state)
+            (begin ;; Escape to the world of effects for a hot second
+              (unless (naive-fn-state? s)
+                (error 'lfc-expr "Cast line with hybrid-fn-state")))
+            (uid : Uid <- (uid-lfc "tmp_for_function_cast"))
+            (if (and (Fn? t1) (Fn? t2))
+                (doing;; continue with do notation
+                 (c-lbl : Uid <- (get-fn-cast/coerce (Fn-arity t1)))
+                 (return-state
+                  (App-Code (Code-Label c-lbl)
+                            (list exp (Type t1) (Type t2) (Quote b-lbl)))))
+                (return-state (Cast exp (Twosome t1 t2 b-lbl))))]
+           #|TODO Get rid of this code once the above is known
+           to work
+           (let ([tmp (Var uid)])
+           (return-state
+           (Let (list (cons uid exp))
+           (App-Code (Fn-Caster tmp)
+           (list tmp (Type t1) (Type t2) (Quote lbl))))))
+           |#                
+           ;; Here we must be representing casts as Coercions because the coercion node is present
+           [(Coercion crcn)
+            (if (Fn? crcn)
+                (doing
+                 (lbl : Uid <- (get-fn-cast/coerce (Fn-arity crcn)))
+                 (return-state
+                  (App-Code (Code-Label lbl)
+                            (list (Quote-Coercion crcn) exp))))
+                (return-state (Cast exp (Coercion crcn))))])]
         ;; Here we can be doing either casts or coercions
         ;; we could check the state and vary behavior but for now I think
         ;; this still works.
@@ -311,7 +303,7 @@ T?l $ (_  ; )  = what here
          (s : LFC-State <- get-state)
          (match s
            [(hybrid-fn-state _ _ _) (return-state (App/Fn-Proxy-Huh exp exp*))]
-           [(naive-fn-state _ _)    (return-state (App-Closure exp exp*))]
+           [(naive-fn-state _ _)    (return-state (App-Fn exp exp*))]
            [else (error 'lfc-expr "this should never happen")])]
         ;; Just Recursion Cases Follow
         ;; Should be pretty boring
@@ -427,16 +419,17 @@ T?l $ (_  ; )  = what here
                 (let* ([i  : CoC1-Expr (Quote i)]
                        [t1 : CoC1-Expr (Type-Fn-arg t1-var i)]
                        [t2 : CoC1-Expr (Type-Fn-arg t2-var i)])
-                  (Interpreted-Cast (Var u) t2 t1 lbl-var)))
+                  (Interpreted-Cast (Var u) (Twosome t2 t1 lbl-var))))]
               ;; TODO Erase this line once the above has been tested
-              #;(mk-casted-args t1-var t2-var lbl-var uid*)]
+             #;(mk-casted-args t1-var t2-var lbl-var uid*)
              ;; formals for the casting function
              [caster-fml : Uid* (list fn t1 t2 lbl)]
              ;; cast the return of the unproxied application
              [t1-ret    : CoC1-Expr (Type-Fn-return t1-var)]
              [t2-ret    : CoC1-Expr (Type-Fn-return t2-var)]
-             [call      : CoC1-Expr (App-Closure fn-var args)]
-             [cast-call : CoC1-Expr (Interpreted-Cast call t1-ret t2-ret lbl-var)]
+             [call      : CoC1-Expr (App-Fn fn-var args)]
+             [cast-call : CoC1-Expr
+                        (Interpreted-Cast call (Twosome t1-ret t2-ret lbl-var))]
              [then-cast : CoC1-Expr (Lambda uid* (Castable name cast-call))])
         (return-state (Code caster-fml then-cast)))))
 
@@ -527,7 +520,7 @@ T?l $ (_  ; )  = what here
                (Let (list (cons crcn (Fn-Proxy-Coercion h-clos-var)))
                  (Interpreted-Coerce
                    (Fn-Coercion-Return crcn-var)
-                   (App-Closure
+                   (App-Fn
                      (Fn-Proxy-Closure h-clos-var)
                      (for/list : (Listof CoC1-Expr)
                                ([u uid*] [i (in-naturals)])
@@ -555,14 +548,14 @@ T?l $ (_  ; )  = what here
     (Fn-Coercion (map (inst Var Uid) args) (Var ret)))
   (: compose-return (Uid Uid Uid -> CoC1-Bnd*))
   (define (compose-return ret new old)
-    (cons (cons ret (Compose (Fn-Coercion-Return (Var old))
+    (cons (cons ret (Compose-Coercions (Fn-Coercion-Return (Var old))
                              (Fn-Coercion-Return (Var new))))
           '()))
   ;; TODO this is likely the wrong definition once this file typechecks
   ;; make sure the composition is in the correct order
   (: compose-arg (Uid Uid Uid Index -> CoC1-Bnd))
   (define (compose-arg arg new old i)
-    (cons arg (Compose (Fn-Coercion-Arg (Var new) (Quote i))
+    (cons arg (Compose-Coercions (Fn-Coercion-Arg (Var new) (Quote i))
                        (Fn-Coercion-Arg (Var old) (Quote i)))))
     (do (bind-state : (State Nat CoC1-Code))
       (u-clos   : Uid <-  (uid-state "unknown_closure"))
@@ -675,7 +668,7 @@ T?l $ (_  ; )  = what here
                           (cons i (apply-fun-coercion-aux i crcn crcn2 raw-fun)))
                         (If proxied?
                             (Let ([raw]))))
-       [0  (mk-fn-coerce-aux crcn fun) (let ([ret-coercion (Compose (Fn-Coercion-return coercions) ()) ]) (Fn-Coercion-return ))])
+       [0  (mk-fn-coerce-aux crcn fun) (let ([ret-coercion (Compose-Coercions (Fn-Coercion-return coercions) ()) ]) (Fn-Coercion-return ))])
 (Let ([raw-fun (if proxied? (Proxied-fn-closure  fun) fun)]
 [crcn2   (if proxied? (Proxied-fn-coercion fun) crcn)])
 ))
@@ -685,7 +678,7 @@ T?l $ (_  ; )  = what here
 [id?      (Quote #t)])  
 (Begin
 (Repeat i 1 arity
-(Let ([tmp (Compose (Function-Coercion-argument c1 i)
+(Let ([tmp (Compose-Coercions (Function-Coercion-argument c1 i)
 (Function-Coercion-argument c2 i))])
 (Begin
 (Function-Coercion-argument! c3 i tmp)
@@ -694,7 +687,7 @@ T?l $ (_  ; )  = what here
 (Assign tmp #t)
 (Assign tmp #f))
 ()))))
-(Let ([tmp (Compose (Function-Coercion-return c1)
+(Let ([tmp (Compose-Coercions (Function-Coercion-return c1)
 (Function-Coercion-return c2))])
 (Begin
 (Function-Coercion-return! c3 tmp)
@@ -710,7 +703,7 @@ tmp))))) ))
                                         #;
 (Code (coercion code)
 (If (Proxied-Function? fun)
-(Let ([coercion (Compose-Function-Coercion (Proxied-Function-coercion fun) coercion)]
+(Let ([coercion (Compose-Coercions-Function-Coercion (Proxied-Function-coercion fun) coercion)]
 [fun      (Proxied-Function-function fun)])
 ;; No need to check for a Failed coercion here the only thing that ;
 ;; should create a fail here is an arity mismatch wich I am convinced is
@@ -729,9 +722,9 @@ fun
 ;; And here is expanded to Ifs in the actual code generated
                                         #;
 (Code (c1 c2)
-(Let ([arg-n (Compose (Funciton-Coercion-argument c1 n)
+(Let ([arg-n (Compose-Coercions (Funciton-Coercion-argument c1 n)
 (Function-Coercion-argument c2 n))] ...
-[ret   (Compose (Function-Coercion-return c1)
+[ret   (Compose-Coercions (Function-Coercion-return c1)
 (Function-Coercion-return c2))])
 (If (AND (Identity? arg-n) ...)
 (Identity-Coercion)

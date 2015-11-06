@@ -21,12 +21,12 @@ form, to the shortest branch of the cast tree that is relevant.
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
-         "../language/cast2.rkt"
-         "../language/cast3.rkt")
+         "../language/cast-or-coerce2.rkt"
+         "../language/cast-or-coerce3.rkt")
 (provide interpret-casts
          (all-from-out
-          "../language/cast2.rkt"
-          "../language/cast3.rkt"))
+         "../language/cast-or-coerce2.rkt"
+         "../language/cast-or-coerce3.rkt"))
 
 (: specialize-casts? (Parameterof Boolean))
 (define specialize-casts?

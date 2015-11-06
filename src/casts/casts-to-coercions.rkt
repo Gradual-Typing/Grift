@@ -31,27 +31,27 @@ should be able to compile programs this the twosome casts for future comparison.
       (Prog (list name next type) exp))))
 
 (: mk-coercion (Blame-Label ->
-                (Schml-Type Schml-Type -> (Coercion Schml-Type Blame-Label))))
+                (Schml-Type Schml-Type -> Schml-Coercion)))
 (define ((mk-coercion lbl) t1 t2)
   (define recur (mk-coercion lbl))
   (logging mk-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
-  (define result : (Coercion Schml-Type Blame-Label)
+  (define result : Schml-Coercion
     (if (equal? t1 t2)
-        (Identity t1)
+        (Identity)
         (match* (t1 t2)
-          [((Dyn)    t)  (Sequence (Project t lbl) (Identity t))]
-          [(t    (Dyn))  (Sequence (Identity t) (Inject t))]
+          [((Dyn)    t)  (Sequence (Project t lbl) (Identity))]
+          [(t    (Dyn))  (Sequence (Identity) (Inject t))]
           [((Fn n1 a1* r1) (Fn n2 a2* r2)) #:when (= n1 n2)
            ;; The arity check here means that all coercions have
            ;; the correct arrity under the static type system.
            ;; Notice that the argument types are reversed
            ;; because of contravarience of functions.
-           (Proxy-Fn n1 (map recur a2* a1*) (recur r1 r2))]
+           (Fn n1 (map recur a2* a1*) (recur r1 r2))]
           ;; It seems like we could get by without other coercions
           [((GRef t1) (GRef t2))
-           (Proxy-Guarded (recur t1 t2) (recur t2 t1))]
+           (Ref (recur t1 t2) (recur t2 t1))]
           [((GVect t1) (GVect t2))
-           (Proxy-Guarded (recur t1 t2) (recur t2 t1))]
+           (Ref (recur t1 t2) (recur t2 t1))]
           [(_ _) (Failed lbl)])))
   (logging mk-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
@@ -66,9 +66,9 @@ should be able to compile programs this the twosome casts for future comparison.
       ;; All Clauses of the match are still in the do macro
       (match exp
         ;; The only Interesting Case
-        [(Cast exp t1 t2 lbl)
+        [(Cast exp (Twosome t1 t2 lbl))
          (exp : Crcn-Expr <- (c2c-expr exp))
-         (return-state (Coerce ((mk-coercion lbl) t1 t2) exp))]
+         (return-state (Cast exp (Coercion ((mk-coercion lbl) t1 t2))))]
         ;; Everything else should be really boring
         [(Lambda f* exp)
          (exp : Crcn-Expr <- (c2c-expr exp))

@@ -11,17 +11,14 @@
 (struct Interp-GProxy (type value proxy)
   #:transparent)
 
-(struct Guarded-Twosome (type1 type2 label)
-  #:transparent)
-
 ;; (: write-gref (Cast-Procedure GReP Value Value Index -> Value))
 (define (write-grep cast ref val [index #f])
   (match ref
     [(box _)        (set-box! ref val) '()]
     [(vector _ ...) (vector-set! ref index val) '()]
-    [(Interp-GProxy _ ref^ (Guarded-Twosome t1 t2 lbl))
+    [(Interp-GProxy _ ref^ (Twosome t1 t2 lbl))
      (write-grep cast ref^ (cast val t2 t1 lbl) index)]
-    [(Interp-GProxy _ ref^ (Proxy-Guarded _ write))
+    [(Interp-GProxy _ ref^ (Ref _ write))
      (write-grep cast ref^ (cast write val) index)]
     [otherwise (raise-not-grep write-grep ref)]))
 
@@ -48,15 +45,15 @@
       [other (error 'cast-grep/twosome
                     "~a not cononical form of gref or gvect"
                     ref)]))
-  (Interp-GProxy type ref (Guarded-Twosome t1 t2 lbl)))
+  (Interp-GProxy type ref (Twosome t1 t2 lbl)))
 
 (define (read-grep cast ref [index #f])
   (match ref
     [(box val) val]
     [(vector _ ...) (vector-ref ref index)]
-    [(Interp-GProxy _ ref^ (Guarded-Twosome t1 t2 lbl))
+    [(Interp-GProxy _ ref^ (Twosome t1 t2 lbl))
      (cast (read-grep cast ref^ index) t1 t2 lbl)]
-    [(Interp-GProxy _ ref^ (Proxy-Guarded read _))
+    [(Interp-GProxy _ ref^ (Ref read _))
      (cast read (read-grep cast ref^ index))]
     [otherwise (raise-not-grep read-gref ref)]))
 

@@ -17,7 +17,7 @@
 (define-type Crcn-Expr
   (Rec E (U ;; Non-Terminals
           ;; replaced (Cast E Schml-Type Schml-Type Label) with next line
-          (Coerce (Coercion Schml-Type Blame-Label) E)
+          (Cast E (Coercion Schml-Coercion))
           (Lambda Uid* E)
 	  (Letrec Crcn-Bnd* E)
 	  (Let Crcn-Bnd* E)
@@ -26,15 +26,6 @@
 	  (If E E E)
           (Begin Crcn-Expr* E)
           (Repeat Uid E E E)
-          ;; Monotonic
-          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Munbox E)
-          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
-          (Mbox-set! E E)
-          (Mvector E E)
-          (Mvector-set! E E E)
-          (Mvector-ref E E)
           ;; Guarded effects
           (Gbox E)
           (Gunbox E)

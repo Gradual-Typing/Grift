@@ -31,7 +31,7 @@
 
 (: mk-cast ((-> String) C0-Expr Schml-Type Schml-Type . -> . C0-Expr))
 (define (mk-cast l-th e t1 t2)
-  (if (equal? t1 t2) e (Cast e t1 t2 (l-th))))
+  (if (equal? t1 t2) e (Cast e (Twosome t1 t2 (l-th)))))
 
 (: iic-expr (S1-Expr . -> . C0-Expr))
 (define (iic-expr exp^)
@@ -92,7 +92,7 @@
             (Gbox-set! (mk-cast lbl1 e1 DYN-TYPE REF-DYN-TYPE)
                        (mk-cast lbl2 e2 e2-ty DYN-TYPE))]
            [else (TODO error message that is appropriate)]))]
-      ;; These rules bastardizations of the rules found in Figure 6 of
+      #|;; These rules bastardizations of the rules found in Figure 6 of
       ;; Monotonic references for efficient gradual typing
       [(Mbox (and (Ann _ (cons e-src e-ty)) (app iic-expr e)))
        (Mbox (Ann e (cons ((mk-label "monotonic box" e-src)) e-ty)))]
@@ -107,6 +107,7 @@
       [(Mbox-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
                   (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
        (TODO come up with a reasonable version of this)]
+      |#
       [(Gvector size e) (Gvector (iic-expr size) (iic-expr e))]
       [(Gvector-ref (and (Ann _ (cons e-src e-ty)) (app iic-expr e)) (app iic-expr ind))
        (cond
