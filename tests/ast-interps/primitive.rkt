@@ -12,14 +12,19 @@
 ;; it will return the result of the primitive
 (define (delta p v*)
   (case p
-    [(+ - * = < > >= <= %/)
+    [(=)
+     (match v*
+       [(list (? integer? m) (? integer? n)) (= m n)]
+       [(list m n) (eq? m n)]
+       [other (raise-delta-types-unenforced p v*)])]
+    [(+ - * < > >= <= %/)
      (match v*
        [(list (? integer? m) (? integer? n))
         (case p 
           [(+) (+ m n)]
           [(-) (- m n)]
           [(*) (* m n)]
-          [(=) (= m n)]
+
           [(<) (< m n)]
           [(>) (> m n)]
           [(>=) (>= m n)]

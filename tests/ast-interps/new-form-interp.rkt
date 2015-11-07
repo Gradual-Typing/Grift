@@ -131,10 +131,10 @@ currently implemented in severral files.
             lbl?))]
         [(Fn-Caster (app recur/env v))
          (unless (Interp-Proc? v)
-           (error 'interp/Fn-Caster "not interpreted function ~a" v))
+           (mismatch Fn-Caster v '(Fn _ _ _)))
          (define lbl? (Interp-Proc-caster v))
          (unless (Uid? lbl?)
-           (error 'interp/Fn-Caster "not a code label ~a" lbl?))
+           (mismatch Fn-Caster lbl? 'Code-Label))
          (Code-Label lbl?)]
         [(App e e*) (apply (recur/env e) (map recur/env e*))]
         [(App-Fn (app recur/env f) (list (app recur/env v*) ...))
@@ -184,6 +184,13 @@ currently implemented in severral files.
         ;; Types as runtime objects
         ;; TODO Rename this
         [(Type t) t]
+        [(Type-Tag (app recur/env t))
+         (cond
+           [(or (Int? t) (Bool? t) (Dyn? t)) 'Atomic]
+           [(Fn? t) 'Fn]
+           [(GRef? t) 'GRef]
+           [(GVect? t) 'GVect]
+           [else (mismatch Type-Tag t 'Type)])]
         [(Type-Fn-arg (app recur/env v) (app recur/env i))
          (unless (and (Fn? v) (integer? i))
            (error 'interp/Type-Fn-Arg))
@@ -198,6 +205,14 @@ currently implemented in severral files.
          (unless (Fn? v)
            (error 'interp/Type-Fn-Arity))
          (Fn-arity v)]
+        [(Type-GRef-Of (app recur/env t))
+         (unless (GRef? t)
+           (mismatch Type-GRef-Of t 'GRef))
+         (GRef-arg t)]
+        [(Type-GVect-Of (app recur/env t))
+         (unless (GVect? t)
+           (mismatch Type-GVect-Of t 'GRef))
+         (GVect-arg t)]
         ;; Coercions as runtime objects
         [(Quote-Coercion c) c]
         [(Compose-Coercions (app recur/env c1) (app recur/env c2))
@@ -248,6 +263,16 @@ currently implemented in severral files.
               [(eq? cast-rep 'Coercions) (cst c  v)]
               [else (error 'interp/Interpret-Coerce)])])]
         [(Blame (app recur/env lbl)) (raise-blame lbl)]
+        [(Observe (app recur/env v) t)
+         (match t
+           [(Int)  (raise (format "Int : ~a" v))]
+           [(Bool) (raise (format "Bool : ~a" v))]
+           [(Unit) (raise "Unit : ()")]
+           [(Dyn)  (raise "Dynamic : ?")]
+           [(Fn _ _ _) (raise "Function : ?")]
+           [(GRef _)   (raise "GReference : ?")]
+           [(GVect _)  (raise "GVector : ?")]
+           [other (error 'interp/Observe "~a ~a" t v)])]
         ;; Guarded references
         [(Gbox (app recur/env v)) (make-gbox v)]
         [(Gunbox (app recur/env v))
@@ -331,7 +356,34 @@ currently implemented in severral files.
          (unless (and (vector? r) (exact-nonnegative-integer? i))
            (error 'interp/UGvect-ref "invalid input ~a ~a" r i))
          (vector-ref r i)]
-        [e (error 'interp "Umatched expression ~a" e)]))
+        ;; The Dynamic Representation (Exposed too early for my taste)
+        [(Dyn-tag (app recur/env v))
+         (match v
+           [(Interp-Dyn _ (Int))  'Int]
+           [(Interp-Dyn _ (Bool)) 'Bool]
+           [(Interp-Dyn _ (Unit)) 'Unit]
+           [(Interp-Dyn _ (Fn _ _ _)) 'Boxed]
+           [(Interp-Dyn _ (GRef _))   'Boxed]
+           [(Interp-Dyn _ (GVect _))  'Boxed]
+           [other (unmatched Dyn-tag v)])]
+        [(Dyn-immediate (app recur/env v))
+         (match v
+           [(Interp-Dyn i (or (Int) (Bool) (Unit))) i]
+           [other (mismatch Dyn-tag v 'Dynamic-Immediate)])]
+        [(Dyn-type (app recur/env v))
+         (match v
+           [(Interp-Dyn _ (and t (or (Fn _ _ _) (GVect _) (GRef _)))) t]
+           [other (mismatch Dyn-type v 'Dynamic-Boxed)])]
+        [(Dyn-value (app recur/env v))
+         (match v
+           [(Interp-Dyn v (or (Fn _ _ _) (GVect _) (GRef _))) v]
+           [other (error 'interp/Dyn-type "~a" other)])]
+        [(Dyn-make (app recur/env v) (app recur/env t))
+         (Interp-Dyn v t)]
+        ;; The Type Tag interface (one that shouldn't be expose so early)
+        [(Tag k) k]
+       
+        [e (unmatched interp e)]))
     (logging cast/interp-res (all) "~a > ~v" (get i-depth) res)
     (dec i-depth)
     res)
@@ -359,8 +411,6 @@ currently implemented in severral files.
 (define ((apply-cast-ld lbls) v1 t1 t2 l1)
   ;;(inc c-depth)
   ;;(logging apply-cast-ld (All) "~a > ~v ~v ~v ~v" (get c-depth) v1 t1 t2 l1)
-  (define-syntax-rule (raise-value-type-mismatch v t)
-    (error 'cast-lang-interp "value ~a not the connoical form of ~t" v t))
   (define res
     (if (shallow-consistent? t1 t2)
         (match* (t1 t2)
@@ -368,7 +418,7 @@ currently implemented in severral files.
            (match v1
              [(Interp-Dyn v2 (Interp-Twosome t3 t1 l2))
               ((apply-cast-ld lbls) v2 t3 t2 l1)]
-             [other (raise-value-type-mismatch v1 t1)])]
+             [other (mismatch apply-cast-ld v1 t1)])]
           [((GRef t1) (GRef t2)) (cast-grep/twosome v1 t1 t2 l1)]
           [((GVect t1) (GVect t2)) (cast-grep/twosome v1 t1 t2 l1)]
           [((Fn n1 t11* t12) (Fn n2 t21* t22))
@@ -385,7 +435,7 @@ currently implemented in severral files.
                    (list  v1 t1 t2 l1)))]
              [else (mk-cast/twosome v1 t1 t2 l1)])]
           [(_ _) (mk-cast/twosome v1 t1 t2 l1)])
-        (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
+        (raise-blame l1)))
   ;;(logging apply-cast-res (All) "~a > ~v" (get c-depth) res)
   ;;(dec c-depth)
   res)
@@ -436,9 +486,13 @@ currently implemented in severral files.
     [(Interp-GProxy _ v^ c^) (mk-cast/coercion v^ (compose c^ c))]
     [other (mk-cast/coercion v c)]))
 
+
+
 #;(: observe-lazy (-> (-> CL-Value) Test-Value))
 (define (observe-lazy thunk)
-  (with-handlers ([exn:schml:type:dynamic?
+  (with-handlers ([string?
+                   (lambda (s) (parse-observable s))]
+                  [exn:schml:type:dynamic?
 		   (lambda (e)
                      (blame #f (exn-message e)))])
     (match (thunk)

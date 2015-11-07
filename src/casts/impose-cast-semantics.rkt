@@ -8,7 +8,7 @@ This is a micro compiler that removes the cast language form.
          "casts-to-coercions.rkt"
          "lower-function-casts.rkt"
          "lower-reference-casts.rkt"
-         #;"interpret-casts.rkt"
+         "interpret-casts.rkt"
          ;"label-lambdas.rkt"
          ;"uncover-free.rkt"
          ;"convert-closures.rkt"
@@ -88,7 +88,7 @@ This is a micro compiler that removes the cast language form.
     casts->coercions)
     lower-function-casts
     lower-reference-casts
-    #;interpret-casts
+    interpret-casts
     )
 
 

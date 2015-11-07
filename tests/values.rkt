@@ -76,22 +76,24 @@
 |#
 
 
-
+(: parse-observable (String -> Test-Value))
+(define (parse-observable s)
+  (cond
+    [(regexp-match #rx".*Int : (-?[0-9]+)" s) =>
+     (lambda (r)
+       (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+    [(regexp-match #rx".*Bool : #(t|f)" s) =>
+     (lambda (r)
+       (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
+    [(regexp-match #rx".*Function : \\?" s) (function)]
+    [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
+    [(regexp-match #rx".*GReference : \\?" s) (gbox)]
+    [(regexp-match #rx".*GVector : \\?" s) (gvect)]
+    [(regexp-match #rx".*GArray : \\?" s) (gvect)]
+    [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
+    [else (blame #f s)]))
 
 (define-syntax-rule (observe exp)
   (let ([s (with-output-to-string (lambda () exp))])
     (logging observe () "~v" s)
-    (cond
-     [(regexp-match #rx".*Int : (-?[0-9]+)" s) =>
-      (lambda (r)
-        (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
-     [(regexp-match #rx".*Bool : #(t|f)" s) =>
-      (lambda (r)
-        (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
-     [(regexp-match #rx".*Function : \\?" s) (function)]
-     [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
-     [(regexp-match #rx".*GReference : \\?" s) (gbox)]
-     [(regexp-match #rx".*GVector : \\?" s) (gvect)]
-     [(regexp-match #rx".*GArray : \\?" s) (gvect)]
-     [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
-     [else (blame #f s)])))
+    (parse-observable s)))

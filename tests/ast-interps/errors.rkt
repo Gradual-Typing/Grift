@@ -25,5 +25,11 @@
           "\t in ~a")
          prim (format "~a" (cons prim val*))))
 
-(define-syntax-rule (raise-insanity who s ...)
+(define-syntax-rule (insanity who s ...)
   (error 'who "this should never happen ~a" `(,s ...)))
+
+(define-syntax-rule (mismatch who v t)
+  (error 'interp "~a: value ~a when expecting a ~a" 'who v t))
+
+(define-syntax-rule (unmatched who v)
+    (error 'interp "~a: unmatched ~a" 'who v))

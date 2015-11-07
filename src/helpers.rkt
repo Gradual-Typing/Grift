@@ -240,10 +240,12 @@
     ;; Normal definition of do but propogating types to help the
     ;; type checker.
     [(_ (bind : (C m b)) (v : a <- e0) s s* ...)
-     (bind (ann e0 (C m a))
+     (ann
+      (bind (ann e0 (C m a))
        (lambda ([v : a])
          : (C m b)
-         (do (bind : (C m b)) s s* ...)))]
+         (do (bind : (C m b)) s s* ...)))
+      (C m b))]
     ;; More concise syntax for throwing away the pure value.
     [(_ (bind : (C m b)) (e0 : T) s s* ...)
      (bind (ann e0 T) (lambda (_) (do (bind : (C m b)) s s* ...)))]))

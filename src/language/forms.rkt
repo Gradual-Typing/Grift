@@ -86,7 +86,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Interpreted-Cast expression instruction)
   (Fn-Caster expression)
   ;;Type Operations
-  (Type-tag expression)
+  (Type-Tag expression)
   (Type-Fn-arity expression)
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
