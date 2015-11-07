@@ -53,7 +53,8 @@
     (display "), alloc_ptr);")
     (display "limit = free_ptr + ")
     (display s)
-    (display ";\n")))
+    (display ";\n")
+    (display "allocd_mem = 0;\n")))
 
 (define timer-boiler-plate
   (concat-string-literal
@@ -95,9 +96,8 @@
     (display "long alloc(int n){")
   (display "    long result = free_ptr;")
   (display "    long newFree = result + n;")
+  (display "    allocd_mem+=n;")
   (display "    if (newFree >= limit){")
-;;   "        printf(\"Memory overflow\");"
-  ;;   "        exit (-1);"
   (display "        printf(\"Requesting more memory\\n\");")
   (display "          free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
   (display s)
@@ -117,8 +117,7 @@
   (for ([i : String C-INCLUDES])
     (display "#include <") (display i) (display ">\n"))
   (newline)
-  (display "void* alloc_ptr;\nlong free_ptr;\nlong limit;\n")
-  (newline)
+  (display "void* alloc_ptr;\nlong free_ptr;\nlong limit;\nunsigned long allocd_mem;\n\n")
   (emit-alloc n)
   (newline)
   (display timer-boiler-plate)
@@ -147,10 +146,32 @@
       (display-seq local-var* "" (string-append IMDT-C-TYPE " ") "" ";\n" "")
       (init-mem mem-limit)
       (newline)
-      (emit-tail tail)
+      (emit-main-tail tail)
+      (display "printf(\"%lu bytes allocated\\n\",allocd_mem);\n")
+      (display "return 0;")
       (display "}"))
     (newline)
     (newline)))
+
+(: emit-main-tail (-> D5-Tail Void))
+(define (emit-main-tail tail)
+  (logging emit-tail (Vomit) tail)
+  (match tail
+    [(Begin s* t)
+     (begin (for ([s : D5-Effect s*])
+              (emit-effect s)
+              (display ";\n"))
+            (emit-main-tail t))]
+    [(If t c a)
+     (begin (display "if ")
+            (emit-pred t)
+            (emit-block '() c)
+            (display " else ")
+            ;; emit-block calls emit-tail which will cause problems if
+            ;; main branches around return
+            (emit-block '() a)
+            (newline))]
+    [(Return e) (display "")]))
 
 (: emit-subroutines (-> D5-Bnd-Code* Void))
 (define (emit-subroutines code*)
