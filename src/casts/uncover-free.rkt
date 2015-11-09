@@ -18,6 +18,7 @@
 
 (: uncover-free (Cast4-Lang Config . -> . Cast5-Lang))
 (define (uncover-free prgm comp-config)
+  (logging uncover-free (All) prgm)
   (match-let ([(Prog (list name count type) (LetT tbnd* exp)) prgm])
     (let-values ([(exp free*) (uf-expr exp)])
       (if (set-empty? free*)

@@ -767,15 +767,15 @@ We are going to UIL
 (define-type Cast-Literal (U Schml-Literal Blame-Label))
 
 #|-----------------------------------------------------------------------------+
-| The Cast Language Family Types, Primitives, Literals, and Terminals        |
+| The Cast Language Family Types, Primitives, Literals, and Terminals          |
 +-----------------------------------------------------------------------------|#
 #|-----------------------------------------------------------------------------+
-| Language/Cast0 created by insert-implicit-casts                              |
+| Language/Cast0 created by insert-casts                                       |
 +-----------------------------------------------------------------------------
 | Description: At the begining of this section of the compiler all cast in the |
 | ast are performed on known schml language types. But as the compiler imposes |
 | the semantics of cast there become situations where a type is dependant on   |
-| econtents of a variable. At this point casts are no longer able to be         |
+| econtents of a variable. At this point casts are no longer able to be        |
 | completely compiled into primitives. These casts require a sort of cast      |
 | interpreter which is built later.                                            |
 | In general this compiler tries to move as mainy casts into the primitive     |
@@ -821,9 +821,52 @@ We are going to UIL
 (define-type C0-Bnd*  (Listof C0-Bnd))
 
 
+#|-----------------------------------------------------------------------------+
+| Language/Cast-with-pure-letrec created by purify-letrec                      |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast-with-pure-letrec (Prog (List String Natural Schml-Type) C/PL-Expr))
+
+(define-type C/PL-Expr
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Uid* E)
+	  (Letrec C/PL-Bnd-Lam* E)
+	  (Let C/PL-Bnd* E)
+	  (App E (Listof E))
+	  (Op Schml-Primitive (Listof E))
+	  (If E E E)
+	  (Cast E Schml-Type Schml-Type Blame-Label)
+          (Begin C/PL-Expr* E)
+          (Repeat Uid E E E)
+          ;; Monotonic
+          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
+          (Munbox E)
+          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
+          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
+          (Mbox-set! E E)
+          (Mvector E E)
+          (Mvector-set! E E E)
+          (Mvector-ref E E)
+          ;; Guarded effects
+          (Gbox E)
+          (Gunbox E)
+          (Gbox-set! E E)
+          (Gvector E E)
+          (Gvector-set! E E E)
+          (Gvector-ref E E)
+	  ;; Terminals
+	  (Var Uid)
+	  (Quote Cast-Literal))))
+
+(define-type C/PL-Expr* (Listof C/PL-Expr))
+(define-type C/PL-Bnd   (Pair Uid C/PL-Expr))
+(define-type C/PL-Bnd*  (Listof C/PL-Bnd))
+(define-type C/PL-Lam (Lambda Uid* C/PL-Expr))
+(define-type C/PL-Bnd-Lam (Pairof Uid C/PL-Lam))
+(define-type C/PL-Bnd-Lam* (Listof C/PL-Bnd-Lam))
 
 #| ----------------------------------------------------------------------------+
-|Cast1                                                                         |
+| Language/Cast1 created by introduce-castable-functions                       |
 ------------------------------------------------------------------------------|#
 
 (define-type Cast1-Lang

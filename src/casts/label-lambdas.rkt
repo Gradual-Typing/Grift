@@ -194,7 +194,7 @@
     (for/fold ([bp* : C4-Bnd-Lambda* '()]
 	       [bd* : C4-Bnd-Data* '()]
 	       [n   : Nat n])
-	([b : C/LT-Bnd b*])
+              ([b : C/LT-Bnd b*])
       (match b
 	[(cons i (Lambda f* (Castable b e)))
          (let-values ([(e n) (run-state (ll-expr e) n)])
