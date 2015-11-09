@@ -30,7 +30,7 @@
       ((inj-coercion? schml-type?) x)
       ((proj-coercion? schml-type? blame-label?) x)
       ((fn-coercion? coercion?) x)
-      ((gref-coercion? coercion? coercion?) x)
+      ((gref-coercion? coercion?) x)
       ((seq-coercion? coercion? coercion?) x)
       ((failed-coercion? blame-label?) x)))
 
@@ -276,46 +276,46 @@
      (error 'compose-se-lud-efficient "precodition violated ~v ~v" c1 c2))
    (define res
      (cond
-    [(Identity? c1) c2]
-    [(Identity? c2) c1]
-    [(seq-prj? c1)
-     (seq-prj (seq-prj-t c1) (seq-prj-l c1) (compose (seq-prj-i c1) c2))]
-    ;; Checking Both fails here eliminates several branches
-    [(Failed? c1) c1]
-    [(Failed? c2) c2]
-    [(seq-inj? c1) ;; c2 must be (seq-prj I3 l i) explained on the next line
-     ;; c1 = [[I1 => Dyn]] = (seq-inj g I1)
-     ;; c2 = [[Dyn =>^l I3]] = (Id Dyn) or (seq-prj I3 l i)
-     ;; but we checked above that for the Id case ;) ... magic
-     ;; furthermore I1 and I3 injectable types
-     ;; therefore we can infer that g? = [[I1 =>^l I3]] = (Failed l) or some g 
-     ;; Failure should always be the slowest path so we can act
-     (let ([g? (make-coercion-efficient (seq-inj-t c1) (seq-prj-t c2) (seq-prj-l c2))])
-       ;; composing the smaller two g and g? avoids one recursive call if i = (seq-inj i I4))
-       (let ([t (compose (seq-inj-g c1) g?)])
-         ;; composing a g and an i will result in another i
-         (compose t (seq-prj-i c2))))]
-    [(seq-inj? c2) (seq-inj (compose c1 (seq-inj-g c2)) (seq-inj-t c2))]
-    [(Fn? c1)
-     (let* ([s? (box #t)]
-            [s* (map (lambda (c1 c2)
-                       (let ([c (compose c1 c2)])
-                         (unless (Identity? c)
-                           (set-box! s? #f))
-                         c))
-                     (Fn-fmls c2)
-                     (Fn-fmls c1))]
-            [t (compose (Fn-ret c1) (Fn-ret c2))])
-       (if (and (Identity? t) (unbox s?))
-           (Identity)
-           (Fn (Fn-arity c1) s* t)))]
-    [(Ref? c1)
-     (let ([s (compose (Ref-read c1) (Ref-read c2))]
-           [t (compose (Ref-write c2) (Ref-write c1))])
-       (if (and (Identity? s) (Identity? t))
-           (Identity)
-           (Ref s t)))]
-    [else (error 'compose-se-lud-eff "there shouldn't be anything else ~a ~a" c1 c2)]))
+       [(Identity? c1) c2]
+       [(Identity? c2) c1]
+       [(seq-prj? c1)
+        (seq-prj (seq-prj-t c1) (seq-prj-l c1) (compose (seq-prj-i c1) c2))]
+       ;; Checking Both fails here eliminates several branches
+       [(Failed? c1) c1]
+       [(Failed? c2) c2]
+       [(seq-inj? c1) ;; c2 must be (seq-prj I3 l i) explained on the next line
+        ;; c1 = [[I1 => Dyn]] = (seq-inj g I1)
+        ;; c2 = [[Dyn =>^l I3]] = (Id Dyn) or (seq-prj I3 l i)
+        ;; but we checked above that for the Id case ;) ... magic
+        ;; furthermore I1 and I3 injectable types
+        ;; therefore we can infer that g? = [[I1 =>^l I3]] = (Failed l) or some g 
+        ;; Failure should always be the slowest path so we can act
+        (let ([g? (make-coercion-efficient (seq-inj-t c1) (seq-prj-t c2) (seq-prj-l c2))])
+          ;; composing the smaller two g and g? avoids one recursive call if i = (seq-inj i I4))
+          (let ([t (compose (seq-inj-g c1) g?)])
+            ;; composing a g and an i will result in another i
+            (compose t (seq-prj-i c2))))]
+       [(seq-inj? c2) (seq-inj (compose c1 (seq-inj-g c2)) (seq-inj-t c2))]
+       [(Fn? c1)
+        (let* ([s? (box #t)]
+               [s* (map (lambda (c1 c2)
+                          (let ([c (compose c1 c2)])
+                            (unless (Identity? c)
+                              (set-box! s? #f))
+                            c))
+                        (Fn-fmls c2)
+                        (Fn-fmls c1))]
+               [t (compose (Fn-ret c1) (Fn-ret c2))])
+          (if (and (Identity? t) (unbox s?))
+              (Identity)
+              (Fn (Fn-arity c1) s* t)))]
+       [(Ref? c1)
+        (let ([s (compose (Ref-read c1) (Ref-read c2))]
+              [t (compose (Ref-write c2) (Ref-write c1))])
+          (if (and (Identity? s) (Identity? t))
+              (Identity)
+              (Ref s t)))]
+       [else (error 'compose-se-lud-eff "there shouldn't be anything else ~a ~a" c1 c2)]))
    (define alt-res (compose-se-lud c1 c2))
    (unless (eq%id res alt-res)
      (error 'compose-se-lud-eff "found a difference ~a ~a\n\t~a\n\t~a" c1 c2 res alt-res))

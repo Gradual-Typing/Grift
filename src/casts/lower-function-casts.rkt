@@ -288,7 +288,7 @@ T?l $ (_  ; )  = what here
                  (lbl : Uid <- (get-fn-cast/coerce (Fn-arity crcn)))
                  (return-state
                   (App-Code (Code-Label lbl)
-                            (list (Quote-Coercion crcn) exp))))
+                            (list exp (Quote-Coercion crcn)))))
                 (return-state (Cast exp (Coercion crcn))))])]
         ;; Here we can be doing either casts or coercions
         ;; we could check the state and vary behavior but for now I think
@@ -566,7 +566,7 @@ T?l $ (_  ; )  = what here
       (old-crcn : Uid <-    (uid-state "old_fn_coercion"))
       (r-clos   : Uid <- (uid-state "raw_closure"))
       (return-state
-       (Code (list new-crcn u-clos)
+       (Code (list u-clos new-crcn)
         ;; Is the closure we are casting a hybrid proxy
         (If (Fn-Proxy-Huh (Var u-clos))
             ;; If so we have to compose the old and new fn-coercions

@@ -289,7 +289,28 @@
                      (a : B <- (f (car l)))
                      (d : (Listof B) <- (loop (cdr l)))
                      (return-state (cons a d)))))])
-      (loop l)))
+    (loop l)))
+
+(define #:forall (M A B C)
+  (map-state2 [f : (A B -> (State M C))] [l1 : (Listof A)] [l2 : (Listof B)])
+  : (State M (Listof C))
+  (letrec ([loop : ((Listof A) (Listof B) -> (State M (Listof C)))
+            (lambda ([l1 : (Listof A)]
+                     [l2 : (Listof B)])
+              : (State M (Listof C))
+              (cond
+                [(null? l1)
+                 (if (null? l2)
+                     (return-state '())
+                     (error 'map-state2 "second list longer"))]
+                [(null? l2) (error 'map-state "first list longer")]
+                [else
+                 (do (bind-state : (State M (Listof C)))
+                     (a : C <- (f (car l1) (car l2)))
+                     (d : (Listof C) <- (loop (cdr l1) (cdr l2)))
+                     (return-state (cons a d)))]))])
+    (loop l1 l2)))
+
 
 (: foldr-state (All (M A B) ((A B -> (State M B)) B (Listof A) -> (State M B))))
 (define (foldr-state fn acc ls)

@@ -82,7 +82,7 @@ currently implemented in severral files.
              (error 'interp "code ~a applied to wrong arity: ~a" id v*))
            (recur b (env-extend (empty-env) fml* v*))))))
     (inc i-depth)
-    (logging cast/interp-expr (All) "~a> ~v" (get i-depth) exp)
+    (logging cast/interp-expr (All) "~a> ~v\n\t~v" (get i-depth) exp env)
     #;(: recur/env (-> C0-Expr CL-Value))
     ;; res is a temporary that stores the result for debugging
     (define res
@@ -121,10 +121,11 @@ currently implemented in severral files.
         [(Quote k) k]
         ;; The interface for functions
         [(Lambda id* body)
-         (let-values ([(lbl? body) (if (Castable? body)
-                                          (values (Castable-caster body)
-                                                  (Castable-body body))
-                                          (values #f body))])
+         (let-values ([(lbl? body)
+           (if (Castable? body)
+               (values (Castable-caster body)
+                       (Castable-body body))
+               (values #f body))])
            (Interp-Proc
             (lambda (arg*)
               (recur body (env-extend env id* arg*)))
@@ -168,19 +169,23 @@ currently implemented in severral files.
            (error 'interp/Fn-Proxy-Coercion))
          (Interp-Dyn-mark v)]
         [(App/Fn-Proxy-Huh (app recur/env v) (list (app recur/env v*) ...))
-         (cond
-           [(Interp-Proc? v) ((Interp-Proc-value v) v*)]
-           [(not (and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v))))
-            (error 'inter/App/Fn-Proxy-Huh "other value ~a" v)]
-           [(not (eq? cast-rep 'Coercions))
-            (error 'inter/App/Fn-Proxy-Huh "wrong cast fun ~a" cst)]
-           [else
-            (let* ([c (Interp-Dyn-mark v)]
-                   [f (Interp-Dyn-value v)])
-              (unless (Interp-Proc? f)
-                (error 'inter/App/Fn-Proxy-Huh "value in proxy not fun: ~a" f))
-              (cst (Fn-ret c)
-                   ((Interp-Proc-value f) (map cst (Fn-fmls c) v*))))])]
+         (match v
+           [(Interp-Proc f _) (f v*)]
+           [(Interp-Dyn (Interp-Proc f _) (Fn _ c* c))
+            (cst c (f (map cst c* v*)))]
+           [other (mismatch App/Fn-Proxy-Huh v 'Fn/Fn-Proxy)])]
+        ;; This is really the same as above but relies on the runtime
+        ;; cast code Is Kindof a cheap trick because we want to delay
+        ;; the desugaring of this line until closure conversion to
+        ;; implement hybrid. But we will need this label at that point
+        ;; If we are implementing the data representation
+        [(App-Fn-or-Proxy i (app recur/env v) (list (app recur/env v*) ...))
+         (match v
+           [(Interp-Proc f _) (f v*)]
+           [(Interp-Dyn (Interp-Proc f _) (Fn _ c* c))
+            (let ([cast (Interp-Code-apply (global-env-lookup lbls i))])
+              (cast (list (f (map (lambda (v c) (cast (list v c))) v* c*)) c)))]
+           [other (error 'App-Fn-or-Proxy "unmatched ~a" exp)])]
         ;; Types as runtime objects
         ;; TODO Rename this
         [(Type t) t]
@@ -191,6 +196,8 @@ currently implemented in severral files.
            [(GRef? t) 'GRef]
            [(GVect? t) 'GVect]
            [else (mismatch Type-Tag t 'Type)])]
+        [(Type-Dyn-Huh (app recur/env t)) (Dyn? t)]
+        [(Type-Fn-Huh (app recur/env t)) (Fn? t)]
         [(Type-Fn-arg (app recur/env v) (app recur/env i))
          (unless (and (Fn? v) (integer? i))
            (error 'interp/Type-Fn-Arg))
@@ -205,16 +212,95 @@ currently implemented in severral files.
          (unless (Fn? v)
            (error 'interp/Type-Fn-Arity))
          (Fn-arity v)]
+        [(Type-GRef-Huh (app recur/env t)) (GRef? t)]
         [(Type-GRef-Of (app recur/env t))
          (unless (GRef? t)
            (mismatch Type-GRef-Of t 'GRef))
          (GRef-arg t)]
+        [(Type-GVect-Huh (app recur/env t)) (GVect? t)]
         [(Type-GVect-Of (app recur/env t))
          (unless (GVect? t)
            (mismatch Type-GVect-Of t 'GRef))
          (GVect-arg t)]
         ;; Coercions as runtime objects
         [(Quote-Coercion c) c]
+        [(Sequence-Coercion-Huh (app recur/env t))
+         (Sequence? t)]
+        [(Sequence-Coercion (app recur/env f) (app recur/env s))
+         (unless (coercion? f)
+           (mismatch Sequence-Coercion f 'Coercion))
+         (unless (coercion? s)
+           (mismatch Sequence-Coercion s 'Coercion))
+         (Sequence f s)]
+        [(Sequence-Coercion-Fst (app recur/env s))
+         (unless (and (coercion? s) (Sequence? s))
+           (mismatch Sequence-Coercion-Fst s 'Sequence-Coercion))
+         (Sequence-fst s)]
+        [(Sequence-Coercion-Snd (app recur/env s))
+         (unless (and (coercion? s) (Sequence? s))
+           (mismatch Sequence-Coercion-Snd s 'Sequence-Coercion))
+         (Sequence-snd s)]
+        [(Project-Coercion (app recur/env t) (app recur/env l))
+         (unless (schml-type? t)
+           (mismatch Project-Coercion t 'Type))
+         (unless (string? l)
+           (mismatch Project-Coercion l 'String))
+         (Project t l)]
+        [(Project-Coercion-Huh (app recur/env c)) (Project? c)]
+        [(Project-Coercion-Type (app recur/env p))
+         (unless (and (coercion? p) (Project? p))
+           (mismatch Project-Coercion-Type p 'Project-Coercion))
+         (Project-type p)]
+        [(Project-Coercion-Label (app recur/env p))
+         (unless (and (coercion? p) (Project? p))
+           (mismatch Project-Coercion-Label p 'Project-Coercion))
+         (Project-label p)]
+        [(Inject-Coercion (app recur/env t))
+         (unless (schml-type? t)
+           (mismatch Inject-Coercion t 'Type))
+         (Inject t)]
+        [(Inject-Coercion-Huh (app recur/env c)) (Inject? c)]
+        [(Inject-Coercion-Type (app recur/env i))
+         (unless (and (coercion? i) (Inject? i))
+           (mismatch Inject-Coercion-Type i 'Inject-Coercion))
+         (Inject-type i)]
+        [(Failed-Coercion (app recur/env l))
+         (unless (string? l)
+           (mismatch Fail-Coercion l 'String))
+         (Failed l)]
+        [(Failed-Coercion-Huh (app recur/env c)) (Failed? c)]
+        [(Failed-Coercion-Label (app recur/env f))
+         (unless (and (coercion? f) (Failed? f))
+           (mismatch Failed-Coercion-Label f 'Failed-Coercion))
+         (Failed-label f)]
+        [(Ref-Coercion-Huh (app recur/env c)) (Ref? c)]
+        [(Fn-Coercion-Huh (app recur/env c)) (Fn? c)]
+        [(Make-Fn-Coercion make-uid
+                           (app recur/env t1) (app recur/env t2)
+                           (app recur/env l))
+         (unless (Fn? t1)
+           (error Make-Fn-Coercion t1 'Fn-Type))
+         (unless (Fn? t2)
+           (error Make-Fn-Coercion t2 'Fn-Type))
+         (unless (string? l)
+           (error Make-Fn-Coercion l  'String))
+         (define ((help fn l) t s) (fn (list t s l)))
+         (let* ([fn (Interp-Code-apply (global-env-lookup lbls make-uid))]
+               [arg* (map (help fn l) (Fn-fmls t2) (Fn-fmls t1))]
+               [ret  ((help fn l) (Fn-ret t1) (Fn-ret t2))])
+           (Fn (Fn-arity t1) arg* ret))]
+        [(Compose-Fn-Coercion comp-uid (app recur/env c1) (app recur/env c2))
+         (unless (Fn? c1)
+           (error Compose-Fn-Coercion c1 'Fn-Coercion))
+         (unless (Fn? c2)
+           (error Compose-Fn-Coercion c2 'Fn-Coercion))
+         (define ((help fn) t s) (fn (list t s)))
+         (let* ([fn   (Interp-Code-apply (global-env-lookup lbls comp-uid))]
+               [arg* (map (help fn) (Fn-fmls c2) (Fn-fmls c1))]
+               [ret  ((help fn) (Fn-ret c1) (Fn-ret c2))])
+           (if (and (andmap Identity? arg*) (Identity? ret))
+               (Identity)
+               (Fn (Fn-arity c1) arg* ret)))]
         [(Compose-Coercions (app recur/env c1) (app recur/env c2))
          (compose c1 c2)]
         [(Id-Coercion-Huh (app recur/env c)) (Identity? c)]
@@ -307,10 +393,12 @@ currently implemented in severral files.
                (Interp-GProxy t v (Twosome t1 t2 l))]
               [other (error 'interp/Guarded-Proxy/Twosome "~a" other)])]
            [(Coercion (app recur/env c))
-            (match v
-              [(box _) (Interp-GProxy 'Box v c)]
-              [(vector _ ...) (Interp-GProxy 'Vector v c)] 
-              [other (error 'interp/Guarded-Proxy/Coercion "~a" other)])]
+            (if (Identity? c)
+                v
+                (match v
+                  [(box _) (Interp-GProxy 'Box v c)]
+                  [(vector _ ...) (Interp-GProxy 'Vector v c)] 
+                  [other (error 'interp/Guarded-Proxy/Coercion "~a" other)]))]
            [other (error 'interp/Guarded-Proxy "~a" other)])]
         [(Guarded-Proxy-Ref (app recur/env p))
          (match p
@@ -372,19 +460,21 @@ currently implemented in severral files.
            [other (mismatch Dyn-tag v 'Dynamic-Immediate)])]
         [(Dyn-type (app recur/env v))
          (match v
-           [(Interp-Dyn _ (and t (or (Fn _ _ _) (GVect _) (GRef _)))) t]
+           [(Interp-Dyn _ t) t]
            [other (mismatch Dyn-type v 'Dynamic-Boxed)])]
         [(Dyn-value (app recur/env v))
          (match v
-           [(Interp-Dyn v (or (Fn _ _ _) (GVect _) (GRef _))) v]
+           [(Interp-Dyn v _) v]
            [other (error 'interp/Dyn-type "~a" other)])]
         [(Dyn-make (app recur/env v) (app recur/env t))
+         (unless (schml-type? t)
+           (mismatch Dyn-make t 'Type))
          (Interp-Dyn v t)]
         ;; The Type Tag interface (one that shouldn't be expose so early)
         [(Tag k) k]
        
         [e (unmatched interp e)]))
-    (logging cast/interp-res (all) "~a > ~v" (get i-depth) res)
+    (logging cast/interp-res (all) "~a > ~v \n\t==> ~v" (get i-depth) exp res)
     (dec i-depth)
     res)
   recur)

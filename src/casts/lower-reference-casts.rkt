@@ -391,6 +391,8 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
               (match c
                 [(Ref r w)
                  (u : Uid <- (uid-state "ref_coercion"))
+                 (r^ : Uid <- (uid-state "ref_read"))
+                 (w^ : Uid <- (uid-state "ref_write"))
                  (`(,b* . ,v) : (Pair CoC2-Bnd* (Var Uid))
                   <- (if (Var? e)
                          (return-state `(() . ,e))
@@ -401,20 +403,20 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
                             (return-state `(((,u . ,e)) . ,(Var u)))))))
                  (let ([e (If (Guarded-Proxy-Huh v)
                               (Let `((,u . ,(Guarded-Proxy-Coercion v)))
-                               (Guarded-Proxy
-                                (Guarded-Proxy-Ref v)
-                                ;; TODO Get Rid of the second coercion here
-                                (Coercion
-                                 (Ref-Coercion
-                                  (Compose-Coercions
-                                   (Ref-Coercion-Read (Var u))
-                                   (Quote-Coercion r))
-                                  (Compose-Coercions
-                                   (Quote-Coercion w)
-                                   (Ref-Coercion-Write (Var u)))))))
-                              (Guarded-Proxy
-                               v
-                               (Coercion (Quote-Coercion (Ref r w)))))])
+                               (Let `((,r^ . ,(Compose-Coercions
+                                               (Ref-Coercion-Read (Var u))
+                                               (Quote-Coercion r)))
+                                      (,w^ . ,(Compose-Coercions
+                                               (Quote-Coercion w)
+                                               (Ref-Coercion-Write (Var u)))))
+                                    (If (If (Id-Coercion-Huh (Var r^))
+                                            (Id-Coercion-Huh (Var w^))
+                                            (Quote #f))
+                                        (Guarded-Proxy-Ref v)
+                                        (Guarded-Proxy
+                                         (Guarded-Proxy-Ref v)
+                                         (Coercion (Ref-Coercion (Var r^) (Var w^)))))))
+                              (Guarded-Proxy v (Coercion (Quote-Coercion (Ref r w)))))])
                    (if (null? b*)
                        (return-state e)
                        (return-state (Let b* e))))]

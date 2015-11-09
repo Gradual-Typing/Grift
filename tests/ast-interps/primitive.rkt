@@ -15,7 +15,7 @@
     [(=)
      (match v*
        [(list (? integer? m) (? integer? n)) (= m n)]
-       [(list m n) (eq? m n)]
+       [(list m n) (equal? m n)]
        [other (raise-delta-types-unenforced p v*)])]
     [(+ - * < > >= <= %/)
      (match v*
