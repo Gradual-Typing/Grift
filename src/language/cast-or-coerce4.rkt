@@ -20,7 +20,7 @@
           (Fn-Caster E)
           (App-Fn E (Listof E))
           ;; Our Lovely Function Proxy Representation
-          (App/Fn-Proxy-Huh E (Listof E))
+          (App- E (Listof E))
           (Fn-Proxy Index E E)
           (Fn-Proxy-Huh E)
           (Fn-Proxy-Closure E)

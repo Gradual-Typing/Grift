@@ -140,7 +140,7 @@
                    (return-state
                     (Guarded-Proxy
                      (Guarded-Proxy-Ref v)
-                     (Coercion comp_crcn))))))))
+                     (Coercion composed_crcn))))))))
          (return-state (Guarded-Proxy v (Coercion c))))]
    ;; the coercion must be failure
    [else (return-state (Blame (fail-label$ c)))]))
