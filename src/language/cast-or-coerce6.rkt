@@ -7,17 +7,19 @@
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
 
-(define-type Cast-or-Coerce5-Lang
+
+(define-type Cast-or-Coerce6-Lang
  (Prog (List String Natural Schml-Type) CoC6-Expr))
 
 (define-type CoC6-Expr
   (Rec E (U
           ;; Closure-Operations
           (LetP CoC6-Bnd-Procedure* (LetC CoC6-Bnd-Closure* E))
+          (LetP CoC6-Bnd-Procedure* E)
           (Closure-code E)
           (Closure-caster E)
           (Closure-ref Uid Uid)
-          (App (Pair E E) (Listof E))
+          (App-Closure E E (Listof E))
           ;; Code Labels
           (Code-Label Uid)
           (Labels CoC6-Bnd-Code* E)
@@ -28,7 +30,8 @@
           (App-Fn E (Listof E))
           ;; Our Lovely Function Proxy Representation
           (App-Fn-or-Proxy Uid E (Listof E))
-          (Fn-Proxy (List Index Uid) E E)
+          (Hybrid-Proxy Uid E E)
+          (Fn-Proxy Index E E)
           (Fn-Proxy-Huh E)
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
@@ -128,7 +131,8 @@
 
 (define-type CoC6-Procedure
   (Procedure Uid Uid* Uid (Option Uid) Uid* CoC6-Expr))
-(define-type CoC6-Closure (Closure-Data CoC6-Expr CoC6-Expr CoC6-Expr*))
+(define-type CoC6-Closure
+  (Closure-Data CoC6-Expr (Option CoC6-Expr) CoC6-Expr*))
 (define-type CoC6-Bnd-Procedure (Pairof Uid CoC6-Procedure))
 (define-type CoC6-Bnd-Procedure* (Listof CoC6-Bnd-Procedure))
 (define-type CoC6-Bnd-Closure (Pairof Uid CoC6-Closure))

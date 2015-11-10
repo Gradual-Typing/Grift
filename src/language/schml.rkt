@@ -6,7 +6,6 @@
 | Language/Schml-Syntax 
 +-----------------------------------------------------------------------------|#
 #| Maybe type |#
-(define-type Src srcloc)
 
 ;; The language created by schml/read
 (define-type Syntax-Lang (Prog String (Listof Stx)))

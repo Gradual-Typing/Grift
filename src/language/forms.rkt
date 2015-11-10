@@ -97,6 +97,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-GRef-Of expression)
   (Type-GVect-Of expression)
   ;; closure Representation
+  (App-Closure code data exprs)
   (Closure-Data code caster variables)
   (Closure-code var)
   (Closure-ref this var)
@@ -628,6 +629,7 @@ Dyn --> Int Int --> Dyn
   (Fn-Proxy-Coercion expression)
   (Fn-Proxy-Closure expression)
   (Fn-Proxy-Huh expression)
+  (Hybrid-Proxy apply closure coercion)
   ;; Coercion Manipulation Stuff
   (Sequence-Coercion-Huh crcn)
   (Sequence-Coercion fst snd)

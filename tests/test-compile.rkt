@@ -52,6 +52,7 @@
        (define (exit/success) (exit 'success))
        (define config (compiler-config))
        (define-syntax-rule (ck t m) (check value=? (interp t config) expected m))
+       (define-syntax-rule (nop . a) (void))
        (with-handlers ([exn:schml:type:static?
                           (lambda ([e : exn:schml:type:static])
                             (begin
@@ -62,7 +63,10 @@
            (define ast0 (reduce-to-cast-calculus path config))
            (check value=? (cast-lang-interp ast0 config) expected "cast-lang interp")
            (ck ast0 "cast 0")
-           (test-impose-cast-semantics ast0 config ck)
+           (define ast1 (test-impose-cast-semantics ast0 config ck))
+           ast1
+
+           
            
            #;
            (when (eq? 'Coercions (Config-cast-rep config))

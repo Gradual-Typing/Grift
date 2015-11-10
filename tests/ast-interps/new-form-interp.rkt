@@ -46,11 +46,12 @@ currently implemented in severral files.
      (values 'Coercions apply-coercion-lazy (apply-lazy apply-coercion-lazy))]))
 
 ;; Various Representations of Procedures and Closures
-(struct Interp-Proc (value caster))
-(struct Interp-Twosome (type1 type2 label))
-(struct Interp-Dyn (value mark)
-  #:transparent)
-(struct Interp-Code (apply))
+(struct Interp-Function (value caster) #:transparent)
+(struct Interp-Procedure (apply) #:transparent)
+(struct Interp-Closure (code cast [bound #:mutable]) #:transparent)
+(struct Interp-Twosome (type1 type2 label) #:transparent)
+(struct Interp-Dyn (value mark) #:transparent)
+(struct Interp-Code (apply) #:transparent)
 
 ;; Makes the casted value respresentation for the twosome implementation
 (define (mk-cast/twosome e t g l)
@@ -81,6 +82,17 @@ currently implemented in severral files.
            (unless (= (length fml*) (length v*))
              (error 'interp "code ~a applied to wrong arity: ~a" id v*))
            (recur b (env-extend (empty-env) fml* v*))))))
+    (define (interp-proc p)
+      (match-let ([(Procedure this params code caster bound-vars body) p])
+        (Interp-Code
+         (lambda a
+           (unless (and (= (length a) 2) (Interp-Closure? (car a)))
+             (error 'Procedure "not provided with closure when called"))
+           (define uid* (cons this (append bound-vars params)))
+           (define val* (cons (car a)
+                              (append (Interp-Closure-bound (car a))
+                                      (cadr a))))
+           (recur body (env-extend (empty-env) uid* val*))))))
     (inc i-depth)
     (logging cast/interp-expr (All) "~a> ~v\n\t~v" (get i-depth) exp env)
     #;(: recur/env (-> C0-Expr CL-Value))
@@ -92,6 +104,37 @@ currently implemented in severral files.
          (let ([id*  (map car bnd*)]
                [rhs* (map cdr bnd*)])
            (recur body (env-extend-rec env id* (map-curry-recur rhs*))))]
+        [(LetP (list (cons cp* (app interp-proc p*)) ...)
+          (LetC (list (cons oc* c*) ...)
+                e))
+         (define ((clos-help1 env) c)
+           (match-let ([(Closure-Data c ctr _) c])
+             (Interp-Closure (recur c env) (and ctr (recur ctr env)) #f)))
+         (define ((clos-help2 env) ic c)
+           (match-let ([(Closure-Data _ _ bound) c])
+             (set-Interp-Closure-bound! ic
+              (map (lambda (e) (recur e env)) bound))))
+         (global-env-extend! lbls cp* p*)
+         (define clos* (map (clos-help1 env) c*))
+         (define env^  (env-extend env oc* clos*))
+         (for-each (clos-help2 env^) clos* c*)
+         (recur e env^)]
+        [(LetP (list (cons cp* (app interp-proc p*)) ...) e)
+         (global-env-extend! lbls cp* p*)
+         (recur/env e)]
+        [(Hybrid-Proxy apply (app recur/env v1) (app recur/env v2))
+         (Interp-Closure (Code-Label apply) #f (list v1 v2))]
+        [(App-Closure (app recur/env v) (app recur/env v^)
+                      (list (app recur/env v*) ...))
+         (unless (Code-Label? v)
+           (error 'interp/App-Closure))
+         ((Interp-Code-apply (global-env-lookup lbls (Code-Label-value v)))
+          v^ v*)]
+        [(Closure-ref c f)
+         (env-lookup env c)
+         (env-lookup env f)]
+        [(Closure-code (app recur/env c)) (Interp-Closure-code c)]
+        [(Closure-caster (app recur/env c)) (Interp-Closure-cast c)]
         [(Labels (list (cons id* code*) ...) body)
          (global-env-extend! lbls id* (map (interp-code recur) id* code*))
          (recur body env)]
@@ -123,32 +166,32 @@ currently implemented in severral files.
         [(Lambda id* M)
          (match M
            [(Castable ctr? e)
-            (Interp-Proc
+            (Interp-Function
              (lambda (arg*)
                (recur e (env-extend env id* arg*)))
              ctr?)]
            [(Free ctr? fv* e)
-            (Interp-Proc
+            (Interp-Function
              (lambda (arg*)
                (recur e (env-extend (env-restrict env fv*) id* arg*)))
              ctr?)]
            [e
-            (Interp-Proc
+            (Interp-Function
              (lambda (arg*)
                (recur e (env-extend env id* arg*)))
              #f)])]
         [(Fn-Caster (app recur/env v))
-         (unless (Interp-Proc? v)
+         (unless (Interp-Function? v)
            (mismatch Fn-Caster v '(Fn _ _ _)))
-         (define lbl? (Interp-Proc-caster v))
+         (define lbl? (Interp-Function-caster v))
          (unless (Uid? lbl?)
            (mismatch Fn-Caster lbl? 'Code-Label))
          (Code-Label lbl?)]
         [(App e e*) (apply (recur/env e) (map recur/env e*))]
         [(App-Fn (app recur/env f) (list (app recur/env v*) ...))
-         (unless (Interp-Proc? f)
+         (unless (Interp-Function? f)
            (error 'interp/App-Closure))
-         ((Interp-Proc-value f) v*)]
+         ((Interp-Function-value f) v*)]
         ;; The interface for code 
         [(App-Code (app recur/env c) (list (app recur/env v*) ...))
          (unless (Code-Label? c)
@@ -158,29 +201,32 @@ currently implemented in severral files.
         ;; The interface for Fn-Proxies
         ;; The underscored value changes but it is only to pass extra
         ;; information to subsequent passes
-        [(Fn-Proxy _ (app recur/env fn-crcn) (app recur/env clos))
+        [(Fn-Proxy _ (app recur/env clos) (app recur/env fn-crcn))
          (Interp-Dyn clos fn-crcn)]
         [(Fn-Proxy-Huh (app recur/env v))
          ;; In final product we are relying on this function to only
          ;; distinguish between the cononical forms for function types
          ;; it is a type error to use it otherwise.
          (cond
-           [(Interp-Proc? v) #f]
+           [(Interp-Function? v) #f]
            ;; TODO Fix the name of Fn to be Fn-Coercion
            [(and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v))) #t]
+           [(Interp-Closure? v) (not (Interp-Closure-cast v))]
            [else (error 'interp/Fn-Proxy-Huh "type invalid value ~a" v)])]
         [(Fn-Proxy-Closure (app recur/env v))
-         (unless (and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v)))
-           (error 'interp/Fn-Proxy-Closure "type invalid ~a" v))
-         (Interp-Dyn-value v)]
+         (match v
+           [(Interp-Dyn c (Fn _ _ _)) c]
+           [(Interp-Closure a #f (list clos crcn)) clos]
+           [other (unmatched Fn-Proxy-Closure other)])]
         [(Fn-Proxy-Coercion (app recur/env v))
-         (unless (and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v)))
-           (error 'interp/Fn-Proxy-Coercion))
-         (Interp-Dyn-mark v)]
+         (match v
+           [(Interp-Dyn _ (and c (Fn _ _ _))) c]
+           [(Interp-Closure _ #f (list clos crcn)) crcn]
+           [other (unmatched Fn-Proxy-Coercion other)])]
         [(App/Fn-Proxy-Huh (app recur/env v) (list (app recur/env v*) ...))
          (match v
-           [(Interp-Proc f _) (f v*)]
-           [(Interp-Dyn (Interp-Proc f _) (Fn _ c* c))
+           [(Interp-Function f _) (f v*)]
+           [(Interp-Dyn (Interp-Function f _) (Fn _ c* c))
             (cst c (f (map cst c* v*)))]
            [other (mismatch App/Fn-Proxy-Huh v 'Fn/Fn-Proxy)])]
         ;; This is really the same as above but relies on the runtime
@@ -190,8 +236,8 @@ currently implemented in severral files.
         ;; If we are implementing the data representation
         [(App-Fn-or-Proxy i (app recur/env v) (list (app recur/env v*) ...))
          (match v
-           [(Interp-Proc f _) (f v*)]
-           [(Interp-Dyn (Interp-Proc f _) (Fn _ c* c))
+           [(Interp-Function f _) (f v*)]
+           [(Interp-Dyn (Interp-Function f _) (Fn _ c* c))
             (let ([cast (Interp-Code-apply (global-env-lookup lbls i))])
               (cast (list (f (map (lambda (v c) (cast (list v c))) v* c*)) c)))]
            [other (error 'App-Fn-or-Proxy "unmatched ~a" exp)])]
@@ -526,11 +572,11 @@ currently implemented in severral files.
              ;; If there are function casters present then we
              ;; must be at the point were we are using functions
              ;; as the wrappers for casted functions.
-             [(and (Interp-Proc? v1) (Interp-Proc-caster v1))
+             [(and (Interp-Function? v1) (Interp-Function-caster v1))
               ;; This check should also be done in the cast interpreter
               (if (equal? t1 t2)
                   v1
-                  ((Interp-Code-apply (global-env-lookup lbls (Interp-Proc-caster v1)))
+                  ((Interp-Code-apply (global-env-lookup lbls (Interp-Function-caster v1)))
                    (list  v1 t1 t2 l1)))]
              [else (mk-cast/twosome v1 t1 t2 l1)])]
           [(_ _) (mk-cast/twosome v1 t1 t2 l1)])
@@ -562,7 +608,7 @@ currently implemented in severral files.
        ;; Threats to validity
        (define result (recur val rands^))
        (apply-coercion-lazy res result)]
-      [(Interp-Proc rator _) (rator rands)]
+      [(Interp-Function rator _) (rator rands)]
       [otherwise 
        (error 'interp "Unexpected value in apply-lazy match ~a" rator)]))
   recur)
@@ -604,7 +650,7 @@ currently implemented in severral files.
       [(vector _ ...)              (gvect)]
       [(Interp-GProxy 'Vector _ _) (gvect)]
       [(Interp-Dyn (vector _ ...) (Ref _ _)) (gvect)]
-      [(Interp-Proc _ _)             (function)]
+      [(Interp-Function _ _)             (function)]
       [(Interp-Dyn _ (list _ _ (Fn _ _ _))) (function)]
       [(Interp-Dyn _ (Fn _ _ _)) (function)]
       [(Interp-Dyn _ (Interp-Twosome _ (Fn _ _ _) _)) (function)]

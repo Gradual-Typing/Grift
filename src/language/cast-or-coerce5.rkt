@@ -27,7 +27,7 @@
           (Fn-Proxy-Coercion E)
           ;; Coercions
           (Quote-Coercion Schml-Coercion)
-          (Compose-Coercions E E)
+          ;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
           (Make-Fn-Coercion Uid E E E)
@@ -55,15 +55,15 @@
           (Failed-Coercion-Label E)
           ;;Type operations
           (Type Schml-Type)
-          (Type-Dyn-Huh E)
-          (Type-Fn-Huh E)
           (Type-Fn-arity E)
           (Type-Fn-arg E E)
           (Type-Fn-return E)
-          (Type-GRef-Huh E)
           (Type-GRef-Of  E)
-          (Type-GVect-Huh E)
           (Type-GVect-Of E)
+          (Type-Dyn-Huh E)
+          (Type-Fn-Huh E)
+          (Type-GRef-Huh E)
+          (Type-GVect-Huh E)
           ;; Tags are exposed before specify This is bad
           ;; TODO fix this after the deadline
           (Type-Tag E)

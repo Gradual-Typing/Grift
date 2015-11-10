@@ -11,7 +11,7 @@ This is a micro compiler that removes the cast language form.
          "interpret-casts.rkt"
          "label-lambdas.rkt"
          "uncover-free.rkt"
-         ;"convert-closures.rkt"
+         "convert-closures.rkt"
          ;"specify-representation.rkt"
          "../language/cast0.rkt"
          "../language/data0.rkt")
@@ -90,6 +90,7 @@ This is a micro compiler that removes the cast language form.
     lower-reference-casts
     interpret-casts
     label-lambdas
-    uncover-free)
+    uncover-free
+    convert-closures)
 
 

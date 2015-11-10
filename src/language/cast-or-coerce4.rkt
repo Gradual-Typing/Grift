@@ -11,7 +11,7 @@
  (Prog (List String Natural Schml-Type) CoC4-Expr))
 
 (define-type CoC4-Expr
-  (Rec E (U ;; Code Labels
+  (Rec E (U ;; Code Labels 
           (Code-Label Uid)
           (Labels CoC4-Bnd-Code* E)
           (App-Code E (Listof E))

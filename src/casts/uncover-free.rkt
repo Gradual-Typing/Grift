@@ -194,7 +194,8 @@
     [(Guarded-Proxy-Blames (app uf-expr e fv))
      (values (Guarded-Proxy-Blames e) fv)]
     [(Guarded-Proxy-Coercion (app uf-expr e fv))
-     (values (Guarded-Proxy-Coercion e) fv)]))
+     (values (Guarded-Proxy-Coercion e) fv)]
+    [other (error 'uncover-free "unmatched ~a" other)]))
 
 
 (: uf-expr* (-> (Listof CoC4-Expr) (Values (Listof CoC5-Expr) (Setof Uid))))

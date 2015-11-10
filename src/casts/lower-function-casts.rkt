@@ -587,10 +587,10 @@ T?l $ (_  ; )  = what here
                       (Var r-clos)
                       ;; Otherwise a new proxy is needed
                       (Fn-Proxy arity
-                                (new-fn-crcn arg* ret)
-                                (Var r-clos)))))
+                                (Var r-clos)
+                                (new-fn-crcn arg* ret)))))
             ;; Closure is a regular on --> just make a new proxy
-            (Fn-Proxy arity (Var new-crcn) (Var u-clos)))))))
+            (Fn-Proxy arity (Var u-clos) (Var new-crcn)))))))
 
 
 
