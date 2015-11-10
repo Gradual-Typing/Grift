@@ -8,12 +8,19 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast-or-Coerce5-Lang
- (Prog (List String Natural Schml-Type) CoC5-Expr))
+ (Prog (List String Natural Schml-Type) CoC6-Expr))
 
-(define-type CoC5-Expr
-  (Rec E (U ;; Code Labels
+(define-type CoC6-Expr
+  (Rec E (U
+          ;; Closure-Operations
+          (LetP CoC6-Bnd-Procedure* (LetC CoC6-Bnd-Closure* E))
+          (Closure-code E)
+          (Closure-caster E)
+          (Closure-ref Uid Uid)
+          (App (Pair E E) (Listof E))
+          ;; Code Labels
           (Code-Label Uid)
-          (Labels CoC5-Bnd-Code* E)
+          (Labels CoC6-Bnd-Code* E)
           (App-Code E (Listof E))
           ;; Functions as an interface
           (Lambda Uid* (Castable (Option Uid) E))
@@ -76,13 +83,12 @@
           (Dyn-type E)
           (Dyn-value E)
           (Dyn-make E E)
-          ;; Binding Forms - Lambda
-	  (Letrec CoC5-Bnd-Lambda* E)
-	  (Let CoC5-Bnd-Data* E)
+          ;; binding 
+	  (Let CoC6-Bnd-Data* E)
           (Var Uid)
           ;; Controll Flow
           (If E E E)
-          (Begin CoC5-Expr* E)
+          (Begin CoC6-Expr* E)
           (Repeat Uid E E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
@@ -113,14 +119,17 @@
 
 
 
-(define-type CoC5-Expr* (Listof CoC5-Expr))
-(define-type CoC5-Code (Code Uid* CoC5-Expr))
-(define-type CoC5-Bnd-Code (Pairof Uid CoC5-Code))
-(define-type CoC5-Bnd-Code* (Listof CoC5-Bnd-Code))
-(define-type CoC5-Lambda (Lambda Uid* (Free (Option Uid) Uid* CoC5-Expr)))
-(define-type CoC5-Bnd-Lambda  (Pairof Uid CoC5-Lambda))
-(define-type CoC5-Bnd-Lambda* (Listof CoC5-Bnd-Lambda))
-(define-type CoC5-Bnd-Data  (Pairof Uid CoC5-Expr))
-(define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
+(define-type CoC6-Expr* (Listof CoC6-Expr))
+(define-type CoC6-Code (Code Uid* CoC6-Expr))
+(define-type CoC6-Bnd-Code (Pairof Uid CoC6-Code))
+(define-type CoC6-Bnd-Code* (Listof CoC6-Bnd-Code))
+(define-type CoC6-Bnd-Data  (Pairof Uid CoC6-Expr))
+(define-type CoC6-Bnd-Data* (Listof CoC6-Bnd-Data))
 
-
+(define-type CoC6-Procedure
+  (Procedure Uid Uid* Uid (Option Uid) Uid* CoC6-Expr))
+(define-type CoC6-Closure (Closure-Data CoC6-Expr CoC6-Expr CoC6-Expr*))
+(define-type CoC6-Bnd-Procedure (Pairof Uid CoC6-Procedure))
+(define-type CoC6-Bnd-Procedure* (Listof CoC6-Bnd-Procedure))
+(define-type CoC6-Bnd-Closure (Pairof Uid CoC6-Closure))
+(define-type CoC6-Bnd-Closure* (Listof CoC6-Bnd-Closure))

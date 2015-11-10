@@ -4,6 +4,7 @@
  empty-env
  env-lookup
  env-extend
+ env-restrict
  env-cons
  env-extend-rec
  global-env
@@ -66,6 +67,13 @@ of an not yet initialized binding.
   (define rec-env (env-extend/undef env uid*))
   (for-each (env-set! rec-env) uid* mk-val*)
   rec-env)
+
+(define (env-restrict env uid*)
+  (define (help env)
+    (lambda (u e)
+      (env-cons u (env-lookup env u) e)))
+  (foldl (help env) (empty-env) uid*))
+
 
 ;; Construct an empty-environment
 (define-syntax-rule (empty-env) (hash))

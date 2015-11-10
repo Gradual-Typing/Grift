@@ -156,7 +156,6 @@
        (Guarded-Proxy-Blames (recur exp))]
       [(Guarded-Proxy-Coercion exp)
        (Guarded-Proxy-Coercion (recur exp))]
-      [(Quote-Coercion c) (Quote-Coercion c)]
       [(Sequence-Coercion f s)
        (Sequence-Coercion (recur f) (recur s))]
       [(Sequence-Coercion-Fst e)

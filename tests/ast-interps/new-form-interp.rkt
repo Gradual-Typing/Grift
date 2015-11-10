@@ -120,16 +120,23 @@ currently implemented in severral files.
         [(Op p e*) (delta p (map recur/env e*))]
         [(Quote k) k]
         ;; The interface for functions
-        [(Lambda id* body)
-         (let-values ([(lbl? body)
-           (if (Castable? body)
-               (values (Castable-caster body)
-                       (Castable-body body))
-               (values #f body))])
-           (Interp-Proc
-            (lambda (arg*)
-              (recur body (env-extend env id* arg*)))
-            lbl?))]
+        [(Lambda id* M)
+         (match M
+           [(Castable ctr? e)
+            (Interp-Proc
+             (lambda (arg*)
+               (recur e (env-extend env id* arg*)))
+             ctr?)]
+           [(Free ctr? fv* e)
+            (Interp-Proc
+             (lambda (arg*)
+               (recur e (env-extend (env-restrict env fv*) id* arg*)))
+             ctr?)]
+           [e
+            (Interp-Proc
+             (lambda (arg*)
+               (recur e (env-extend env id* arg*)))
+             #f)])]
         [(Fn-Caster (app recur/env v))
          (unless (Interp-Proc? v)
            (mismatch Fn-Caster v '(Fn _ _ _)))
