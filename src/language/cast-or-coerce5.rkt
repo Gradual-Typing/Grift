@@ -7,13 +7,13 @@
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
 
-(define-type Cast-or-Coerce4-Lang
- (Prog (List String Natural Schml-Type) CoC4-Expr))
+(define-type Cast-or-Coerce3-Lang
+ (Prog (List String Natural Schml-Type) CoC5-Expr))
 
-(define-type CoC4-Expr
+(define-type CoC5-Expr
   (Rec E (U ;; Code Labels
           (Code-Label Uid)
-          (Labels CoC4-Bnd-Code* E)
+          (Labels CoC5-Bnd-Code* E)
           (App-Code E (Listof E))
           ;; Functions as an interface
           (Lambda Uid* (Castable (Option Uid) E))
@@ -27,7 +27,7 @@
           (Fn-Proxy-Coercion E)
           ;; Coercions
           (Quote-Coercion Schml-Coercion)
-          ;;(Compose-Coercions E E)
+          (Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
           (Make-Fn-Coercion Uid E E E)
@@ -77,12 +77,12 @@
           (Dyn-value E)
           (Dyn-make E E)
           ;; Binding Forms - Lambda
-	  (Letrec CoC4-Bnd-Lambda* E)
-	  (Let CoC4-Bnd-Data* E)
+	  (Letrec CoC5-Bnd-Lambda* E)
+	  (Let CoC5-Bnd-Data* E)
           (Var Uid)
           ;; Controll Flow
           (If E E E)
-          (Begin CoC4-Expr* E)
+          (Begin CoC5-Expr* E)
           (Repeat Uid E E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
@@ -113,21 +113,14 @@
 
 
 
-(define-type CoC4-Expr* (Listof CoC4-Expr))
-(define-type CoC4-Code (Code Uid* CoC4-Expr))
-(define-type CoC4-Bnd-Code (Pairof Uid CoC4-Code))
-(define-type CoC4-Bnd-Code* (Listof CoC4-Bnd-Code))
-(define-type CoC4-Lambda (Lambda Uid* (Castable (Option Uid) CoC4-Expr)))
-(define-type CoC4-Bnd-Lambda  (Pairof Uid CoC4-Lambda))
-(define-type CoC4-Bnd-Lambda* (Listof CoC4-Bnd-Lambda))
-(define-type CoC4-Bnd-Data  (Pairof Uid CoC4-Expr))
-(define-type CoC4-Bnd-Data* (Listof CoC4-Bnd-Data))
-
-
-
-
-;(define-type Type-Ctr (U 'Dyn 'Bool 'Int 'Unit 'Fn 'GRef 'GVect))
-;(define-type (Type-Ctr-Clause x) (Pair Type-Ctr x))
-;(define-type (Type-Ctr-Clause* x) (Listof (Type-Ctr-Clause x)))
+(define-type CoC5-Expr* (Listof CoC5-Expr))
+(define-type CoC5-Code (Code Uid* CoC5-Expr))
+(define-type CoC5-Bnd-Code (Pairof Uid CoC5-Code))
+(define-type CoC5-Bnd-Code* (Listof CoC5-Bnd-Code))
+(define-type CoC5-Lambda (Lambda Uid* (Free (Option Uid) Uid* CoC5-Expr)))
+(define-type CoC5-Bnd-Lambda  (Pairof Uid CoC5-Lambda))
+(define-type CoC5-Bnd-Lambda* (Listof CoC5-Bnd-Lambda))
+(define-type CoC5-Bnd-Data  (Pairof Uid CoC5-Expr))
+(define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
 
 

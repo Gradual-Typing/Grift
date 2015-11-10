@@ -21,7 +21,7 @@
           (App-Fn E (Listof E))
           ;; Our Lovely Function Proxy Representation
           (App-Fn-or-Proxy Uid E (Listof E))
-          (Fn-Proxy Index E E)
+          (Fn-Proxy (List Index Uid) E E)
           (Fn-Proxy-Huh E)
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)

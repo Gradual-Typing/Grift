@@ -12,8 +12,8 @@
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
-         "../language/cast4.rkt"
-         "../language/cast5.rkt")
+         "../language/cast-or-coerce4.rkt"
+         "../language/cast-or-coerce5.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-free)
@@ -26,7 +26,7 @@
 	  (Prog (list name count type) exp)
 	  (raise-pass-exn 'uncover-free "Free variables detect ~a" free*)))))
 
-(: uf-expr (-> C4-Expr (Values C5-Expr (Setof Uid))))
+(: uf-expr (-> C4-Expr (Values CoC5-Expr (Setof Uid))))
 (define (uf-expr e)
   (match e
     ;; Core
@@ -110,7 +110,7 @@
 ;; racket so ...
 
 (: uf-expr* (-> (Listof C4-Expr)
-		(values (Listof C5-Expr) (Setof Uid))))
+		(values (Listof CoC5-Expr) (Setof Uid))))
 (define (uf-expr* e*)
   (if (null? e*)
       (values '() (set))
@@ -120,7 +120,7 @@
 		     [(e e-fvars) (uf-expr a)])
 	  (values (cons e e*) (set-union e*-fvars e-fvars))))))
 
-(: uf-lambda (C4-Lambda . -> . (values C5-Lambda (Setof Uid))))
+(: uf-lambda (C4-Lambda . -> . (values CoC5-Lambda (Setof Uid))))
 (define (uf-lambda lam)
   (: id-subtract (-> Uid (Setof Uid) (Setof Uid)))
   ;; id-subtract is set remove with the arguments in reverse
@@ -133,7 +133,7 @@
 
 (: uf-bnd-lambda* (-> C4-Bnd-Lambda*
                       (values (Setof Uid)
-                              (Listof (Pairof Uid C5-Lambda))
+                              (Listof (Pairof Uid CoC5-Lambda))
                               (Setof Uid))))
 (define (uf-bnd-lambda* b*)
   (if (null? b*)
@@ -147,7 +147,7 @@
 
 (: uf-bnd-data* (-> C4-Bnd-Data*
                     (values (Setof Uid)
-                            (Listof (Pairof Uid C5-Expr))
+                            (Listof (Pairof Uid CoC5-Expr))
                             (Setof Uid))))
 (define (uf-bnd-data* b*)
   (if (null? b*)

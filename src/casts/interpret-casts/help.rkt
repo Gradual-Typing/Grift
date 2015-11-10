@@ -21,9 +21,12 @@
 
 (define-type ApplyT   (CoC3-Expr CoC3-Expr* -> (State Nat CoC3-Expr)))
 
+(define-type Fn-ProxyT
+  (Index CoC3-Expr CoC3-Expr -> (State Nat CoC3-Expr)))
+
 (define-type Get-Helpers-Type
   (Function-Proxy-Rep
-   -> (State Nat (List Cast-Rule ComposeT ApplyT CoC3-Bnd-Code*))))
+   -> (State Nat (List Cast-Rule ComposeT ApplyT Fn-ProxyT CoC3-Bnd-Code*))))
 
 
 ;; Expr$ and cond$ will prune branches if the condition is (Quote #t) or (Quote #f)

@@ -5,7 +5,7 @@
  "../../language/cast-or-coerce3.rkt"
  "./help.rkt")
 
-(provide get-twosome-helpers ComposeT ApplyT Cast-Rule)
+(provide get-twosome-helpers ComposeT ApplyT Cast-Rule Fn-ProxyT)
 
 (: specialize-casts? (Parameterof Boolean))
 (define specialize-casts?
@@ -17,7 +17,7 @@
 
 (: get-twosome-helpers Get-Helpers-Type)
 (define (get-twosome-helpers fn-proxy-rep)
-  (do (bind-state : (State Nat (List Cast-Rule ComposeT ApplyT CoC3-Bnd-Code*)))
+  (do (bind-state : (State Nat (List Cast-Rule ComposeT ApplyT Fn-ProxyT CoC3-Bnd-Code*)))
          (interp-cast : Uid <- (uid-state "interp_cast"))
        (let* ([interp
                : Cast-Rule
@@ -75,7 +75,10 @@
                           "data representation not yet implemented")
                    (lambda (e e*)
                      (error 'interp-cast/twosome/apply
-                            "app/fn-proxy-huh node shouldn't exist")))])
+                            "app/fn-proxy-huh node shouldn't exist")))]
+              [proxy : Fn-ProxyT
+                     (lambda (i e1 e2)
+                       (error 'interp-cast/twosome/proxy))])
          ;; This is a little weird but leads to code reuse.
          ;; Notice invoking specialize on vars will cause the
          ;; entire cast decision tree to be built.
@@ -90,7 +93,7 @@
          (let* ([interp-cast-code (Code `(,v ,t1 ,t2 ,l) cast-tree)]
                 [interp-cast-bnd* : CoC3-Bnd-Code*
                                   `((,interp-cast . ,interp-cast-code))])
-           (return-state (list judge compose apply interp-cast-bnd*))))))
+           (return-state (list judge compose apply proxy interp-cast-bnd*))))))
 
 
 

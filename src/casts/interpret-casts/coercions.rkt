@@ -6,11 +6,11 @@
  "../../language/cast-or-coerce3.rkt"
  "../interpret-casts/help.rkt")
 
-(provide get-coercion-helpers ComposeT ApplyT Cast-Rule)
+(provide get-coercion-helpers ComposeT ApplyT Cast-Rule Fn-ProxyT)
 
 (: get-coercion-helpers Get-Helpers-Type)
 (define (get-coercion-helpers fn-proxy-rep) 
-  (do (bind-state : (State Nat (List Cast-Rule ComposeT ApplyT CoC3-Bnd-Code*)))
+  (do (bind-state : (State Nat (List Cast-Rule ComposeT ApplyT Fn-ProxyT CoC3-Bnd-Code*)))
          (interp-uid  : Uid <- (uid-state "interp_cast"))
          (compose-uid : Uid <- (uid-state "compose_coercion"))
          (make-uid    : Uid <- (uid-state "make_coercion"))
@@ -25,7 +25,6 @@
                 [interp_
                  : Cast/Coercion-Type
                  (lambda (v c)
-                   (return-state (App-Code (Code-Label interp-uid) (list v c)))
                    (interp v (Coercion c)))]
                 [compose
                  : ComposeT
@@ -42,7 +41,11 @@
                 ;; Going until we get to closure conversion
                 [apply : ApplyT
                  (lambda (e e*)
-                  (return-state (App-Fn-or-Proxy interp-uid e e*)))])
+                   (return-state (App-Fn-or-Proxy interp-uid e e*)))]
+                [proxy : Fn-ProxyT
+                 (lambda (i e1 e2)
+                   (return-state (Fn-Proxy (list i interp-uid) e1 e2)))])
+           
            ;; This is a little weird but leads to code reuse.
            ;; Notice invoking specialize on vars will cause the
            ;; entire cast decision tree to be built.
@@ -69,7 +72,7 @@
                         `((,interp-uid  . ,interp-code)
                           (,compose-uid . ,compose-code)
                           (,make-uid   . ,make-code))])
-             (return-state (list interp compose apply bnd*))))))
+             (return-state (list interp compose apply proxy bnd*))))))
 
 
 

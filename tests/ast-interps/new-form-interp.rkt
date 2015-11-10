@@ -149,7 +149,9 @@ currently implemented in severral files.
          ((Interp-Code-apply (global-env-lookup lbls (Code-Label-value c))) v*)]
         [(Code-Label id) (Code-Label id)]
         ;; The interface for Fn-Proxies
-        [(Fn-Proxy i (app recur/env fn-crcn) (app recur/env clos))
+        ;; The underscored value changes but it is only to pass extra
+        ;; information to subsequent passes
+        [(Fn-Proxy _ (app recur/env fn-crcn) (app recur/env clos))
          (Interp-Dyn clos fn-crcn)]
         [(Fn-Proxy-Huh (app recur/env v))
          ;; In final product we are relying on this function to only

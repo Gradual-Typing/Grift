@@ -9,7 +9,7 @@ This is a micro compiler that removes the cast language form.
          "lower-function-casts.rkt"
          "lower-reference-casts.rkt"
          "interpret-casts.rkt"
-         ;"label-lambdas.rkt"
+         "label-lambdas.rkt"
          ;"uncover-free.rkt"
          ;"convert-closures.rkt"
          ;"specify-representation.rkt"
@@ -89,6 +89,6 @@ This is a micro compiler that removes the cast language form.
     lower-function-casts
     lower-reference-casts
     interpret-casts
-    )
+    label-lambdas)
 
 

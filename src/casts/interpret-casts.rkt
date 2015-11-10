@@ -55,22 +55,23 @@ form, to the shortest branch of the cast tree that is relevant.
     (define-values (exp^ next^)
       (run-state
        (do (bind-state : (State Nat CoC3-Expr))
-           ((list mk-cast mk-compose mk-apply bnd*)
-            : (List Cast-Rule ComposeT ApplyT CoC3-Bnd-Code*)
+           ((list mk-cast mk-compose mk-apply mk-fn-proxy bnd*)
+            : (List Cast-Rule ComposeT ApplyT Fn-ProxyT CoC3-Bnd-Code*)
             <- (cond
                  [(eq? 'Twosomes cast-rep) (get-twosome-helpers 'Hybrid)]
                  [(eq? 'Coercions cast-rep) (get-coercion-helpers 'Hybrid)]
                  [else (error 'interpret-casts/cast-rep "~a" cast-rep)]))
-            (exp : CoC3-Expr <- ((ic-expr mk-cast mk-compose mk-apply) exp))
+            (exp : CoC3-Expr
+                 <- ((ic-expr mk-cast mk-compose mk-apply mk-fn-proxy) exp))
             (return-state (Labels bnd* (Observe exp type))))
        next))
     (Prog (list name next^ type) exp^)))
 
 
 ;; Traverse the expression envoking the Cast-Rule where appropriate
-(: ic-expr (Cast-Rule ComposeT ApplyT -> IC-ExprT))
+(: ic-expr (Cast-Rule ComposeT ApplyT Fn-ProxyT -> IC-ExprT))
 (define-type IC-ExprT (CoC2-Expr -> (State Nat CoC3-Expr)))
-(define ((ic-expr mk-cast mk-compose mk-apply) exp)
+(define ((ic-expr mk-cast mk-compose mk-apply mk-fn-proxy) exp)
   (: recur IC-ExprT)
   (define (recur exp)
     (do (bind-state : (State Nat CoC3-Expr))
@@ -101,7 +102,7 @@ form, to the shortest branch of the cast tree that is relevant.
           [(Fn-Proxy i e1 e2)
            (e1 : CoC3-Expr <- (recur e1))
            (e2 : CoC3-Expr <- (recur e2))
-           (return-state (Fn-Proxy i e1 e2))]
+           (mk-fn-proxy i e1 e2)]
           [(App/Fn-Proxy-Huh e e*)
            (e  : CoC3-Expr  <- (recur e))
            (e* : CoC3-Expr* <- (map-state recur e*))
