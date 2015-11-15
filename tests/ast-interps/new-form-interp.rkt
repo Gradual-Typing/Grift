@@ -9,7 +9,8 @@ currently implemented in severral files.
 
 (provide interp)
 
-(require racket/fixnum
+(require racket/port
+         racket/fixnum
          racket/match
          "../../src/helpers-untyped.rkt"
          "../../src/errors.rkt"
@@ -31,7 +32,7 @@ currently implemented in severral files.
   (define global-lbls (global-env))
   (define-values (cast-rep cast apply) (select-help config global-lbls))
   (define eval
-    (interp-expr cast-rep cast apply global-lbls))
+    (interp-expr cast-rep cast apply global-lbls (box 0) (make-hash)))
   (match-let ([(Prog _ exp) prgm])
     (observe-lazy (lambda () (eval exp (empty-env))))))
 
@@ -53,6 +54,8 @@ currently implemented in severral files.
 (struct Interp-Dyn (value mark) #:transparent)
 (struct Interp-Code (apply) #:transparent)
 
+
+
 ;; Makes the casted value respresentation for the twosome implementation
 (define (mk-cast/twosome e t g l)
   (cond
@@ -65,11 +68,14 @@ currently implemented in severral files.
 (define (dec r) (set-box! r (sub1 (unbox r))))
 (define (get r) (unbox r))
 
+
+(define racket-apply apply)
+
 #;(define-type eval-expr-type (-> C0-Expr (Env CL-Value) CL-Value))
 #;(: interp-expr (-> Cast-Type apply-type eval-expr-type))
 ;; TODO lbls here is broken one possible fix is to use a mutable hash table
 ;; to make the scope of lbls global.
-(define (interp-expr cast-rep cst apply lbls)
+(define (interp-expr cast-rep cst apply lbls alloc-next heap)
   (define (recur exp env)
     (define (recur/env e) (recur e env))
     (define (map-curry-recur exp*)
@@ -160,7 +166,45 @@ currently implemented in severral files.
              [else
               (run-repeat-loop recur env body id start-v stop-v '())]))]
         ;; Primitives
-        [(Op p e*) (delta p (map recur/env e*))]
+        [(Op p (list (app recur/env v*) ...))
+         (match* (p v*)
+           [('Alloc (list n))
+            (unless (exact-nonnegative-integer? n)
+              (mismatch Alloc n 'Index))
+            (let* ((ap (unbox alloc-next))
+                   (a  (* ap 8)))
+              (set-box! alloc-next (+ ap n))
+              (hash-set! heap a (make-vector n 'Undefined))
+              a)]
+           [('Array-set! (list a o v))
+            (let* ((m (hash-ref heap a #f)))
+              (unless m (error 'Array-set! "got bad address ~a" a))
+              (unless (< o (vector-length m))
+                (error 'Array-set! "out of bounds"))
+              (vector-set! m o v)
+              '())]
+           [('Array-ref (list a o))
+            (let* ((m (hash-ref heap a #f)))
+              (unless m (error 'Array-ref! "got bad address ~a" a))
+              (unless (< o (vector-length m))
+                (error 'Array-ref! "out of bounds"))
+              (vector-ref m o))]
+           [('Exit (list n))
+            (unless (integer? n)
+              (mismatch Exit n 'Integer))
+            (raise n)]
+           ;; TODO reformat
+           [('Printf (list fmt v* ...))
+            ;;This is super hacky try to do something that will
+            ;; cover arbitray cast
+            (define (reformat n s)
+              (cond
+                [(eq? #\% n) (cons #\~ (cons #\a (cdr s)))]
+                [else (cons n s)]))
+            (racket-apply printf (cons (list->string (foldr reformat '() (string->list fmt))) v*))]
+           [('Print (list s)) (display s)]
+           [((? schml-primitive? p) v*) (delta p v*)]
+           [(other v*) (unmatched Op (cons p v*))])]
         [(Quote k) k]
         ;; The interface for functions
         [(Lambda id* M)
@@ -404,16 +448,6 @@ currently implemented in severral files.
               [(eq? cast-rep 'Coercions) (cst c  v)]
               [else (error 'interp/Interpret-Coerce)])])]
         [(Blame (app recur/env lbl)) (raise-blame lbl)]
-        [(Observe (app recur/env v) t)
-         (match t
-           [(Int)  (raise (format "Int : ~a" v))]
-           [(Bool) (raise (format "Bool : ~a" v))]
-           [(Unit) (raise "Unit : ()")]
-           [(Dyn)  (raise "Dynamic : ?")]
-           [(Fn _ _ _) (raise "Function : ?")]
-           [(GRef _)   (raise "GReference : ?")]
-           [(GVect _)  (raise "GVector : ?")]
-           [other (error 'interp/Observe "~a ~a" t v)])]
         ;; Guarded references
         [(Gbox (app recur/env v)) (make-gbox v)]
         [(Gunbox (app recur/env v))
@@ -527,7 +561,19 @@ currently implemented in severral files.
          (Interp-Dyn v t)]
         ;; The Type Tag interface (one that shouldn't be expose so early)
         [(Tag k) k]
-       
+        
+        ;; Observables
+        [(Observe (app recur/env v) t)
+         (match t
+           [(Int)  (raise (format "Int : ~a" v))]
+           [(Bool) (raise (format "Bool : ~a" v))]
+           [(Unit) (raise "Unit : ()")]
+           [(Dyn)  (raise "Dynamic : ?")]
+           [(Fn _ _ _) (raise "Function : ?")]
+           [(GRef _)   (raise "GReference : ?")]
+           [(GVect _)  (raise "GVector : ?")]
+           [other (error 'interp/Observe "~a ~a" t v)])]
+        [(Success) (Success)]
         [e (unmatched interp e)]))
     (logging cast/interp-res (all) "~a > ~v \n\t==> ~v" (get i-depth) exp res)
     (dec i-depth)
@@ -635,12 +681,27 @@ currently implemented in severral files.
 
 #;(: observe-lazy (-> (-> CL-Value) Test-Value))
 (define (observe-lazy thunk)
+  (define (io-thunk)
+    (define (return-string)
+      (begin (flush-output) (void)))
+    (call/cc
+     (lambda (return-value)
+       (parse-observable
+        (with-output-to-string
+          (lambda ()
+            (with-handlers ([number? (lambda (e) (return-string))])
+              (let ((result (thunk)))
+                (if (Success? result)
+                    (return-string)
+                    (return-value result))))))))))
   (with-handlers ([string?
                    (lambda (s) (parse-observable s))]
                   [exn:schml:type:dynamic?
 		   (lambda (e)
                      (blame #f (exn-message e)))])
-    (match (thunk)
+    (define v (io-thunk))
+    (logging observe-lazy (All) v)
+    (match v 
       [(? integer? v) (int v)] 
       [(? boolean? v) (bool v)]
       [(? null?)      (unit)]
@@ -655,6 +716,6 @@ currently implemented in severral files.
       [(Interp-Dyn _ (Fn _ _ _)) (function)]
       [(Interp-Dyn _ (Interp-Twosome _ (Fn _ _ _) _)) (function)]
       [(Interp-Dyn _ _) (dyn)]
-      [else (error "returned unexpected value")])))
+      [other other])))
 
 

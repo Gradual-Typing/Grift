@@ -5,6 +5,7 @@
 | The Constants for the representation of casts                                |
 +-----------------------------------------------------------------------------|#
 ;; The Representation of functional types is an array
+(define FN-TYPE-TAG #b000)
 (define FN-ARITY-INDEX 0)
 (define FN-RETURN-INDEX 1)
 (define FN-FMLS-OFFSET 2)
@@ -59,8 +60,10 @@
 (define UGBOX-VALUE-INDEX 0)
 (define UGBOX-TAG #b000)
 (define GPROXY-TAG  #b001)
-(define GPROXY-SIZE 4)
+(define GPROXY/COERCION-SIZE 2)
+(define GPROXY/TWOSOME-SIZE  4)
 (define GPROXY-FOR-INDEX 0)
+(define GPROXY-COERCION-INDEX 1)
 (define GPROXY-FROM-INDEX 1)
 (define GPROXY-TO-INDEX 2)
 (define GPROXY-BLAMES-INDEX 3)
@@ -81,3 +84,9 @@
 (define CLOS-CODE-INDEX 0)
 (define CLOS-CSTR-INDEX 1)
 (define CLOS-FVAR-OFFSET 2)
+
+;; Function Proxy Representation
+(define HYBRID-PROXY-CRCN-SIZE 3)
+(define HYBRID-PROXY-CODE-INDEX 0)
+(define HYBRID-PROXY-CLOS-INDEX 1)
+(define HYBRID-PROXY-CRCN-INDEX 2)

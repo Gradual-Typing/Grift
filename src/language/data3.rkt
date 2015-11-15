@@ -22,7 +22,8 @@
   (Rec T
    (U (If D3-Pred T T)
       (Begin D3-Effect* T)
-      (Return D3-Value))))
+      (Return D3-Value)
+      (Return Success))))
 
 (define-type D3-Value
  (Rec V
@@ -31,7 +32,7 @@
      (If D3-Pred V V)
      (Begin D3-Effect* V)
      (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
-     (App D3-Trivial D3-Trivial*))))
+     (App-Code D3-Trivial D3-Trivial*))))
 
 (define-type D3-Pred
  (Rec P
@@ -44,7 +45,7 @@
   (U (If D3-Pred E E)
      (Begin D3-Effect* No-Op)
      (Repeat Uid D3-Trivial D3-Trivial E)
-     (App D3-Trivial D3-Trivial*)
+     (App-Code D3-Trivial D3-Trivial*)
      (UIL-Op! D3-Trivial)
      (Assign Uid D3-Value)
      No-Op)))

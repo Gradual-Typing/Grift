@@ -15,18 +15,18 @@ exposed as the effects that they truelly are.
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
-         "../language/cast6.rkt"
+         "../language/cast-or-coerce6.rkt"
          "../language/data0.rkt"
          "../language/data-representation.rkt")
 
 ;; Only the pass is provided by this module
 (provide
  (all-from-out
-  "../language/cast6.rkt"
+  "../language/cast-or-coerce6.rkt"
   "../language/data0.rkt")
  specify-representation)
 
-#;
+#|
 (TODO Rewrite any allocating procedures in this pass.
       Remebering the lessons of the runtime class.
       No complex expressions should be able to be evaluated while
@@ -38,673 +38,675 @@ exposed as the effects that they truelly are.
       have variables as sub expressions.
       Perhaps one pass before this.
       member to force the evaluation of sub-arguments)
-#;
+
 (TODO Talk to jeremy about taging all heap values)
+|#
 
+;; Only allocate each of these once
+(define FN-ARITY-INDEX-VALUE        : D0-Expr (Quote FN-ARITY-INDEX))
+(define FN-RETURN-INDEX-VALUE       : D0-Expr (Quote FN-RETURN-INDEX))
+(define FN-FMLS-OFFSET-VALUE        : D0-Expr (Quote FN-FMLS-OFFSET))
+                                   
+(define TYPE-TAG-MASK-VALUE         : D0-Expr (Quote TYPE-TAG-MASK))
+(define TYPE-FN-TAG-VALUE           : D0-Expr (Quote TYPE-FN-TAG))
+(define TYPE-ATOMIC-TAG-VALUE       : D0-Expr (Quote TYPE-ATOMIC-TAG))
+(define TYPE-DYN-RT-VALUE-VALUE     : D0-Expr (Quote TYPE-DYN-RT-VALUE))
+(define TYPE-INT-RT-VALUE-VALUE     : D0-Expr (Quote TYPE-INT-RT-VALUE))
+(define TYPE-BOOL-RT-VALUE-VALUE    : D0-Expr (Quote TYPE-BOOL-RT-VALUE))
+(define TYPE-UNIT-RT-VALUE-VALUE    : D0-Expr (Quote TYPE-UNIT-RT-VALUE))
+(define TYPE-GREF-SIZE-VALUE        : D0-Expr (Quote TYPE-GREF-SIZE))
+(define TYPE-GREF-TAG-VALUE         : D0-Expr (Quote TYPE-GREF-TAG))
+(define TYPE-GVECT-SIZE-VALUE       : D0-Expr (Quote TYPE-GVECT-SIZE))
+(define TYPE-GVECT-TAG-VALUE        : D0-Expr (Quote TYPE-GVECT-TAG))
+(define DYN-TAG-MASK-VALUE          : D0-Expr (Quote DYN-TAG-MASK))
+(define DYN-BOXED-TAG-VALUE         : D0-Expr (Quote DYN-BOXED-TAG))
+(define DYN-INT-TAG-VALUE           : D0-Expr (Quote DYN-INT-TAG))
+(define DYN-BOOL-TAG-VALUE          : D0-Expr (Quote DYN-BOOL-TAG))
+(define DYN-UNIT-TAG-VALUE          : D0-Expr (Quote DYN-UNIT-TAG))
+(define DYN-IMDT-SHIFT-VALUE        : D0-Expr (Quote DYN-IMDT-SHIFT))
+(define DYN-BOX-SIZE-VALUE          : D0-Expr (Quote DYN-BOX-SIZE))
+(define DYN-VALUE-INDEX-VALUE       : D0-Expr (Quote DYN-VALUE-INDEX))
+(define DYN-TYPE-INDEX-VALUE        : D0-Expr (Quote DYN-TYPE-INDEX))
+(define FALSE-IMDT-VALUE            : D0-Expr (Quote FALSE-IMDT))
+(define TRUE-IMDT-VALUE             : D0-Expr (Quote TRUE-IMDT))
+(define UNDEF-IMDT-VALUE            : D0-Expr (Quote UNDEF-IMDT))
+(define UNIT-IMDT-VALUE             : D0-Expr (Quote UNIT-IMDT))
+(define GREP-TAG-MASK-VALUE         : D0-Expr (Quote GREP-TAG-MASK))
+(define UGBOX-SIZE-VALUE            : D0-Expr (Quote UGBOX-SIZE))
+(define UGBOX-VALUE-INDEX-VALUE     : D0-Expr (Quote UGBOX-VALUE-INDEX))
+(define UGVECT-SIZE-INDEX-VALUE     : D0-Expr (Quote UGVECT-SIZE-INDEX))
+(define UGVECT-OFFSET-VALUE         : D0-Expr (Quote UGVECT-OFFSET))
+(define GPROXY-TAG-VALUE            : D0-Expr (Quote GPROXY-TAG))
+(define GPROXY/TWOSOME-SIZE-VALUE   : D0-Expr (Quote GPROXY/TWOSOME-SIZE))
+(define GPROXY/COERCION-SIZE-VALUE  : D0-Expr (Quote GPROXY/COERCION-SIZE))
+(define GPROXY-COERCION-INDEX-VALUE : D0-Expr (Quote GPROXY-COERCION-INDEX))
+(define GPROXY-FOR-INDEX-VALUE      : D0-Expr (Quote GPROXY-FOR-INDEX))
+(define GPROXY-FROM-INDEX-VALUE     : D0-Expr (Quote GPROXY-FROM-INDEX))
+(define GPROXY-TO-INDEX-VALUE       : D0-Expr (Quote GPROXY-TO-INDEX))
+(define GPROXY-BLAMES-INDEX-VALUE   : D0-Expr (Quote GPROXY-BLAMES-INDEX))
+(define CLOS-CODE-INDEX-VALUE       : D0-Expr (Quote CLOS-CODE-INDEX))
+(define CLOS-CSTR-INDEX-VALUE       : D0-Expr (Quote CLOS-CSTR-INDEX))
+(define CLOS-FVAR-OFFSET-VALUE      : D0-Expr (Quote CLOS-FVAR-OFFSET))
+(define GREF-TO-INDEX-VALUE         : D0-Expr (Quote GREF-TO-INDEX))
+(define GVECT-TO-INDEX-VALUE        : D0-Expr (Quote GVECT-TO-INDEX))
 
-      ;; Only allocate each of these once
-      (define FN-ARITY-INDEX-VALUE      : D0-Expr (Quote FN-ARITY-INDEX))
-      (define FN-RETURN-INDEX-VALUE     : D0-Expr (Quote FN-RETURN-INDEX))
-      (define FN-FMLS-OFFSET-VALUE      : D0-Expr (Quote FN-FMLS-OFFSET))
+(: specify-representation (Cast-or-Coerce6-Lang Config -> Data0-Lang))
+(trace-define (specify-representation prgm comp-config)
+  (match-let ([(Prog (list name next type) exp) prgm])
+    (let* ([next : (Boxof Nat) (box next)]
+           [exp (sr-expr next (hash) empty-index-map exp)]
+           [next : Nat (unbox next)])
+      (Prog (list name next type) exp))))
 
-      (define TYPE-TAG-MASK-VALUE       : D0-Expr (Quote TYPE-TAG-MASK))
-      (define TYPE-FN-TAG-VALUE         : D0-Expr (Quote TYPE-FN-TAG))
-      (define TYPE-ATOMIC-TAG-VALUE     : D0-Expr (Quote TYPE-ATOMIC-TAG))
-      (define TYPE-DYN-RT-VALUE-VALUE   : D0-Expr (Quote TYPE-DYN-RT-VALUE))
-      (define TYPE-INT-RT-VALUE-VALUE   : D0-Expr (Quote TYPE-INT-RT-VALUE))
-      (define TYPE-BOOL-RT-VALUE-VALUE  : D0-Expr (Quote TYPE-BOOL-RT-VALUE))
-      (define DYN-TAG-MASK-VALUE        : D0-Expr (Quote DYN-TAG-MASK))
-      (define DYN-BOXED-TAG-VALUE       : D0-Expr (Quote DYN-BOXED-TAG))
-      (define DYN-INT-TAG-VALUE         : D0-Expr (Quote DYN-INT-TAG))
-      (define DYN-BOOL-TAG-VALUE        : D0-Expr (Quote DYN-BOOL-TAG))
-      (define DYN-UNIT-TAG-VALUE        : D0-Expr (Quote DYN-UNIT-TAG))
-      (define DYN-IMDT-SHIFT-VALUE      : D0-Expr (Quote DYN-IMDT-SHIFT))
-      (define DYN-BOX-SIZE-VALUE        : D0-Expr (Quote DYN-BOX-SIZE))
-      (define DYN-VALUE-INDEX-VALUE     : D0-Expr (Quote DYN-VALUE-INDEX))
-      (define DYN-TYPE-INDEX-VALUE      : D0-Expr (Quote DYN-TYPE-INDEX))
-      (define FALSE-IMDT-VALUE          : D0-Expr (Quote FALSE-IMDT))
-      (define TRUE-IMDT-VALUE           : D0-Expr (Quote TRUE-IMDT))
-      (define UNDEF-IMDT-VALUE          : D0-Expr (Quote UNDEF-IMDT))
-      (define UNIT-IMDT-VALUE           : D0-Expr (Quote UNIT-IMDT))
-      (define GREP-TAG-MASK-VALUE       : D0-Expr (Quote GREP-TAG-MASK))
-      (define UGBOX-SIZE-VALUE          : D0-Expr (Quote UGBOX-SIZE))
-      (define UGBOX-VALUE-INDEX-VALUE   : D0-Expr (Quote UGBOX-VALUE-INDEX))
-      (define UGVECT-SIZE-INDEX-VALUE   : D0-Expr (Quote UGVECT-SIZE-INDEX))
-      (define UGVECT-OFFSET-VALUE       : D0-Expr (Quote UGVECT-OFFSET))
-      (define GPROXY-TAG-VALUE          : D0-Expr (Quote GPROXY-TAG))
-      (define GPROXY-SIZE-VALUE         : D0-Expr (Quote GPROXY-SIZE))
-      (define GPROXY-FOR-INDEX-VALUE    : D0-Expr (Quote GPROXY-FOR-INDEX))
-      (define GPROXY-FROM-INDEX-VALUE   : D0-Expr (Quote GPROXY-FROM-INDEX))
-      (define GPROXY-TO-INDEX-VALUE     : D0-Expr (Quote GPROXY-TO-INDEX))
-      (define GPROXY-BLAMES-INDEX-VALUE : D0-Expr (Quote GPROXY-BLAMES-INDEX))
-      (define CLOS-CODE-INDEX-VALUE     : D0-Expr (Quote CLOS-CODE-INDEX))
-      (define CLOS-CSTR-INDEX-VALUE     : D0-Expr (Quote CLOS-CSTR-INDEX))
-      (define CLOS-FVAR-OFFSET-VALUE    : D0-Expr (Quote CLOS-FVAR-OFFSET))
-      (define TYPE-GREF-SIZE-VALUE      : D0-Expr (Quote TYPE-GREF-SIZE))
-      (define TYPE-GREF-TAG-VALUE       : D0-Expr (Quote TYPE-GREF-TAG))
-      (define GREF-TO-INDEX-VALUE       : D0-Expr (Quote GREF-TO-INDEX))
-      (define TYPE-GVECT-SIZE-VALUE     : D0-Expr (Quote TYPE-GVECT-SIZE))
-      (define TYPE-GVECT-TAG-VALUE      : D0-Expr (Quote TYPE-GVECT-TAG))
-      (define GVECT-TO-INDEX-VALUE      : D0-Expr (Quote GVECT-TO-INDEX))
+;; Env must be maintained as a mapping from uids to how to access those
+;; values. This is important because uid references to variable inside a
+;; closure must turn into memory loads.
 
-      (: specify-representation (Cast6-Lang Config -> Data0-Lang))
-      (trace-define (specify-representation prgm comp-config)
-                    (match-let ([(Prog (list name next type) expr) prgm])
-                      (let ([sr-top-expr (sr-expr (hash) empty-index-map)])
-                        (let-values ([(expr next) (run-state (sr-top-expr expr) next)])
-                          (Prog (list name next type) expr)))))
+(define-type IndexMap (Uid Uid -> Nat))
 
-      ;; Env must be maintained as a mapping from uids to how to access those
-      ;; values. This is important because uid references to variable inside a
-      ;; closure must turn into memory loads.
+(: sr-expr ((Boxof Nat) Env IndexMap CoC6-Expr -> D0-Expr))
+(define (sr-expr next env cenv exp)
+  ;; This is the only piece of code that should touch the unique counter
+  (: next-uid! (String -> Uid))
+  (define (next-uid! x)
+    (let ([n (unbox next)])
+      (set-box! next (add1 n))
+      (Uid x n)))
 
-      (define-type IndexMap (-> Uid Uid Nat))
+  ;; Allocate without forgetting to lift evaluating subterms first
+  ;; this prevents evaluating terms which may cause more allocation
+  ;; will initializing the values of an allocation
+  ;; it essentially produces expression of the form:
+  ;; (let ((t* e*) ...) (let ((tmp (alloc ...))) (begin (set tmp i t*) ... (binary-or tmp tag))))
+  ;; though it does eliminate any form that it can based on it's input
+  (: sr-alloc (String Fixnum (Listof (Pair String D0-Expr)) -> D0-Expr))
+  (define (sr-alloc name tag slots)
+    ;; As long as this is used to initialize all the data I have
+    ;; a faily stong guarentee that no other allocation could possibly occur.
+    (: sr-alloc-init ((Var Uid) -> (Index (Var Uid) -> D0-Expr)))
+    (define ((sr-alloc-init mem) offset value)
+      (Op 'Array-set! (list mem (Quote offset) value)))
+    ;; Take a list of variables and expressions paired with there names
+    ;; make variables that are bound to the expressions and the bindings
+    (: get-bnd/var ((Listof (Pair String D0-Expr)) -> (Values D0-Bnd* (Listof (Var Uid)))))
+    (define (get-bnd/var b*)
+      (if (null? b*)
+          (values '() '())
+          (let*-values ([(a  d)  (values (car b*) (cdr b*))]
+                        [(b* v*) (get-bnd/var d)]
+                        [(n  e)  (values (car a) (cdr a))])
+            (if (Var? e)
+                (values b* (cons e v*))
+                (let* ([u (next-uid! n)])
+                  (values `((,u . ,e) . ,b*) `(,(Var u) . ,v*)))))))
+    (let ([size (length slots)])
+      (if (= size 0)
+          (error 'specify-representation "Empty objects can not be allocated")
+          (let*-values ([(bnd* var*) (get-bnd/var slots)]
+                        [(ind*)      (range 0 size)]
+                        [(alloc-id)  (next-uid! name)]
+                        [(alloc-var) (Var alloc-id)]
+                        [(alloc-bnd) `((,alloc-id . ,(Op 'Alloc `(,(Quote size)))))]
+                        [(set*)       (map (sr-alloc-init alloc-var) ind* var*)]
+                        [(tag-return) (if (= tag 0)
+                                          alloc-var
+                                          (Op 'binary-or (list alloc-var (Quote tag))))]
+                        [(alloc-set-return) (Let alloc-bnd (Begin set* tag-return))])
+            (if (null? bnd*)
+                alloc-set-return
+                (Let bnd* alloc-set-return))))))
 
-      (: index-closure (-> Uid Uid* IndexMap))
-      (define (index-closure clos fvar*)
-        (define ((fvar-err f))
-          (error 'specifiy-representation
-                 "failed attempt to index free var ~a from clos ~a"
-                 f clos))
-        (define (clos-err c f) (error 'specify-representation
-                                      "unbound closure index ~a from closure ~a inside of clos ~a"
-                                      f c clos))
-        (let ([map (for/fold ([index : (HashTable Uid Nat) (hash)])
-                             ([fvar : Uid fvar*] [i : Nat (in-naturals CLOS-FVAR-OFFSET)])
-                     (hash-set index fvar i))])
-          (lambda ([c : Uid] [f : Uid]) : Nat
-                  #;(logf "index-closure: ~a ~a ~a\n\ttable: ~a\n" clos c f map)
-                  (if (uid=? c clos)
-                      (hash-ref map f (fvar-err f))
-                      (clos-err c f)))))
-
-      (define (empty-index-map u i)
-        (error 'specify-representation "attempt to index without index map ~a ~a" u i))
-
-      (: sr-expr (-> Env IndexMap (-> C6-Expr (State Nat D0-Expr))))
-      (define (sr-expr env cenv)
-        (: recur* (-> C6-Expr* (State Nat D0-Expr*)))
-        (define (recur* e*) (map-state recur e*))
-        (: recur (-> C6-Expr (State Nat D0-Expr)))
-        (define (recur e)
-          (match e
-            [(Let b* e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (b* : D0-Bnd*  <- (sr-bnd* env cenv b*))
-               (let* ([id* (map (inst car Uid Any) b*)]
-                      [env (extend* env id* (map var id*))])
-                 (e  : D0-Expr  <- ((sr-expr env cenv) e))
-                 (return-state (Let b* e))))]
-            [(If t c a)
-             (do (bind-state : (State Nat D0-Expr))
-                 (t : D0-Expr <- (recur t))
-               (c : D0-Expr <- (recur c))
-               (a : D0-Expr <- (recur a))
-               (return-state (If t c a)))]
-            [(App (cons e e^) e*)
-             #;(TODO this is likely broken fix it)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e  : D0-Expr  <- (recur  e))
-               (e^ : D0-Expr  <- (recur  e^))
-               (e* : D0-Expr* <- (recur* e*))
-               (return-state (App e (cons e^ e*))))]
-            [(Op p e*)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e* : D0-Expr* <- (recur* e*))
-               (cond
-                 [(schml-prim? p) (return-state (Op p e*))]
-                 [(schml-prim!? p) (return-state (Op p e*))]))]
-            [(Quote k)
-             (return-state
-              (cond
-                [(null? k)  UNIT-IMDT-VALUE]
-                [(boolean? k) (if k TRUE-IMDT-VALUE FALSE-IMDT-VALUE)]
-                [(fixnum? k) (Quote k)]
-                [(string? k) (Quote k)]
-                [else (error 'specify-representation/quote "given ~a" k)]))]
-            ;; Closure Representation
-            [(LetP p* (LetC c* e))
-             (do (bind-state : (State Nat D0-Expr))
-                 (p* : D0-Bnd-Code*  <- (sr-bndp* p*))
-               (let* ([l*  : Uid* (map (inst car Uid D0-Code) p*)]
-                      [env : Env  (extend* env l* (map label l*))]
-                      [u*  : Uid* (map (inst car Uid Any) c*)]
-                      [env : Env  (extend* env u* (map var u*))])
-                 (c* : (Pair D0-Bnd* D0-Expr*) <- (sr-bndc* env cenv c*))
-                 (e  : D0-Expr <- ((sr-expr env cenv) e))
-                 (return-state (Labels p* (Let (car c*) (Begin (cdr c*) e))))))]
-            [(Closure-caster e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e CLOS-CSTR-INDEX-VALUE))))]
-            [(Closure-code e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e CLOS-CODE-INDEX-VALUE))))]
-            [(Closure-ref clos fvar)
-             (return-state
-              (Op 'Array-ref (list (Var clos) (Quote (cenv clos fvar)))))]
-            [(Var i)  (return-state (lookup env i))]
-            [(Code-Label u) (return-state (Code-Label u))]
-            ;; Type Representation
-            [(Type t) (sr-type t)]
-            [(Type-Fn-arity e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e FN-ARITY-INDEX-VALUE))))]
-            [(Type-Fn-return e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e FN-RETURN-INDEX-VALUE))))]
-            [(Type-Fn-arg e1 e2)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e1 : D0-Expr <- (recur e1))
-               (e2 : D0-Expr <- (recur e2))
-               (let ([e2^ (match e2
-                            [(Quote (? number? k)) (Quote (+ FN-FMLS-OFFSET k))]
-                            [otherwiths (Op '+ (list e2 FN-FMLS-OFFSET-VALUE))])])
-                 (return-state (Op 'Array-ref (list e1 e2^)))))]
-            [(Type-GRef-to e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state
-                (let ([arg : D0-Expr
-                           (Op 'binary-xor (list e TYPE-GREF-TAG-VALUE))])
-                  (Op 'Array-ref (list arg GREF-TO-INDEX-VALUE)))))]
-            [(Type-GVect-to e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state
-                (let ([arg : D0-Expr
-                           (Op 'binary-xor (list e TYPE-GVECT-TAG-VALUE))])
-                  (Op 'Array-ref (list arg GVECT-TO-INDEX-VALUE)))))]
-            [(Type-tag e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'binary-and (list e TYPE-TAG-MASK-VALUE))))]
-            ;; I am using tags for the purpose of constant folding
-            ;; This should be replase with deep pattern matching
-            ;; (Tag 'Atomic) == (Type-Tag (Int))
-            [(Tag  t) (return-state (sr-tag t))]
-            ;; Dynamic Values Representation
-            [(Dyn-tag e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'binary-and (list e DYN-TAG-MASK-VALUE))))]
-            [(Dyn-immediate e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op '%>> (list e DYN-IMDT-SHIFT-VALUE))))]
-            [(Dyn-make e1 e2)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e1 : D0-Expr <- (recur e1))
-               (sr-dyn-make e1 e2 env cenv))]
-            [(Dyn-type e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e DYN-TYPE-INDEX-VALUE))))]
-            [(Dyn-value e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e DYN-VALUE-INDEX-VALUE))))]
-            ;; Observable Results Representation
-            [(Blame e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state
-                (Begin
-                  (list (Op 'Print (list e))
-                        (Op 'Exit  (list (Quote -1))))
-                  UNDEF-IMDT-VALUE)))]
-            [(Observe e t)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (sr-observe e t))]
-            ;; References Representation
-            [(Begin eff* exp)
-             (do (bind-state : (State Nat D0-Expr))
-                 (eff* : D0-Expr* <- (recur* eff*))
-               (exp  : D0-Expr  <- (recur exp))
-               (return-state (Begin eff* exp)))]
-            [(Repeat i e1 e2 e3)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e1 : D0-Expr <- (recur e1))
-               (e2 : D0-Expr <- (recur e2))
-               (let ([env (extend env i (Var i))])
-                 (e3 : D0-Expr <- ((sr-expr env cenv) e3))
-                 (return-state (Repeat i e1 e2 e3))))]
-            ;; Guarded
-            [(UGbox e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (tmp1 : Uid <- (uid-state "ugbox1"))
-               (tmp2 : Uid <- (uid-state "ugbox2"))
-               (let* ([tmp1-var (Var tmp1)]
-                      [tmp2-var (Var tmp2)]
-                      [alloc    (Op 'Alloc (list UGBOX-SIZE-VALUE))]
-                      [set      (Op 'Array-set! (list tmp2-var UGBOX-VALUE-INDEX-VALUE tmp1-var))])
-                 (return-state
-                  (Let (list (cons tmp1 e))
-                       (Let (list (cons tmp2 alloc))
-                            (Begin (list set) tmp2-var))))))]
-            [(UGbox-ref e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state (Op 'Array-ref (list e UGBOX-VALUE-INDEX-VALUE))))]
-            [(UGbox-set! e1 e2)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e1 : D0-Expr <- (recur e1))
-               (e2 : D0-Expr <- (recur e2))
-               (return-state (Op 'Array-set! (list e1 UGBOX-VALUE-INDEX-VALUE e2))))]
-            [(UGvect n e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (n : D0-Expr <- (recur n))
-                 (e : D0-Expr <- (recur e))
-               (tmp1 : Uid <- (uid-state "ugvect1"))
-               (tmp2 : Uid <- (uid-state "ugvect2"))
-               (tmp3 : Uid <- (uid-state "ugvect3"))
-               (tmp4 : Uid <- (uid-state "ugvect4"))
-               (i    : Uid <- (uid-state "index"))
-               (let* ([tmp1-var (Var tmp1)]
-                      [tmp2-var (Var tmp2)]
-                      [tmp3-var (var tmp3)]
-                      [tmp4-var (var tmp4)]
-                      [tl       (Op '+ (list tmp1-var UGVECT-OFFSET-VALUE))]
-                      [alloc    (Op 'Alloc (list tmp4-var))]
-                      [set      (Repeat i UGVECT-OFFSET-VALUE tmp4-var
-                                        (Op 'Array-set! (list tmp3-var (Var i) tmp2-var)))]
-                      [set-n    (Op 'Array-set! (list tmp3-var UGVECT-SIZE-INDEX-VALUE tmp1-var))])
-                 (return-state
-                  (Let (list (cons tmp1 n) (cons tmp2 e))
-                       (Let (list (cons tmp4 tl))
-                            (Let (list (cons tmp3 alloc))
-                                 (Begin (list set-n set) tmp3-var)))))))]
-            [(UGvect-ref e i)
-             (do (bind-state : (State Nat D0-Expr))
-               (e    : D0-Expr <- (recur e))
-               (i    : D0-Expr <- (recur i))
-               (ind  : Uid <- (uid-state "index"))
-               (tmp1 : Uid <- (uid-state "e"))
-               (let ([zro (Quote 0)]
-                     [tmp1-var (Var tmp1)]
-                     [ind-var (Var ind)])
-                 (return-state
-                  (Let (list (cons ind i) (cons tmp1 e))
-                       (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-                           (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
-                               (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET-VALUE))))
-                               (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
-                           (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))))))]
-            [(UGvect-set! e1 i e2)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e1 : D0-Expr <- (recur e1))
-                 (i :  D0-Expr <- (recur i))
-                 (e2 : D0-Expr <- (recur e2))
-                 (ind  : Uid <- (uid-state "index"))
-                 (tmp1 : Uid <- (uid-state "ugvect"))
-                 (let ([zro (Quote 0)]
-                       [tmp1-var (Var tmp1)]
-                       [ind-var (Var ind)])
-                   (return-state
-                    (Let (list (cons ind i))
-                         (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-                             (Let (list (cons tmp1 e1))
-                                  (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
-                                      (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET-VALUE)) e2))
-                                      (Op 'Printf (list (Quote "index out of bound %l\n") ind-var))))
-                             (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))))))]
-            [(GRep-proxied? e)
-             (do (bind-state : (State Nat D0-Expr))
-                 (e : D0-Expr <- (recur e))
-               (return-state
-                (Op '= (list GPROXY-TAG-VALUE
-                             (Op 'binary-and (list e GREP-TAG-MASK-VALUE))))))]
-            [(Gproxy for from to blames)
-             (do (bind-state : (State Nat D0-Expr))
-                 (for     : D0-Expr <- (recur for))
-               (from    : D0-Expr <- (recur from))
-               (to      : D0-Expr <- (recur to))
-               (blames  : D0-Expr <- (recur blames))
-               (alloc-tag-set-gproxy for from to blames))]
-            [(Gproxy-for e)
-             (lift-state (untag-deref-gproxy GPROXY-FOR-INDEX-VALUE) (recur e))]
-            [(Gproxy-from e)
-             (lift-state (untag-deref-gproxy GPROXY-FROM-INDEX-VALUE) (recur e))]
-            [(Gproxy-to e)
-             (lift-state (untag-deref-gproxy GPROXY-TO-INDEX-VALUE) (recur e))]
-            [(Gproxy-blames e)
-             (lift-state (untag-deref-gproxy GPROXY-BLAMES-INDEX-VALUE) (recur e))]))
-        recur)
-
-      (: untag-deref-gproxy (-> D0-Expr (-> D0-Expr D0-Expr)))
-      (define (untag-deref-gproxy index-e)
-        (lambda ((proxy-e : D0-Expr)) : D0-Expr
-                (Op 'Array-ref (list (Op 'binary-xor (list proxy-e GPROXY-TAG-VALUE))
-                                     index-e))))
-
-      (: alloc-tag-set-gproxy
-         (D0-Expr D0-Expr D0-Expr D0-Expr -> (State Nat D0-Expr)))
-      (define (alloc-tag-set-gproxy for from to blames)
-        (do (bind-state : (State Nat D0-Expr))
-            (tmpp : Uid <- (uid-state "gproxy"))
-          (tmpf : Uid <- (uid-state "for"))
-          (tmpm : Uid <- (uid-state "from"))
-          (tmpt : Uid <- (uid-state "to"))
-          (tmpl : Uid <- (uid-state "blames"))
-          (let* ([tmp-var : D0-Expr (Var tmpp)]
-                 [alloc   : D0-Expr (Op 'Alloc (list GPROXY-SIZE-VALUE))]
-                 [set-for : D0-Expr
-                          (Op 'Array-set! (list tmp-var GPROXY-FOR-INDEX-VALUE (Var tmpf)))]
-                 [set-from : D0-Expr
-                           (Op 'Array-set! (list tmp-var GPROXY-FROM-INDEX-VALUE (Var tmpm)))]
-                 [set-to : D0-Expr
-                         (Op 'Array-set! (list tmp-var GPROXY-TO-INDEX-VALUE (Var tmpt)))]
-                 [set-blames : D0-Expr
-                             (Op 'Array-set! (list tmp-var GPROXY-BLAMES-INDEX-VALUE (Var tmpl)))]
-                 [bnd-tmps : (Listof (Pairof Uid D0-Expr))
-                           (list (cons tmpf for) (cons tmpm from)
-                                 (cons tmpt to) (cons tmpl blames))]
-                 [set* : (Listof D0-Expr)
-                       (list set-for set-from set-to set-blames)]
-                 [bnd-alloc : (Listof (Pairof Uid D0-Expr)) (list (cons tmpp alloc))]
-                 [tag-proxy : D0-Expr (Op 'binary-or (list tmp-var GPROXY-TAG-VALUE))])
-            (return-state
-             (Let bnd-tmps (Let bnd-alloc (Begin set* tag-proxy)))))))
-
-      ;; What to do with a binding
-      (: sr-bnd (-> Env IndexMap (-> C6-Bnd-Data (State Nat D0-Bnd))))
-      (define (sr-bnd env cenv)
-        (lambda ([b : C6-Bnd-Data]) : (State Nat D0-Bnd)
-                (do (bind-state : (State Nat D0-Bnd))
-                    (e : D0-Expr <- ((sr-expr env cenv) (cdr b)))
-                  (let ([i : Uid (car b)])
-                    (return-state (cons i e))))))
-
-      ;; And the catamorphism for a List of bind
-      (: sr-bnd* (-> Env IndexMap C6-Bnd-Data* (State Nat D0-Bnd*)))
-      (define (sr-bnd* env cenv b*) (map-state (sr-bnd env cenv) b*))
-
-      (: sr-type (-> Schml-Type (State Nat D0-Expr)))
-      (define (sr-type t)
-        ;; lays down the data in the third list in continuous sequence
-        ;; of memory
-        (: array-set* (-> D0-Expr Integer (Listof D0-Expr) (Listof D0-Expr)))
-        (define (array-set* a i f*)
-          (if (null? f*)
-              '()
-              (cons
-               (Op 'Array-set! (list a (Quote i) (car f*)))
-               (array-set* a (add1 i) (cdr f*)))))
+  ;; The way that boxed immediate work currently bothers me.
+  ;; Since we have access to unboxed static ints should we just
+  ;; abandon the unboxed dyn integers another a mixture of static
+  ;; allocation and and constant lifting could be used to make all
+  (: sr-dyn-make ((CoC6-Expr -> D0-Expr) D0-Expr CoC6-Expr -> D0-Expr))
+  (define (sr-dyn-make sr-expr e1 e2)
+    (cond
+      [(Type? e2)
+       (match e2
+         [(Type (Int))
+          (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
+                       DYN-INT-TAG-VALUE))]
+         [(Type (Bool))
+          (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
+                       DYN-BOOL-TAG-VALUE))]
+         [(Type (Unit))
+          (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
+                       DYN-UNIT-TAG-VALUE))]
+         [else (sr-alloc "dynamic_boxed" #b000
+                         `(("value" . ,e1)
+                           ("type" . ,(sr-expr e2))))])]
+      [else
+       (let* ([val    (next-uid! "value")]
+              [type   (next-uid! "type")]
+              [tag    (next-uid! "tag")]
+              [imm    (next-uid!  "imm")]
+              [val-var (Var val)]
+              [type-var (Var type)]
+              [tag-var (Var tag)]
+              [imm-var (Var imm)])
+       (Let `((,val . ,e1)
+              (,type . ,(sr-expr e2)))
+        (Let `((,tag . ,(Op 'binary-and `(,type-var ,TYPE-TAG-MASK-VALUE))))
+         (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG-VALUE))
+             (Let `((,imm . ,(Op '%<< (list val-var DYN-IMDT-SHIFT-VALUE))))
+              (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE-VALUE))
+                  (Op 'binary-or `(,imm-var ,DYN-INT-TAG-VALUE))
+                  (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE-VALUE))
+                      (Op 'binary-or `(,imm-var ,DYN-BOOL-TAG-VALUE))
+                      (Op 'binary-or `(,imm-var ,DYN-UNIT-TAG-VALUE)))))
+             (sr-alloc "dynamic_boxed" #b000
+                       `(("" . ,val-var)
+                         ("" . ,type-var)))))))]))
+  
+  (: sr-type (Schml-Type -> D0-Expr))
+  (define (sr-type t)
         (match t
-          [(Int)  (return-state (Quote TYPE-INT-RT-VALUE))]
-          [(Bool) (return-state (Quote TYPE-BOOL-RT-VALUE))]
-          [(Dyn)  (return-state (Quote TYPE-DYN-RT-VALUE))]
-          [(Unit) (return-state (Quote TYPE-UNIT-RT-VALUE))]
-          ;; abstract over allocating so that all allocations
-          ;; are shorter than this.
-          [(GRef t)
-           (do (bind-state : (State Nat D0-Expr))
-               (gref-u : Uid <- (uid-state "GRefT"))
-             (ty-u   : Uid <- (uid-state "ty"))
-             (ty-e : D0-Expr <- (sr-type t))
-             (let* ([gref-v : D0-Expr (Var gref-u)]
-                    [ty-v   : D0-Expr (Var ty-u)]
-                    [alloc  : D0-Expr
-                            (Op 'Alloc (list TYPE-GREF-SIZE-VALUE))]
-                    [stmt   : D0-Expr
-                            (Op 'Array-set! (list gref-v GREF-TO-INDEX-VALUE ty-v))]
-                    [ty-bnd : D0-Bnd (cons ty-u ty-e)]
-                    [gref-bnd : D0-Bnd (cons gref-u alloc)])
-               (return-state
-                (Let (list ty-bnd)
-                     (Let (list gref-bnd)
-                          (Begin (list stmt)
-                                 (Op 'binary-or (list gref-v TYPE-GREF-TAG-VALUE))))))))]
-          ;; TODO: parametrize over the logic of GRef and GVect
-          [(GVect t)
-           (do (bind-state : (State Nat D0-Expr))
-               (gvect-u : Uid <- (uid-state "GVectT"))
-             (ty-u   : Uid <- (uid-state "ty"))
-             (ty-e : D0-Expr <- (sr-type t))
-             (let* ([gvect-v : D0-Expr (Var gvect-u)]
-                    [ty-v   : D0-Expr (Var ty-u)]
-                    [alloc  : D0-Expr
-                            (Op 'Alloc (list TYPE-GVECT-SIZE-VALUE))]
-                    [stmt   : D0-Expr
-                            (Op 'Array-set! (list gvect-v GVECT-TO-INDEX-VALUE ty-v))]
-                    [ty-bnd : D0-Bnd (cons ty-u ty-e)]
-                    [gvect-bnd : D0-Bnd (cons gvect-u alloc)])
-               (return-state
-                (Let (list ty-bnd)
-                     (Let (list gvect-bnd)
-                          (Begin (list stmt)
-                                 (Op 'binary-or (list gvect-v TYPE-GVECT-TAG-VALUE))))))))]
-          [(Fn a f* r)
-           (do (bind-state : (State Nat D0-Expr))
-               (tmp : Uid <- (uid-state "FunT"))
-             (f*  : D0-Expr* <- (map-state sr-type f*))
-             (r   : D0-Expr  <- (sr-type r))
-             (let* ([tmp-var (Var tmp)]
-                    [bnd
-                     (cons tmp (Op 'Alloc (list (Quote (+ a FN-FMLS-OFFSET)))))]
-                    [bnd*
-                     (list bnd)]
-                    [stmt1
-                     (Op 'Array-set! (list tmp-var (Quote FN-ARITY-INDEX) (Quote a)))]
-                    [stmt2
-                     (Op 'Array-set! (list tmp-var (Quote FN-RETURN-INDEX) r))]
-                    [stmt*
-                     (array-set* tmp-var FN-FMLS-OFFSET f*)])
-               (return-state
-                (Let bnd*
-                     (Begin (cons stmt1 (cons stmt2 stmt*)) tmp-var)))))]
-          [else (TODO implement reference code around here)]))
+      [(Int)  (Quote TYPE-INT-RT-VALUE)]
+      [(Bool) (Quote TYPE-BOOL-RT-VALUE)]
+      [(Dyn)  (Quote TYPE-DYN-RT-VALUE)]
+      [(Unit) (Quote TYPE-UNIT-RT-VALUE)]
+      ;; abstract over allocating so that all allocations
+      ;; are shorter than this.
+      [(GRef t) (sr-alloc "GRefT" TYPE-GREF-TAG `(("type" . ,(sr-type t))))
+       
+       #|
+       (do (bind-state : (State Nat D0-Expr))
+       (gref-u : Uid <- (uid-state "GRefT"))
+       (ty-u   : Uid <- (uid-state "ty"))
+       (ty-e : D0-Expr <- (sr-type t))
+       (let* ([gref-v : D0-Expr (Var gref-u)]
+       [ty-v   : D0-Expr (Var ty-u)]
+       [alloc  : D0-Expr
+       (Op 'Alloc (list TYPE-GREF-SIZE-VALUE))]
+       [stmt   : D0-Expr
+       (Op 'Array-set! (list gref-v GREF-TO-INDEX-VALUE ty-v))]
+       [ty-bnd : D0-Bnd (cons ty-u ty-e)]
+       [gref-bnd : D0-Bnd (cons gref-u alloc)])
+       (return-state
+       (Let (list ty-bnd)
+       (Let (list gref-bnd)
+       (Begin (list stmt)
+       (Op 'binary-or (list gref-v TYPE-GREF-TAG-VALUE))))))))
+       |#]
+      ;; TODO: parametrize over the logic of GRef and GVect
+      
+      [(GVect t) (sr-alloc "GVect_Type" TYPE-GVECT-TAG `(("type" . ,(sr-type t))))
+       #|
+       (do (bind-state : (State Nat D0-Expr))
+       (gvect-u : Uid <- (uid-state "GVectT"))
+       (ty-u   : Uid <- (uid-state "ty"))
+       (ty-e : D0-Expr <- (sr-type t))
+       (let* ([gvect-v : D0-Expr (Var gvect-u)]
+       [ty-v   : D0-Expr (Var ty-u)]
+       [alloc  : D0-Expr
+       (Op 'Alloc (list TYPE-GVECT-SIZE-VALUE))]
+       [stmt   : D0-Expr
+       (Op 'Array-set! (list gvect-v GVECT-TO-INDEX-VALUE ty-v))]
+       [ty-bnd : D0-Bnd (cons ty-u ty-e)]
+       [gvect-bnd : D0-Bnd (cons gvect-u alloc)])
+       (return-state
+       (Let (list ty-bnd)
+       (Let (list gvect-bnd)
+       (Begin (list stmt)
+       (Op 'binary-or (list gvect-v TYPE-GVECT-TAG-VALUE))))))))
+       |#]
+      
+      [(Fn a f* r)
+       (sr-alloc "Fun_Type" TYPE-FN-TAG
+                 `(("arity" . ,(Quote a))
+                   ("return" . ,(sr-type r)) .
+                   ,(map (lambda ([t : Schml-Type])
+                           (cons "argument" (sr-type t)))
+                         f*)))
+       #|
+       (do (bind-state : (State Nat D0-Expr))
+       (tmp : Uid <- (uid-state "FunT"))
+       (f*  : D0-Expr* <- (map-state sr-type f*))
+       (r   : D0-Expr  <- (sr-type r))
+       (let* ([tmp-var (Var tmp)]
+       [bnd
+       (cons tmp (Op 'Alloc (list (Quote (+ a FN-FMLS-OFFSET)))))]
+       [bnd*
+       (list bnd)]
+       [stmt1
+       (Op 'Array-set! (list tmp-var (Quote FN-ARITY-INDEX) (Quote a)))]
+       [stmt2
+       (Op 'Array-set! (list tmp-var (Quote FN-RETURN-INDEX) r))]
+       [stmt*
+       (array-set* tmp-var FN-FMLS-OFFSET f*)])
+       (return-state
+       (Let bnd*
+       (Begin (cons stmt1 (cons stmt2 stmt*)) tmp-var)))))
+       |#]
+      [else (TODO implement reference code around here)])
 
 
-      ;; The way that boxed immediate work currently bothers me.
-      ;; Since we have access to unboxed static ints should we just
-      ;; abandon the unboxed dyn integers another a mixture of static
-      ;; allocation and and constant lifting could be used to make all
-      (: sr-dyn-make (-> D0-Expr C6-Expr Env IndexMap (State Nat D0-Expr)))
-      (define (sr-dyn-make e1 e2 env cenv)
-        (match e2
-          [(Type (Int))
-           (return-state
-            (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
-                         DYN-INT-TAG-VALUE)))]
-          [(Type (Bool))
-           (return-state
-            (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
-                         DYN-BOOL-TAG-VALUE)))]
-          [(Type (Bool))
-           (return-state
-            (Op '+ (list (Op '%<< (list e1 DYN-IMDT-SHIFT-VALUE))
-                         DYN-UNIT-TAG-VALUE)))]
-          [otherwise
-           (do (bind-state : (State Nat D0-Expr))
-               (e2  : D0-Expr <- ((sr-expr env cenv) e2))
-             (sr-alloc "dyn_box" e1 e2))]))
+    ;; TODO Get rid of these extra definitions once we know this code works
+  #|
+  (: array-set (-> D0-Expr Integer D0-Expr D0-Expr))
+  (define ((array-set a) i f*)
+    (Op 'Array-set! (list a (Quote i) (car f*))))
+  (: array-set (-> D0-Expr Integer D0-Expr* D0-Expr*))
+  (define (array-set* a i f*)
+    (map (array-set a) (build-list (length f*) values) f*))
+  |#)
 
-      (: sr-observe (-> D0-Expr Schml-Type (State Nat D0-Expr)))
-      (define (sr-observe e t)
-        (: generate-print (Uid Schml-Type -> D0-Expr))
-        (define (generate-print id ty)
-          (cond
-            [(Int? t) (Op 'Printf (list (Quote "Int : %d\n") (Var id)))]
-            [(Unit? t) (Op 'Printf (list (Quote "Unit : ()\n")))]
-            [(Bool? t) (If (Op '= (list (Quote TRUE-IMDT) (Var id)))
-                           (Op 'Print (list (Quote "Bool : #t\n")))
-                           (Op 'Print (list (Quote "Bool : #f\n"))))]
-            [(Fn? t) (Op 'Print (list (Quote "Function : ?\n")))]
-            [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
-            [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
-            [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
-            [else (TODO implement thing for reference types)]))
-        (do (bind-state : (State Nat D0-Expr))
-            (res : Uid <- (uid-state "result"))
-          (let ([prt : D0-Expr (generate-print res t)])
-            (return-state
-             (Let (list (cons res e))
-                  (Begin (list prt)
-                         (Quote 0)))))))
+  (: recur-curry-env (Env IndexMap -> (CoC6-Expr -> D0-Expr)))
+  (define ((recur-curry-env env cenv) exp)
+    (recur/env exp env cenv))
 
-      #;(TODO GET RID OF TAGS IN THE COMPILER)
-      (: sr-tag (Tag-Symbol -> (Quote Integer)))
-      (define (sr-tag t)
-        (case t
-          [(Int)    (Quote DYN-INT-TAG)]
-          [(Bool)   (Quote DYN-BOOL-TAG)]
-          [(Unit)   (Quote DYN-UNIT-TAG)]
-          [(Atomic) (Quote TYPE-ATOMIC-TAG)]
-          [(Fn)     (Quote TYPE-FN-TAG)]
-          [(GRef)   (Quote TYPE-GREF-TAG)]
-          [(GVect)  (Quote TYPE-GVECT-TAG)]
-          [(Boxed)  (Quote DYN-BOXED-TAG)]))
+  (: recur/env (CoC6-Expr Env IndexMap -> D0-Expr))
+  (define (recur/env exp env cenv)
+    (: recur* (CoC6-Expr* -> D0-Expr*))
+    (define (recur* e*) (map recur e*))
+    (: recur (CoC6-Expr -> D0-Expr))
+    (define (recur e)
+      (match e
+        [(Let (app (sr-bnd* recur) b*) e)
+         (let* ([id* (map (inst car Uid Any) b*)]
+                [env (extend* env id* (map var id*))])
+           (Let b* (recur/env e env cenv)))]
+        [(If (app recur t) (app recur c) (app recur a))
+         (If t c a)]
+        [(Op p (app recur* e*))
+         (cond
+           [(uil-prim-value? p) (Op p e*)]
+           [(uil-prim-effect? p) (Op p e*)]
+           [else (error 'specify-representation/Op "~a" p)])]
+        [(Quote k)
+         (cond
+           [(null? k)  UNIT-IMDT-VALUE]
+           [(boolean? k) (if k TRUE-IMDT-VALUE FALSE-IMDT-VALUE)]
+           [(fixnum? k) (Quote k)]
+           [(string? k) (Quote k)]
+           [else (error 'specify-representation/quote "given ~a" k)])]
+        ;; Closure Representation
+        [(App-Closure (app recur e) (app recur e^) (app recur* e*))
+         (App-Code e (cons e^ e*))]
+        [(LetP (app (sr-bndp* recur/env) p*) b)
+         (let* ([l*  : Uid* (map (inst car Uid D0-Code) p*)]
+                [env : Env  (extend* env l* (map label l*))])
+           (if (LetC? b)
+               (match-let ([(LetC c* e) b])
+                 (let* ([u*  : Uid* (map (inst car Uid Any) c*)]
+                        [env : Env  (extend* env u* (map var u*))]
+                        [recur      (recur-curry-env env cenv)])
+                   (let-values ([(b* s*) (sr-bndc* recur c*)])
+                     (Labels p* (Let b* (Begin s* (recur e))))))) 
+               (Labels p* (recur/env b env cenv))))]
+        [(Closure-caster (app recur e))
+         (Op 'Array-ref (list e CLOS-CSTR-INDEX-VALUE))]
+        [(Closure-code (app recur e))
+         (Op 'Array-ref (list e CLOS-CODE-INDEX-VALUE))]
+        [(Closure-ref clos fvar)
+         (Op 'Array-ref (list (Var clos) (Quote (cenv clos fvar))))]
+        [(Var i) (lookup env i)]
+        [(Labels (app (sr-bnd-code* recur/env) b*) e)
+         (let* ([u* (map (inst car Uid Any) b*)]
+                [l* (map label u*)])
+           (Labels b* (recur/env e (extend* env u* l*) cenv)))]
+        [(App-Code e e*) (App-Code (recur e) (recur* e*))]
+        [(Code-Label u) (Code-Label u)]
+        ;; Type Representation
+        [(Type t) (sr-type t)]
+        [(Type-Fn-arity (app recur e))
+         (Op 'Array-ref (list e FN-ARITY-INDEX-VALUE))]
+        [(Type-Fn-return (app recur e))
+         (Op 'Array-ref (list e FN-RETURN-INDEX-VALUE))]
+        [(Type-Fn-arg (app recur e1) (app recur e2))
+         (define e2^
+           (match e2
+             [(Quote (? number? k)) (Quote (+ FN-FMLS-OFFSET k))]
+             [otherwiths (Op '+ (list e2 FN-FMLS-OFFSET-VALUE))]))
+         (Op 'Array-ref (list e1 e2^))]
+        [(Type-GRef-Of (app recur e))
+         (define arg : D0-Expr
+           (Op 'binary-xor (list e TYPE-GREF-TAG-VALUE)))
+         (Op 'Array-ref (list arg GREF-TO-INDEX-VALUE))]
+        [(Type-GVect-Of (app recur e))
+         (define arg : D0-Expr
+           (Op 'binary-xor (list e TYPE-GVECT-TAG-VALUE)))
+         (Op 'Array-ref (list arg GVECT-TO-INDEX-VALUE))]
+        [(Type-Tag (app recur e))
+         (Op 'binary-and (list e TYPE-TAG-MASK-VALUE))]
+        ;; Fix me I should never have been exposed
+        [(Tag t) (sr-tag t)]
+        ;; Dynamic Values Representation
+        [(Dyn-tag (app recur e))
+         (Op 'binary-and (list e DYN-TAG-MASK-VALUE))]
+        [(Dyn-immediate (app recur e))
+         (Op '%>> (list e DYN-IMDT-SHIFT-VALUE))]
+        [(Dyn-make (app recur e1) e2)
+         (sr-dyn-make recur e1 e2)]
+        [(Dyn-type (app recur e))
+         (define tmp (next-uid! "tmp"))
+         (define tag (next-uid! "tag"))
+         (define tagv (Var tag))
+         (define tmpv (Var tmp))
+         (Let `((,tmp . ,e))
+          (Let `((,tag . ,(Op 'binary-and `(,tmpv ,DYN-TAG-MASK-VALUE))))
+           (If (Op '= `(,tagv ,DYN-BOXED-TAG-VALUE))
+               (Op 'Array-ref (list tmpv DYN-TYPE-INDEX-VALUE))
+               (If (Op '= `(,tagv ,DYN-INT-TAG-VALUE))
+                   TYPE-INT-RT-VALUE-VALUE
+                   (If (Op '= `(,tagv ,DYN-BOOL-TAG-VALUE))
+                       TYPE-BOOL-RT-VALUE-VALUE
+                       TYPE-UNIT-RT-VALUE-VALUE)))))]
+        [(Dyn-value (app recur e))
+         (define tmp (next-uid! "dyn_value_tmp"))
+         (define tag (next-uid! "dyn_value_tag"))
+         (define tmp-var (Var tmp))
+         (define tag-var (Var tag))
+         (Let `((,tmp . ,e))
+          (Let `((,tag . ,(Op 'binary-and `(,tmp-var ,DYN-TAG-MASK-VALUE))))
+           (If (Op '= (list tag-var DYN-BOXED-TAG-VALUE))
+               (Op 'Array-ref (list tmp-var DYN-VALUE-INDEX-VALUE))
+               (Op '%>> (list tmp-var DYN-IMDT-SHIFT-VALUE)))))]
+        ;; Observable Results Representation
+        [(Blame (app recur e))
+         (Begin
+           (list (Op 'Print (list e))
+                 (Op 'Exit  (list (Quote -1))))
+           UNDEF-IMDT-VALUE)]
+        [(Observe (app recur e) t) (sr-observe next-uid! e t)]
+        ;; References Representation
+        [(Begin (app recur* e*) (app recur e))
+         (Begin e* e)]
+        [(Repeat i (app recur e1) (app recur e2) e3)
+         (Repeat i e1 e2 (recur/env e3 (extend env i (Var i)) cenv))]
+        ;; Guarded
+        [(Unguarded-Box (app recur e))
+         (sr-alloc "unguarded_box" UGBOX-TAG (list (cons "init_value" e)))]
+        [(Unguarded-Box-Ref (app recur e))
+         (Op 'Array-ref (list e UGBOX-VALUE-INDEX-VALUE))]
+        [(Unguarded-Box-Set! (app recur e1) (app recur e2))
+         (Op 'Array-set! (list e1 UGBOX-VALUE-INDEX-VALUE e2))]
+        [(Unguarded-Vect (app recur e1) (app recur e2))
+         (define tmp1     (next-uid! "ugvect1"))
+         (define tmp2     (next-uid! "ugvect2"))
+         (define tmp3     (next-uid! "ugvect3"))
+         (define tmp4     (next-uid! "ugvect4"))
+         (define i        (next-uid! "index"))
+         (define tmp1-var (Var tmp1))
+         (define tmp2-var (Var tmp2))
+         (define tmp3-var (var tmp3))
+         (define tmp4-var (var tmp4))
+         (define tl       (Op '+ (list tmp1-var UGVECT-OFFSET-VALUE)))
+         (define alloc    (Op 'Alloc (list tmp4-var)))
+         (define set      (Repeat i UGVECT-OFFSET-VALUE tmp4-var
+                                  (Op 'Array-set! (list tmp3-var (Var i) tmp2-var))))
+         (define set-n    (Op 'Array-set! (list tmp3-var UGVECT-SIZE-INDEX-VALUE tmp1-var)))  
+         (Let `((,tmp1 . ,e1)
+                (,tmp2 . ,e2))
+          (Let `((,tmp4 . ,tl))
+           (Let `((,tmp3 . ,alloc))
+            (Begin `(,set-n ,set) tmp3-var))))]
+        [(Unguarded-Vect-Ref (app recur e1) (app recur e2))
+         (define ind  (next-uid! "index"))
+         (define tmp1 (next-uid! "e"))
+         (define zro (Quote 0))
+         (define tmp1-var (Var tmp1))
+         (define ind-var (Var ind))
+         (Let (list (cons ind e2) (cons tmp1 e1))
+          (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+              (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                  (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET-VALUE))))
+                  (Begin
+                    (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                    (Op 'Exit (list (Quote -1)))))
+              (Begin
+                (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                (Op 'Exit (list (Quote -1))))))]
+        [(Unguarded-Vect-Set! (app recur e1) (app recur e2) (app recur e3))
+         (define ind  (next-uid! "index"))
+         (define tmp1 (next-uid! "ugvect"))
+         (define zro (Quote 0))
+         (define tmp1-var (Var tmp1))
+         (define ind-var (Var ind))
+         (Let (list (cons ind e2))
+          (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+              (Let (list (cons tmp1 e1))
+               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                   (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET-VALUE)) e3))
+                   (Begin
+                     (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                     (Op 'Exit (list (Quote -1))))))
+              (Begin
+                `(,(Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                (Op 'Exit (list (Quote -1))))))]
+        [(Guarded-Proxy-Huh (app recur e))
+         (Op '= `(,(Op 'binary-and (list e GREP-TAG-MASK-VALUE))
+                  ,GPROXY-TAG-VALUE))]
+        [(Guarded-Proxy (app recur e) r)
+         ;; Consider using sr-alloc here
+         (match r
+           [(Twosome (app recur t1) (app recur t2) (app recur l))
+            (alloc-tag-set-gproxy/twosome next-uid! e t1 t2 l)]
+           [(Coercion (app recur c))
+            (alloc-tag-set-gproxy/coercion next-uid! e c)])]
+        [(Guarded-Proxy-Ref (app recur e))
+         ((untag-deref-gproxy GPROXY-FOR-INDEX-VALUE) e)]
+        [(Guarded-Proxy-Source (app recur e))
+         ((untag-deref-gproxy GPROXY-FROM-INDEX-VALUE) e)]
+        [(Guarded-Proxy-Target (app recur e))
+         ((untag-deref-gproxy GPROXY-TO-INDEX-VALUE) e)]
+        [(Guarded-Proxy-Blames (app recur e))
+         ((untag-deref-gproxy GPROXY-BLAMES-INDEX-VALUE) e)]
+        [(Guarded-Proxy-Coercion (app recur e))
+         ((untag-deref-gproxy GPROXY-COERCION-INDEX-VALUE) e)]
+        [other (error 'specify-representation "unmatched ~a" other)]))
+    (recur exp))
+  (recur/env exp env cenv))
 
-      ;; This is a pretty concise way of performing this but one could imagine looking at
-      ;; only the capture form and build the set and ref forms at once.
-      ;; TODO make the code loop through the closures and build sets and refs all at once
+(: untag-deref-gproxy (-> D0-Expr (-> D0-Expr D0-Expr)))
+(define ((untag-deref-gproxy index) proxy)
+  (Op 'Array-ref
+      (list (Op 'binary-xor (list proxy GPROXY-TAG-VALUE))
+            index)))
 
-      (: sr-bndp* (-> C6-Bnd-Procedure* (State Nat D0-Bnd-Code*)))
-      (define (sr-bndp* b*) (map-state sr-bndp b*))
+(: alloc-tag-set-gproxy/twosome
+   ((String -> Uid) D0-Expr D0-Expr D0-Expr D0-Expr -> D0-Expr))
+(define (alloc-tag-set-gproxy/twosome uid! ref-e src-e tar-e lbl-e)
+  ;; TODO Consider using sr-alloc here
+  (define proxy (uid! "guarded_proxy"))
+  (define ref   (uid! "guarded_ref"))
+  (define src   (uid! "source_t"))
+  (define tar   (uid! "target_t"))
+  (define lbl   (uid! "blame"))
+  (define var   (Var proxy))
+  (Let `((,ref . ,ref-e) (,src . ,src-e)
+         (,tar . ,tar-e) (,lbl . ,lbl-e))
+   (Let `((,proxy . ,(Op 'Alloc (list GPROXY/TWOSOME-SIZE-VALUE))))
+    (Begin
+      (list
+       (Op 'Array-set! (list var GPROXY-FOR-INDEX-VALUE    (Var ref)))
+       (Op 'Array-set! (list var GPROXY-FROM-INDEX-VALUE   (Var src)))
+       (Op 'Array-set! (list var GPROXY-TO-INDEX-VALUE     (Var tar)))
+       (Op 'Array-set! (list var GPROXY-BLAMES-INDEX-VALUE (Var lbl))))
+      (Op 'binary-or (list var GPROXY-TAG-VALUE))))))
 
-      (: sr-bndp (-> C6-Bnd-Procedure (State Nat D0-Bnd-Code)))
-      (define (sr-bndp b)
-        (match-let ([(cons u (Procedure cp param* code ctr? fvar* exp)) b])
-          (let* ([env (for/hash : Env ([fvar fvar*] [i (in-naturals 2)])
-                        (values fvar (sr-clos-ref-free (Var cp) i)))]
-                 [env (extend* env param* (map var param*))]
-                 [cenv (index-closure cp fvar*)])
-            (do (bind-state : (State Nat D0-Bnd-Code))
-                (exp : D0-Expr <- ((sr-expr env cenv) exp))
-              (return-state
-               (cons u (Code (cons cp param*) exp)))))))
+(: alloc-tag-set-gproxy/coercion
+   ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
+(define (alloc-tag-set-gproxy/coercion uid! ref-e crcn-e)
+  (define proxy (uid! "guarded_proxy"))
+  (define ref   (uid! "guarded_ref"))
+  (define crcn  (uid! "coercion"))
+  (define var   (Var proxy))
+  (Let `((,ref . ,ref-e) (,crcn . ,crcn-e))
+   (Let `((,proxy . ,(Op 'Alloc (list GPROXY/COERCION-SIZE-VALUE))))
+    (Begin
+      (list
+       (Op 'Array-set! (list var GPROXY-FOR-INDEX-VALUE      (Var ref)))
+       (Op 'Array-set! (list var GPROXY-COERCION-INDEX-VALUE (Var crcn))))
+      (Op 'binary-or (list var GPROXY-TAG-VALUE))))))
 
-      (: sr-bndc* (-> Env IndexMap C6-Bnd-Closure* (State Nat (Pair D0-Bnd* D0-Expr*))))
-      (define (sr-bndc* env cenv b*)
-        (do (bind-state : (State Nat (Pair D0-Bnd* D0-Expr*)))
-            (b* : (Listof (Pairof D0-Bnd D0-Expr*)) <- (map-state (sr-bndc env cenv) b*))
-          (let ([b* (map (inst car D0-Bnd Any) b*)]
-                [e* (append-map (inst cdr Any D0-Expr*) b*)])
-            (return-state (ann (cons b* e*) (Pair D0-Bnd* D0-Expr*))))))
 
-      ;; The representation of closures as created by letrec
-      (: sr-bndc (-> Env IndexMap (-> C6-Bnd-Closure (State Nat (Pair D0-Bnd D0-Expr*)))))
-      (define (sr-bndc env cenv)
-        ;; Capture/Initialize the values of the closure
-        (: mk-set* (-> D0-Expr D0-Expr D0-Expr D0-Expr* D0-Expr*))
-        (define (mk-set* clos code cst fvar*)
-          (cons
-           (sr-clos-set-code clos code)
-           (cons
-            (sr-clos-set-caster clos cst)
-            (for/list : (Listof D0-Expr) ([fvar : D0-Expr fvar*] [i : Integer (in-naturals)])
-              (sr-clos-set-free clos i fvar)))))
-        (lambda ([b : C6-Bnd-Closure]) : (State Nat (Pair D0-Bnd D0-Expr*))
-                (match-let ([(cons uid (Closure-Data lbl ctr free*)) b])
-                  (do (bind-state : (State Nat (Pair D0-Bnd D0-Expr*)))
-                      (lbl : D0-Expr  <- ((sr-expr env cenv) lbl))
-                    (ctr : D0-Expr  <- ((sr-expr env cenv) ctr))
-                    (fr* : D0-Expr* <- (map-state (sr-expr env cenv) free*))
-                    (let ([bnd  : D0-Bnd   (cons uid (sr-clos-alloc fr*))]
-                          [set* : D0-Expr* (mk-set* (Var uid) lbl ctr fr*)])
-                      (return-state (ann (cons bnd set*) (Pair D0-Bnd D0-Expr*))))))))
+;; fold map through bindings
+(: sr-bnd* ((CoC6-Expr -> D0-Expr) -> (CoC6-Bnd-Data* -> D0-Bnd*)))
+(define ((sr-bnd* sr-expr) b*)
+  (: sr-bnd (CoC6-Bnd-Data -> D0-Bnd))
+  (define (sr-bnd b)
+    (cons (car b) (sr-expr (cdr b))))
+  (map sr-bnd b*))
 
-      ;; The representation details for closures without recursion
-      (: sr-clos-alloc (-> (Listof Any) D0-Expr))
-      (define (sr-clos-alloc free*)
-        (Op 'Alloc (list (Quote (+ CLOS-FVAR-OFFSET (length free*))))))
+(: sr-bnd-code* ((CoC6-Expr Env IndexMap -> D0-Expr)
+                 -> (CoC6-Bnd-Code* -> D0-Bnd-Code*)))
+(define ((sr-bnd-code* sr-expr/env) b*)
+  (: sr-bnd (CoC6-Bnd-Code -> D0-Bnd-Code))
+  (define (sr-bnd b)
+    (match-let ([(cons u (Code u* e)) b])
+      (let ([env (extend* (hash) u* (map var u*))])
+        (cons u (Code u* (sr-expr/env e env empty-index-map))))))
+  (map sr-bnd b*))
 
-      (: sr-clos-set-code (-> D0-Expr D0-Expr D0-Expr))
-      (define (sr-clos-set-code clos code)
-        (Op 'Array-set! (list clos CLOS-CODE-INDEX-VALUE code)))
 
-      (: sr-clos-set-caster (-> D0-Expr D0-Expr D0-Expr))
-      (define (sr-clos-set-caster clos caster)
-        (Op 'Array-set! (list clos CLOS-CSTR-INDEX-VALUE caster)))
 
-      (: sr-clos-set-free (-> D0-Expr Integer D0-Expr D0-Expr))
-      (define (sr-clos-set-free clos index fvar)
-        (Op 'Array-set! (list clos (Quote (+ CLOS-FVAR-OFFSET index)) fvar)))
 
-      (: sr-clos-ref-code (-> D0-Expr D0-Expr))
-      (define (sr-clos-ref-code clos)
-        (Op 'Array-ref  (list clos CLOS-CODE-INDEX-VALUE)))
+(: sr-observe ((String -> Uid) D0-Expr Schml-Type -> D0-Expr))
+(define (sr-observe uid! e t)
+  (: generate-print (Uid Schml-Type -> D0-Expr))
+  (define (generate-print id ty)
+    (cond
+      [(Int? t) (Op 'Printf (list (Quote "Int : %d\n") (Var id)))]
+      [(Unit? t) (Op 'Printf (list (Quote "Unit : ()\n")))]
+      [(Bool? t) (If (Var id)
+                     (Op 'Print (list (Quote "Bool : #t\n")))
+                     (Op 'Print (list (Quote "Bool : #f\n"))))]
+      [(Fn? t) (Op 'Print (list (Quote "Function : ?\n")))]
+      [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
+      [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
+      [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
+      [else (TODO implement thing for reference types)]))
+  (let* ([res (uid! "result")])
+    (Let (list (cons res e))
+      (Begin (list (generate-print res t)) (Success)))))
 
-      (: sr-clos-ref-caster (-> D0-Expr D0-Expr))
-      (define (sr-clos-ref-caster clos)
-        (Op 'Array-ref  (list clos CLOS-CSTR-INDEX-VALUE)))
+#;(TODO GET RID OF TAGS IN THE COMPILER)
+(: sr-tag (Tag-Symbol -> (Quote Integer)))
+(define (sr-tag t)
+  (case t
+    [(Int)    (Quote DYN-INT-TAG)]
+    [(Bool)   (Quote DYN-BOOL-TAG)]
+    [(Unit)   (Quote DYN-UNIT-TAG)]
+    [(Atomic) (Quote TYPE-ATOMIC-TAG)]
+    [(Fn)     (Quote TYPE-FN-TAG)]
+    [(GRef)   (Quote TYPE-GREF-TAG)]
+    [(GVect)  (Quote TYPE-GVECT-TAG)]
+    [(Boxed)  (Quote DYN-BOXED-TAG)]))
 
-      (: sr-clos-ref-free (-> D0-Expr Integer D0-Expr))
-      (define (sr-clos-ref-free clos index)
-        (Op 'Array-ref (list clos (Quote (+ CLOS-FVAR-OFFSET index)))))
 
-      (define-type Env (HashTable Uid D0-Expr))
 
-      (define-syntax-rule (extend e k v)
-        (hash-set e k v))
+(: sr-bndp* ((CoC6-Expr Env IndexMap -> D0-Expr)
+             -> (CoC6-Bnd-Procedure* -> D0-Bnd-Code*)))
+(define ((sr-bndp* sr-expr) b*)
+  (: sr-bndp (CoC6-Bnd-Procedure -> D0-Bnd-Code))
+  (define (sr-bndp bnd)
+    (match-let ([(cons u (Procedure cp param* code ctr? fvar* exp)) bnd])
+      (let* ([offset (if ctr? 2 1)]
+             [closv  (Var cp)]
+             [env (for/hash : Env ([fvar fvar*]
+                                   [i (in-naturals offset)])
+                  (values fvar (Op 'Array-ref (list closv (Quote i)))))]
+             [env (extend* env param* (map var param*))]
+             [cenv (index-closure offset cp fvar*)])
+        (cons u (Code (cons cp param*) (sr-expr exp env cenv))))))
+  (map sr-bndp b*))
 
-      (: extend* (-> Env Uid* D0-Expr* Env))
-      (define (extend* env id* exp*)
-        (match* (id* exp*)
-          [('() _) env]
-          [(_ '()) env]
-          [((cons id id*) (cons exp exp*))
-           (extend* (extend env id exp) id* exp*)]))
+(: index-closure (Nat Uid Uid* -> IndexMap))
+(define (index-closure offset clos fvar*)
+  (define ((fvar-err f))
+    (error 'specifiy-representation "failed to index free var ~a from clos ~a"
+           f clos))
+  (define (clos-err c f)
+    (error 'specify-representation
+           "unbound closure index ~a from closure ~a inside of clos ~a"
+           f c clos))
+  (let ([map (for/hash : (HashTable Uid Nat)
+                       ([fvar : Uid fvar*]
+                        [i : Nat (in-naturals offset)])
+               (values fvar i))])
+    (lambda ([c : Uid] [f : Uid]) : Nat
+            (if (uid=? c clos)
+                (hash-ref map f (fvar-err f))
+                (clos-err c f)))))
 
-      ;; The variable is a normal variable
-      (: var  (-> Uid D0-Expr))
-      (define (var id) (Var id))
 
-      (: label (-> Uid D0-Expr))
-      (define (label id) (Code-Label id))
+(: sr-bndc* ((CoC6-Expr -> D0-Expr) CoC6-Bnd-Closure* -> (Values D0-Bnd* D0-Expr*)))
+(define (sr-bndc* sr-expr b*)
+  (: sr-bndc (CoC6-Bnd-Closure -> (Pair D0-Bnd D0-Expr*)))
+  (define (sr-bndc bnd)
+    (match-let ([(cons uid (Closure-Data lbl ctr? free*)) bnd])
+      (let* ([lbl   (sr-expr lbl)]
+             [free* (map sr-expr free*)]
+             [data  (cons lbl (if ctr? (cons (sr-expr ctr?) free*) free*))]
+             [size  (length data)]
+             [clos  (Var uid)]
+             [bnd   (cons uid (Op 'Alloc `(,(Quote size))))]
+             [set*  (for/list : (Listof D0-Expr)
+                              ([d : D0-Expr data]
+                               [i : Integer (in-naturals)])
+                      (Op 'Array-set! (list clos (Quote i) d)))])
+        (cons bnd set*))))
+  (let* ([b.e*  (map sr-bndc b*)]
+         [b*    (map (inst car D0-Bnd Any) b.e*)]
+         [e*    (append-map (inst cdr Any D0-Expr*) b.e*)])
+    ;; This code implies that the tag of a closure is #b000
+    (values b* e*)))
 
-      (: cref  (-> Uid Natural D0-Expr))
-      (define (cref clos index)
-        (Op 'Array-ref (list (Var clos) (Quote (+ index CLOS-FVAR-OFFSET)))))
 
-      (: lookup (-> Env Uid D0-Expr))
-      (define (lookup e u)
-        (hash-ref e u (lookup-error e u)))
 
-      (define (lookup-error e u)
-        (lambda ()
-          (error 'specify-representation/lookup
-                 "Unbound uid ~a\n\tin program with env ~a" u e)))
+(: sr-clos-ref-code (-> D0-Expr D0-Expr))
+(define (sr-clos-ref-code clos)
+  (Op 'Array-ref  (list clos CLOS-CODE-INDEX-VALUE)))
 
-      (define-type Triv (U (Quote String) (Quote Integer) (Code-Label Uid) (Var Uid)))
-      (define-predicate triv? Triv)
+(: sr-clos-ref-caster (-> D0-Expr D0-Expr))
+(define (sr-clos-ref-caster clos)
+  (Op 'Array-ref  (list clos CLOS-CSTR-INDEX-VALUE)))
 
-      (: rename (-> String (-> Any String)))
-      (define (rename name)
-        (lambda (_) name))
 
-      (: sr-alloc-init (-> D0-Expr (-> D0-Expr D0-Expr D0-Expr)))
-      (define (sr-alloc-init var)
-        (lambda ([n : D0-Expr] [v : D0-Expr]) : D0-Expr
-                (Op 'Array-set! (list var n v))))
+(define-type Env (HashTable Uid D0-Expr))
 
-      ;; Allocate without forgetting to lift evaluating subterms first
-      ;; this prevents evaluating terms which may cause more allocation
-      ;; will initializing the values of an allocation
-      (: sr-alloc (->* (String) #:rest D0-Expr (State Nat D0-Expr)))
-      (define (sr-alloc name . exp*)
-        (let ([size (length exp*)])
-          (if (= size 0)
-              (error "Empty objects can not be allocated")
-              (let ([name* (build-list size (rename (string-append name "_init")))])
-                (do (bind-state : (State Nat D0-Expr))
-                    (init-id* : Uid* <- (map-state uid-state name*))
-                  (box-id   : Uid  <- (uid-state name))
-                  (let* ([init-expr* (map var init-id*)]
-                         [init-index* (map sr-quote (range 0 size))]
-                         [set* (map (sr-alloc-init (Var box-id)) init-index* init-expr*)]
-                         [bnd-init* (map (inst cons Uid D0-Expr) init-id* exp*)]
-                         [bnd-box (cons box-id (Op 'Alloc (list (Quote size))))]
-                         [box-var (Var box-id)])
-                    (return-state
-                     (Let bnd-init*
-                          (Let (list bnd-box)
-                               (Begin set* box-var))))))))))
+(define-syntax-rule (extend e k v)
+  (hash-set e k v))
 
-      (define sr-quote : (D0-Literal -> D0-Expr) Quote)
+(: extend* (-> Env Uid* D0-Expr* Env))
+(define (extend* env id* exp*)
+  (match* (id* exp*)
+    [('() _) env]
+    [(_ '()) env]
+    [((cons id id*) (cons exp exp*))
+     (extend* (extend env id exp) id* exp*)]))
+
+;; The variable is a normal variable
+(: var  (-> Uid D0-Expr))
+(define (var id) (Var id))
+
+(: label (-> Uid D0-Expr))
+(define (label id) (Code-Label id))
+
+(: cref  (-> Uid Natural D0-Expr))
+(define (cref clos index)
+  (Op 'Array-ref (list (Var clos) (Quote (+ index CLOS-FVAR-OFFSET)))))
+
+(: lookup (-> Env Uid D0-Expr))
+(define (lookup e u)
+  (hash-ref e u (lookup-error e u)))
+
+(define (lookup-error e u)
+  (lambda ()
+    (error 'specify-representation/lookup
+           "Unbound uid ~a\n\tin program with env ~a" u e)))
+
+(define-type Triv (U (Quote String) (Quote Integer) (Code-Label Uid) (Var Uid)))
+(define-predicate triv? Triv)
+
+(: rename (-> String (-> Any String)))
+(define (rename name)
+  (lambda (_) name))
+
+(define sr-quote : (D0-Literal -> D0-Expr) Quote)
+
+(define (empty-index-map u i)
+  (error 'specify-representation "attempt to index without index map ~a ~a" u i))

@@ -25,7 +25,7 @@
           "../language/data1.rkt"))
 
 (: normalize-context (-> Data0-Lang Config Data1-Lang))
-(trace-define (normalize-context prgm comp-config)
+(define (normalize-context prgm comp-config)
   (match-let ([(Prog (list name count type) exp) prgm])
     (let-values ([(tail bnd-code*) (run-state (nc-tail exp) '())])
       (Prog (list name count type) (Labels bnd-code* tail)))))
@@ -58,11 +58,11 @@
          (e2 : D1-Value <- (nc-value e2))
          (e3 : D1-Effect <- (nc-effect e3))
          (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote 0))))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Tail))
          (val  : D1-Value  <- (nc-value  exp))
          (val* : D1-Value* <- (nc-value* exp*))
-         (return-state (App val val*)))]
+         (return-state (App-Code val val*)))]
     [(Op p exp*)
      ;; Filter effects into errors until I can fix this
      (do (bind-state : (State D1-Bnd-Code* D1-Tail))
@@ -70,10 +70,12 @@
          (if (uil-prim-effect? p)
              (return-state (Begin (list (Op p v*)) (Quote UNIT-IMDT)))
              (return-state (nc-value-op p v*))))]
-    [(Halt) (return-state (Halt))]
     [(Var i) (return-state (Var i))]
     [(Code-Label i) (return-state (Code-Label i))]
-    [(Quote k) (return-state (Quote k))]))
+    [(Quote k) (return-state (Quote k))]
+    [(Halt) (return-state (Halt))]
+    [(Success) (return-state (Success))]
+    [other (error 'normalize-context "umatched ~a" other)]))
 
 (: nc-value (-> D0-Expr (State D1-Bnd-Code* D1-Value)))
 (define (nc-value exp)
@@ -103,11 +105,11 @@
          (e2 : D1-Value  <- (nc-value e2))
          (e3 : D1-Effect <- (nc-effect e3))
          (return-state (Begin (list (Repeat i e1 e2 e3)) (Quote 0))))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
          (val  : D1-Value  <- (nc-value  exp))
          (val* : D1-Value* <- (nc-value* exp*))
-         (return-state (App val val*)))]
+         (return-state (App-Code val val*)))]
     [(Op p exp*)
      ;; Filter effects into errors until I can fix this
      (do (bind-state : (State D1-Bnd-Code* D1-Value))
@@ -148,11 +150,11 @@
          (e2 : D1-Value <- (nc-value e2))
          (e3 : D1-Effect <- (nc-effect e3))
          (return-state (Repeat i e1 e2 e3)))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (do (bind-state : (State D1-Bnd-Code* D1-Effect))
          (val  : D1-Value  <- (nc-value  exp))
          (val* : D1-Value* <- (nc-value* exp*))
-         (return-state (App val val*)))]
+         (return-state (App-Code val val*)))]
     [(Op p exp*)
      (if (uil-prim-effect? p)
          ;; effects need to remain
@@ -214,8 +216,7 @@
   (cond
    [(IntxInt->Bool-primitive? p)
     (match exp*
-      [(list a b)
-       (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT))]
+      [(list a b) (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT)) ] ;; (Relop p a b) if this is broken try 
       [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
    [(uil-prim-value? p) (Op p exp*)]
    [else (error 'nc-value-op "primitive out of context")]))

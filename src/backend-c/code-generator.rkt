@@ -1,6 +1,7 @@
 #lang typed/racket
 
-(require "../configuration.rkt"
+(require ;;racket/path
+         "../configuration.rkt"
          "../language/data5.rkt"
          "../helpers.rkt"
          "./generate-c.rkt")
@@ -10,25 +11,26 @@
 ;; Basic driver for the entire backend
 (: c-backend-generate-code (Data5-Lang Config . -> . Path))
 (define (c-backend-generate-code uil config)
-  (define c-path (Config-c-path config))
+  (define c-path (normalize-path (Config-c-path config)))
   ;; Write the C code to a file
   (logging c-backend-generate-code (Vomit) "~v" c-path)
   (with-output-to-file c-path #:mode 'text #:exists 'replace
     (lambda ()
       (generate-c uil config)))
-  ;; if clang-format is present and we keep c then clean up
-  ;; the file
-  (parameterize ([current-error-port (open-output-string)]
-                 [current-output-port (open-output-string)])
-         ;; TODO I think that I need to close this port
-    (cond
-      [(system "which clang-format")
-       ;; There is an error message that doesn't mean anything
-       (system (format "clang-format -i ~a" (path->string c-path)))]))
+  
+  ;; if clang-format is present and we keep c then clean up the file
+  (when (with-output-to-file "/dev/null" #:exists 'append
+          (lambda () (system "which clang-format")))
+    (call-with-output-file "/dev/null" #:exists 'append
+      (lambda ([p : Output-Port])
+        (parameterize ([current-error-port p]
+                       [current-output-port p])
+          ;; do an in place reformat throwing away all warnings
+          (system (format "clang-format -i ~a" (path->string c-path)))))))
 
   ;; Invoke the system cc compiler on the file
   (invoke-c-compiler config))
-
+  
 ;; call the host system's cc function
 (: invoke-c-compiler (-> Config Path))
 (define (invoke-c-compiler config)
@@ -50,7 +52,9 @@
         (when asm?
           (system (format "cc ~a -S -o ~a ~a" in (path->string asm?) flags))))
       (unless (system cmd)
-        (TODO raise appropriate error here))
+        (error 'schml/backend-c/invoke-c-compiler
+               "failed to compile with: ~a"
+               cmd))
       out-path)))
 
 (: append-flags : (Listof String) -> String)

@@ -22,7 +22,8 @@
   (Rec T
    (U (If D4-Pred T T)
       (Begin D4-Effect* T)
-      (Return D4-Value))))
+      (Return D4-Value)
+      (Return Success))))
 
 (define-type D4-Pred
  (Rec P
@@ -43,7 +44,7 @@
   (U D4-Trivial
      Halt
      (UIL-Op D4-Trivial)
-     (App D4-Trivial D4-Trivial*)))
+     (App-Code D4-Trivial D4-Trivial*)))
 
 (define-type D4-Trivial
   (U (Code-Label Uid)

@@ -17,16 +17,17 @@
 (define-type D0-Expr
   (Rec E (U (Labels D0-Bnd-Code* E)
             (Let D0-Bnd* E)
-	    (App E (Listof E))
+	    (App-Code E (Listof E))
             (UIL-Op! E)
             (UIL-Op E)
 	    (If E E E)
 	    (Begin D0-Expr* E)
             (Repeat Uid E E E)
-	    Halt
 	    (Var Uid)
 	    (Code-Label Uid)
-	    (Quote D0-Literal))))
+	    (Quote D0-Literal)
+            Halt
+            Success)))
 
 (define-type D0-Expr* (Listof D0-Expr))
 (define-type D0-Bnd* (Listof D0-Bnd))

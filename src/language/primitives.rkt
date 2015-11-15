@@ -20,7 +20,7 @@ We are going to UIL
 -----------------------------------------------------------------------------|#
 
 (define-type UIL-Prim  (U Schml-Prim Array-Prim))
-(define-type UIL-Prim! (U Schml-Prim! Array-Prim! Print-Prim! Runtime-Prim!))
+(define-type UIL-Prim! (U Schml-Prim! Array-Prim! Print-Prim! Bottom-Prim))
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
 
@@ -29,7 +29,7 @@ We are going to UIL
 (define-type Array-Prim (U 'Alloc 'Array-ref))
 (define-type Array-Prim! 'Array-set!)
 (define-type Print-Prim! (U 'Printf 'Print))
-(define-type Runtime-Prim! (U 'Exit))
+(define-type Bottom-Prim (U 'Exit))
 
 (define-type (UIL-Op E) (Op UIL-Prim (Listof E)))
 (define-type (UIL-Op! E) (Op UIL-Prim! (Listof E)))

@@ -22,7 +22,8 @@
   (Rec T
    (U (If D5-Pred T T)
       (Begin D5-Effect* T)
-      (Return D5-Value))))
+      (Return D5-Value)
+      (Return Success))))
 
 (define-type D5-Pred (Relop IxI->B-Prim D5-Trivial D5-Trivial))
 
@@ -38,7 +39,7 @@
   (U D5-Trivial
      Halt
      (UIL-Op D5-Trivial)
-     (App D5-Trivial D5-Trivial*)
+     (App-Code D5-Trivial D5-Trivial*)
      (If D5-Pred D5-Trivial D5-Trivial)))
 
 (define-type D5-Trivial

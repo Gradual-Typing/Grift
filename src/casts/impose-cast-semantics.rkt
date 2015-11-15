@@ -12,7 +12,7 @@ This is a micro compiler that removes the cast language form.
          "label-lambdas.rkt"
          "uncover-free.rkt"
          "convert-closures.rkt"
-         ;"specify-representation.rkt"
+         "specify-representation.rkt"
          "../language/cast0.rkt"
          "../language/data0.rkt")
 
@@ -35,13 +35,15 @@ This is a micro compiler that removes the cast language form.
     [(_ (a c t) (begin e* ...) p* ...)
      (begin e* ... (compose-passes (a c t) p* ...))]
     [(_ (a c t) (when t? p) p* ...)
-     (let ([ast (if (t? a c) (p a c) a)])
-       (t ast (format "post ~a" 'p))
-       (compose-passes (ast c t) p* ...))]
+     (begin
+       (t a (format "pre ~a" 'p))
+       (let ([a (if (t? a c) (p a c) a)])
+         (compose-passes (a c t) p* ...)))]
     [(_ (a c t) p p* ...)
-     (let ([a (p a c)])
-       (t a (format "post ~a" 'p))
-       (compose-passes (a c t) p* ...))]))
+     (begin
+       (t a (format "pre ~a" 'p))
+       (let ([a (p a c)])
+         (compose-passes (a c t) p* ...)))]))
 
 (define-syntax (define-compiler stx)
   (syntax-case stx (:)
@@ -78,19 +80,20 @@ This is a micro compiler that removes the cast language form.
        )
     (specify-representation l3 config)))
 
-(: coercion-semantics? (Any Config -> Boolean))
-(define (coercion-semantics? _ c)
+(: coercion-representation? (Any Config -> Boolean))
+(define (coercion-representation? _ c)
   (equal? 'Coercions (Config-cast-rep c)))
 
-(define-compiler impose-cast-semantics : (Cast0-Lang Config -> Any #;Cast-or-Coerce1-Lang
+(define-compiler impose-cast-semantics : (Cast0-Lang Config -> Data0-Lang
                                                      )
-  (when coercion-semantics?
+  (when coercion-representation?
     casts->coercions)
     lower-function-casts
     lower-reference-casts
     interpret-casts
     label-lambdas
     uncover-free
-    convert-closures)
+    convert-closures
+    specify-representation)
 
 

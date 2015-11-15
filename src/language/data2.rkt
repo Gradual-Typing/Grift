@@ -22,13 +22,14 @@
   (Rec T
    (U (If D2-Pred T T)
       (Begin D2-Effect* T)
-      D2-Value)))
+      D2-Value
+      Success)))
 
 (define-type D2-Value
  (Rec V
   (U (If D2-Pred V V)
      (Begin D2-Effect* V)
-     (App V (Listof V))
+     (App-Code V (Listof V))
      (Op (U IxI->I-Prim Array-Prim) (Listof V))
      Halt
      (Var Uid)
@@ -46,7 +47,7 @@
   (U (If D2-Pred E E)
      (Begin D2-Effect* No-Op)
      (Repeat Uid D2-Value D2-Value E)
-     (App D2-Value D2-Value*)
+     (App-Code D2-Value D2-Value*)
      (UIL-Op! D2-Value)
      (Assign Uid D2-Value)
      No-Op)))

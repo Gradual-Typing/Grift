@@ -22,10 +22,10 @@
    (U (Let D1-Bnd* T)
       (If D1-Pred T T)
       (Begin D1-Effect* T)
-      (App D1-Value D1-Value*)
-      (Op (U IxI->I-Prim Array-Prim) (Listof T))
+      (App-Code D1-Value D1-Value*)
+      (Op (U IxI->I-Prim Array-Prim) D1-Value*)
       (Var Uid)
-      Halt
+      Halt Success
       (Var Uid)
       (Code-Label Uid)
       (Quote D1-Literal))))
@@ -35,7 +35,7 @@
   (U (Let D1-Bnd* V)
      (If D1-Pred V V)
      (Begin D1-Effect* V)
-     (App V (Listof V))
+     (App-Code V (Listof V))
      (Op (U IxI->I-Prim Array-Prim) (Listof V))
      Halt
      (Var Uid)
@@ -55,7 +55,7 @@
      (If D1-Pred E E)
      (Begin D1-Effect* No-Op)
      (Repeat Uid D1-Value D1-Value E)
-     (App D1-Value D1-Value*)
+     (App-Code D1-Value D1-Value*)
      (UIL-Op! D1-Value)
      No-Op)))
 

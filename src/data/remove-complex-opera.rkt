@@ -9,7 +9,7 @@
 (provide remove-complex-opera)
 
 (: remove-complex-opera (Data2-Lang Config -> Data3-Lang))
-(trace-define (remove-complex-opera prog config)
+(define (remove-complex-opera prog config)
   (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
     (let*-values ([(body count) (run-state (rco-body body) count)]
                   [(bnd* count) (run-state (map-state rco-bnd-code bnd*) count)])
@@ -55,21 +55,23 @@
          (e* : D3-Effect* <- (rco-effect* e*))
          (t  : D3-Tail    <- (rco-tail v))
          (return-state (Begin e* t)))]
-    [(App v v*)
+    [(App-Code v v*)
      (do (bind-state  : (State RcoSt D3-Tail))
          ((cons s*1 t)  : Triv-Value  <- (trivialize-value v))
          ((cons s*2 t*) : Triv-Value* <- (trivialize-value* v*))
-         (return-state (Begin (append s*1 s*2) (Return (App t t*)))))]
+         (return-state (Begin (append s*1 s*2) (Return (App-Code t t*)))))]
     [(Op p v*)
      (do (bind-state : (State RcoSt D3-Tail))
          ((cons s* t*) : Triv-Value* <- (trivialize-value* v*))
          (return-state (make-begin s* (Return (Op p t*)))))]
-    [(Halt) (return-state (Return (Halt)))]
     ;; I do not think that this should ever happen
     ;; perhaps I need a type rule to guarentee it.
     [(Code-Label i) (return-state (Return (Code-Label i)))]
     [(Var i) (return-state (Return (Var i)))]
-    [(Quote k) (return-state (Return (Quote k)))]))
+    [(Quote k) (return-state (Return (Quote k)))]
+    [(Halt) (return-state (Return (Halt)))]
+    [(Success) (return-state (Return (Success)))]
+    [other (error 'remove-complex-opera "unmatched ~a" other)]))
 
 (: rco-pred (D2-Pred -> (State RcoSt D3-Pred)))
 (define (rco-pred pred)
@@ -124,11 +126,11 @@
              (list (Assign i1 t1)
                    (Assign i2 t2)
                    (Repeat i (Var i1) (Var i2) e))) NO-OP)))]
-    [(App v v*)
+    [(App-Code v v*)
      (do (bind-state : (State RcoSt D3-Effect))
          ((cons s*  t)  : Triv-Value  <- (trivialize-value v))
          ((cons s*^ t*) : Triv-Value* <- (trivialize-value* v*))
-         (return-state (make-begin (append s* s*^ (list (App t t*))) NO-OP)))]
+         (return-state (make-begin (append s* s*^ (list (App-Code t t*))) NO-OP)))]
     [(Op p v*)
      (do (bind-state : (State RcoSt D3-Effect))
          ((cons s* t*) : Triv-Value* <- (trivialize-value* v*))
@@ -154,11 +156,11 @@
          (e* : D3-Effect* <- (rco-effect* e*))
          (v  : D3-Value   <- (rco-value v))
          (return-state (make-begin e* v)))]
-    [(App v v*)
+    [(App-Code v v*)
      (do (bind-state : (State RcoSt D3-Value))
          ((cons s*  t)  : Triv-Value  <- (trivialize-value v))
          ((cons s*^ t*) : Triv-Value* <- (trivialize-value* v*))
-         (return-state (make-begin (append s* s*^) (App t t*))))]
+         (return-state (make-begin (append s* s*^) (App-Code t t*))))]
     [(Op p v*)
      (do (bind-state : (State RcoSt D3-Value))
          ((cons s* t*) : Triv-Value* <- (trivialize-value* v*))
@@ -189,12 +191,12 @@
          (e* : D3-Effect* <- (rco-effect* e*))
          ((cons t* t)  : Triv-Value <- (trivialize-value v))
          (return-state (cons (append e* t*) t)))]
-    [(App v v*)
+    [(App-Code v v*)
      (do (bind-state : (State RcoSt Triv-Value))
          ((cons s*  t)  : Triv-Value  <- (trivialize-value v))
          ((cons s*^ t*) : Triv-Value* <- (trivialize-value* v*))
          (i : Uid <- (loc-state "tmp_value"))
-         (let ([s (Assign i (App t t*))])
+         (let ([s (Assign i (App-Code t t*))])
            (return-state (cons (append s* s*^ (list s)) (Var i)))))]
     [(Op p v*)
      (do (bind-state : (State RcoSt Triv-Value))

@@ -131,6 +131,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Repeat var start end body)
   ;; TODO figue out an appropriate comment about all forms here
   (Halt)
+  (Success)
   (Assign lhs rhs)
   ;; Declares Local Variables
   (Locals names body)
@@ -284,7 +285,19 @@ And a type constructor "name" expecting the types of field1 and field2
 
 (: uid->string (-> Uid String))
 (define (uid->string u)
-  (format "u~a_~a" (number->string (Uid-suffix u)) (Uid-prefix u)))
+  ;; Rubout all non c identifier characters
+  (: help (Char -> Char))
+  (define (help c)
+    (let ([n (char->integer c)])
+      ;;        A-Z          a-z          0-9
+      (if (or (<= 65 n 90) (<= 97 n 122) (<= 48 n 57))
+          c
+          #\_)))
+  (string-append
+   "u"
+   (number->string (Uid-suffix u))
+   "_"
+   (list->string (map help (string->list (Uid-prefix u))))))
 
 ;; Are two uid equal?
 (: uid=? (-> Uid Uid Boolean))

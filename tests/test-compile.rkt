@@ -8,7 +8,7 @@
          ;;"../src/language.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
-         #;
+         
          (only-in "../src/compile.rkt"
          compile/conf envoke-compiled-program)
          "./values.rkt"
@@ -18,8 +18,8 @@
  "../src/schml/reduce-to-cast-calculus.rkt"
  "../src/casts/impose-cast-semantics.rkt"
  ;;"../src/casts/casts-to-coercions.rkt"
- ;;"../src/data/convert-representation.rkt"
- ;;"../src/backend-c/code-generator.rkt"
+ "../src/data/convert-representation.rkt"
+ "../src/backend-c/code-generator.rkt"
  ;; The interpreters
  "./ast-interps/cast-lang-interp.rkt"
  )
@@ -64,27 +64,17 @@
            (check value=? (cast-lang-interp ast0 config) expected "cast-lang interp")
            (ck ast0 "cast 0")
            (define ast1 (test-impose-cast-semantics ast0 config ck))
-           ast1
-
-           
-           
-           #;
-           (when (eq? 'Coercions (Config-cast-rep config))
-           (define crcn (casts->coercions c0 config))
-           (ck (interp crcn config) "coercion lang semantics")
-           (exit/success))
-         #|(define d0 (impose-cast-semantics c0 config))
-         (define u0 (convert-representation d0 config))
-         (define p  (c-backend-generate-code u0 config))
-         (check value=?
-                expected
-                (observe (envoke-compiled-program #:config config))
-                "test compiler semantics")
-         (compile/conf path config)
-         (check value=?
-                expected
-                (observe (envoke-compiled-program #:config config))
-                "compiler semantics")|#)))))
+           (define ast2 (convert-representation ast1 config))
+           (c-backend-generate-code ast2 config)
+           (check value=?
+                  (observe (envoke-compiled-program #:config config))
+                  expected
+                  "test compiler semantics")
+           (compile/conf path config)
+           (check value=?
+                  (observe (envoke-compiled-program #:config config))
+                  expected
+                  "real compiler semantics"))))))
 
 (define-syntax-rule (test-file p ... n e)
   (test-compile n (simplify-path (build-path test-suite-path p ... n)) e))

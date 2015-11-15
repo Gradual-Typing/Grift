@@ -9,7 +9,7 @@
 
 (provide simplify-predicates)
 (: simplify-predicates (Data4-Lang Config -> Data5-Lang))
-(trace-define (simplify-predicates prog config)
+(define (simplify-predicates prog config)
   (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
     (let*-values ([(body count) (run-state (sp-body body) count)]
                   [(bnd* count) (run-state (map-state sp-bnd-code bnd*) count)])
@@ -61,10 +61,12 @@
            (e* : D5-Effect* <- (sp-effect* e*))
            (t  : D5-Tail    <- (sp-tail v))
            (return-state (make-begin e* t)))]
-      [(Return v)
-       (do (bind-state : (State SpSt D5-Tail))
+    [(Return v)
+     (if (Success? v)
+         (return-state (Return (Success)))
+         (do (bind-state : (State SpSt D5-Tail))
            (v : D5-Value <- (sp-value v))
-           (return-state (Return v)))]))
+           (return-state (Return v))))]))
 
 ;; (TODO remove relops and just use value in predicate context)
 ;; I think that having relops is not actually necissary
@@ -107,11 +109,11 @@
 (: sp-value (D4-Value -> (State SpSt D5-Value)))
 (define (sp-value v)
   (match v
-    [(App t t*)
+    [(App-Code t t*)
      (do (bind-state : (State SpSt D5-Value))
          (t  : D5-Trivial  <- (sp-trivial  t))
          (t* : D5-Trivial* <- (sp-trivial* t*))
-         (return-state (App t t*)))]
+         (return-state (App-Code t t*)))]
     [(Op p t*)
      (do (bind-state : (State SpSt D5-Value))
          (t* : D5-Trivial* <- (sp-trivial* t*))

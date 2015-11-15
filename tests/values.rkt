@@ -78,6 +78,7 @@
 
 (: parse-observable (String -> Test-Value))
 (define (parse-observable s)
+  (logging parse-observable (All) s)
   (cond
     [(regexp-match #rx".*Int : (-?[0-9]+)" s) =>
      (lambda (r)
@@ -94,6 +95,10 @@
     [else (blame #f s)]))
 
 (define-syntax-rule (observe exp)
-  (let ([s (with-output-to-string (lambda () exp))])
+  (let ([s (with-output-to-string
+             (lambda ()
+               (parameterize ([current-error-port (current-output-port)])
+                 exp
+                 (flush-output))))])
     (logging observe () "~v" s)
     (parse-observable s)))
