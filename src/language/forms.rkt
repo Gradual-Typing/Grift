@@ -629,6 +629,7 @@ Dyn --> Int Int --> Dyn
   ;; "Proxy a function call with args coercions and return coercion"
   ;; I am switching over to using the Fn form for this
   #;(Proxy-Fn arity args return)
+  (Fn-Coercion-Arity c)
   (Fn-Coercion args return)
   (Fn-Coercion-Arg coercion index)
   (Fn-Coercion-Return coercion)
@@ -643,6 +644,9 @@ Dyn --> Int Int --> Dyn
   (Fn-Proxy-Closure expression)
   (Fn-Proxy-Huh expression)
   (Hybrid-Proxy apply closure coercion)
+  (Hybrid-Proxy-Huh clos)
+  (Hybrid-Proxy-Closure hybrid)
+  (Hybrid-Proxy-Coercion hybrid)
   ;; Coercion Manipulation Stuff
   (Sequence-Coercion-Huh crcn)
   (Sequence-Coercion fst snd)

@@ -8,6 +8,7 @@
 +-----------------------------------------------------------------------------|#
 
 
+
 (define-type Cast-or-Coerce6-Lang
  (Prog (List String Natural Schml-Type) CoC6-Expr))
 
@@ -31,18 +32,22 @@
           ;; Our Lovely Function Proxy Representation
           (App-Fn-or-Proxy Uid E (Listof E))
           (Hybrid-Proxy Uid E E)
+          (Hybrid-Proxy-Huh E)
+          (Hybrid-Proxy-Closure E)
+          (Hybrid-Proxy-Coercion E)
           (Fn-Proxy Index E E)
           (Fn-Proxy-Huh E)
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
           (Quote-Coercion Schml-Coercion)
-          (Compose-Coercions E E)
+          ;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
           (Make-Fn-Coercion Uid E E E)
           (Compose-Fn-Coercion Uid E E)
           (Fn-Coercion (Listof E) E)
+          (Fn-Coercion-Arity E)
           (Fn-Coercion-Arg E E)
           (Fn-Coercion-Return E)
           (Ref-Coercion E E)

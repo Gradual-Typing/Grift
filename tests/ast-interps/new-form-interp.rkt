@@ -247,7 +247,8 @@ currently implemented in severral files.
         ;; information to subsequent passes
         [(Fn-Proxy _ (app recur/env clos) (app recur/env fn-crcn))
          (Interp-Dyn clos fn-crcn)]
-        [(Fn-Proxy-Huh (app recur/env v))
+        [(or (Fn-Proxy-Huh (app recur/env v))
+             (Hybrid-Proxy-Huh (app recur/env v))) 
          ;; In final product we are relying on this function to only
          ;; distinguish between the cononical forms for function types
          ;; it is a type error to use it otherwise.
@@ -257,12 +258,14 @@ currently implemented in severral files.
            [(and (Interp-Dyn? v) (Fn? (Interp-Dyn-mark v))) #t]
            [(Interp-Closure? v) (not (Interp-Closure-cast v))]
            [else (error 'interp/Fn-Proxy-Huh "type invalid value ~a" v)])]
-        [(Fn-Proxy-Closure (app recur/env v))
+        [(or (Fn-Proxy-Closure (app recur/env v))
+             (Hybrid-Proxy-Closure (app recur/env v)))
          (match v
            [(Interp-Dyn c (Fn _ _ _)) c]
            [(Interp-Closure a #f (list clos crcn)) clos]
            [other (unmatched Fn-Proxy-Closure other)])]
-        [(Fn-Proxy-Coercion (app recur/env v))
+        [(or (Fn-Proxy-Coercion (app recur/env v))
+             (Hybrid-Proxy-Coercion (app recur/env v)))
          (match v
            [(Interp-Dyn _ (and c (Fn _ _ _))) c]
            [(Interp-Closure _ #f (list clos crcn)) crcn]

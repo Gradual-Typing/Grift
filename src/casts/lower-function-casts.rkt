@@ -549,14 +549,14 @@ T?l $ (_  ; )  = what here
   (: compose-return (Uid Uid Uid -> CoC1-Bnd*))
   (define (compose-return ret new old)
     (cons (cons ret (Compose-Coercions (Fn-Coercion-Return (Var old))
-                             (Fn-Coercion-Return (Var new))))
+                                       (Fn-Coercion-Return (Var new))))
           '()))
   ;; TODO this is likely the wrong definition once this file typechecks
   ;; make sure the composition is in the correct order
   (: compose-arg (Uid Uid Uid Index -> CoC1-Bnd))
   (define (compose-arg arg new old i)
     (cons arg (Compose-Coercions (Fn-Coercion-Arg (Var new) (Quote i))
-                       (Fn-Coercion-Arg (Var old) (Quote i)))))
+                                 (Fn-Coercion-Arg (Var old) (Quote i)))))
     (do (bind-state : (State Nat CoC1-Code))
       (u-clos   : Uid <-  (uid-state "unknown_closure"))
       (new-crcn : Uid <-  (uid-state "new_fn_coercion"))
@@ -573,10 +573,12 @@ T?l $ (_  ; )  = what here
             ;; First get the old fn-coercion
             (Let `((,old-crcn  . ,(Fn-Proxy-Coercion (Var u-clos)))
                    (,r-clos    . ,(Fn-Proxy-Closure  (Var u-clos))))
-             ;; Then compose each sub coercion
+                 ;; Then compose each sub coercion
+                 ;; this loop reverses the list arguments hence the
+                 ;; reverse that is used in the argument list
              (Let (for/fold ([b* : CoC1-Bnd*
                                  (compose-return ret new-crcn old-crcn)])
-                            ([a : Uid arg*]
+                            ([a : Uid (reverse arg*)]
                              [i : Integer (in-range (- arity 1) -1 -1)])
                     (unless (index? i)
                       (error 'lower-function-casts "bad index made"))

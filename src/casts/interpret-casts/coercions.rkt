@@ -241,13 +241,13 @@
   (cond$
    ;; Eliminating the Identities cuts down on the number of branches
    ;; and should be fast
-   [(id?$ c1) (return-state c1)]
-   [(id?$ c2) (return-state c2)]
+   [(id?$ c1) (return-state c2)]
+   [(id?$ c2) (return-state c1)]
    ;; We could elminate failure on the left next, but we choose to make
    ;; success as fast as possible even if it introduces more branches overall.
    [(seq?$ c1)
     (let$* ([seq_fst (seq-fst$ c1)]
-           [seq_snd (seq-snd$ c1)])
+            [seq_snd (seq-snd$ c1)])
      (cond$
       [(prj?$ seq_fst)
        (bind-state

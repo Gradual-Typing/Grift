@@ -25,6 +25,9 @@
 (define optimize-known-call?
   (make-parameter #f))
 
+(define optimize-well-known?
+  (make-parameter #f))
+
 (define use-code-casters?
   (make-parameter #f))
 
@@ -185,19 +188,18 @@
         ;; Alternatively if we are using data representation
         ;; we need to cast the arguments
         [(App-Fn-or-Proxy cast-uid e e*)
-         (cond
-           [(eq? cast-rep 'Coercions)
-            (cond
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
               ;; If it is a hybrid representation then proxies and closures
               ;; are applied the same way.
-              [(eq? fn-proxy-rep 'Hybrid)
+              [(Hybrid)
                (recur (App-Fn e e*))]
               ;; If it a data representation and it is a known definition
               ;; site then it can't be a proxy
-              [(eq? fn-proxy-rep 'Data)
+              [(Data)
                (cond
-                 [(and (Var? e)
-                       (optimize-known-call?)
+                 [(and (Var? e) (optimize-known-call?)
                        (hash-ref code-env (Var-id e) #f))
                   => (lambda ([c : CoC6-Expr])
                        (App-Closure c e (recur* e*)))]
@@ -222,19 +224,37 @@
               [else (error 'covert-closures "Unkown Fn-Proxy Representaion")])]
            [else (error 'covert-closures "Unkown Cast Representaion")])]
         [(Fn-Proxy (list i cast) (app recur e1)(app recur e2))
-         (cond
-           [(eq? cast-rep 'Coercions)
-            (cond
-              ;; If it is a hybrid representation then proxies and closures
-              ;; are applied the same way.
-              [(eq? fn-proxy-rep 'Hybrid) 
-               (Hybrid-Proxy (get-apply-uid! i cast) e1 e2)]
-              ;; If it a data representation and it is a known definition
-              ;; site then it can't be a proxy
-              [(eq? fn-proxy-rep 'Data)
-               (Fn-Proxy i e1 e2)]
-              [else (error 'covert-closures "Unkown Fn-Proxy Representaion")])]
-           [else (error 'covert-closures "Unkown Cast Representaion")])]
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep              
+              [(Hybrid) (Hybrid-Proxy (get-apply-uid! i cast) e1 e2)]
+              [(Data)   (Fn-Proxy i e1 e2)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        [(Fn-Proxy-Huh (app recur e))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              [(Hybrid) (Hybrid-Proxy-Huh e)]
+              [(Data)   (Fn-Proxy-Huh e)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        [(Fn-Proxy-Closure (app recur e))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              [(Hybrid) (Hybrid-Proxy-Closure e)]
+              [(Data)   (Fn-Proxy-Closure e)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        [(Fn-Proxy-Coercion (app recur e))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              [(Hybrid) (Hybrid-Proxy-Coercion e)]
+              [(Data)   (Fn-Proxy-Coercion e)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
         ;; varibles that are free are extracted from the closure
         ;; while variable that are not bound by the closure are rebuilt
         [(Var u) (lookup data-env selfp u)]
@@ -331,12 +351,7 @@
         [(Failed-Coercion-Label (app recur e))
          (Failed-Coercion-Label e)]
         ;; Function Proxy Representation
-        [(Fn-Proxy-Huh (app recur e))
-         (Fn-Proxy-Huh e)]
-        [(Fn-Proxy-Closure (app recur e))
-         (Fn-Proxy-Closure e)]
-        [(Fn-Proxy-Coercion (app recur e))
-         (Fn-Proxy-Coercion e)]
+        
         ;; Gaurded Representation
         [(Unguarded-Box (app recur e))(Unguarded-Box e)]
         [(Unguarded-Box-Ref (app recur e)) (Unguarded-Box-Ref e)]

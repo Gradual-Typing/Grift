@@ -1,5 +1,6 @@
 #lang typed/racket/base
 (require racket/cmdline
+         "./rackunit.rkt"
          ;;"../src/compile.rkt"
          "../src/helpers.rkt"
          "./test-compile.rkt")
@@ -11,13 +12,12 @@
 (define log (open-output-file (build-path test-tmp-path "d.log.txt")
                               #:exists 'replace))
 
-(: cc (-> String Boolean))
+(: cc (-> String Any))
 (define (cc path)
   (let ([path (build-path path)])
     (parameterize ([current-log-port log]
-                   [traces '(All)])
-      (test-compile "debug" path (debug))
-      #t)))
+                   [traces '()])
+      (run-tests (test-suite "debug" (test-compile "debug" path (debug)))))))
 
 (unless (directory-exists? test-tmp-path)
     (make-directory test-tmp-path))

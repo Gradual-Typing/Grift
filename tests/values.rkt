@@ -95,10 +95,11 @@
     [else (blame #f s)]))
 
 (define-syntax-rule (observe exp)
-  (let ([s (with-output-to-string
-             (lambda ()
-               (parameterize ([current-error-port (current-output-port)])
+  (let ([s (call-with-output-string 
+             (lambda ([p : Output-Port])
+               (parameterize ([current-output-port p]
+                              [current-error-port p])
                  exp
-                 (flush-output))))])
+                 (flush-output p))))])
     (logging observe () "~v" s)
     (parse-observable s)))
