@@ -35,7 +35,7 @@
          [out (path->string out-path)]
          [in  (path->string (Config-c-path config))]
          [flags (append-flags (Config-c-flags config))]
-         [cmd (format "cc -o ~a ~a ~a" out in flags)])
+         [cmd (format "clang -o ~a ~a ~a" out in flags)])
     (when (trace? 'Vomit)
       (logf "System call: ~a" cmd))
     (flush-output (current-log-port))

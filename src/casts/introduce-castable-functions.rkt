@@ -33,7 +33,7 @@
 (provide introduce-castable-functions)
 
 ;; The entry point for this pass it is called by impose-casting semantics
-(: introduce-castable-functions (Cast0-Lang Config . -> . Cast1-Lang))
+(: introduce-castable-functions (Cast-with-pure-letrec Config . -> . Cast1-Lang))
 (define (introduce-castable-functions prgm config)
   (match-let ([(Prog (list name next type) exp) prgm])
     (let-values ([(exp state) (run-state (icf-expr exp)
@@ -41,8 +41,9 @@
       (Prog (list name (car state) type)
        (Letrec (hash-values (cdr state)) exp)))))
 
-(: icf-expr (-> C0-Expr (State Casters C1-Expr)))
+(: icf-expr (-> C/PL-Expr (State Casters C1-Expr)))
 (define (icf-expr exp)
+  (logging icf-expr (All) "~v" exp)
   (match exp
     [(Lambda f* exp)
      (do (bind-state : (State Casters C1-Expr))
@@ -104,13 +105,13 @@
     [(Var id)    (return-state (Var id))]
     [(Quote lit) (return-state (Quote lit))]))
 
-(: icf-expr* (-> C0-Expr* (State Casters C1-Expr*)))
+(: icf-expr* (-> C/PL-Expr* (State Casters C1-Expr*)))
 (define (icf-expr* e*) (map-state icf-expr e*))
 
 ;; Recur through binding with the casting state
-(: icf-bnd* (-> C0-Bnd* (State Casters C1-Bnd*)))
+(: icf-bnd* (-> C/PL-Bnd* (State Casters C1-Bnd*)))
 (define (icf-bnd* b*)
-  (: icf-bnd (-> C0-Bnd (State Casters C1-Bnd)))
+  (: icf-bnd (-> C/PL-Bnd (State Casters C1-Bnd)))
   (define (icf-bnd b)
     (match-let ([(cons i e) b])
       (do (bind-state : (State Casters C1-Bnd))

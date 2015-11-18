@@ -224,7 +224,7 @@
       [(Gvector-ref (app recur/env e) (app recur/env i))
        (if (integer? i)
            (read-gvect cst i (cast e CL-GVect))
-           (TODO raise an error here))]
+           (error 'cast-interp "~v" i))]
       [(Gvector-set! (app recur/env e1) (app recur/env i) (app recur/env e2))
        (write-gvect cst (cast e1 CL-GVect) (assert i integer?) e2)]
       [e (error 'interp "Umatched expression ~a" e)]))

@@ -20,6 +20,8 @@
   (make-parameter (build-path "a.out")))
 (define log-path : (Parameterof (Option Path))
   (make-parameter #f))
+(define mem-dflt : (Parameterof (Option Natural))
+  (make-parameter 100000000))
 
 ;; Semantic Option
 (define semantics : (Parameterof Semantics)
@@ -50,7 +52,8 @@
                  #:keep-c Path
                  #:keep-a Path
                  #:cc-opt (U String (Listof String))
-                 #:log    Path)
+                 #:log    Path
+                 #:mem    Natural)
                 Path))
 (define (compile path
                  #:semantics [smtc (semantics)]
@@ -58,17 +61,20 @@
                  #:keep-c    [kp-c : (Option Path) (if (keep-c?) (c-path) #f)]
                  #:keep-a    [kp-a : (Option Path) (asm-path)]
                  #:cc-opt    [opts : (U String (Listof String)) (c-flags)]
-                 #:log       [logp : (Option Path) (log-path)])
+                 #:log       [logp : (Option Path) (log-path)]
+                 #:mem       [mem :  (Option Natural) (mem-dflt)])
   (let* ([path  (simple-form-path (if (string? path)
                                       (string->path path)
                                       path))]
          [opts (if (string? opts) (list opts) opts)]
          [cpth (or kp-c (c-path))]
-         [kp-c (true? kp-c)])
+         [kp-c (true? kp-c)]
+         [mem (if (number? mem) mem 0)])
+    
     (when logp
       (current-log-port (open-output-file logp #:exists 'replace #:mode 'text)))
     (parameterize ([print-as-expression #t] [print-graph #t] [print-struct #t])
-      (compile/conf path (Config path smtc outp cpth kp-c opts kp-a)))))
+      (compile/conf path (Config path smtc outp cpth kp-c opts kp-a mem)))))
 
 (: envoke-compiled-program
    (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))

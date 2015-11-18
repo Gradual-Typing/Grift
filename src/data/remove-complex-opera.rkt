@@ -7,10 +7,10 @@
 
 (: remove-complex-opera (Data2-Lang Config -> Data3-Lang))
 (trace-define (remove-complex-opera prog config)
-  (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
+  (match-let ([(Prog (list name count ty) (GlobDecs d* (Labels bnd* body))) prog])
     (let*-values ([(body count) (run-state (rco-body body) count)]
                   [(bnd* count) (run-state (map-state rco-bnd-code bnd*) count)])
-      (Prog (list name count ty) (Labels bnd* body)))))
+      (Prog (list name count ty) (GlobDecs d* (Labels bnd* body))))))
 
 ;; Simple recursion into the body of code bindings
 (: rco-bnd-code (D2-Bnd-Code -> (State Nat D3-Bnd-Code)))
@@ -96,7 +96,8 @@
     [(Assign i v)
      (do (bind-state : (State RcoSt D3-Effect))
          (v : D3-Value <- (rco-value v))
-         (return-state (Assign i v)))]
+       (return-state (Assign i v)))]
+    [(Halt) (return-state (Halt))]
     [(If t c a)
      (do (bind-state : (State RcoSt D3-Effect))
          (t : D3-Pred   <- (rco-pred t))

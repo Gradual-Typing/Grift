@@ -80,6 +80,8 @@
    (test-file "core" "letrec4.schml" (bool #t))
    (test-file "core" "letrec5.schml" (bool #t))
    (test-file "core" "letrec6.schml" (int 1))
+   (test-file "core" "letrec7.schml" (int 2))
+   (test-file "core" "letrec8.schml" (int 0))
    ;; Ascription
    (test-file "core" "int-dyn-int.schml"   (int 1))
    (test-file "core" "ascribe-dyn.schml"       (dyn))

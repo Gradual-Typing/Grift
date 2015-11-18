@@ -24,13 +24,13 @@
 ;; Only the pass is provided by this module
 (provide label-lambdas)
 
-(: label-lambdas (Cast3-Lang Config . -> . Cast4-Lang))
+(: label-lambdas (Cast-with-hoisted-types Config . -> . Cast4-Lang))
 (define (label-lambdas prgm comp-config)
-  (match-let ([(Prog (list name count type) exp) prgm])
+  (match-let ([(Prog (list name count type) (LetT tbnd* exp)) prgm])
     (let-values ([(exp count) (run-state (ll-expr exp) count)])
-      (Prog (list name count type) exp))))
+      (Prog (list name count type) (LetT tbnd* exp)))))
 
-(: ll-expr (-> C3-Expr (State Nat C4-Expr)))
+(: ll-expr (-> C/LT-Expr (State Nat C4-Expr)))
 (define (ll-expr exp)
   (match exp
     ;; The tiny core
@@ -73,7 +73,7 @@
          (e  : C4-Expr  <- (ll-expr  e))
          (return-state (Observe e t)))]
     ;; Type Representation
-    [(Type t) (return-state (Type t))]
+    [(Type u) (return-state (Type u))]
     [(Type-tag e) (lift-state (inst Type-tag C4-Expr) (ll-expr e))]
     [(Type-Fn-arg e i)
      (do (bind-state : (State Nat C4-Expr))
@@ -173,7 +173,7 @@
     [(Gproxy-blames e)
      (lift-state (inst Gproxy-blames C4-Expr) (ll-expr e))]))
 
-(: ll-expr* (-> C3-Expr* (State Nat C4-Expr*)))
+(: ll-expr* (-> C/LT-Expr* (State Nat C4-Expr*)))
 (define (ll-expr* e*) (map-state ll-expr e*))
 
 ;; ll-let takes the fields of from let and letrecs and pulls all
@@ -183,18 +183,18 @@
 ;; is that in a lexical world this would break horribly but invariants
 ;; about variable renaming prevents this from occuing.
 ;; We should do some closure and letrec optimization soon!
-(: ll-let (-> C3-Bnd* C3-Expr (State Nat C4-Expr)))
+(: ll-let (-> C/LT-Bnd* C/LT-Expr (State Nat C4-Expr)))
 (define (ll-let b* e)
   ;; split-bound-procedures actually performs the filtering
   ;; breaking the macro here for now until I have a better operator
   ;; such as fold-state
-  (: split-bnds (-> C3-Bnd* Nat
+  (: split-bnds (-> C/LT-Bnd* Nat
 		    (values C4-Bnd-Lambda* C4-Bnd-Data* Nat)))
   (define (split-bnds b* n)
     (for/fold ([bp* : C4-Bnd-Lambda* '()]
 	       [bd* : C4-Bnd-Data* '()]
 	       [n   : Nat n])
-	([b : C3-Bnd b*])
+              ([b : C/LT-Bnd b*])
       (match b
 	[(cons i (Lambda f* (Castable b e)))
          (let-values ([(e n) (run-state (ll-expr e) n)])

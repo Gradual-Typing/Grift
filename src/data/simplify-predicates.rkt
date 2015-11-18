@@ -6,10 +6,10 @@
 (provide simplify-predicates)
 (: simplify-predicates (Data4-Lang Config -> Data5-Lang))
 (trace-define (simplify-predicates prog config)
-  (match-let ([(Prog (list name count ty) (Labels bnd* body)) prog])
+  (match-let ([(Prog (list name count ty) (GlobDecs d* (Labels bnd* body))) prog])
     (let*-values ([(body count) (run-state (sp-body body) count)]
                   [(bnd* count) (run-state (map-state sp-bnd-code bnd*) count)])
-      (Prog (list name count ty) (Labels bnd* body)))))
+      (Prog (list name count ty) (GlobDecs d* (Labels bnd* body))))))
 
 ;; Simple recursion into the body of code bindings
 (: sp-bnd-code (D4-Bnd-Code -> (State Nat D5-Bnd-Code)))
@@ -123,7 +123,8 @@
     [(Assign i v)
      (do (bind-state : (State SpSt D5-Effect*))
          (v : D5-Value <- (sp-value v))
-         (return-state (list (Assign i v))))]
+       (return-state (list (Assign i v))))]
+    [(Halt) (return-state (list (Halt)))]
     [(If t c a)
      (do (bind-state : (State SpSt D5-Effect*))
          ((cons e* t) : (D5E D5-Pred)   <- (sp-pred t))

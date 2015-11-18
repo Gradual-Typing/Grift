@@ -388,24 +388,29 @@ Provide comments about where to find definitions of types and data
   (define (fold-env-extend/bnd b* env)
     (for/fold : (values S0-Bnd* Env) ([bnd* : S0-Bnd* '()] [env : Env env]) ([bnd : S0-Bnd b*])
               (match bnd
-                [(Bnd id type (Ann (Lambda f* (Ann b t^)) src))
-                 (cond
-                   [type (values (cons bnd bnd*) (hash-set env id type))]
-                   [else
-                    (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
-                           [arity  (length arg-t*)])
-                       (cond
-                         [t^
-                          (values (cons bnd bnd*)
-                                  (hash-set env id (Fn arity arg-t* t^)))]
-                         [else
-                          ;; Function without return-type annotatin gets dyn return
-                          (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
-                                 [rhs : S0-Expr
-                                      (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
-                            (values (cons (Bnd id type rhs) bnd*)
-                                    (hash-set env id type)))]))])]
-                [else (raise-letrec-restrict src)])))
+                [(Bnd id type (Ann exp src))
+                 (match exp
+                   [(Lambda f* (Ann b t^))
+                    (cond
+                      [type (values (cons bnd bnd*) (hash-set env id type))]
+                      [else
+                       (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
+                              [arity  (length arg-t*)])
+                         (cond
+                           [t^
+                            (values (cons bnd bnd*)
+                                    (hash-set env id (Fn arity arg-t* t^)))]
+                           [else
+                            ;; Function without return-type annotatin gets dyn return
+                            (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
+                                   [rhs : S0-Expr
+                                        (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
+                              (values (cons (Bnd id type rhs) bnd*)
+                                      (hash-set env id type)))]))])]
+                   [e (let* ([recur/env (lambda ([e : S0-Expr]) (tc-expr e env))]
+                            [e2 ((mk-tc-binding src recur/env) bnd)])
+                        (match-let ([(Bnd id type rhs) e2])
+                          (values (cons bnd bnd*) (hash-set env id type))))])])))
   (let*-values
       ([(bnd* env) (fold-env-extend/bnd bnd* env)]
        [(recur/env) (lambda ([e : S0-Expr]) (tc-expr e env))]

@@ -26,10 +26,10 @@
 
 (: remove-let (-> Data1-Lang Config Data2-Lang))
 (trace-define (remove-let prgm comp-config)
-  (match-let ([(Prog (list name count type) (Labels bnd-code* tail)) prgm])
+  (match-let ([(Prog (list name count type) (GlobDecs d* (Labels bnd-code* tail))) prgm])
     (let ([bnd-code* : D2-Bnd-Code* (rl-bnd-code* bnd-code*)]
           [body : D2-Body (rl-body tail)])
-      (Prog (list name count type) (Labels bnd-code* body)))))
+      (Prog (list name count type) (GlobDecs d* (Labels bnd-code* body))))))
 
 
 (: rl-bnd-code* (-> D1-Bnd-Code* D2-Bnd-Code*))
@@ -160,18 +160,22 @@
 (: rl-effect (D1-Effect Uid* -> (values D2-Effect Uid*)))
 (define (rl-effect eff lv*)
   (match eff
-    [(Let bnd* exp)
-     (let*-values ([(exp lv*)  (rl-effect exp lv*)]
+    [(Let bnd* e)
+     (let*-values ([(e lv*)  (rl-effect e lv*)]
                    [(stm* lv*) (rl-bnd* bnd* lv*)])
-       (values (make-begin (append stm* (list exp)) NO-OP) lv*))]
+       (values (make-begin (append stm* (list e)) NO-OP) lv*))]
+    [(Assign u e1)
+     (let-values ([(e2 lv2*) (rl-value e1)])
+       (values (Assign u e2) (append lv* lv2*)))]
+    [(Halt) (values (Halt) lv*)]
     [(If t c a)
      (let*-values ([(t p-lv*) (rl-pred t)]
                    [(c lv*)   (rl-effect c lv*)]
-                   [(a lv*) (rl-effect a lv*)])
+                   [(a lv*)   (rl-effect a lv*)])
          (values (If t c a) (append p-lv* lv*)))]
     [(Begin stm* _)
-     (let*-values ([(stm* lv*) (rl-effect* stm* lv*)])
-       (values (make-begin stm* NO-OP) lv*))]
+     (let*-values ([(stm2* lv*) (rl-effect* stm* lv*)])
+       (values (make-begin stm2* NO-OP) lv*))]
     [(Repeat i e1 e2 e3)
      (let*-values ([(e1 l1) (rl-value e1)]
                    [(e2 l2) (rl-value e2)]

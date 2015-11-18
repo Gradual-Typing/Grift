@@ -42,7 +42,8 @@ TODO
                 [c-path : Path]
                 [keep-c : Boolean]
                 [c-flags : (Listof String)]
-                [asm-path : (Option Path)]))
+                [asm-path : (Option Path)]
+                [mem-limit : Natural])) ;; memory size in bytes
 
 
 #|
@@ -108,6 +109,7 @@ name-field2 - accessor for field2
   (Code-Label value)
   (Tag bits)         ;; an tag for an imediate value
   (Type type)        ;; an atomic type
+  (TypeId compact-type)  ;; variable refers to the runtime representation of a type
   ;; Effectfull expressions
   ;; typed bindings annotations
   (Fml identifier type)
@@ -130,8 +132,10 @@ name-field2 - accessor for field2
   (Closure-code var)
   (Closure-ref this var)
   (Closure-caster this)
-  (LetP bindings body)
-  (LetC bindings body);; Can create cyclic immutable data
+  (LetP bindings body) ;; binds procedures
+  (LetC bindings body) ;; binds closures; Can create cyclic immutable data
+  (LetT bindings body) ;; binds type ids to type representations
+  (GlobDecs vars body) ;; declaration of global variables
   (Procedure this params code caster bound-vars body)
   ;; represents a set of moves to initialize variables before
   (Code variables body)
@@ -333,11 +337,11 @@ name-field2 - accessor for field2
     (-> C7-Effect* C7-Value  C7-Value)
     (-> C7-Effect* No-Op C7-Effect)
     (-> D1-Effect* D1-Value  D1-Value)
+    (-> D2-Effect* No-Op D2-Effect)
     (-> D1-Effect* No-Op D1-Effect)
 #;  (-> D3-Effect* D3-Trivial D3-Value)
     (-> D2-Effect* D2-Value  D2-Value)
     (-> D2-Effect* D2-Pred D2-Pred)
-    (-> D2-Effect* No-Op D2-Effect)
     (-> D4-Effect* D4-Tail D4-Tail)
     (-> D4-Effect* No-Op D4-Effect)
     (-> D5-Effect* D5-Tail D5-Tail)))
@@ -520,6 +524,7 @@ name-field2 - accessor for field2
      (MVect Schml-Type)))
 
 (define-type Atomic-Schml-Type (U Unit Int Bool Dyn))
+
 
 (: schml-type? (Any -> Boolean : Schml-Type))
 (define (schml-type? x)
@@ -762,15 +767,15 @@ We are going to UIL
 (define-type Cast-Literal (U Schml-Literal Blame-Label))
 
 #|-----------------------------------------------------------------------------+
-| The Cast Language Family Types, Primitives, Literals, and Terminals        |
+| The Cast Language Family Types, Primitives, Literals, and Terminals          |
 +-----------------------------------------------------------------------------|#
 #|-----------------------------------------------------------------------------+
-| Language/Cast0 created by insert-implicit-casts                              |
+| Language/Cast0 created by insert-casts                                       |
 +-----------------------------------------------------------------------------
 | Description: At the begining of this section of the compiler all cast in the |
 | ast are performed on known schml language types. But as the compiler imposes |
 | the semantics of cast there become situations where a type is dependant on   |
-| econtents of a variable. At this point casts are no longer able to be         |
+| econtents of a variable. At this point casts are no longer able to be        |
 | completely compiled into primitives. These casts require a sort of cast      |
 | interpreter which is built later.                                            |
 | In general this compiler tries to move as mainy casts into the primitive     |
@@ -816,9 +821,52 @@ We are going to UIL
 (define-type C0-Bnd*  (Listof C0-Bnd))
 
 
+#|-----------------------------------------------------------------------------+
+| Language/Cast-with-pure-letrec created by purify-letrec                      |
++-----------------------------------------------------------------------------|#
+
+(define-type Cast-with-pure-letrec (Prog (List String Natural Schml-Type) C/PL-Expr))
+
+(define-type C/PL-Expr
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Uid* E)
+	  (Letrec C/PL-Bnd-Lam* E)
+	  (Let C/PL-Bnd* E)
+	  (App E (Listof E))
+	  (Op Schml-Primitive (Listof E))
+	  (If E E E)
+	  (Cast E Schml-Type Schml-Type Blame-Label)
+          (Begin C/PL-Expr* E)
+          (Repeat Uid E E E)
+          ;; Monotonic
+          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
+          (Munbox E)
+          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
+          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
+          (Mbox-set! E E)
+          (Mvector E E)
+          (Mvector-set! E E E)
+          (Mvector-ref E E)
+          ;; Guarded effects
+          (Gbox E)
+          (Gunbox E)
+          (Gbox-set! E E)
+          (Gvector E E)
+          (Gvector-set! E E E)
+          (Gvector-ref E E)
+	  ;; Terminals
+	  (Var Uid)
+	  (Quote Cast-Literal))))
+
+(define-type C/PL-Expr* (Listof C/PL-Expr))
+(define-type C/PL-Bnd   (Pair Uid C/PL-Expr))
+(define-type C/PL-Bnd*  (Listof C/PL-Bnd))
+(define-type C/PL-Lam (Lambda Uid* C/PL-Expr))
+(define-type C/PL-Bnd-Lam (Pairof Uid C/PL-Lam))
+(define-type C/PL-Bnd-Lam* (Listof C/PL-Bnd-Lam))
 
 #| ----------------------------------------------------------------------------+
-|Cast1                                                                         |
+| Language/Cast1 created by introduce-castable-functions                       |
 ------------------------------------------------------------------------------|#
 
 (define-type Cast1-Lang
@@ -869,7 +917,7 @@ We are going to UIL
 (define-type C1-Bnd*  (Listof C1-Bnd))
 
 #|-----------------------------------------------------------------------------+
-| Language/Cast2 created by introduce-castable-references                      |
+| Language/Cast2 created by lower-reference-casts                              |
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast2-Lang
@@ -979,11 +1027,70 @@ We are going to UIL
 (define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
 
 #|-----------------------------------------------------------------------------+
+| Language/Cast-with-hoisted-types created by hoist-types
+------------------------------------------------------------------------------|#
+
+(define-type Cast-with-hoisted-types
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C/LT-Expr)))
+
+(define-type C/LT-TBnd*
+  (Listof C/LT-TBnd))
+
+(define-type C/LT-TBnd
+  (Pair Uid Compact-Type))
+
+(define-type Compact-Type
+  (U (Fn Index (Listof Prim-Type) Prim-Type)
+     (GRef Prim-Type) (MRef Prim-Type)
+     (GVect Prim-Type) (MVect Prim-Type)))
+
+(define-type Prim-Type (U Atomic-Schml-Type (TypeId Uid)))
+
+(define-type C/LT-Expr
+  (Rec E (U ;; Non-Terminals
+	  (Lambda Uid* (Castable (Option Uid) E))
+	  (Letrec C/LT-Bnd* E)
+	  (Let C/LT-Bnd* E)
+	  (App E (Listof E))
+          (Op Schml-Primitive (Listof E))
+	  (If E E E)
+          (Begin C/LT-Expr* E)
+          (Repeat Uid E E E)
+          ;; closure operations
+          (Fn-Caster E)
+          ;; Type operations
+          (Type-tag E)
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-Fn-arity E)
+          (Type-GRef-to E)
+          (Type-GVect-to E)
+          ;; Dyn operations
+          (Dyn-tag E)
+          (Dyn-immediate E)
+          (Dyn-type E)
+          (Dyn-value E)
+          (Dyn-make E E)
+          ;; Observational Operations
+          (Blame E)
+          (Observe E Schml-Type)
+          ;; Terminals
+          (Type Prim-Type)
+          (Tag Tag-Symbol)
+	  (Var Uid)
+          (GRep E)
+	  (Quote Cast-Literal))))
+
+(define-type C/LT-Expr* (Listof C/LT-Expr))
+(define-type C/LT-Bnd   (Pair Uid C/LT-Expr))
+(define-type C/LT-Bnd*  (Listof C/LT-Bnd))
+
+#|-----------------------------------------------------------------------------+
 | Language/Cast created by label-lambdas                    |
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast4-Lang
-  (Prog (List String Natural Schml-Type) C4-Expr))
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C4-Expr)))
 
 (define-type C4-Expr
   (Rec E (U ;; Non-Terminals
@@ -1013,7 +1120,7 @@ We are going to UIL
           (Blame E)
           (Observe E Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Prim-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -1032,7 +1139,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast5-Lang
-  (Prog (List String Natural Schml-Type) C5-Expr))
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C5-Expr)))
 
 (define-type C5-Expr
   (Rec E (U ;; Non-Terminals
@@ -1062,7 +1169,7 @@ We are going to UIL
           (Blame E)
           (Observe E Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Prim-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -1081,7 +1188,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast6-Lang
-  (Prog (List String Natural Schml-Type) C6-Expr))
+  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C6-Expr)))
 
 (define-type C6-Expr
   (Rec E (U ;; Non-Terminals
@@ -1113,7 +1220,7 @@ We are going to UIL
           (Blame E)
           (Observe E Schml-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Prim-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -1284,7 +1391,7 @@ We are going to UIL
 | Data0-Language created by impose-cast-semantics                              |
 +-----------------------------------------------------------------------------|#
 (define-type Data0-Lang
-  (Prog (List String Natural Schml-Type) D0-Expr))
+  (Prog (List String Natural Schml-Type) (GlobDecs (Listof Uid) D0-Expr)))
 
 (define-type D0-Bnd-Code* (Listof D0-Bnd-Code))
 (define-type D0-Bnd-Code (Pairof Uid D0-Code))
@@ -1301,6 +1408,7 @@ We are going to UIL
             (Repeat Uid E E E)
 	    Halt
 	    (Var Uid)
+            (Assign Uid E)
 	    (Code-Label Uid)
 	    (Quote D0-Literal))))
 
@@ -1308,15 +1416,14 @@ We are going to UIL
 (define-type D0-Bnd* (Listof D0-Bnd))
 (define-type D0-Bnd  (Pairof Uid D0-Expr))
 (define-type D0-Literal Data-Literal)
-
 #|-----------------------------------------------------------------------------+
 | Data1-Language created by normalize-context                                          |
 +-----------------------------------------------------------------------------|#
-
 (define-type Data1-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D1-Bnd-Code*
-		D1-Tail)))
+	(GlobDecs (Listof Uid)
+                  (Labels D1-Bnd-Code*
+                          D1-Tail))))
 
 (define-type D1-Bnd-Code* (Listof D1-Bnd-Code))
 (define-type D1-Bnd-Code (Pairof Uid D1-Code))
@@ -1362,6 +1469,8 @@ We are going to UIL
      (Repeat Uid D1-Value D1-Value E)
      (App D1-Value D1-Value*)
      (UIL-Op! D1-Value)
+     (Assign Uid D1-Value)
+     Halt
      No-Op)))
 
 
@@ -1381,8 +1490,9 @@ We are going to UIL
 
 (define-type Data2-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D2-Bnd-Code*
-		D2-Body)))
+	(GlobDecs (Listof Uid)
+                  (Labels D2-Bnd-Code*
+                          D2-Body))))
 
 (define-type D2-Body (Locals Uid* D2-Tail))
 (define-type D2-Bnd-Code* (Listof D2-Bnd-Code))
@@ -1420,6 +1530,7 @@ We are going to UIL
      (App D2-Value D2-Value*)
      (UIL-Op! D2-Value)
      (Assign Uid D2-Value)
+     Halt
      No-Op)))
 
 
@@ -1436,8 +1547,9 @@ We are going to UIL
 
 (define-type Data3-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D3-Bnd-Code*
-		D3-Body)))
+        (GlobDecs (Listof Uid)
+                  (Labels D3-Bnd-Code*
+                          D3-Body))))
 
 (define-type D3-Body (Locals Uid* D3-Tail))
 (define-type D3-Bnd-Code* (Listof D3-Bnd-Code))
@@ -1473,6 +1585,7 @@ We are going to UIL
      (App D3-Trivial D3-Trivial*)
      (UIL-Op! D3-Trivial)
      (Assign Uid D3-Value)
+     Halt
      No-Op)))
 
 ;; (TODO halt is not trivial though because we are targeting c it may be treated so)
@@ -1496,8 +1609,9 @@ We are going to UIL
 
 (define-type Data4-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D4-Bnd-Code*
-		D4-Body)))
+	(GlobDecs (Listof Uid)
+                  (Labels D4-Bnd-Code*
+                          D4-Body))))
 
 (define-type D4-Body (Locals Uid* D4-Tail))
 (define-type D4-Bnd-Code* (Listof D4-Bnd-Code))
@@ -1523,6 +1637,7 @@ We are going to UIL
      (Repeat Uid D4-Trivial D4-Trivial E)
      (UIL-Op! D4-Trivial)
      (Assign Uid D4-Value)
+     Halt
      No-Op)))
 
 (define-type D4-Value
@@ -1549,8 +1664,9 @@ We are going to UIL
 
 (define-type Data5-Lang
   (Prog (List String Natural Schml-Type)
-	(Labels D5-Bnd-Code*
-		D5-Body)))
+        (GlobDecs (Listof Uid)
+                  (Labels D5-Bnd-Code*
+                          D5-Body))))
 
 (define-type D5-Body (Locals Uid* D5-Tail))
 (define-type D5-Bnd-Code* (Listof D5-Bnd-Code))
@@ -1571,6 +1687,7 @@ We are going to UIL
      (Repeat Uid D5-Trivial D5-Trivial (Begin D5-Effect* No-Op))
      (UIL-Op! D5-Trivial)
      (Assign Uid D5-Value)
+     Halt
      No-Op)))
 
 (define-type D5-Value

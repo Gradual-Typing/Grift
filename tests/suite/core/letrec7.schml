@@ -1,0 +1,1 @@
+(letrec ([i : Int 1] [add1 : (Int -> Int) (lambda (x) (+ x 1))]) (add1 i))
