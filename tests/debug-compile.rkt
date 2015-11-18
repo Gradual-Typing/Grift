@@ -32,6 +32,9 @@
             (eq? 'Coercions crep))
         (compiler-config-cast-representation crep)
         (error 'tests "--cast-representation given invalid argument ~a" crep)))]
+  [("-i" "--itermediate-checks")
+   "turn on itermediate checks during testing"
+   (intermediate-checks? #t)]
  #:args (path)
  (if (string? path)
      (cc path)

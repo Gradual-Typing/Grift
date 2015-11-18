@@ -45,6 +45,10 @@
   : (Parameterof Cast-Representation)
   (make-parameter 'Twosomes))
 
+(define intermediate-checks?
+  : (Parameterof Boolean)
+  (make-parameter #f))
+
 (define-syntax-rule (test-compile name path expected)
   (test-case name
     (call/cc
@@ -60,24 +64,29 @@
                                      expected
                                      (blame #t (exn-message e))
                                      "static type error")))])
+         (when (intermediate-checks?)
            (define ast0 (reduce-to-cast-calculus path config))
            (check value=? (cast-lang-interp ast0 config) expected "cast-lang interp")
-           (ck ast0 "cast 0")
+           (ck ast0 "cast 0")            
            (define ast1 (test-impose-cast-semantics ast0 config ck))
            (define ast2 (convert-representation ast1 config))
            (c-backend-generate-code ast2 config)
            (check value=?
                   (observe (envoke-compiled-program #:config config))
                   expected
-                  "test compiler semantics")
-           (compile/conf path config)
-           (check value=?
-                  (observe (envoke-compiled-program #:config config))
-                  expected
-                  "real compiler semantics"))))))
+                  "test compiler semantics"))
+         (compile/conf path config)
+         (check value=?
+                (observe (envoke-compiled-program #:config config))
+                expected
+                "real compiler semantics"))))))
 
 (define-syntax-rule (test-file p ... n e)
   (test-compile n (simplify-path (build-path test-suite-path p ... n)) e))
+
+(define-syntax-rule (test-file/no-checks p ... n e)
+  (parameterize ([intermediate-checks? #f])
+    (test-compile n (simplify-path (build-path test-suite-path p ... n)) e)))
 
 (define-syntax-rule (make-test-file p ...)
   (syntax-rules ()
