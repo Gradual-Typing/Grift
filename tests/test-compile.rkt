@@ -32,7 +32,7 @@
            #f
            '()
            #f
-           100000000)))
+           100000000000)))
 
 (define-syntax-rule (test-compile name path expected)
   (test-case name

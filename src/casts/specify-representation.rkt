@@ -81,9 +81,9 @@ exposed as the effects that they truelly are.
 
       (: specify-representation (Cast6-Lang Config -> Data0-Lang))
       (trace-define (specify-representation prgm comp-config)
-                    (match-let ([(Prog (list name next type) (LetT tbnd* expr)) prgm])
+                    (match-let ([(Prog (list name next type) (LetT* tbnd* expr)) prgm])
                       (let ([sr-top-expr (sr-expr (hash) empty-index-map)]
-                            [d* ((inst map Uid C/LT-TBnd) car tbnd*)])
+                            [d* (map (inst car Uid Any) tbnd*)])
                         (let*-values ([(texp* next) (run-state (map-state sr-type tbnd*) next)]
                                       [(expr next) (run-state (sr-top-expr expr) next)])
                           (Prog (list name next type) (GlobDecs d* (Begin texp* expr)))))))
@@ -428,7 +428,7 @@ exposed as the effects that they truelly are.
       (define (sr-bnd* env cenv b*) (map-state (sr-bnd env cenv) b*))
 
 
-      (: sr-type (-> C/LT-TBnd (State Nat D0-Expr)))
+      (: sr-type (-> C/LT-BndT (State Nat D0-Expr)))
       (define (sr-type b)
         ;; lays down the data in the third list in continuous sequence
         ;; of memory

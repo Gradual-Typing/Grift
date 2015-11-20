@@ -27,10 +27,10 @@
 
 (: convert-closures (Cast5-Lang Config . -> . Cast6-Lang))
 (define (convert-closures prgm conf)
-  (match-let ([(Prog (list name count type) (LetT tbnd* exp)) prgm])
+  (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
     (let ([base-cc-expr (cc-expr empty-env empty-env no-selfp)])
       (let-values ([(exp count) (run-state (base-cc-expr exp) count)])
-        (Prog (list name count type) (LetT tbnd* exp))))))
+        (Prog (list name count type) (LetT* tbnd* exp))))))
 
 (define empty-env : Env (hash))
 (define no-selfp : SelfP

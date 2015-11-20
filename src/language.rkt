@@ -134,7 +134,7 @@ name-field2 - accessor for field2
   (Closure-caster this)
   (LetP bindings body) ;; binds procedures
   (LetC bindings body) ;; binds closures; Can create cyclic immutable data
-  (LetT bindings body) ;; binds type ids to type representations
+  (LetT* bindings body);; binds type ids to type representations in order
   (GlobDecs vars body) ;; declaration of global variables
   (Procedure this params code caster bound-vars body)
   ;; represents a set of moves to initialize variables before
@@ -1031,12 +1031,12 @@ We are going to UIL
 ------------------------------------------------------------------------------|#
 
 (define-type Cast-with-hoisted-types
-  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C/LT-Expr)))
+  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C/LT-Expr)))
 
-(define-type C/LT-TBnd*
-  (Listof C/LT-TBnd))
+(define-type C/LT-BndT*
+  (Listof C/LT-BndT))
 
-(define-type C/LT-TBnd
+(define-type C/LT-BndT
   (Pair Uid Compact-Type))
 
 (define-type Compact-Type
@@ -1090,7 +1090,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast4-Lang
-  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C4-Expr)))
+  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C4-Expr)))
 
 (define-type C4-Expr
   (Rec E (U ;; Non-Terminals
@@ -1139,7 +1139,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast5-Lang
-  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C5-Expr)))
+  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C5-Expr)))
 
 (define-type C5-Expr
   (Rec E (U ;; Non-Terminals
@@ -1188,7 +1188,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast6-Lang
-  (Prog (List String Natural Schml-Type) (LetT C/LT-TBnd* C6-Expr)))
+  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C6-Expr)))
 
 (define-type C6-Expr
   (Rec E (U ;; Non-Terminals

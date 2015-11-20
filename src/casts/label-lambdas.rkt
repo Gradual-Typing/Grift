@@ -26,9 +26,9 @@
 
 (: label-lambdas (Cast-with-hoisted-types Config . -> . Cast4-Lang))
 (define (label-lambdas prgm comp-config)
-  (match-let ([(Prog (list name count type) (LetT tbnd* exp)) prgm])
+  (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
     (let-values ([(exp count) (run-state (ll-expr exp) count)])
-      (Prog (list name count type) (LetT tbnd* exp)))))
+      (Prog (list name count type) (LetT* tbnd* exp)))))
 
 (: ll-expr (-> C/LT-Expr (State Nat C4-Expr)))
 (define (ll-expr exp)

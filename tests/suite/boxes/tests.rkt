@@ -26,5 +26,4 @@
    (test-file "boxes" "gbox7-7.schml" (int 42))
    (test-file "boxes" "gbox8.schml" (int 42))
    (test-file "boxes" "gbox9.schml" (bool #f))
-   (test-file "boxes" "gbox10.schml" (int 42))
    ))
