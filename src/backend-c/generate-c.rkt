@@ -19,6 +19,9 @@
 ;; Only the pass is provided by this module
 (provide generate-c)
 
+(define display-mem-statistics? : (Parameterof Boolean)
+  (make-parameter #f))
+
 (: IMDT-C-TYPE String)
 (define IMDT-C-TYPE "long")
 
@@ -78,14 +81,7 @@
    "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);\n"
    "double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);\n"
    "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
-   "}\n"
-   #;(
-   "    // subtract the two times in order to get result \n"
-   "    timersub(&timer_stop_time, &timer_start_time, &timer_result_time);\n\n"
-   "    // print out the result \n"
-   "    printf(\"time (sec): %f\\n\", ((double) timer_result_time.tv_sec) +\n"
-   "            (((double) timer_result_time.tv_usec) / 1000000.0));\n"
-   "}\n")))
+   "}\n"))
 
 
 (define (emit-source-comment name type)
@@ -95,22 +91,22 @@
 (define (emit-alloc n)
   (let ([s (number->string n)])
     (display "long alloc(int n){")
-  (display "    long result = free_ptr;")
-  (display "    long newFree = result + n;")
-  (display "    allocd_mem+=n;")
-  (display "    if (newFree >= limit){")
-  (display "        printf(\"Requesting more memory\\n\");")
-  (display "          free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
-  (display s)
-  (display "), alloc_ptr);")
-  (display "          limit = free_ptr + ")
-  (display s)
-  (display ";")
-  (display "          return alloc (n);")
-  (display "    }")
-  (display "    free_ptr = newFree;")
-  (display "    return result;")
-  (display "}")))
+    (display "    long result = free_ptr;")
+    (display "    long newFree = result + n;")
+    (display "    allocd_mem+=n;")
+    (display "    if (newFree >= limit){")
+    (display "        printf(\"Requesting more memory\\n\");")
+    (display "          free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
+    (display s)
+    (display "), alloc_ptr);")
+    (display "          limit = free_ptr + ")
+    (display s)
+    (display ";")
+    (display "          return alloc (n);")
+    (display "    }")
+    (display "    free_ptr = newFree;")
+    (display "    return result;")
+    (display "}")))
 
 (: emit-boiler-plate (Natural -> Void))
 (define (emit-boiler-plate n)
@@ -148,7 +144,8 @@
       (init-mem mem-limit)
       (newline)
       (emit-main-tail tail)
-      (display "printf(\"%lu bytes allocated\\n\",allocd_mem);\n")
+      (when (display-mem-statistics?)
+        (display "printf(\"%lu bytes allocated\\n\",allocd_mem);\n"))
       (display "return 0;")
       (display "}"))
     (newline)
