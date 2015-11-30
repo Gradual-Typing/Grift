@@ -1,21 +1,27 @@
-#lang typed/racket
+#lang typed/racket/base
+
 #|
 This is a micro compiler that takes a path, reads the contents
 of that file, parses the syntax into an ast, type-checks the
 ast, and finally converts that ast into an equivalent ast
 of the cast calculus.
 |#
-(provide (all-defined-out))
-(require "../language.rkt"
+
+(require "../configuration.rkt"
          "../helpers.rkt"
          "./read.rkt"
-         "./parse.rkt"
+         "./syntax-to-schml0.rkt"
          "./type-check.rkt"
-         "./insert-casts.rkt")
+         "./insert-casts.rkt"
+         "../language/cast0.rkt")
+(provide (all-defined-out)
+         (all-from-out "../language/cast0.rkt"))
 
-(: reduce-to-cast-calculus (Path Config . -> . Cast0-Lang))
+(: reduce-to-cast-calculus (Path Config -> Cast0-Lang))
 (trace-define (reduce-to-cast-calculus path config)
   (let* ((stx-lang (read path config))
 	 (s0 (syntax->schml0 stx-lang config))
          (s1 (type-check s0 config)))
     (insert-casts s1 config)))
+
+

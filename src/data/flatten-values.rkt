@@ -18,12 +18,15 @@
 |#
 
 
-(require "../language.rkt"
+(require "../language/data3.rkt"
+         "../language/data4.rkt"
+         "../language/make-begin.rkt"
+         "../configuration.rkt"
          "../helpers.rkt")
 
 (provide flatten-values)
 (: flatten-values (Data3-Lang Config -> Data4-Lang))
-(trace-define (flatten-values prog config)
+(define (flatten-values prog config)
   (match-let ([(Prog (list name count ty) (GlobDecs d* (Labels bnd* body))) prog])
     (let*-values ([(body count) (run-state (fv-body body) count)]
                   [(bnd* count) (run-state (map-state fv-bnd-code bnd*) count)])
@@ -71,15 +74,17 @@
          (c : D4-Tail <- (fv-tail c))
          (a : D4-Tail <- (fv-tail a))
          (return-state (If t c a)))]
-      [(Begin e* v)
-       (do (bind-state : (State Locs D4-Tail))
-           (e* : D4-Effect* <- (fv-effect* e*))
-           (t  : D4-Tail <- (fv-tail v))
-           (return-state (make-begin e* t)))]
-      [(Return v)
-       (do (bind-state  : (State Locs D4-Tail))
-           ((cons e* v) : (E* D4-Value) <- (fv-value v))
-           (return-state (make-begin e* (Return v))))]))
+    [(Begin e* v)
+     (do (bind-state : (State Locs D4-Tail))
+         (e* : D4-Effect* <- (fv-effect* e*))
+       (t  : D4-Tail <- (fv-tail v))
+       (return-state (make-begin e* t)))]
+    [(Return v)
+     (if (Success? v)
+         (return-state (Return (Success)))
+         (do (bind-state  : (State Locs D4-Tail))
+             ((cons e* v) : (E* D4-Value) <- (fv-value v))
+             (return-state (make-begin e* (Return v)))))]))
 
 (: fv-value (D3-Value -> (State Locs (E* D4-Value))))
 (define (fv-value v)
@@ -103,11 +108,11 @@
          (e* : D4-Effect* <- (fv-effect* e*))
          ((cons e*^ v) : (E* D4-Value) <- (fv-value v))
          (return-state (cons (append e* e*^) v)))]
-    [(App t t*)
+    [(App-Code t t*)
      (do (bind-state : (State Locs (E* D4-Value)))
          (t  : D4-Trivial  <- (fv-trivial  t))
          (t* : D4-Trivial* <- (fv-trivial* t*))
-         (let ([v : D4-Value (App t t*)])
+         (let ([v : D4-Value (App-Code t t*)])
            (return-state (cons '() v))))]
     [(Op p t*)
      (do (bind-state : (State Locs (E* D4-Value)))
@@ -162,12 +167,12 @@
          (t2 : D4-Trivial <- (fv-trivial t2))
          (e  : D4-Effect  <- (fv-effect  e))
          (return-state (Repeat i t1 t2 e)))]
-    [(App t t*)
+    [(App-Code t t*)
      (do (bind-state : (State Locs D4-Effect))
          (t  : D4-Trivial  <- (fv-trivial  t))
          (t* : D4-Trivial* <- (fv-trivial* t*))
          (u  : Uid         <- (loc-state "unused_return"))
-         (return-state (Assign u (App t t*))))]
+         (return-state (Assign u (App-Code t t*))))]
     [(Op p t*)
      (do (bind-state : (State Locs D4-Effect))
          (t* : D4-Trivial* <- (fv-trivial* t*))
@@ -192,7 +197,7 @@
 
 (: simplify-assignment (Uid D3-Value -> (State Locs D4-Effect)))
 (define (simplify-assignment var val)
-  (logging simplify-assignment () "\n~v\n~v" var val)
+  (logging simplify-assignment (Vomit) "\n~v\n~v" var val)
   (define (sa [val : D3-Value]) (simplify-assignment var val))
   (match val
     [(Var u) (return-state (Assign var (Var u)))]
@@ -202,18 +207,18 @@
      (do (bind-state : (State Locs D4-Effect))
          (t* : D4-Trivial* <- (map-state fv-trivial t*))
          (return-state (Assign var (Op p t*))))]
-    [(App t t*)
+    [(App-Code t t*)
      (do (bind-state : (State Locs D4-Effect))
          (t  : D4-Trivial  <- (fv-trivial  t))
          (t* : D4-Trivial* <- (fv-trivial* t*))
-         (return-state (Assign var (App t t*))))]
+         (return-state (Assign var (App-Code t t*))))]
     [(If t c a)
      (do (bind-state : (State Locs D4-Effect))
          (t : D4-Pred <- (fv-pred t))
          (c : D4-Effect <- (simplify-assignment var c))
          (a : D4-Effect <- (simplify-assignment var a))
          (begin
-           (logging fv-sa-if () "t ~v\nc ~v\na ~v" t c a)
+           (logging fv-sa-if (Vomit) "t ~v\nc ~v\na ~v" t c a)
            (return-state (If t c a))))]
     [(Begin e* v)
      (do (bind-state : (State Locs D4-Effect))

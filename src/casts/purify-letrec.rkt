@@ -12,12 +12,18 @@
 +------------------------------------------------------------------------------|#
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/cast0.rkt"
+         "../language/cast-with-pure-letrec.rkt")
 
 ;; Only the pass is provided by this module
-(provide purify-letrec)
+(provide
+ purify-letrec
+ (all-from-out
+  "../language/cast0.rkt"
+  "../language/cast-with-pure-letrec.rkt"))
 
-(: purify-letrec (Cast0-Lang Config -> Cast-with-pure-letrec))
+(: purify-letrec (Cast0-Lang Config -> Cast/Pure-Letrec))
 (define (purify-letrec prgm comp-config)
   (match-let ([(Prog (list name next type) exp) prgm])
     (let-values ([(exp next) (run-state (pl-expr exp) next)])
@@ -71,7 +77,7 @@
      (and (simple? e1 uid* (+ 1 depth) outer-lambda?)
           (simple? e2 uid* (+ 1 depth) outer-lambda?)
           (simple? e3 uid* (+ 1 depth) outer-lambda?))]
-    [(Cast e _ _ _) (simple? e uid* (+ 1 depth) outer-lambda?)]
+    [(Cast e r) (simple? e uid* (+ 1 depth) outer-lambda?)]
     [(Begin e* e)
      (and (simple? e uid* (+ 1 depth) outer-lambda?)
           (simple?* e* uid* (+ 1 depth) outer-lambda?))]
@@ -152,7 +158,12 @@
       [(Op op e*) (Op op (map recur/env e*))]
       [(If e1 e2 e3)
        (If (replace-ref e1 v*) (replace-ref e2 v*) (replace-ref e3 v*))]
-      [(Cast e t1 t2 lbl) (Cast (replace-ref e v*) t1 t2 lbl)]
+      [(Cast e r)
+       (match r
+         [(Twosome t1 t2 lbl)
+          (Cast (replace-ref e v*) (Twosome t1 t2 lbl))]
+         [(Coercion c)
+          (Cast (replace-ref e v*) (Coercion c))])]
       [(Begin e* e)
        (Begin (map recur/env e*) (replace-ref e v*))]
       [(Repeat i e1 e2 e3)
@@ -176,9 +187,13 @@
         [(Lambda f* exp)
          (exp : C/PL-Expr <- (pl-expr exp))
          (return-state (Lambda f* exp))]
-        [(Cast exp t1 t2 lbl)
+        [(Cast exp r)
          (exp : C/PL-Expr <- (pl-expr exp))
-         (return-state (Cast exp t1 t2 lbl))]
+         (match r
+           [(Twosome t1 t2 lbl)
+            (return-state (Cast exp (Twosome t1 t2 lbl)))]
+           [(Coercion c)
+            (return-state (Cast exp (Coercion c)))])]
         [(Letrec bnd* exp)
          (exp : C/PL-Expr  <- (pl-expr exp))
          (next : Nat <- get-state)

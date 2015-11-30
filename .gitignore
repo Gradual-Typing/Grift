@@ -1,6 +1,7 @@
 # emacs and vim temporary files
 *.*~
 \#*.*\#
+**/*\#*
 
 # racket byte code
 *.dep

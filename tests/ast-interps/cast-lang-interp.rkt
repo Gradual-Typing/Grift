@@ -4,7 +4,8 @@
 
 (require "../../src/helpers.rkt"
          "../../src/errors.rkt"
-	 "../../src/language.rkt"
+	 "../../src/language/cast0.rkt"
+         "../../src/configuration.rkt"
 	 "../values.rkt"
          racket/fixnum)
 
@@ -191,7 +192,7 @@
        (if tst (recur/env csq) (recur/env alt))]
       [(App e e*) (apply (recur/env e) (map recur/env e*))]
       [(Op p e*) (delta p (map recur/env e*))]
-      [(Cast (app recur/env val) t-exp t-cast label)
+      [(Cast (app recur/env val) (Twosome t-exp t-cast label))
        (cst val t-exp t-cast label)]
       [(Var id) (env-lookup env id)]
       [(Quote k) k]

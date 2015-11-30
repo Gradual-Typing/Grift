@@ -1,6 +1,6 @@
-#lang typed/racket
+#lang typed/racket/base
 
-(require ;;racket/port
+(require racket/port
          "../src/helpers.rkt")
 
 (provide (all-defined-out))
@@ -74,20 +74,32 @@
    as if it were returning a value from one of our compiled
    programs.
 |#
+
+
+(: parse-observable (String -> Test-Value))
+(define (parse-observable s)
+  (logging parse-observable (All) s)
+  (cond
+    [(regexp-match #rx".*Int : (-?[0-9]+)" s) =>
+     (lambda (r)
+       (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+    [(regexp-match #rx".*Bool : #(t|f)" s) =>
+     (lambda (r)
+       (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
+    [(regexp-match #rx".*Function : \\?" s) (function)]
+    [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
+    [(regexp-match #rx".*GReference : \\?" s) (gbox)]
+    [(regexp-match #rx".*GVector : \\?" s) (gvect)]
+    [(regexp-match #rx".*GArray : \\?" s) (gvect)]
+    [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
+    [else (blame #f s)]))
+
 (define-syntax-rule (observe exp)
-  (let ([s (with-output-to-string (lambda () exp))])
+  (let ([s (call-with-output-string 
+             (lambda ([p : Output-Port])
+               (parameterize ([current-output-port p]
+                              [current-error-port p])
+                 exp
+                 (flush-output p))))])
     (logging observe () "~v" s)
-    (cond
-     [(regexp-match #rx".*Int : (-?[0-9]+)" s) =>
-      (lambda (r)
-        (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
-     [(regexp-match #rx".*Bool : #(t|f)" s) =>
-      (lambda (r)
-        (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
-     [(regexp-match #rx".*Function : \\?" s) (function)]
-     [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
-     [(regexp-match #rx".*GReference : \\?" s) (gbox)]
-     [(regexp-match #rx".*GVector : \\?" s) (gvect)]
-     [(regexp-match #rx".*GArray : \\?" s) (gvect)]
-     [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
-     [else (blame #f s)])))
+    (parse-observable s)))

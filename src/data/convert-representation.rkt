@@ -1,12 +1,18 @@
 #lang typed/racket
-(require "../language.rkt"
+(require 
          "./normalize-context.rkt"
          "./remove-let.rkt"
          "./remove-complex-opera.rkt"
          "./flatten-values.rkt"
-         "./simplify-predicates.rkt")
+         "./simplify-predicates.rkt"
+         "../configuration.rkt"
+         "../language/data0.rkt"
+         "../language/data5.rkt")
 
-(provide convert-representation)
+(provide convert-representation
+         (all-from-out
+          "../language/data0.rkt"
+          "../language/data5.rkt"))
 
 (: convert-representation (Data0-Lang Config . -> . Data5-Lang))
 (define (convert-representation d0 config)

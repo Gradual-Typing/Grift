@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 #|------------------------------------------------------------------------------+
 |Pass: compiler/schml/typecheck                                                  |
 +-------------------------------------------------------------------------------+
@@ -23,12 +23,19 @@ TODO
 Provide a comment for how each pass is layed out in code.
 Provide comments about where to find definitions of types and data
 +------------------------------------------------------------------------------|#
-(require "../helpers.rkt"
+(require racket/match
+         "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/primitives.rkt"
+         "../language/schml0.rkt"
+         "../language/schml1.rkt")
 
 ;; Only the pass is provided by this module
-(provide type-check)
+(provide type-check
+         (all-from-out
+          "../language/schml0.rkt"
+          "../language/schml1.rkt"))
 
 (: type-check (Schml0-Lang Config . -> . Schml1-Lang))
 (define (type-check prgm config)

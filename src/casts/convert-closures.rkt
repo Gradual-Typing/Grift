@@ -8,13 +8,16 @@
 +-------------------------------------------------------------------------------+
 | Grammer:
 +------------------------------------------------------------------------------|#
-;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
-
-(provide convert-closures)
-
+         "../configuration.rkt"
+         "../language/cast-or-coerce5.rkt"
+         "../language/cast-or-coerce6.rkt")
+(provide
+ convert-closures
+ (all-from-out
+  "../language/cast-or-coerce5.rkt"
+  "../language/cast-or-coerce6.rkt"))
 
 (define optimize-self-reference?
   (make-parameter #f))
@@ -22,295 +25,437 @@
 (define optimize-known-call?
   (make-parameter #f))
 
+(define optimize-well-known?
+  (make-parameter #f))
+
 (define use-code-casters?
   (make-parameter #f))
 
-(: convert-closures (Cast5-Lang Config . -> . Cast6-Lang))
+(: convert-closures (Cast-or-Coerce5-Lang Config -> Cast-or-Coerce6-Lang))
 (define (convert-closures prgm conf)
+  (define cr  (Config-cast-rep conf))
+  (define fr 'Hybrid)
   (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
-    (let ([base-cc-expr (cc-expr empty-env empty-env no-selfp)])
-      (let-values ([(exp count) (run-state (base-cc-expr exp) count)])
-        (Prog (list name count type) (LetT* tbnd* exp))))))
+    (let* ([next : (Boxof Nat) (box count)]
+           [bndp : (HashTable Integer BP) (make-hash)]
+           [exp ;; This is an abusively long function call
+            (cc-expr cr fr next bndp empty-env empty-env no-selfp exp)]
+           [next : Nat (unbox next)])
+      (Prog (list name count type) (LetT* tbnd* (LetP (hash-values bndp) exp))))))
 
+(define-type BP  CoC6-Bnd-Procedure)
+(define-type BC  CoC6-Bnd-Closure)
+(define-type BP* CoC6-Bnd-Procedure*)
+(define-type BC* CoC6-Bnd-Closure*)
+(define-type BD* CoC6-Bnd-Data*)
+
+(define-type Env (HashTable Uid CoC6-Expr))
 (define empty-env : Env (hash))
+
+(define-type SelfP (-> Uid (Option CoC6-Expr)))
 (define no-selfp : SelfP
-  (lambda a #f))
+  (lambda (u) #f))
 
-(define-type BP  C6-Bnd-Procedure)
-(define-type BC  C6-Bnd-Closure)
-(define-type BP* C6-Bnd-Procedure*)
-(define-type BC* C6-Bnd-Closure*)
-(define-type BD* C6-Bnd-Data*)
-(define-type Env (HashTable Uid C6-Expr))
-(define-type SelfP (-> Uid (Option C6-Expr)))
+(define-type Fn-Proxy-Representation (U 'Hybrid 'Data))
 
-(: cc-expr : Env Env SelfP -> (C5-Expr -> (State Nat C6-Expr)))
-(define (cc-expr code-env data-env selfp)
-  (: cc-expr/env : C5-Expr -> (State Nat C6-Expr))
-  (define (cc-expr/env e)
-    (match e
-      ;; The interesting cases:
-      ;; letrec are actually code bindings with shared state closure
-      ;; creating bodies
-      [(Letrec b* e)
-       (do (bind-state : (State Nat C6-Expr))
-           (b*-ext : (List BP* BC* Env Env) <- (cc-bnd-lambda* code-env data-env selfp b*))
-           (match-let ([(list bp bc c-env d-env) b*-ext])
-             (e : C6-Expr <- ((cc-expr c-env d-env selfp) e))
-             (return-state (LetP bp (LetC bc e)))))]
-      ;; Function cast extraction removes the cast closure (could optimize to cast pointer)
-      [(Fn-Caster e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e  : C6-Expr <- (cc-expr/env e))
-           (return-state (Closure-caster e)))]
-      ;; Applications get the code pointer and pass the closure as the first argument
-      [(App e e*)
-       ;; When optimize known call is in effect any known closure
-       ;; that is applied has the code label inlined
-       ;; otherwise the closure pointer is extracted
-       (do (bind-state : (State Nat C6-Expr))
-           (e* : C6-Expr* <- (map-state cc-expr/env e*))
-           (e : C6-Expr  <- (cc-expr/env e))
-           (if (Var? e)
-               (let ([code? : (Option C6-Expr)
-                            (or (optimize-known-call?)
-                                (hash-ref code-env (Var-id e) #f))])
-                 (if code?
-                     (return-state (App (cons code? e) e*))
-                     (return-state (App (cons (Closure-code e) e) e*))))
-               (do (bind-state : (State Nat C6-Expr))
-                   (id : Uid <- (uid-state "tmp_clos"))
-                   (let ([var (Var id)])
-                    (return-state
-                     (Let (list (cons id e))
-                      (App (cons (Closure-code (Var id)) (Var id)) e*)))))))]
-      ;; varibles that are free are extracted from the closure
-      ;; while variable that are not bound by the closure are rebuilt
-      [(Var u) (return-state (lookup data-env selfp u))]
-      ;; The rest of the cases are just recursing into sub expressions
-      [(Let b* e)
-       (do (bind-state : (State Nat C6-Expr))
-           (b* : BD*     <- (cc-bnd-data* cc-expr/env b*))
-           (e  : C6-Expr <- (cc-expr/env e))
-           (return-state (Let b* e)))]
-      [(If t c a)
-       (do (bind-state : (State Nat C6-Expr))
-           (t : C6-Expr <- (cc-expr/env t))
-           (c : C6-Expr <- (cc-expr/env c))
-           (a : C6-Expr <- (cc-expr/env a))
-           (return-state (If t c a)))]
-      [(Op p e*)
-       (do (bind-state : (State Nat C6-Expr))
-           (e* : C6-Expr* <- (map-state cc-expr/env e*))
-           (return-state (Op p e*)))]
-      [(Quote k) (return-state (Quote k))]
-      [(Tag t)   (return-state (Tag t))]
-      ;; Observables Representation
-      [(Blame e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (return-state (Blame e)))]
-      [(Observe e t)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (return-state (Observe e t)))]
-      ;; Type Representation
-      [(Type t) (return-state (Type t))]
-      [(Type-tag e) (lift-state (inst Type-tag C6-Expr) (cc-expr/env e))]
-      [(Type-GRef-to e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e  : C6-Expr <- (cc-expr/env  e))
-         (return-state (Type-GRef-to e)))]
-      [(Type-GVect-to e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e  : C6-Expr <- (cc-expr/env  e))
-         (return-state (Type-GVect-to e)))]
-      [(Type-Fn-arg e i)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (i : C6-Expr <- (cc-expr/env i))
-           (return-state (Type-Fn-arg e i)))]
-      [(Type-Fn-return e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e  : C6-Expr <- (cc-expr/env  e))
-           (return-state (Type-Fn-return e)))]
-      [(Type-Fn-arity e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e  : C6-Expr <- (cc-expr/env  e))
-           (return-state (Type-Fn-arity e)))]
-      ;; Dynamic Representation
-      [(Dyn-tag e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (return-state (Dyn-tag e)))]
-      [(Dyn-immediate e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (return-state (Dyn-immediate e)))]
-      [(Dyn-type e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (return-state (Dyn-type e)))]
-      [(Dyn-value e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e : C6-Expr <- (cc-expr/env e))
-           (return-state (Dyn-value e)))]
-      [(Dyn-make e1 e2)
-       (do (bind-state : (State Nat C6-Expr))
-           (e1 : C6-Expr <- (cc-expr/env e1))
-           (e2 : C6-Expr <- (cc-expr/env e2))
-           (return-state (Dyn-make e1 e2)))]
-      ;; control flow for effects
-      [(Begin e* e)
-       (do (bind-state : (State Nat C6-Expr))
-           (e* : C6-Expr* <- (map-state cc-expr/env e*))
-           (e  : C6-Expr  <- (cc-expr/env  e))
-           (return-state (Begin e* e)))]
-      [(Repeat i e1 e2 e3)
-       (do (bind-state : (State Nat C6-Expr))
-           (e1 : C6-Expr <- (cc-expr/env e1))
-           (e2 : C6-Expr <- (cc-expr/env e2))
-           (e3 : C6-Expr <- (cc-expr/env e3))
-           (return-state (Repeat i e1 e2 e3)))]
-      ;; Gaurded Representation
-      [(GRep-proxied? e)
-       (lift-state (inst GRep-proxied? C6-Expr) (cc-expr/env e))]
-      [(UGbox e)
-       (lift-state (inst UGbox C6-Expr) (cc-expr/env e))]
-      [(UGbox-ref e)
-       (lift-state (inst UGbox-ref C6-Expr) (cc-expr/env e))]
-      [(UGbox-set! e1 e2)
-       (do (bind-state : (State Nat C6-Expr))
-           (e1 : C6-Expr <- (cc-expr/env e1))
-           (e2 : C6-Expr <- (cc-expr/env e2))
-           (return-state (UGbox-set! e1 e2)))]
-      [(UGvect e1 e2)
-       (lift-state (inst UGvect C6-Expr C6-Expr)
-                   (cc-expr/env e1) (cc-expr/env e2))]
-      [(UGvect-ref e1 e2)
-       (lift-state (inst UGvect-ref C6-Expr C6-Expr)
-                   (cc-expr/env e1) (cc-expr/env e2))]
-      [(UGvect-set! e1 e2 e3)
-       (do (bind-state : (State Nat C6-Expr))
-           (e1 : C6-Expr <- (cc-expr/env e1))
-           (e2 : C6-Expr <- (cc-expr/env e2))
-           (e3 : C6-Expr <- (cc-expr/env e3))
-           (return-state (UGvect-set! e1 e2 e3)))]
-      [(Gproxy e1 e2 e3 e4)
-       (do (bind-state : (State Nat C6-Expr))
-           (e1 : C6-Expr <- (cc-expr/env e1))
-           (e2 : C6-Expr <- (cc-expr/env e2))
-           (e3 : C6-Expr <- (cc-expr/env e3))
-           (e4 : C6-Expr <- (cc-expr/env e4))
-           (return-state (Gproxy e1 e2 e3 e4)))]
-      [(Gproxy-for e)
-       (lift-state (inst Gproxy-for C6-Expr) (cc-expr/env e))]
-      [(Gproxy-from e)
-       (lift-state (inst Gproxy-from C6-Expr) (cc-expr/env e))]
-      [(Gproxy-to e)
-       (lift-state (inst Gproxy-to C6-Expr) (cc-expr/env e))]
-      [(Gproxy-blames e)
-       (lift-state (inst Gproxy-blames C6-Expr) (cc-expr/env e))]))
-  cc-expr/env)
+(: cc-expr (Cast-Representation
+            Fn-Proxy-Representation
+            (Boxof Nat) (HashTable Integer BP)
+            Env Env SelfP CoC5-Expr
+            -> CoC6-Expr))
+(define (cc-expr cast-rep fn-proxy-rep next new-bnd-procs
+                 code-env data-env selfp exp)
+  ;; This is the only piece of code that should touch the unique counter
+  (: next-uid! (String -> Uid))
+  (define (next-uid! x)
+    (let ([n (unbox next)])
+      (set-box! next (add1 n))
+      (Uid x n)))
 
-;;TODO remove this continuation base return
-(define-type LCont (BP* BC* Env Env -> (State Nat C6-Expr)))
+  ;; Lookup or Create a Apply-Hybrid-Proxy-Fn
+  (: get-apply-uid! (Integer Uid -> Uid))
+  (define (get-apply-uid! i cast)
+    (define apply-bnd? (hash-ref new-bnd-procs i #f))
+    (cond
+      [apply-bnd? => car]
+      [else
+       (define cp
+         (next-uid! (string-append "apply_hybrid_" (number->string i))))
+       (define hc (next-uid! "hybrid_closure"))
+       (define a* (build-list i (lambda (a) (next-uid! "arg"))))
+       (define v* (map (inst Var Uid) a*))
+       (define clos-clos (next-uid! "closure_field"))
+       (define crcn-clos (next-uid! "corcion_field"))
+       (define clos      (next-uid! "closure"))
+       (define crcn      (next-uid! "corcion"))
+       (define bnd
+         (cons
+          cp
+          (Procedure hc a* cp #f (list clos-clos crcn-clos)
+           (Let `((,clos . ,(Closure-ref hc clos-clos))
+                  (,crcn . ,(Closure-ref hc crcn-clos)))
+            (cast-apply-cast cast (Var clos) v* (Var crcn))))))
+       (hash-set! new-bnd-procs i bnd)
+       cp]))
 
-(: cc-bnd-lambda* (Env Env SelfP C5-Bnd-Lambda*  ->
-                       (State Nat (List BP* BC* Env Env))))
-(define (cc-bnd-lambda* code-env data-env selfp b*)
-  ;; the code labels
-  (define cp* : Uid* (map (inst car Uid Any) b*))
-  (define cl* : C6-Expr* (map (inst Code-Label Uid) cp*))
-  (do (bind-state : (State Nat (List BP* BC* Env Env)))
-      ;; the inner closure names
-      (ic* : Uid* <- (map-state clos-uid cp*))
-      ;; the outer closure names
-      (oc* : Uid* <- (map-state clos-uid cp*))
-      ;; extend environments with extra closure and code info
-      (let* ([oc-var* (map (inst Var Uid) oc*)]
-             [ic-env (extend* code-env ic* cl*)]
-             [oc-env (extend* code-env oc* cl*)]
-             [od-env (extend* data-env cp* oc-var*)]
-             [ic.b*  (map (inst cons Uid C5-Bnd-Lambda) ic* b*)]
-             [oc.b*  (map (inst cons Uid C5-Bnd-Lambda) oc* b*)])
-        (bp* : BP* <- (map-state (cc-make-proc ic-env) ic.b*))
-        (bd* : BC* <- (map-state (cc-make-clos oc-env od-env selfp) oc.b*))
-        ;; call the continuation that will make the body of the let forms
-        (return-state (list bp* bd* oc-env od-env)))))
 
-(: cc-make-proc (Env -> ((Pairof Uid C5-Bnd-Lambda) -> (State Nat BP))))
-(define (cc-make-proc code-env)
-  (lambda ([b : (Pairof Uid C5-Bnd-Lambda)]) : (State Nat BP)
-   (match-let ([(cons clos (cons code (Lambda fml* (Free ctr? uid* e)))) b])
-      ;; even though the closure contains other data only free vars will be
-      ;; found in the body.
-      (let* ([clos-ref* (map (mk-clos-ref clos) uid*)]
-             [data-env  (extend* (hash) uid* clos-ref*)]
-             [self   (Var clos)]
-             [selfp  (lambda ([u : Uid]) : (Option C6-Expr)
-                       (and (eq? u code) self))])
-        (do (bind-state : (State Nat BP))
-            (e : C6-Expr <- ((cc-expr code-env data-env selfp) e))
-            (return-state
-             (cons code
-                   (Procedure clos fml* code ctr? uid* e))))))))
+  ;; Make a procedure that references a closure data structure
+  (: cc-make-proc (Env -> ((Pairof Uid CoC5-Bnd-Lambda) -> BP)))
+  (define ((cc-make-proc code-env) b)
+    ;; destructure the inner-closure-id and lambda binding
+    (match-let ([(cons clos (cons code (Lambda fml* (Free ctr? uid* e)))) b])
+      ;; create expressions that represent accessing the closure for each free var
+      (define clos-ref* (map (mk-clos-ref clos) uid*))
+      ;; create a new environment that maps uses of variables to closure access
+      (define data-env   (extend* (hash) uid* clos-ref*))
+      ;; create a new self reference check
+      (define self (Var clos))
+      (define (selfp [u : Uid]) (and (equal? u code) self))
+      ;; Process the body of the lambda replacing free variable uses
+      ;; with closure accesses
+      (define body (recur/env code-env data-env selfp e))
+      ;; return the new procedure binding after recuring on
+      (cons code (Procedure clos fml* code ctr? uid* body))))
 
-(: mk-clos-ref : Uid -> (Uid -> C6-Expr))
+
+  ;; Make a closure data structure that can be reference by a procedure
+  (: cc-make-clos (Env Env SelfP -> ((Pairof Uid CoC5-Bnd-Lambda) -> BC)))
+  (define ((cc-make-clos code-env data-env selfp) b)
+    (match-let ([(cons clos (cons code (Lambda fml* (Free ctr? uid* _)))) b])
+      ;; Get the Variables that need to be bound by the closure
+      (define bound* (map (lookup-in data-env selfp) uid*))
+      (define ctr    (if ctr? (Code-Label ctr?) #f))
+      (define data   (Closure-Data (Code-Label code) ctr bound*))
+      ;; return the new closure binding
+      (cons clos data)))
+
+  ;; Process Expression in a particular closure environment
+  (: recur/env (Env Env SelfP CoC5-Expr -> CoC6-Expr))
+  (define (recur/env code-env data-env selfp exp)
+    
+    ;; Build new closure binding forms
+    (: cc-bnd-lambda* (CoC5-Bnd-Lambda* -> (Values BP* BC* Env Env)))
+    (define (cc-bnd-lambda* b*)
+      ;; Make some code labels from the original bindings
+      (define cp* : Uid* (map (inst car Uid Any) b*))
+      (define cl* : CoC6-Expr* (map (inst Code-Label Uid) cp*))
+      ;; Make some uids for the inner(ic) and outer(oc) closure variables
+      (define ic* : Uid* (map (clos-uid next-uid!) cp*))
+      (define oc* : Uid* (map (clos-uid next-uid!) cp*))
+      ;; Extend the environments with new closure and code info
+      (define oc-var* (map (inst Var Uid) oc*))
+      (define ic-env (extend* code-env ic* cl*))
+      (define oc-env (extend* code-env oc* cl*))
+      (define od-env (extend* data-env cp* oc-var*))
+      (define ic.b*  (map (inst cons Uid CoC5-Bnd-Lambda) ic* b*))
+      (define oc.b*  (map (inst cons Uid CoC5-Bnd-Lambda) oc* b*))
+      ;; Make the new bindings
+      (define bp* : BP* (map (cc-make-proc ic-env) ic.b*))
+      (define bd* : BC* (map (cc-make-clos oc-env od-env selfp) oc.b*))
+      ;; return the new bindings and environments
+      (values bp* bd* oc-env od-env))
+
+    ;; recure through the expressions in the grammar
+    (: recur (CoC5-Expr -> CoC6-Expr))
+    (define (recur e)
+      (match e
+        ;; The interesting cases:
+        ;; letrec are actually code bindings with shared state closure creating bodies
+        [(Letrec b* e)
+         (let-values ([(bp bc c-env d-env) (cc-bnd-lambda* b*)])
+           (LetP bp (LetC bc (recur/env c-env d-env selfp e))))]
+        ;; Function cast extraction removes the cast closure (could optimize to cast pointer)
+        [(Fn-Caster e) (Closure-caster (recur e))]
+        ;; Applications get the code pointer and pass the closure as the first argument
+        [(App-Fn (app recur e) (app recur* e*))
+         ;; When optimize known call is in effect any known closure
+         ;; that is applied has the code label inlined
+         ;; otherwise the closure pointer is extracted
+         (cond
+           [(Var? e)
+            (define code?
+              (and (optimize-known-call?) (hash-ref code-env (Var-id e) #f)))
+            (cond
+              [code? (App-Closure code? e e*)]
+              [else (App-Closure (Closure-code e) e e*)])]
+           [else
+            (define id  (next-uid! "tmp_closure"))
+            (define var (Var id))
+            (Let (list (cons id e))
+                 (App-Closure (Closure-code var) var e*))])]
+        ;; If we are using hybrid representation we can treat
+        ;; this like a normal apply-closure.
+        ;; Alternatively if we are using data representation
+        ;; we need to cast the arguments
+        [(App-Fn-or-Proxy cast-uid e e*)
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              ;; If it is a hybrid representation then proxies and closures
+              ;; are applied the same way.
+              [(Hybrid)
+               (recur (App-Fn e e*))]
+              ;; If it a data representation and it is a known definition
+              ;; site then it can't be a proxy
+              [(Data)
+               (cond
+                 [(and (Var? e) (optimize-known-call?)
+                       (hash-ref code-env (Var-id e) #f))
+                  => (lambda ([c : CoC6-Expr])
+                       (App-Closure c e (recur* e*)))]
+                 ;; othewise we build code to cast the arguments
+                 ;; at the call site.
+                 [else
+                  (define e^  : CoC6-Expr  (recur  e))
+                  (define e*^ : CoC6-Expr* (recur* e*))
+
+                  (define prox (next-uid! "maybe_proxy"))
+                  (define pvar (Var prox))
+                  (define func (next-uid! "closure"))
+                  (define fvar (Var prox))
+                  (define crcn (next-uid! "coercion"))
+                  (define cvar (Var crcn))
+                  (Let (list (cons prox e^))
+                       (If (Fn-Proxy-Huh (Var prox))
+                           (Let (list (cons func (Fn-Proxy-Closure pvar))
+                                      (cons crcn (Fn-Proxy-Coercion pvar)))
+                                (cast-apply-cast cast-uid fvar e*^ cvar))
+                           (App-Closure (Closure-code pvar) pvar e*^)))])]
+              [else (error 'covert-closures "Unkown Fn-Proxy Representaion")])]
+           [else (error 'covert-closures "Unkown Cast Representaion")])]
+        [(Fn-Proxy (list i cast) (app recur e1)(app recur e2))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep              
+              [(Hybrid) (Hybrid-Proxy (get-apply-uid! i cast) e1 e2)]
+              [(Data)   (Fn-Proxy i e1 e2)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        [(Fn-Proxy-Huh (app recur e))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              [(Hybrid) (Hybrid-Proxy-Huh e)]
+              [(Data)   (Fn-Proxy-Huh e)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        [(Fn-Proxy-Closure (app recur e))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              [(Hybrid) (Hybrid-Proxy-Closure e)]
+              [(Data)   (Fn-Proxy-Closure e)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        [(Fn-Proxy-Coercion (app recur e))
+         (case cast-rep
+           [(Coercions)
+            (case fn-proxy-rep
+              [(Hybrid) (Hybrid-Proxy-Coercion e)]
+              [(Data)   (Fn-Proxy-Coercion e)]
+              [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+           [else (error 'convert-closures "unkown cast representation")])]
+        ;; varibles that are free are extracted from the closure
+        ;; while variable that are not bound by the closure are rebuilt
+        [(Var u) (lookup data-env selfp u)]
+        ;; The rest of the cases are just recuring into sub expressions
+        [(Let (app (cc-bnd-data* recur) b*) (app recur e)) (Let b* e)]
+        [(If (app recur t) (app recur c) (app recur a)) (If t c a)]
+        [(Op p (app recur* e*)) (Op p e*)]
+        [(Quote k) (Quote k)]
+        [(Tag t)   (Tag t)]
+        ;; Observables Representation
+        [(Blame (app recur e)) (Blame e)]
+        [(Observe (app recur e) t) (Observe e t)]
+        ;; Dynamic Representation
+        [(Dyn-tag (app recur e)) (Dyn-tag e)]
+        [(Dyn-immediate (app recur e)) (Dyn-immediate e)]
+        [(Dyn-type (app recur e)) (Dyn-type e)]
+        [(Dyn-value (app recur e)) (Dyn-value e)]
+        [(Dyn-make (app recur e1) (app recur e2)) (Dyn-make e1 e2)]
+        ;; control flow for effects
+        [(Begin (app recur* e*) (app recur e)) (Begin e* e)]
+        [(Repeat i (app recur e1) (app recur e2) (app recur e3))
+         (Repeat i e1 e2 e3)]
+
+        ;; Type Representation
+        [(Type t) (Type t)]
+        [(Type-Tag (app recur e)) (Type-Tag e)]
+        [(Type-GRef-Of (app recur e)) (Type-GRef-Of e)]
+        [(Type-GVect-Of (app recur e)) (Type-GVect-Of e)]
+        [(Type-Fn-arg (app recur e) (app recur i)) (Type-Fn-arg e i)]
+        [(Type-Fn-return (app recur e)) (Type-Fn-return e)]
+        [(Type-Fn-arity (app recur e)) (Type-Fn-arity e)]
+        [(Type-Fn-Huh (app recur e)) (Type-Fn-Huh e)]
+        [(Type-GVect-Huh (app recur e)) (Type-GVect-Huh e)]
+        [(Type-GRef-Huh (app recur e)) (Type-GRef-Huh e)]
+        [(Type-Dyn-Huh (app recur e)) (Type-Dyn-Huh e)]
+        
+        [(Labels (app (cc-bnd-code* recur) b*) (app recur e))
+         (Labels b* e)]
+        [(App-Code (app recur e) (app recur* e*))
+         (App-Code e e*)]
+        [(Code-Label u)  (Code-Label u)]
+
+        ;; Coercion Representation Stuff
+        [(Quote-Coercion c)
+         (Quote-Coercion c)]
+        [(Id-Coercion-Huh (app recur e))
+         (Id-Coercion-Huh e)]
+        [(Fn-Coercion-Huh (app recur e))
+         (Fn-Coercion-Huh e)]
+        [(Make-Fn-Coercion u (app recur e1) (app recur e2) (app recur e3))
+         (Make-Fn-Coercion u e1 e2 e3)]
+        [(Compose-Fn-Coercion u (app recur e1) (app recur e2))
+         (Compose-Fn-Coercion u e1 e2)]
+        [(Fn-Coercion (app recur* e*) (app recur e))
+         (Fn-Coercion e* e)]
+        [(Fn-Coercion-Arg (app recur e1)(app recur e2))
+         (Fn-Coercion-Arg e1 e2)]
+        [(Fn-Coercion-Return (app recur e))
+         (Fn-Coercion-Return e)]
+        [(Ref-Coercion (app recur e1) (app recur e2))
+         (Ref-Coercion e1 e2)]
+        [(Ref-Coercion-Huh (app recur e))
+         (Ref-Coercion-Huh e)]
+        [(Ref-Coercion-Read (app recur e))
+         (Ref-Coercion-Read e)]
+        [(Ref-Coercion-Write (app recur e))
+         (Ref-Coercion-Write e)]
+        [(Sequence-Coercion (app recur e1) (app recur e2))
+         (Sequence-Coercion e1 e2)]
+        [(Sequence-Coercion-Huh (app recur e))
+         (Sequence-Coercion-Huh e)]
+        [(Sequence-Coercion-Fst (app recur e))
+         (Sequence-Coercion-Fst e)]
+        [(Sequence-Coercion-Snd (app recur e))
+         (Sequence-Coercion-Snd e)]
+        [(Project-Coercion (app recur e1) (app recur e2))
+         (Project-Coercion e1 e2)]
+        [(Project-Coercion-Huh (app recur e))
+         (Project-Coercion-Huh e)]
+        [(Project-Coercion-Type (app recur e))
+         (Project-Coercion-Type e)]
+        [(Project-Coercion-Label (app recur e))
+         (Project-Coercion-Label e)]
+        [(Inject-Coercion (app recur e))
+         (Inject-Coercion e)]
+        [(Inject-Coercion-Type (app recur e))
+         (Inject-Coercion-Type e)]
+        [(Inject-Coercion-Huh (app recur e))
+         (Inject-Coercion-Huh e)]
+        [(Failed-Coercion (app recur e))
+         (Failed-Coercion e)]
+        [(Failed-Coercion-Huh (app recur e))
+         (Failed-Coercion-Huh e)]
+        [(Failed-Coercion-Label (app recur e))
+         (Failed-Coercion-Label e)]
+        ;; Function Proxy Representation
+        
+        ;; Gaurded Representation
+        [(Unguarded-Box (app recur e))(Unguarded-Box e)]
+        [(Unguarded-Box-Ref (app recur e)) (Unguarded-Box-Ref e)]
+        [(Unguarded-Box-Set! (app recur e1) (app recur e2))
+         (Unguarded-Box-Set! e1 e2)]
+        [(Unguarded-Vect (app recur e1) (app recur e2))
+         (Unguarded-Vect e1 e2)]
+        [(Unguarded-Vect-Ref (app recur e1) (app recur e2))
+         (Unguarded-Vect-Ref e1 e2)]
+        [(Unguarded-Vect-Set!
+          (app recur e1) (app recur e2) (app recur e3))
+         (Unguarded-Vect-Set! e1 e2 e3)]
+        [(Guarded-Proxy-Huh (app recur e))
+         (Guarded-Proxy-Huh e)]
+        [(Guarded-Proxy (app recur e) r)
+         (match r
+           [(Twosome (app recur t1) (app recur t2) (app recur l))
+            (Guarded-Proxy e (Twosome t1 t2 l))]
+           [(Coercion (app recur c))
+            (Guarded-Proxy e (Coercion c))])]
+        [(Guarded-Proxy-Ref (app recur e))
+         (Guarded-Proxy-Ref e)]
+        [(Guarded-Proxy-Source (app recur e))
+         (Guarded-Proxy-Source e)]
+        [(Guarded-Proxy-Target (app recur e))
+         (Guarded-Proxy-Target e)]
+        [(Guarded-Proxy-Blames (app recur e))
+         (Guarded-Proxy-Blames e)]
+        [(Guarded-Proxy-Coercion (app recur e))
+         (Guarded-Proxy-Coercion e)]
+        [other (error 'Convert-Closures "unmatched ~a" other)]))
+
+    ;; recur through a list of expressions
+    (: recur* (CoC5-Expr* -> CoC6-Expr*))
+    (define (recur* e*) (map recur e*))
+    
+    (recur exp))
+  (recur/env code-env data-env selfp exp))
+
+;; THE following are helpers that don't require any
+;; of the internal state of this pass
+
+
+;; make an expression the expresses the notion of fetching
+;; a variable from a closure
+(: mk-clos-ref : Uid -> (Uid -> CoC6-Expr))
 (define (mk-clos-ref clos)
-  (lambda ([fvar : Uid]) : C6-Expr
+  (lambda ([fvar : Uid]) : CoC6-Expr
    (Closure-ref clos fvar)))
 
+;; Recur through bound data
+(: cc-bnd-data*
+   ((CoC5-Expr -> CoC6-Expr) -> CoC5-Bnd-Data* -> CoC6-Bnd-Data*))
+(define ((cc-bnd-data* cc-expr) b*)
+  (: help (CoC5-Bnd-Data -> CoC6-Bnd-Data))
+  (define (help b)
+    (cons (car b) (cc-expr (cdr b))))
+  (map help b*))
 
-(: cc-make-clos : Env Env SelfP -> ((Pairof Uid C5-Bnd-Lambda) -> (State Nat BC)))
-(define (cc-make-clos code-env data-env selfp)
-  (lambda ([b : (Pairof Uid C5-Bnd-Lambda)]) : (State Nat BC)
-    (match-let ([(cons clos (cons code (Lambda fml* (Free ctr? uid* _)))) b])
-      (let* ([bound* (map (lookup-in data-env selfp) uid*)]
-             [ctr    (get-caster-binding code-env data-env ctr?)]
-             [data   (Closure-Data (Code-Label code) ctr bound*)])
-        (return-state (cons clos data))))))
-
-(: get-caster-binding : Env Env (Option Uid) -> C6-Expr)
-(define (get-caster-binding c-env d-env ctr?)
-  (cond
-    [(not ctr?) (Quote #f)]
-    [(use-code-casters?)
-     (or (hash-ref c-env ctr? #f)
-         (error 'convert-closures/get-caste-binding
-                "no code found for ~a" ctr?))]
-    [else (hash-ref d-env ctr? (thunk (Var ctr?)))]))
-
-(: cc-bnd-data* ((C5-Expr -> (State Nat C6-Expr)) C5-Bnd-Data*
-                 ->  (State Nat C6-Bnd-Data*)))
-(define (cc-bnd-data* cc-expr bnd*)
-  (map-state (cc-bnd-data cc-expr) bnd*))
-
-(: cc-bnd-data ((C5-Expr -> (State Nat C6-Expr)) ->
-                (C5-Bnd-Data -> (State Nat C6-Bnd-Data))))
-(define ((cc-bnd-data cc-expr) bnd)
-  (do (bind-state : (State Nat C6-Bnd-Data))
-      (e : C6-Expr <- (cc-expr (cdr bnd)))
-      (return-state (cons (car bnd) e))))
+;; Recur through bound code
+(: cc-bnd-code*
+   ((CoC5-Expr -> CoC6-Expr) -> CoC5-Bnd-Code* -> CoC6-Bnd-Code*))
+(define ((cc-bnd-code* cc-expr) b*)
+  ;; Handle a single code binding 
+  (: help (CoC5-Bnd-Code -> CoC6-Bnd-Code))
+  (define (help b)
+    (match-let ([(cons u (Code u* e)) b])
+      (cons u (Code u* (cc-expr e)))))
+  (map help b*))
 
 ;; create a clos annotated unique name
-(: clos-uid (-> Uid (State Nat Uid)))
-(define (clos-uid u)
-  (uid-state (string-append (Uid-prefix u) "_clos")))
+(: clos-uid ((String -> Uid) -> (Uid -> Uid)))
+(define ((clos-uid uid!) u)
+  (uid! (string-append (Uid-prefix u) "_clos")))
 
-(: lookup : Env SelfP Uid -> C6-Expr)
+;; create a casted fn application call site
+(: cast-apply-cast (Uid (Var Uid) CoC6-Expr* (Var Uid) -> CoC6-Expr))
+(define (cast-apply-cast cast-uid fun arg* crcn)
+  (define cast (Code-Label cast-uid))
+  (define i*   (build-list (length arg*) (lambda ([i : Index]) i)))
+  (: help (CoC6-Expr Integer -> CoC6-Expr))
+  (define (help e i)
+    (App-Code cast (list e (Fn-Coercion-Arg crcn (Quote i)))))
+  (App-Code cast (list (App-Closure (Closure-code fun) fun (map help arg* i*))
+                       (Fn-Coercion-Return crcn))))
+
+
+;; Lookup a variables local access instruction
+;; within an environment that represents 
+(: lookup : Env SelfP Uid -> CoC6-Expr)
 (define (lookup env selfp uid)
   ;; If optimize self reference is enabled then check
   ;; to see if this is a self reference.
   (or (and (optimize-self-reference?) (selfp uid))
       (hash-ref env uid (thunk (Var uid)))))
 
-(: lookup-in : Env SelfP -> (Uid -> C6-Expr))
+(: lookup-in : Env SelfP -> (Uid -> CoC6-Expr))
 (define ((lookup-in env selfp) uid)
   (lookup env selfp uid))
 
-(: extend* :  Env Uid* C6-Expr* -> Env)
+(: extend* :  Env Uid* CoC6-Expr* -> Env)
 (define (extend* env k* v*)
   (for/fold ([env : Env env])
-            ([k : Uid k*] [v : C6-Expr v*])
+            ([k : Uid k*] [v : CoC6-Expr v*])
     (hash-set env k v)))
+
+

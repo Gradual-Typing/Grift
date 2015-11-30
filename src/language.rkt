@@ -1,11 +1,12 @@
-#lang typed/racket
-#|------------------------------------------------------------------------------+
+#lang typed/racket/base
+#|#|------------------------------------------------------------------------------+
 |File: src/language.rkt                                                         |
 +-------------------------------------------------------------------------------+
 |Authors:                                                                       |
 | Andre Kuhlenshmidt (akuhlens@indiana.edu)                                     |
 |                                                                               |
 +-------------------------------------------------------------------------------+
+<<<<<<< HEAD
 |Description:
 |This file contains the definitions of the various intermediate languages that
 |the compiler uses and helper functions that define some of the semantics of
@@ -825,45 +826,7 @@ We are going to UIL
 | Language/Cast-with-pure-letrec created by purify-letrec                      |
 +-----------------------------------------------------------------------------|#
 
-(define-type Cast-with-pure-letrec (Prog (List String Natural Schml-Type) C/PL-Expr))
 
-(define-type C/PL-Expr
-  (Rec E (U ;; Non-Terminals
-	  (Lambda Uid* E)
-	  (Letrec C/PL-Bnd-Lam* E)
-	  (Let C/PL-Bnd* E)
-	  (App E (Listof E))
-	  (Op Schml-Primitive (Listof E))
-	  (If E E E)
-	  (Cast E Schml-Type Schml-Type Blame-Label)
-          (Begin C/PL-Expr* E)
-          (Repeat Uid E E E)
-          ;; Monotonic
-          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Munbox E)
-          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
-          (Mbox-set! E E)
-          (Mvector E E)
-          (Mvector-set! E E E)
-          (Mvector-ref E E)
-          ;; Guarded effects
-          (Gbox E)
-          (Gunbox E)
-          (Gbox-set! E E)
-          (Gvector E E)
-          (Gvector-set! E E E)
-          (Gvector-ref E E)
-	  ;; Terminals
-	  (Var Uid)
-	  (Quote Cast-Literal))))
-
-(define-type C/PL-Expr* (Listof C/PL-Expr))
-(define-type C/PL-Bnd   (Pair Uid C/PL-Expr))
-(define-type C/PL-Bnd*  (Listof C/PL-Bnd))
-(define-type C/PL-Lam (Lambda Uid* C/PL-Expr))
-(define-type C/PL-Bnd-Lam (Pairof Uid C/PL-Lam))
-(define-type C/PL-Bnd-Lam* (Listof C/PL-Bnd-Lam))
 
 #| ----------------------------------------------------------------------------+
 | Language/Cast1 created by introduce-castable-functions                       |
@@ -1690,20 +1653,42 @@ We are going to UIL
      Halt
      No-Op)))
 
-(define-type D5-Value
-  (U D5-Trivial
-     Halt
-     (UIL-Op D5-Trivial)
-     (App D5-Trivial D5-Trivial*)
-     (If D5-Pred D5-Trivial D5-Trivial)))
+|#
 
-(define-type D5-Trivial
-  (U (Code-Label Uid)
-     (Var Uid)
-     (Quote D5-Literal)))
+#||Description: This file has been devided in order to support less recompilation
+|by typed racket. It remains as a compatability layer until all files requiring
+|this file have specified specifically what they require.
++-------------------------------------------------------------------------------|#
 
-(define-type D5-Trivial* (Listof D5-Trivial))
-(define-type D5-Effect* (Listof D5-Effect))
-(define-type D5-Value* (Listof D5-Value))
 
-(define-type D5-Literal Data-Literal)
+(define-syntax-rule (require/provide r ...)
+  (begin (require r ...)
+         (provide (all-from-out r ...))))
+
+(require/provide 
+ "./language/forms.rkt"
+ "./language/primitives.rkt"
+ "./language/types.rkt"
+ "./language/schml0.rkt"
+ "./language/schml1.rkt"
+ "./language/cast0.rkt"
+ "./language/coercion.rkt"
+ "./language/cast1.rkt"
+ "./language/cast2.rkt"
+ "./language/cast3.rkt"
+ "./language/cast4.rkt"
+ "./language/cast5.rkt"
+ "./language/cast6.rkt"
+ "./language/data-representation.rkt"
+ "./language/data0.rkt"
+ "./language/data1.rkt"
+ "./language/data2.rkt"
+ "./language/data3.rkt"
+ "./language/data4.rkt"
+ "./language/data5.rkt"
+ )
+
+
+
+
+

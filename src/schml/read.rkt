@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 #|------------------------------------------------------------------------------+
 |Pass: src/read                                                                 |
 +-------------------------------------------------------------------------------+
@@ -10,8 +10,11 @@
 +------------------------------------------------------------------------------|#
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
-(provide read)
+         "../configuration.rkt"
+         "../language/schml0.rkt")
+
+(provide (all-from-out "../language/schml0.rkt")
+         read)
 
 #|
 Function: get-name-of-file
@@ -22,6 +25,10 @@ This helper function called by read extracts a file name from a path.
     (if maybe-name
 	(path->string maybe-name)
 	(raise-file-name-exn p))))
+
+(require/typed racket/path
+  [file-name-from-path
+   (Path -> (Option Path))])
 
 #|
 Function: get-reader

@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 
 (require "./helpers.rkt")
 (provide (all-defined-out))
@@ -116,7 +116,7 @@
 
 (struct exn:schml:type exn:schml ())
 (struct exn:schml:type:static exn:schml:type ())
-(struct exn:schml:type:dynamic exn:schml:type ())
+(struct exn:schml:type:dynamic exn:schml:type () #:transparent)
 
 (define-syntax-rule (raise-static-type-exn src fmt args ...)
   (raise (exn:schml:type:static

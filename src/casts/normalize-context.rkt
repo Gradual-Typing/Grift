@@ -19,12 +19,15 @@ Description: This pass create effect, and value contexts
 (: normalize-context (Cast6-Lang Config . -> . Cast7-Lang))
 (define (normalize-context prgm comp-config)
   (match-let ([(Prog (list name count type) exp) prgm])
-    (let-values ([(exp count) (run-state (nc-expr->value exp) count)])
-      (Prog (list name count type) exp))))
+    (let* ([next : (Box Nat) (box count)]
+           [exp (expr->value next exp)]
+           [next (unbox next)])
+      (Prog (list name next type) exp))))
 
-(: nc-expr->value (-> C6-Expr (State Natural C7-Value)))
-(define (nc-expr->value exp)
-  (match exp
+(: expr->value ((Boxof Natural) C6-Expr -> C7-Valur))
+(define (expr->value next exp)
+  (define (recur exp)
+    (match exp
     [(If t c a)
      (lift-state (inst If C7-Value C7-Value C7-Value)
                  (nc-expr->value t) (nc-expr->value c) (nc-expr->value a))]
@@ -47,9 +50,6 @@ Description: This pass create effect, and value contexts
          (return-state (Op p e*)))]
     [(Var i) (return-state (Var i))]
     [(Quote k) (return-state (Quote k))]
-    ;; This is pretty sucky and should not be relied upon
-    ;; (TODO) Switch to using deep nesting to propigate constants without
-    ;; introducing constants into the sub-language
     [(Tag t)  (return-state (Tag t))]
     ;; Function Representation
     [(Fn-Caster e) (lift-state (inst Fn-Caster C7-Value) (nc-expr->value e))]
@@ -93,6 +93,7 @@ Description: This pass create effect, and value contexts
      (lift-state (inst Gproxy-to C7-Value) (nc-expr->value e))]
     [(Gproxy-blames e)
      (lift-state (inst Gproxy-blames C7-Value) (nc-expr->value e))]))
+  (recur exp))
 
 (: nc-expr->value* (-> C6-Expr* (State Natural C7-Value*)))
 (define (nc-expr->value* e*) (map-state nc-expr->value e*))

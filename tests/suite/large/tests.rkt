@@ -10,7 +10,7 @@
    "large tests"
    #:before (lambda () (display "large tests running ... "))
    #:after (lambda () (display "done\n"))
-   (test-file "large" "ack-3-10-static.schml" (int 125))
-   (test-file "large" "ack-4-1-static.schml"  (int 65533))
-   (test-file "large" "ack-static.schml"      (bool #t))
-   (test-file "large" "guarded-writes-alot.schml" (int 0))))
+   (test-file/no-checks "large" "ack-3-5-static.schml" (int 253))
+   (test-file/no-checks "large" "ack-4-1-static.schml"  (int 65533))
+   (test-file/no-checks "large" "ack-static.schml"      (bool #t))
+   (test-file/no-checks "large" "guarded-writes-alot.schml" (int 0))))

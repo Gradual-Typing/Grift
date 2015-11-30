@@ -12,10 +12,16 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt")
+         "../configuration.rkt"
+         "../language/data1.rkt"
+         "../language/data2.rkt"
+         "../language/make-begin.rkt")
 
 ;; Only the pass is provided by this module
-(provide remove-let)
+(provide remove-let
+         (all-from-out
+          "../language/data1.rkt"
+          "../language/data2.rkt"))
 
 #;
 (TODO this pass has a very wierd interface for effects.
@@ -25,7 +31,7 @@
       monad.)
 
 (: remove-let (-> Data1-Lang Config Data2-Lang))
-(trace-define (remove-let prgm comp-config)
+(define (remove-let prgm comp-config)
   (match-let ([(Prog (list name count type) (GlobDecs d* (Labels bnd-code* tail))) prgm])
     (let ([bnd-code* : D2-Bnd-Code* (rl-bnd-code* bnd-code*)]
           [body : D2-Body (rl-body tail)])
@@ -62,17 +68,18 @@
      (let*-values ([(tail lv*) (rl-tail tail)]
                    [(stm* lv*)  (rl-effect* stm* lv*)])
        (values (Begin stm* tail) lv*))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (let*-values ([(exp lv*) (rl-value exp)]
                    [(exp* lv*^) (rl-value* exp*)])
-       (values (App exp exp*) (append lv* lv*^)))]
+       (values (App-Code exp exp*) (append lv* lv*^)))]
     [(Op p exp*)
      (let*-values ([(exp* lv*) (rl-value* exp*)])
        (values (Op p exp*) lv*))]
-    [(Halt) (values (Halt) '())]
     [(Var i) (values (Var i) '())]
     [(Code-Label i) (values (Code-Label i) '())]
     [(Quote k) (values (Quote k) '())]
+    [(Halt) (values (Halt) '())]
+    [(Success) (values (Success) '())]
     [other (error 'remove-let/rl-tail "~a" other)]))
 
 (: rl-value (-> D1-Value (values D2-Value Uid*)))
@@ -92,10 +99,10 @@
      (let*-values ([(exp lv*) (rl-value exp)]
                    [(stm* lv*) (rl-effect* stm* lv*)])
        (values (Begin stm* exp) lv*))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (let*-values ([(exp lv*) (rl-value exp)]
                    [(exp* lv*^) (rl-value* exp*)])
-       (values (App exp exp*) (append lv* lv*^)))]
+       (values (App-Code exp exp*) (append lv* lv*^)))]
     [(Op p exp*)
      (let*-values ([(exp* lv*) (rl-value* exp*)])
        (values (Op p exp*) lv*))]
@@ -126,10 +133,10 @@
      (let-values ([(e1 e1-lv*) (rl-value e1)]
                   [(e2 e2-lv*) (rl-value e2)])
        (values (Relop p e1 e2) (append e1-lv* e2-lv*)))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (let*-values ([(exp lv*) (rl-value exp)]
                    [(exp* lv*^) (rl-value* exp*)])
-       (values (App exp exp*) (append lv* lv*^)))]
+       (values (App-Code exp exp*) (append lv* lv*^)))]
     [other (error 'remove-let/rl-pred "~a" other)]))
 
 (: rl-value* (-> (Listof D1-Value) (values (Listof D2-Value) Uid*)))
@@ -181,10 +188,10 @@
                    [(e2 l2) (rl-value e2)]
                    [(e3 lv*) (rl-effect e3 lv*)])
        (values (Repeat i e1 e2 e3) (cons i (append l1 l2 lv*))))]
-    [(App exp exp*)
+    [(App-Code exp exp*)
      (let*-values ([(exp lv*^)   (rl-value exp)]
                    [(exp* lv*^^) (rl-value* exp*)])
-       (values (App exp exp*) (append lv*^ lv*^^ lv*)))]
+       (values (App-Code exp exp*) (append lv*^ lv*^^ lv*)))]
     [(Op p exp*)
      (let*-values ([(exp* lv*^) (rl-value* exp*)])
       (values (Op p exp*) (append lv*^ lv*)))]

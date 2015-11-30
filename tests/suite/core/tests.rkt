@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 
 (require "../../rackunit.rkt"
          "../../test-compile.rkt")
@@ -91,7 +91,7 @@
    (test-file "core" "ascribe-bool-bad.schml"  (blame #t "Pass"))
    ;; blame
    (test-file "core" "blame2.schml" (blame #t "Right"))
-   (test-file "core" "blame3.schml" (blame #f "Correct\n"))
+   (test-file "core" "blame3.schml" (blame #f "Correct"))
    (test-file "core" "blame4.schml" (blame #t #f))
    (test-file "core" "blame5.schml" (blame #f (not-lbl "Fail")))
    (test-file "core" "blame6.schml" (blame #f (not-lbl "Fail")))
@@ -101,6 +101,6 @@
    ;; Multi  arg function
    (test-file "core" "blame10.schml" (blame #f (not-lbl "Fail")))
    (test-file "core" "blame11.schml" (blame #f (not-lbl "Fail")))
-   (test-file "core" "blame12.schml" (blame #f "Pass\n"))
-   (test-file "core" "blame13.schml" (blame #f "Pass\n"))
+   (test-file "core" "blame12.schml" (blame #f "Pass"))
+   (test-file "core" "blame13.schml" (blame #f "Pass"))
    ))

@@ -11,7 +11,8 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../language.rkt"
+         "../configuration.rkt"
+         "../language/data5.rkt"
          "../macros.rkt")
 
 
@@ -220,9 +221,12 @@
             (emit-block '() a)
             (newline))]
     [(Return e)
-     (begin (display "return ")
-            (emit-value e)
-            (display ";\n"))]))
+     (if (Success? e)
+         (display "return 0;")
+         (begin
+           (display "return ")
+           (emit-value e)
+           (display ";\n")))]))
 
 (: emit-pred (-> D5-Pred Void))
 (define (emit-pred r)
@@ -237,11 +241,12 @@
   (match e
     [(If t c a)       (emit-ternary (emit-pred t) (emit-value c) (emit-value a))]
     #;[(Begin stm* exp) (emit-begin stm* (emit-value exp))]
-    [(App v v*)       (emit-function-call v v*)]
+    [(App-Code v v*)       (emit-function-call v v*)]
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Quote k)        (print k)]
-    [(Halt)           (display C-EXIT)]
+    ;; TODO Consider changing how Halt is handled
+    [(Halt)           (display "exit(-1),-1")]
     [(Code-Label i)  (begin
                        (display "((")
                        (display "long)")
@@ -345,7 +350,9 @@
 (: emit-function-call (-> D5-Value D5-Value* Void))
 (define (emit-function-call val val*)
   (emit-wrap
-   (emit-cast->fn val val*)
+   (if (Code-Label? val)
+       (display (uid->string (Code-Label-value val)))
+       (emit-cast->fn val val*))
    (sequence emit-value val* display "(" "" "," "" ")")))
 
 ;; primitives for generating syntax
