@@ -1,0 +1,12 @@
+(letrec ((cast-loop
+          :
+          (Int (Int -> Int) -> (Int -> Int))
+          (lambda ((n : Int) (g : (Int -> Int)))
+            (if (= n 0) g (cast-loop (- n 1) (: g (Dyn -> Dyn)))))))
+  (let ((f : (Int -> Int) (lambda ((x : Int)) x)))
+    (let ((f^ : (Int -> Int) (cast-loop N-CASTS f)))
+      (begin
+        (timer-start)
+        (repeat (i 0 N-ITERATIONS) (f^ 0))
+        (timer-stop)
+        (timer-report)))))
