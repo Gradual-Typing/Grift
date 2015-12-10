@@ -1,0 +1,20 @@
+(letrec ([f : (Int -> Int) (lambda (x) x)]
+         [g1 : ((GRef (Int -> Int)) Int -> (GRef (Dyn -> Dyn)))
+             (lambda (bf i)
+               (let ([bf : (GRef (Dyn -> Dyn)) (: bf (GRef (Dyn -> Dyn)))])
+                 (g2 bf (- i 1))))]
+         [g2 : ((GRef (Dyn -> Dyn)) Int -> (GRef (Dyn -> Dyn)))
+             (lambda (dbf i)
+               (if (<= i 0)
+                   dbf
+                   (let ([bf : (GRef (Int -> Int)) (: dbf (GRef (Int -> Int)))])
+                     (g1 bf i))))])
+  (let ([r : (GRef (Int -> Int)) (gbox f)])
+    (repeat (i 0 CAST-COUNT)
+            (let ([x (g1 r i)])
+              (begin
+                (timer-start)
+                (repeat (u 0 OP-COUNT)
+                        (gunbox x))
+                (timer-stop)
+                (timer-report))))))
