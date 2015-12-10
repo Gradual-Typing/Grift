@@ -5,9 +5,12 @@
  racket/date
  math/statistics)
 
-;; This is the script for running the casted-X-n-function-application
-;; benchmark.
-;; TODO Setup command line argument that saftly cleans up tmp files.
+;; This is the script for running the function application benchmark
+;; which strive to measure the savings due to space efficiency during
+;; function application.
+
+;; TODO Setup command line argument that saftly cleans up tmp files,
+;; build and display graphs.
 
 
 #|--------------------------------------------------------------------
@@ -23,7 +26,7 @@ Configuaration variables
 (define runs 30)
 
 ;; casts is a list of the number of casts to test in the benchmark
-(define casts (build-list 11 values))
+(define casts (build-list 21 values))
 
 ;; The file is hard coded for each compiler configuration because
 ;; it makes formatting the each new data file easier.
@@ -40,19 +43,25 @@ to test the efficiency of applying a casted function.
 
 (define (generate-source output-port iterations casts)
   (pretty-print
-   `(letrec ([cast-loop
-              : (Int (Int -> Int) -> (Int -> Int))
-              (lambda ([n : Int] [g : (Int -> Int)])
-                (if (= n 0)
-                    g 
-                    (cast-loop (- n 1) (: g (Dyn -> Dyn)))))])
-      (let ([f : (Int -> Int) (lambda ([x : Int]) x)])
-        (let ([f^ : (Int -> Int) (cast-loop ,casts f)])
-          (begin
-            (timer-start)
-            (repeat (i 0 ,iterations ) (f^ 0))
-            (timer-stop)
-            (timer-report)))))
+   (let-values ([(annotation invocation)
+                 ;; Try doing this in a typed language
+                 (if (or (symbol? casts) (even? casts))
+                     (values '(Int -> Int) `(cast-loop ,casts f))
+                     (values '(Dyn -> Dyn)
+                             `(: (cast-loop ,(sub1 casts) f) (Dyn -> Dyn))))])
+     `(letrec ([cast-loop
+                : (Int (Int -> Int) -> (Int -> Int))
+                (lambda ([n : Int] [g : (Int -> Int)])
+                  (if (= n 0)
+                      g 
+                      (cast-loop (- n 2) (: g (Dyn -> Dyn)))))])
+        (let ([f : (Int -> Int) (lambda ([x : Int]) x)])
+          (let ([f^ : ,annotation ,invocation])
+            (begin
+              (timer-start)
+              (repeat (i 0 ,iterations ) (f^ 0))
+              (timer-stop)
+              (timer-report))))))
    output-port 1))
 
 #|-------------------------------------------------------------------
@@ -96,10 +105,11 @@ it hard to find this directory.
 (unless (directory-exists? logs-dir)
   (make-directory logs-dir))
 
-;; This is where the pdf graphs are stored
-(define pdf-dir (build-path this-dir "pdfs/"))
-(unless (directory-exists? pdf-dir)
-  (make-directory pdf-dir))
+;; .paper is a symlink that I sometime put in place to automate
+;; updating a paper's graphs and figures
+(define paper-dir (build-path this-dir ".paper"))
+(define paper-latex-plot (build-path paper-dir "graphics" "fn-app.tex"))
+(define tmp-latex-plot (build-path this-dir "fn-app.tex"))
 
 
 ;; The data files are "Uniquified" by the current hash of the git repo
@@ -129,14 +139,14 @@ the base file name, the path to the file, and the number of casts.
 (display "Generating benchmark source code\n")
 
 (define benchmarks
-  (for*/list ([cast (in-list casts)])
-    (let* ([base (format "app-test_i-~a_c-~a" iterations cast)]
+  (for*/list ([n (in-list casts)])
+    (let* ([base (format "~a-i~a-c~a" unique-name iterations n)]
            [src  (build-path src-dir (string-append base ".schml"))]
            [port (open-output-file src #:exists 'replace)])
       (printf "\t~a\n" base)
-      (generate-source port iterations cast)
+      (generate-source port iterations n)
       (close-output-port port)
-      (list base src cast))))
+      (list base src n))))
 
 (call-with-output-file
   (build-path this-dir "fn-app-code-template.schml") #:exists 'replace
@@ -144,10 +154,11 @@ the base file name, the path to the file, and the number of casts.
 
 ;; Run each benchmark for a particular compiler configuration
 (define (run-series out cast-rep)
+  (define (unit->micro x) (* x (expt 10 6)))
   (define spec #px"^time \\(sec\\): (\\d+.\\d+)\nUnit : \\(\\)\n$")
   (for* ([b (in-list benchmarks)])
     (match-let ([(list base src casts) b])
-      (let* ([base^ (format "~a_~a" base cast-rep)] 
+      (let* ([base^ (format "~a-~a" base cast-rep)] 
              [tmpc (build-path tmp-dir (string-append base^ ".c"))]
              [tmpa (build-path tmp-dir (string-append base^ ".s"))]
              [exe  (build-path exe-dir  (string-append base^ ".out"))])
@@ -172,10 +183,12 @@ the base file name, the path to the file, and the number of casts.
                              "failed to parse output of ~a\n\t~a\n"
                              exe result))
                     ;; parse the number
-                    (string->number (cadr parse?))))]
-               [mean (mean run-results)]
-               [sdev (stddev run-results)])
-          (fprintf out "~a\t~a\t~a\n" casts mean sdev))))))
+                    (unit->micro (string->number (cadr parse?)))))]
+               [mean  (mean run-results)]
+               [sdev  (stddev run-results)]
+               [max   (apply max run-results)]
+               [min   (apply min run-results)])
+          (fprintf out "~a\t~a\t~a\t~a\t~a\n" casts mean sdev min max))))))
 
 ;; Here we gather and write the benchmark data to file
 (call-with-output-file data-file #:exists 'replace
@@ -208,10 +221,9 @@ the base file name, the path to the file, and the number of casts.
 
 (when (system "which gnuplot")
   (define data (path->string data-file))
-  (define make-pdf  (path->string (build-path this-dir "pdf.gnuplot")))
   (define show-plot (path->string (build-path this-dir "show.gnuplot")))
-  (define pdf-file
-    (path->string (build-path pdf-dir (string-append unique-name ".pdf"))))
-  (system (format "gnuplot -e \"inFile='~a';outFile='~a'\" ~a"
-                  data pdf-file make-pdf))
-  (system (format "gnuplot -e \"inFile='~a'\" ~a" data show-plot)))
+  (define latex-plot (path->string (build-path this-dir "latex.gnuplot")))
+  (system (format "gnuplot -e \"inFile='~a'\" ~a" data show-plot))
+  (when (directory-exists? paper-dir)
+    (system (format "gnuplot -e \"inFile='~a'\" ~a" data latex-plot))
+    (system (format "mv ~a ~a" tmp-latex-plot paper-latex-plot))))

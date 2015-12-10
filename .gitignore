@@ -13,3 +13,6 @@ compiled/
 *.[oas]
 *.out
 
+# any hidden files
+**/.*
+

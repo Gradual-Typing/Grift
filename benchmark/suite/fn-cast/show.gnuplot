@@ -9,11 +9,11 @@ set xtics 5
 set mxtics 1
 set xlabel "number of function casts"
 
-set ylabel "time (seconds)"
+set ylabel "time (microseconds)"
 set autoscale
 
-plot   inFile index 0 u 1:2 t "Twosomes" w p lw 2,\
-       inFile index 1 u 1:2 t "Coercions" w p lw 2
+plot   inFile index 0 u 1:2:3 title "Twosomes"  w errorbars  lw 2,\
+       inFile index 1 u 1:2:3 title "Coercions" w errorbars  lw 2
 
 pause -1 "Press ENTER to exit"
 
