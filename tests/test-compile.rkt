@@ -24,16 +24,26 @@
  "./ast-interps/cast-lang-interp.rkt"
  )
 
-(require/typed "./ast-interps/new-form-interp.rkt"
-  [interp (Any Config -> Test-Value)])
+;(require/typed "./ast-interps/new-form-interp.rkt"
+;  [interp (Any Config -> Test-Value)])
 
 (provide (all-defined-out)
          (all-from-out "./values.rkt")
          Config)
 
-(define compiler-config-cast-representation
-  : (Parameterof Cast-Representation)
-  (make-parameter 'Twosomes))
+(: compiler-config-cast-representation (-> Cast-Representation Void))
+(define (compiler-config-cast-representation r)
+  (define c (compiler-config))
+  (compiler-config
+   (Config (Config-source-path c)
+           (Config-semantics c)
+           (Config-exec-path c)
+           (Config-c-path c)
+           (Config-keep-c c)
+           (Config-c-flags c)
+           (Config-asm-path c)
+           r
+           (Config-mem-limit c))))
 
 (define intermediate-checks?
   : (Parameterof Boolean)
@@ -49,7 +59,7 @@
            #f
            '()
            #f
-           (compiler-config-cast-representation)
+           'Twosomes
            1000000)))
 
 
@@ -59,7 +69,7 @@
      (lambda ([exit : (Any -> Any)])
        (define (exit/success) (exit 'success))
        (define config (compiler-config))
-       (define-syntax-rule (ck t m) (check value=? (interp t config) expected m))
+       ;(define-syntax-rule (ck t m) (check value=? (interp t config) expected m))
        (define-syntax-rule (nop . a) (void))
        (with-handlers ([exn:schml:type:static?
                           (lambda ([e : exn:schml:type:static])
@@ -71,8 +81,8 @@
          (when (intermediate-checks?)
            (define ast0 (reduce-to-cast-calculus path config))
            (check value=? (cast-lang-interp ast0 config) expected "cast-lang interp")
-           (ck ast0 "cast 0")            
-           (define ast1 (test-impose-cast-semantics ast0 config ck))
+           (nop ast0 "cast 0")            
+           (define ast1 (test-impose-cast-semantics ast0 config nop))
            (define ast2 (convert-representation ast1 config))
            (c-backend-generate-code ast2 config)
            (check value=?

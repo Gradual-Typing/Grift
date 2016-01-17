@@ -1,0 +1,27 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <time.h>
+
+double get_cpu_time(){
+  return (double)clock() / CLOCKS_PER_SEC;
+}
+
+int main(){
+  unsigned long long volatile * x = malloc(sizeof(unsigned long long));
+  *x = 0;
+  
+  //  Start Timers
+  double cpu0  = get_cpu_time();
+
+  //  Perform some computation.
+  for (unsigned long long f=0;f<OP-COUNT;++f){
+    *x = 1;
+  }
+
+  //  Stop timers
+  double cpu1  = get_cpu_time();
+
+  printf("CPU Time: %f",cpu1  - cpu0);
+  
+}

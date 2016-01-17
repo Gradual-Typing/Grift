@@ -15,4 +15,7 @@ compiled/
 
 # any hidden files
 **/.*
-
+**/tmp/*
+**/data/*
+**/output/*
+**/results/*
