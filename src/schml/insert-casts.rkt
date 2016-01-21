@@ -4,12 +4,12 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-|Discription: This pass converts differences in type equality via a inserted
-|cast. After this pass all types should be explicit and the program should be
-|roughly equivalent to the cast-calculus mentioned in papers on the gradually
-|typed lambda calculus.
+|Description: This pass converts differences in type equality via a inserted    |
+|cast. After this pass all types should be explicit and the program should be   |
+|roughly equivalent to the cast-calculus mentioned in papers on the gradually   |
+|typed lambda calculus.                                                         |
 +-------------------------------------------------------------------------------+
-|Input Grammar
+|Input Grammar                                                                  |
 +------------------------------------------------------------------------------|#
 (require racket/match
          "../helpers.rkt"
@@ -95,37 +95,47 @@
       #|;; These rules bastardizations of the rules found in Figure 6 of
       ;; Monotonic references for efficient gradual typing
       [(Mbox (and (Ann _ (cons e-src e-ty)) (app iic-expr e)))
-       (Mbox (Ann e (cons ((mk-label "monotonic box" e-src)) e-ty)))]
+      (Mbox (Ann e (cons ((mk-label "monotonic box" e-src)) e-ty)))]
       [(Munbox (and (Ann _ (cons e-src e-ty)) (app iic-expr e)))
-       (if (completely-static-type? e-ty)
-           ;; if the types are static then in order to typecheck they must have
-           ;; been consistent with (Ref type)
-           (Munbox e)
-           (Munbox
-            (Ann (mk-cast (mk-label "monotonic unbox" e-src) e e-ty (MRef type))
-                 (cons ((mk-label "monotonic unbox" e-src)) type))))]
+      (if (completely-static-type? e-ty)
+      ;; if the types are static then in order to typecheck they must have
+      ;; been consistent with (Ref type)
+      (Munbox e)
+      (Munbox
+      (Ann (mk-cast (mk-label "monotonic unbox" e-src) e e-ty (MRef type))
+      (cons ((mk-label "monotonic unbox" e-src)) type))))]
       [(Mbox-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
-                  (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
-       (TODO come up with a reasonable version of this)]
+      (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
+      (TODO come up with a reasonable version of this)]
       |#
-      [(Gvector size e) (Gvector (iic-expr size) (iic-expr e))]
-      [(Gvector-ref (and (Ann _ (cons e-src e-ty)) (app iic-expr e)) (app iic-expr ind))
+      [(Gvector (and (Ann _ (cons size-src size-ty)) (app iic-expr size)) (app iic-expr e))
        (cond
-         [(GVect? e-ty) (Gvector-ref e ind)]
-         [(Dyn? e-ty)
-          (Gvector-ref (mk-cast (mk-label "guarded vector ref" e-src) e e-ty (GVect DYN-TYPE)) ind)]
-         [else (TODO come up with an error)])]
+         [(Dyn? size-ty)
+          (Gvector (mk-cast (mk-label "gvector index" size-src) size size-ty INT-TYPE) e)]
+         [else (Gvector size e)])]
+      [(Gvector-ref (and (Ann _ (cons e-src e-ty)) (app iic-expr e))
+                    (and (Ann _ (cons i-src i-ty)) (app iic-expr i)))
+       (let ([e (if (Dyn? e-ty)
+                    (mk-cast (mk-label "gvector-ref" e-src) e e-ty (GVect DYN-TYPE))
+                    e)]
+             [i (if (Dyn? i-ty)
+                    (mk-cast (mk-label "gvector-ref index" i-src) i i-ty INT-TYPE)
+                    i)])
+         (Gvector-ref e i))]
       [(Gvector-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
-                     (app iic-expr ind)
+                     (and (Ann _ (cons i-src i-ty)) (app iic-expr i))
                      (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
-       (let ([lbl1 (mk-label "guarded vector-set!" e1-src)]
-             [lbl2 (mk-label "guarded vector-set!" e2-src)])
+       (let ([lbl1 (mk-label "gvector-set!" e1-src)]
+             [lbl2 (mk-label "gvector-set!" e2-src)]
+             [i (if (Dyn? i-ty)
+                    (mk-cast (mk-label "gvector-ref index" i-src) i i-ty INT-TYPE)
+                    i)])
          (cond
            [(GVect? e1-ty)
-            (Gvector-set! e1 ind (mk-cast lbl2 e2 e2-ty (GVect-arg e1-ty)))]
+            (Gvector-set! e1 i (mk-cast lbl2 e2 e2-ty (GVect-arg e1-ty)))]
            [(Dyn? e1-ty)
             (Gvector-set! (mk-cast lbl1 e1 DYN-TYPE (GVect DYN-TYPE))
-                          ind
+                          i
                           (mk-cast lbl2 e2 e2-ty DYN-TYPE))]
            [else (TODO error message that is appropriate)]))]
       [(Mvector e1 e2)         (TODO define vector insert implicit casts)]
