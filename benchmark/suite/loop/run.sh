@@ -8,25 +8,27 @@ schmldir=/u/dalmahal/Schml
 name=loop
 testdir=$schmldir/benchmark/suite
 datadir=$schmldir/benchmark/suite/loop/data
+outdir=$schmldir/benchmark/suite/loop/output
+tmpdir=$schmldir/benchmark/suite/loop/tmp
 logfile=$datadir/$name.csv
 TIMEFORMAT=%R
 
 echo "Benchmarking empty loops"
 
-# create the results directory if it does not exist
-mkdir -p $datadir
+# create the data and tmp directories if they do not exist
+mkdir -p $datadir $tmpdir
 
 # specialize all source files templates to a concrete number of
 # iterations.
 cd $testdir/loop/src
-sed "s/OP-COUNT/$loop/" < c${name}-template> c${name}.c
-sed "s/OP-COUNT/$loop/" < s${name}-template> s${name}.scm
-sed "s/OP-COUNT/$gloop/" < ${name}-template> ${name}.schml
+sed "s/OP-COUNT/$loop/" < c${name}-template> $tmpdir/c${name}.c
+sed "s/OP-COUNT/$loop/" < s${name}-template> $tmpdir/s${name}.scm
+sed "s/OP-COUNT/$gloop/" < ${name}-template> $tmpdir/${name}.schml
 
 # compile Schml source files, then enter the src directory
 cd $schmldir
-racket benchmark.rkt $testdir/loop/src
-cd $testdir/loop/src
+racket benchmark.rkt $tmpdir
+cd $tmpdir
 
 # compile scheme source files
 gsc -prelude "(declare (standard-bindings)) (declare (block)) (declare (fixnum))" \
