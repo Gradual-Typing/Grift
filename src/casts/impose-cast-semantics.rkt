@@ -10,7 +10,8 @@ This is a micro compiler that removes the cast language form.
          "casts-to-coercions.rkt"
          "lower-function-casts.rkt"
          "lower-reference-casts.rkt"
-         "interpret-casts.rkt"
+         "interpret-casts-with-twosomes.rkt"
+         "interpret-casts-with-coercions.rkt"
          "label-lambdas.rkt"
          "uncover-free.rkt"
          "convert-closures.rkt"
@@ -41,6 +42,11 @@ This is a micro compiler that removes the cast language form.
        (t a (format "pre ~a" 'p))
        (let ([a (if (t? a c) (p a c) a)])
          (compose-passes (a c t) p* ...)))]
+    [(_ (a c t) (if t? pc pa) p* ...)
+     (begin
+       (t a (format "pre ~a" 'p))
+       (let ([a (if (t? a c) (pc a c) (pa a c))])
+         (compose-passes (a c t) p* ...)))]
     [(_ (a c t) p p* ...)
      (begin
        (t a (format "pre ~a" 'p))
@@ -70,7 +76,9 @@ This is a micro compiler that removes the cast language form.
     casts->coercions)
   lower-function-casts
   lower-reference-casts
-  interpret-casts
+  (if coercion-representation?
+      interpret-casts/coercions
+      interpret-casts/twosomes)
   hoist-types
   label-lambdas
   uncover-free

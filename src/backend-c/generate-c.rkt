@@ -277,7 +277,8 @@
             (display " ; ")
             (display (uid->string i))
             (display " += 1 ) {\n")
-            (emit-begin e* (display "__asm__(\"\");"))
+            (display "__asm__(\"\");")
+            (emit-begin e* (void))
             (display "}\n"))]
     [(Op p exp*)
      (emit-op p exp*)]

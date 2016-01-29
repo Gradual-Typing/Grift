@@ -2,47 +2,30 @@
 (require
  racket/match
  racket/format
- "../../helpers.rkt"
- "../../errors.rkt"
- "../../configuration.rkt"
- "../../language/cast-or-coerce2.rkt"
- "../../language/cast-or-coerce3.rkt")
+ "../helpers.rkt"
+ "../errors.rkt"
+ "../configuration.rkt"
+ "../language/cast-or-coerce2.rkt"
+ "../language/cast-or-coerce3.rkt")
 
 (provide (all-defined-out))
 
-(define-type Function-Proxy-Rep (U 'Data 'Hybrid))
-
-(define-type Cast-Rule
-  (CoC3-Expr (U (Twosome CoC3-Expr CoC3-Expr CoC3-Expr)
-                (Coercion CoC3-Expr))
-             -> (State Nat CoC3-Expr)))
-
-(define-type ComposeT (CoC3-Expr CoC3-Expr -> (State Nat CoC3-Expr)))
-
-(define-type ApplyT   (CoC3-Expr CoC3-Expr* -> (State Nat CoC3-Expr)))
-
-(define-type Fn-ProxyT
-  (Index CoC3-Expr CoC3-Expr -> (State Nat CoC3-Expr)))
-
-(define-type Get-Helpers-Type
-  (Function-Proxy-Rep
-   -> (State Nat (List Cast-Rule ComposeT ApplyT Fn-ProxyT CoC3-Bnd-Code*))))
-
+(define-type Function-Proxy-Rep (U 'Data 'Hybrid 'Functional))
 
 ;; Expr$ and cond$ will prune branches if the condition is (Quote #t) or (Quote #f)
 ;; and generates If statements (to construct the cast tree)
-(: if$ (CoC3-Expr (State Nat CoC3-Expr) (State Nat CoC3-Expr) -> (State Nat CoC3-Expr)))
-(define (if$ t c a)
+(: if/specialization (CoC3-Expr (-> CoC3-Expr) (-> CoC3-Expr) -> CoC3-Expr))
+(define (if/specialization t c a)
   (if (Quote? t)
-      (if (Quote-literal t)
-          c
-          a)
-      (do (bind-state : (State Nat CoC3-Expr))
-          (tmp-c : CoC3-Expr <- c)
-        (tmp-a : CoC3-Expr <- a)
-        (return-state (If t tmp-c tmp-a)))))
+      (if (Quote-literal t) (c) (a))
+      (If t (c) (a))))
 
-;; Pure version of the above
+;; better syntax for calling if/specialization
+(define-syntax-rule (if$ t c a)
+  (if/specialization t (lambda () c) (lambda () a)))
+
+;; Pure version of the above use for programming in
+;; the object language with and/or
 (: if$_ (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (if$_ t c a)
   (if (Quote? t)
@@ -65,11 +48,11 @@
 
 ;; make sure that t is a trivial expression
 (define-type CoC3-Trivial (U (Quote-Coercion Schml-Coercion)
-                             (Quote Cast-Literal)
-                             (Tag Tag-Symbol)
-                             (Type Schml-Type)
-                             (Var Uid)))
-
+                              (Quote Cast-Literal)
+                              (Tag Tag-Symbol)
+                              (Type Schml-Type)
+                              (Var Uid)))
+#|
 ;(: trivial? (CoC3-Expr -> Boolean : Trivial))
 (define (trivial? x)
   (or (Quote? x)
@@ -77,11 +60,14 @@
       (Type? x)
       (Var? x)))
 
-(: trivialize (String CoC3-Expr CoC3-Bnd* ->
-                      (State Nat (Pair CoC3-Bnd* CoC3-Trivial))))
-(define (trivialize s e b*)
+(: trivialize ((Box Nat) String CoC3-Expr CoC3-Bnd* ->
+               (Pair CoC3-Bnd* let$-Trivial)))
+(define (trivialize next s e b*)
   (if (or (Quote? e) (Tag? e) (Type? e) (Var? e))
-      (return-state (cons b* e))
+      `(,b* . ,e)
+      (let ([u (unbox next)])
+        (set-box! next (add1 u))
+        ())
       (bind-state
        (uid-state s)
        (lambda ([u : Uid])
@@ -95,32 +81,52 @@
   (if (null? b*)
       b
       (let$*-help (cdr b*) (Let (list (car b*)) b))))
+|#
 
-;; creates CoC3-Expr let bindings for non-trivial CoC3-Expr expressions,
+
+;; createsCoC3-Expr let bindings for non-trivial CoC3-Expr expressions,
 ;; since non-trivial expressions must be evaluated only once.
 ;; This has to be a macro because it plays with what value is bound to
 ;; the t* variable in the code in order to reduce the number of cases
 ;; that must be handle
-(define-syntax let$*
-  (syntax-rules ()
-    [(_ () b) b]
-    [(_ ([t* v*] ...) b)
-     ;; I have had some major typechecking problems with sites that
-     ;; have multiple cases of this code. On way around this would be
-     ;; to stop this nonsense and to make sure that every expression
-     ;; is fully evaluated before casting. The thought would then be
-     ;; that some uneeded evaluations wouldn't be remove by eliminating
-     ;; uneeded results later.
-     ;; Another way would be to always allocate the uvar and just throw
-     ;; it away if it turns out that the thing is already a trivial value.
-     (let ([b* : CoC3-Bnd* '()])
+(define-syntax-rule (define-syntax-let$* let$* next)
+  (... ;; Quote-ellipsis
+   (begin
+     (: trivialize (String CoC3-Expr (Listof (Pairof Uid CoC3-Expr))
+                           ->
+                           (Values CoC3-Bnd* CoC3-Trivial)))
+    (define (trivialize name expr bnd*)
+      (if (or (Quote? expr) (Tag? expr) (Type? expr)
+              (Var? expr) (Quote-Coercion? expr))
+          (values bnd* expr)
+          (let* ([unique (unbox next)]
+                 [uvar   (Uid name unique)])
+            (set-box! next (+ unique 1))
+            (values (cons (cons uvar expr) bnd*) (Var uvar)))))
+    (: let$*-help ((Listof (Pairof Uid CoC3-Expr)) CoC3-Expr -> CoC3-Expr))
+    (define (let$*-help b* b)
+      (if (null? b*)
+          b
+          (let$*-help (cdr b*) (Let (list (car b*)) b))))
+    (define-syntax let$*
+      (syntax-rules ()
+        [(_ () b) b]
+        [(_ ([t* v*] ...) b)
+         (let ([b* : (Listof (Pairof Uid CoC3-Expr)) '()])
+           (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
+             (let ([body : CoC3-Expr b])
+               (if (null? b*)
+                 body
+                 (let$*-help b* body)))))])))))
+
+#|
        (do (bind-state : (State Nat CoC3-Expr))
            ((cons b* t*) : (Pair CoC3-Bnd* CoC3-Trivial)
             <- (trivialize (~a 't*) v* b*)) ...
            (b^ : CoC3-Expr <- b)
            (if (null? b*)
                (return-state b^)
-               (return-state (let$*-help b* b^)))))]))
+               (return-state (let$*-help b* b^))))|#
 
 
 
@@ -143,7 +149,7 @@
   (if (Type? o)
       (let ([v (Type-type o)])
         (cond
-          [(or (Dyn? v) (Int? v) (Bool? v))
+          [(or (Dyn? v) (Int? v) (Bool? v) (Unit? v))
            (Tag 'Atomic)]
           [(GRef? v) (Tag 'GRef)]
           [(GVect? v) (Tag 'GVect)]
