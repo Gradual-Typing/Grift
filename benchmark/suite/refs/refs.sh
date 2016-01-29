@@ -1,5 +1,5 @@
 #!/bin/sh
-num=5
+num=2
 cd refs
 ./run.sh $num
 cd ..

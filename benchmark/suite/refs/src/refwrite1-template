@@ -2,6 +2,6 @@
   (begin
     (timer-start)
     (repeat (u 0 OP-COUNT)
-            (gbox-set! r (+ (gunbox r) 1)))
+            (gbox-set! r 1))
     (timer-stop)
     (timer-report)))

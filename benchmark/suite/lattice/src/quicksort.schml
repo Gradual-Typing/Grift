@@ -1,0 +1,36 @@
+(let ([a : (GVect Int) (gvector 100 1)])
+  (begin
+    (repeat (i 0 100)
+    	    (gvector-set! a i (- 100 i)))
+    (letrec ([sort : (Int Int -> Int)
+                   (lambda ([p : Int] [r : Int]) : Int
+                           (if (< p r)
+                               (let ([q : Int (partition p r)])
+                                 (begin
+                                   (sort p (- q 1))
+                                   (sort (+ q 1) r)))
+                               0))]
+             [partition : (Int Int -> Int)
+                        (lambda ([p : Int] [r : Int]) : Int
+                                (let ([i : (GRef Int) (gbox (- p 1))]
+                                      [x : Int (gvector-ref a r)])
+                                  (begin
+                                    (repeat (j p r)
+                                            (if (<= (gvector-ref a j) x)
+                                                (begin
+                                                  (gbox-set! i (+ (gunbox i) 1))
+                                                  (swap (gunbox i) j))
+                                                0))
+                                    (swap (+ (gunbox i) 1) r)
+                                    (+ (gunbox i) 1))))]
+             [swap : (Int Int -> Int)
+                   (lambda ([i : Int] [j : Int]) : Int
+                           (if (= i j)
+                               0
+                               (let ([t : Int (gvector-ref a i)])
+                                 (begin
+                                   (gvector-set! a i (gvector-ref a j))
+                                   (gvector-set! a j t)
+                                   0))))])
+      (sort 0 99))
+    (gvector-ref a 99)))

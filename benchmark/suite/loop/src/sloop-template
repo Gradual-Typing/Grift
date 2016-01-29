@@ -1,4 +1,6 @@
-(let loop ([i 999999999])
+(time
+ (let loop ([i OP-COUNT])
    (cond
      [(zero? i) i]
      [else (loop (- i 1))]))
+ (current-output-port))

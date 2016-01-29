@@ -1,7 +1,7 @@
-(let ([r : (GRef Dyn) (gbox 0)])
+(let ([r : (GRef Int) (gbox 0)])
   (begin
     (timer-start)
     (repeat (u 0 OP-COUNT)
-            (gbox-set! r (+ (gunbox r) 1)))
+            (gunbox r))
     (timer-stop)
     (timer-report)))
