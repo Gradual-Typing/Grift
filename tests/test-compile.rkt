@@ -39,18 +39,17 @@
   : (Parameterof Boolean)
   (make-parameter #f))
 
-
-(define compiler-config : (Parameter Config)
-  (make-parameter
-   (Config (build-path "test")
-           'Lazy-D
-           (build-path test-tmp-path "t.out")
-           (build-path test-tmp-path "t.c")
-           #f
-           '()
-           #f
-           (compiler-config-cast-representation)
-           1000000)))
+(: compiler-config (-> Config))
+(define (compiler-config) 
+  (Config (build-path "test")
+          'Lazy-D
+          (build-path test-tmp-path "t.out")
+          (build-path test-tmp-path "t.c")
+          #f
+          '()
+          #f
+          (compiler-config-cast-representation)
+          1000000))
 
 
 (define-syntax-rule (test-compile name path expected)
