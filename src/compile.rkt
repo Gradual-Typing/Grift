@@ -59,7 +59,8 @@
                  #:cc-opt (U String (Listof String))
                  #:log    Path
                  #:mem    Natural
-                 #:cast-rep Cast-Representation)
+                 #:cast-rep Cast-Representation
+                 #:rt Path)
                 Path))
 (define (compile path
                  #:semantics [smtc (semantics)]
@@ -69,7 +70,8 @@
                  #:cc-opt    [opts : (U String (Listof String)) (c-flags)]
                  #:log       [logp : (Option Path) (log-path)]
                  #:mem       [mem :  (Option Natural) (mem-dflt)]
-                 #:cast-rep  [crep (cast-rep)])
+                 #:cast-rep  [crep (cast-rep)]
+                 #:rt        [rt   (build-path "runtime.o")])
   (let* ([path  (simple-form-path (if (string? path)
                                       (string->path path)
                                       path))]
@@ -81,7 +83,7 @@
     (when logp
       (current-log-port (open-output-file logp #:exists 'replace #:mode 'text)))
     (parameterize ([print-as-expression #t] [print-graph #t] [print-struct #t])
-      (compile/conf path (Config path smtc outp cpth kp-c opts kp-a crep mem)))))
+      (compile/conf path (Config path smtc outp cpth kp-c opts kp-a crep mem rt)))))
 
 
 (: envoke-compiled-program

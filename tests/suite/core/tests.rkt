@@ -73,6 +73,11 @@
    (test-file "core" "let18.schml" (bool #f))
    (test-file "core" "let19.schml" (bool #f))
    (test-file "core" "let20.schml" (bool #t))
+   ;; Read - Int
+   (test-file "core" "read-int0.schml" (int 42))
+   (test-file "core" "read-int1.schml" (bool #t))
+   (test-file "core" "read-int2.schml" (int 42))
+   (test-file "core" "read-int3.schml" (blame #f #f))
    ;; Letrec
    (test-file "core" "letrec1.schml" (dyn))
    (test-file "core" "letrec2.schml" (function))
@@ -103,4 +108,6 @@
    (test-file "core" "blame11.schml" (blame #f (not-lbl "Fail")))
    (test-file "core" "blame12.schml" (blame #f "Pass"))
    (test-file "core" "blame13.schml" (blame #f "Pass"))
+
+
    ))

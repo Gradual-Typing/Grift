@@ -10,6 +10,7 @@
   (cond
    [(IntxInt->Bool-primitive? p) INTxINT->BOOL-TYPE]
    [(IntxInt->Int-primitive? p)  INTxINT->INT-TYPE]
+   [(->Int-primitive? p) ->INT-TYPE]
    [(timer-primitive? p)         ->UNIT-TYPE]))
 
 
@@ -24,7 +25,7 @@ We are going to UIL
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
 
-(define-type UIL-Expr-Prim (U Array-Prim IxI->I-Prim))
+(define-type UIL-Expr-Prim (U Array-Prim IxI->I-Prim ->I-Prim))
 
 (define-type Array-Prim (U 'Alloc 'Array-ref))
 (define-type Array-Prim! 'Array-set!)

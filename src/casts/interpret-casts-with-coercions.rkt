@@ -45,7 +45,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (: recursive-dyn-cast? (Parameterof Boolean))
   (define recursive-dyn-cast? (make-parameter #t))
   (: space-efficient? Boolean)
-  (define space-efficient? #f)
+  (define space-efficient? #t)
   
   ;; Desugaring the input program into its constituents 
   (match-define (Prog (list prgm-name prgm-next prgm-type) prgm-exp)

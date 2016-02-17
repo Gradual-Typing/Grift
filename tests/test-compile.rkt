@@ -43,7 +43,8 @@
            (Config-c-flags c)
            (Config-asm-path c)
            r
-           (Config-mem-limit c))))
+           (Config-mem-limit c)
+           (Config-runtime-path c))))
 
 (define intermediate-checks?
   : (Parameterof Boolean)
@@ -60,7 +61,8 @@
           '()
           #f
           'Twosomes
-          1000000)))
+          1000000
+          (build-path test-tmp-path "runtime.o"))))
 
 
 (define-syntax-rule (test-compile name path expected)
@@ -78,22 +80,31 @@
                                      expected
                                      (blame #t (exn-message e))
                                      "static type error")))])
+         (define ast0 (reduce-to-cast-calculus path config))
          (when (intermediate-checks?)
-           (define ast0 (reduce-to-cast-calculus path config))
-           (check value=? (cast-lang-interp ast0 config) expected "cast-lang interp")
            (nop ast0 "cast 0")            
            (define ast1 (test-impose-cast-semantics ast0 config nop))
            (define ast2 (convert-representation ast1 config))
            (c-backend-generate-code ast2 config)
+           (parameterize ([current-input-port (open-test-input path)])
+             (check value=?
+                    (observe (envoke-compiled-program #:config config))
+                    expected
+                    "test compiler semantics")))
+         (compile/conf path config)
+         (parameterize ([current-input-port (open-test-input path)])
            (check value=?
                   (observe (envoke-compiled-program #:config config))
                   expected
-                  "test compiler semantics"))
-         (compile/conf path config)
-         (check value=?
-                (observe (envoke-compiled-program #:config config))
-                expected
-                "real compiler semantics"))))))
+                  "real compiler semantics")))))))
+
+(: open-test-input (Path -> Input-Port))
+(define (open-test-input path)
+  (let* ([root (string-trim (path->string path) ".schml")]
+         [in   (string-append root ".in")])
+    (if (file-exists? in)
+        (open-input-file in)
+        (current-input-port))))
 
 (define-syntax-rule (test-file p ... n e)
   (test-compile n (simplify-path (build-path test-suite-path p ... n)) e))

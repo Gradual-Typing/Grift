@@ -230,6 +230,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
 (define ->UNIT-TYPE (Fn 0 '() UNIT-TYPE))
+(define ->INT-TYPE (Fn 0 '() INT-TYPE))
 
 ;; Are two types consistent at the top of the types?
 (: shallow-consistent? (Any Any -> Boolean))
@@ -351,7 +352,9 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-predicate schml-primitive? Schml-Primitive)
 
 (define-type Schml-Prim
-  (U IntxInt->Int-Primitive IntxInt->Bool-Primitive))
+  (U IntxInt->Int-Primitive
+     IntxInt->Bool-Primitive
+     ->Int-Primitive))
 
 (define-predicate schml-prim? Schml-Prim)
 
@@ -377,6 +380,13 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-type IxI->I-Prim IntxInt->Int-Primitive)
 
 (define-predicate IntxInt->Int-primitive? IntxInt->Int-Primitive)
+
+(define-type ->Int-Primitive (U 'read-int))
+(define-type ->I-Prim ->Int-Primitive)
+
+(define-predicate ->Int-primitive? ->Int-Primitive)
+
+
 #;(: IntxInt->Int-primitive? (-> Any Boolean : IntxInt->Int-Primitive))
 #;
 (define (IntxInt->Int-primitive? x)

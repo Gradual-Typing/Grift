@@ -32,7 +32,7 @@
      Halt
      (If D3-Pred V V)
      (Begin D3-Effect* V)
-     (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
+     (Op UIL-Expr-Prim (Listof D3-Trivial))
      (App-Code D3-Trivial D3-Trivial*))))
 
 (define-type D3-Pred

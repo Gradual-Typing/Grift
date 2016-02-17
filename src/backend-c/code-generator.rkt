@@ -37,8 +37,9 @@
   (let* ([out-path (Config-exec-path config)]
          [out (path->string out-path)]
          [in  (path->string (Config-c-path config))]
+         [rt  (path->string (Config-runtime-path config))]
          [flags (append-flags (Config-c-flags config))]
-         [cmd (format "clang -o ~a ~a ~a" out in flags)])
+         [cmd (format "clang -o ~a ~a ~a ~a" out in rt flags)])
     (when (trace? 'Vomit)
       (logf "System call: ~a" cmd))
     (flush-output (current-log-port))

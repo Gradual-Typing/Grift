@@ -24,7 +24,7 @@
       (If D1-Pred T T)
       (Begin D1-Effect* T)
       (App-Code D1-Value D1-Value*)
-      (Op (U IxI->I-Prim Array-Prim) D1-Value*)
+      (Op UIL-Expr-Prim D1-Value*)
       (Var Uid)
       Halt Success
       (Var Uid)
@@ -37,7 +37,7 @@
      (If D1-Pred V V)
      (Begin D1-Effect* V)
      (App-Code V (Listof V))
-     (Op (U IxI->I-Prim Array-Prim) (Listof V))
+     (Op UIL-Expr-Prim (Listof V))
      Halt
      (Var Uid)
      (Code-Label Uid)

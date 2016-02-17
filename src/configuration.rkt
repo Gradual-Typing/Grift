@@ -14,7 +14,8 @@
    [c-flags : (Listof String)]
    [asm-path : (Option Path)]
    [cast-rep : Cast-Representation]
-   [mem-limit : Natural])
+   [mem-limit : Natural]
+   [runtime-path : Path])
   #:transparent)
 
 

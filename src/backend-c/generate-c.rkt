@@ -23,14 +23,17 @@
   (make-parameter #f))
 
 (: IMDT-C-TYPE String)
-(define IMDT-C-TYPE "long")
+(define IMDT-C-TYPE "int64_t")
 
 (: C-EXIT String)
 (define C-EXIT "exit(-1)")
 
 (: C-INCLUDES (Listof String))
-(define C-INCLUDES '("stdio.h" "stdlib.h" "sys/time.h"))
+(define C-INCLUDES '("stdio.h" "stdlib.h" "sys/time.h" "stdint.h"))
 
+(: C-DECLARATIONS (Listof String))
+(define C-DECLARATIONS
+  '("int64_t read_int();"))
 
 (: generate-c (-> Data5-Lang Config Void))
 (define (generate-c prgm config)
@@ -114,6 +117,9 @@
   (for ([i : String C-INCLUDES])
     (display "#include <") (display i) (display ">\n"))
   (newline)
+  (for ([d : String C-DECLARATIONS])
+    (display d)
+    (newline))
   (display "void* alloc_ptr;\nlong free_ptr;\nlong limit;\nunsigned long allocd_mem;\n\n")
   (emit-alloc n)
   (newline)
@@ -323,6 +329,7 @@
      (display "timer_stopped = gettimeofday(&timer_stop_time, NULL)")]
     [('timer-report (list))
      (display "timer_report()")]
+    [('read-int (list)) (display "read_int()")]
     [(p (list exp1 exp2))
      (emit-wrap
       (emit-value exp1)

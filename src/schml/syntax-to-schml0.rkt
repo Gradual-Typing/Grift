@@ -67,6 +67,7 @@
     [(mbox munbox mbox-set! mvector mvector-ref mvector-set!) #t]
     [(+ - * binary-and binary-or < <= = >= > %/ %<< %>>) #t]
     [(timer-start timer-stop timer-report repeat) #t]
+    [(read-int) #t]
     [else #f]))
 
 (: parse-top-level (String (Listof Stx) Env . -> . (State Natural S0-Expr)))

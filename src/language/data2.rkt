@@ -31,7 +31,7 @@
   (U (If D2-Pred V V)
      (Begin D2-Effect* V)
      (App-Code V (Listof V))
-     (Op (U IxI->I-Prim Array-Prim) (Listof V))
+     (Op UIL-Expr-Prim (Listof V))
      Halt
      (Var Uid)
      (Code-Label Uid)
