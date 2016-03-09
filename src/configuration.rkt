@@ -15,7 +15,7 @@
    [asm-path : (Option Path)]
    [cast-rep : Cast-Representation]
    [mem-limit : Natural]
-   [runtime-path : Path])
+   [runtime-path : (Option Path)])
   #:transparent)
 
 

@@ -4,9 +4,18 @@
          "../configuration.rkt"
          "../language/data5.rkt"
          "../helpers.rkt"
-         "./generate-c.rkt")
+         "./generate-c.rkt"
+         syntax/location)
 
 (provide (all-defined-out))
+
+;; TODO find a better way of doing this
+(define runtime.o-path
+  (let* ([p (or (path-only (string->path (quote-source-file)))
+                (error 'code-generator "runtime.o-path"))]
+         [p (build-path p 'up "runtime.o")])
+    (or (and p (file-exists? p) p)
+        (error 'code-generator "couldn't locate runtime ~a" p))))
 
 ;; Basic driver for the entire backend
 (: c-backend-generate-code (Data5-Lang Config . -> . Path))
@@ -37,7 +46,8 @@
   (let* ([out-path (Config-exec-path config)]
          [out (path->string out-path)]
          [in  (path->string (Config-c-path config))]
-         [rt  (path->string (Config-runtime-path config))]
+         [rt  (path->string (or (Config-runtime-path config)
+                                runtime.o-path))]
          [flags (append-flags (Config-c-flags config))]
          [cmd (format "clang -o ~a ~a ~a ~a" out in rt flags)])
     (when (trace? 'Vomit)

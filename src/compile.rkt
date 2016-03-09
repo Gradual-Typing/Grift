@@ -71,7 +71,7 @@
                  #:log       [logp : (Option Path) (log-path)]
                  #:mem       [mem :  (Option Natural) (mem-dflt)]
                  #:cast-rep  [crep (cast-rep)]
-                 #:rt        [rt   (build-path "runtime.o")])
+                 #:rt        [rt  : (Option Path) #f])
   (let* ([path  (simple-form-path (if (string? path)
                                       (string->path path)
                                       path))]
