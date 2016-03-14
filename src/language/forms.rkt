@@ -526,47 +526,34 @@ And a type constructor "name" expecting the types of field1 and field2
 (define (consistent? t g)
   ;; Typed racket made me structure the code this way.
   ;; TODO change the names to be both-unit? ...
-  (: unit? ConsistentT)
-  (define (unit? t g) (and (Unit? t) (Unit? g)))
-  (: bool? ConsistentT)
-  (define (bool? t g) (and (Bool? t) (Bool? g)))
-  (: int? ConsistentT)
-  (define (int? t g) (and (Int? t) (Int? g)))
-  (: fn? ConsistentT)
-  (define (fn? t g)
+  (: both-unit? ConsistentT)
+  (define (both-unit? t g) (and (Unit? t) (Unit? g)))
+  (: both-bool? ConsistentT)
+  (define (both-bool? t g) (and (Bool? t) (Bool? g)))
+  (: both-int? ConsistentT)
+  (define (both-int? t g) (and (Int? t) (Int? g)))
+  (: consistent-fns? ConsistentT)
+  (define (consistent-fns? t g)
     (and (Fn? t) (Fn? g)
          (= (Fn-arity t) (Fn-arity g))
          (andmap consistent? (Fn-fmls t) (Fn-fmls g))
          (consistent? (Fn-ret t) (Fn-ret g))))
-  (: gref? ConsistentT)
-  (define (gref? t g)
+  (: consistent-grefs? ConsistentT)
+  (define (consistent-grefs? t g)
     (and (GRef? t) (GRef? g)
          (consistent? (GRef-arg t) (GRef-arg g))))
-  (: gvect? ConsistentT)
-  (define (gvect? t g)
+  (: consistent-gvects? ConsistentT)
+  (define (consistent-gvects? t g)
     (and (GVect? t) (GVect? g)
          (consistent? (GVect-arg t) (GVect-arg g))))
-  (or (Dyn? t) (Dyn? g)
-      (unit? t g)
-      (bool? t g)
-      (int? t g)
-      (fn? t g)
-      (gref? t g)
-      (gvect? t g)
-      
-
-
-      ;; These will need to be added back but were adding
-      ;; considerable type checking time.
-      #;
-      (and (GVect? t) (GVect? g)
-           (consistent? (GVect-arg t) (GVect-arg g)))
-      #;
-      (and (MRef? t) (MRef? g)
-           (consistent? (MRef-arg t) (MRef-arg g)))
-      #;
-      (and (MVect? t) (MVect? g)
-           (consistent? (MVect-arg t) (MVect-arg g)))))
+  (or (Dyn? t)
+      (Dyn? g)
+      (both-unit? t g)
+      (both-bool? t g)
+      (both-int? t g)
+      (consistent-fns? t g)
+      (consistent-grefs? t g)
+      (consistent-gvects? t g)))
 
 #|
  Join :: type X type -> type
@@ -600,12 +587,6 @@ Dyn --> Int Int --> Dyn
      (GRef (join (GRef-arg t) (GRef-arg g)))]
     [(and (GVect? t) (GVect? g))
      (join (GVect-arg t) (GVect-arg g))]
-    #;
-    [(and (MRef? t) (MRef? g))
-     (join (MRef-arg t) (MRef-arg g))]
-    #;
-    [(and (MVect? t) (MVect? g))
-    (join (MVect-arg t) (MVect-arg g))]
     [else (error 'join "Types are not consistent")]))
 
 

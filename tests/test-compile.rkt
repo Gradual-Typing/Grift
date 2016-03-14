@@ -62,7 +62,7 @@
           #f
           'Twosomes
           1000000
-          (build-path test-tmp-path "runtime.o"))))
+          #f)))
 
 
 (define-syntax-rule (test-compile name path expected)

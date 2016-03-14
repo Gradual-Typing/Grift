@@ -20,7 +20,9 @@
 
 (if-in-construction (require typed/rackunit))
 
-(provide (all-from-out "../language/schml0.rkt") syntax->schml0)
+(provide (all-from-out "../language/schml0.rkt")
+         syntax->schml0
+         parse-type)
 
 (: syntax->schml0 (Syntax-Lang Config . -> . Schml0-Lang))
 (define (syntax->schml0 prgm config)
@@ -463,6 +465,9 @@ represents types in the schml abstract syntax tree.
     [(list (app syntax-unroll fst) stx* ...)
      (match* (fst stx*)
        #| References and Vectors are the same in a general sense |#
+       ;; TODO make a flag to determine which semantics is used by default
+       [('Ref (list stx)) (GRef  (parse-type stx))]
+       [('Vect (list stx)) (GVect (parse-type stx))]
        ;; Guarded
        [('GRef  (list stx))  (GRef (parse-type stx))]
        [('GVect (list stx))  (GVect (parse-type stx))]
