@@ -11,11 +11,13 @@
 
 ;; TODO find a better way of doing this
 (define runtime.o-path
-  (let* ([p (or (path-only (string->path (quote-source-file)))
+  (let* ([cgpath (or (path-only (string->path (quote-source-file)))
                 (error 'code-generator "runtime.o-path"))]
-         [p (build-path p 'up "runtime.o")])
-    (or (and p (file-exists? p) p)
-        (error 'code-generator "couldn't locate runtime ~a" p))))
+         [rtpath (build-path cgpath 'up "runtime.o")])
+    (or (and rtpath (file-exists? rtpath) rtpath)
+        (if (system (format "cc ~a -c -o ~a" (build-path cgpath 'up "runtime.c") rtpath))
+            rtpath
+            (error "cc compile error")))))
 
 ;; Basic driver for the entire backend
 (: c-backend-generate-code (Data5-Lang Config . -> . Path))
