@@ -46,15 +46,8 @@
   (let* ([out-path (Config-exec-path config)]
          [out (path->string out-path)]
          [in  (path->string (Config-c-path config))]
-         [rt  (path->string (or (Config-runtime-path config)
-                                runtime.o-path))]
          [flags (append-flags (Config-c-flags config))]
-         [cmd (format "clang -o ~a ~a ~a ~a" out in rt flags)])
-    (when (trace? 'Vomit)
-      (logf "System call: ~a" cmd))
-    (flush-output (current-log-port))
-    (flush-output (current-error-port))
-    (flush-output)
+         [rt? (Config-runtime-path config)])
     (parameterize
         ([current-error-port (if (trace? 'CC-Errors 'All 'Vomit)
                                  (current-log-port)
@@ -62,11 +55,24 @@
       (let ([asm? (Config-asm-path config)])
         (when asm?
           (system (format "cc ~a -S -o ~a ~a" in (path->string asm?) flags))))
-      (unless (system cmd)
-        (error 'schml/backend-c/invoke-c-compiler
-               "failed to compile with: ~a"
-               cmd))
+
+      (if rt?
+          (cc/runtime out in flags #:runtime rt?)
+          (cc/runtime out in flags))
       out-path)))
+
+(: cc/runtime (->* (String String String) (#:runtime Path) Void))
+(define (cc/runtime out in flags #:runtime [rt runtime.o-path])
+  (define cmd (format "clang -o ~a ~a ~a ~a" out in (path->string rt) flags))
+  (when (trace? 'Vomit)
+    (logf "System call: ~a" cmd))
+  (flush-output (current-log-port))
+  (flush-output (current-error-port))
+  (flush-output)
+  (unless (system cmd)
+    (error 'schml/backend-c/invoke-c-compiler
+           "failed to compile with: ~a"
+           cmd)))
 
 (: append-flags : (Listof String) -> String)
 (define (append-flags s)
