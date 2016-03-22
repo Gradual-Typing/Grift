@@ -4,7 +4,8 @@
          "../../../src/compile.rkt"
          "../../../src/schml/syntax-to-schml0.rkt"
          "../../../src/casts/casts-to-coercions.rkt"
-         "../../../src/language/forms.rkt")
+         "../../../src/language/forms.rkt"
+         "../../../src/backend-c/code-generator.rkt")
 (provide (all-defined-out))
 #|-------------------------------------------------------------------
 Directory Structure
@@ -84,7 +85,8 @@ it hard to find this directory.
                                     #:cast-repr     c-rep
                                     #:function-repr f-rep
                                     #:output-regexp out-rx
-                                    #:memory-limit  [mem (* 4096 2000)])
+                                    #:memory-limit  [mem (* 4096 2000)]
+                                    #:mean-of-runs? [mean-of-runs? #t])
 
   ;; Compile the source code keeping both .c and .s files
   (define c-file   (build-path tmp-dir (string-append name ".c")))
@@ -100,38 +102,80 @@ it hard to find this directory.
            #:cast-rep c-rep
            #:cc-opt "-w -O3"
            #:mem mem))
+  (define-values (run-result* iter-result*)
+    (run-test-repeatedly exe-file runs iters out-rx))
+  (if mean-of-runs?
+      (mean-of-runs run-result* iter-result*)
+      (list run-result* iter-result*)))
+
+(define (compile-c/run #:base-name name
+                       #:src-file  src-file
+                       #:runs      runs
+                       #:iters     iters
+                       #:out-rx    out-rx
+                       #:mean-of-runs? [mean-of-runs? #t])
+  (define tmp-s (build-path tmp-dir (string-append name ".s")))
+  (define exe-file (build-path exe-dir (string-append name ".out")))
+  (cc/runtime (path->string exe-file)
+              (path->string src-file)
+              "-w -O3")
+  (define-values (run-result* iter-result*)
+    (run-test-repeatedly exe-file runs iters out-rx))
+
+  (if mean-of-runs?
+      (mean-of-runs run-result* iter-result*)
+      (list run-result* iter-result*)))
+
+(define (mean-of-runs run-result* iter-result*)
+  (define-values (run-mean run-sdev iter-mean iter-sdev)
+    (values (mean run-result*)
+            (stddev run-result*)
+            (mean iter-result*)
+            (stddev iter-result*)))
+  (printf "\n\truns: m= ~a s= ~a\n\titer: m= ~a s= ~a\n"
+          (real->decimal-string run-mean  10)
+          (real->decimal-string run-sdev  10)
+          (real->decimal-string iter-mean 10)
+          (real->decimal-string iter-sdev 10))
+  ;; Return a pair containting mean and std-deviation
+  (list iter-mean iter-sdev))
+
+;; Produces a two values a list of time per run and a list of time per iteration
+;; both results are in terms of whatever unit is specified.
+(define (run-test-repeatedly exe-file runs iters out-rx
+                             #:unit-conversion [unit->? unit->micro]
+                             #:epsilon-check   [epsilon (expt 10 -6)])
   
   ;; Run the test "runs" number of times and save the results
   ;; as a list of micro-second numbers.
-  (define run-results
-    (for/list ([a-run (in-range 0 runs)])
+  (for/lists (r i)
+             ([a-run (in-range 0 runs)])
+    (when (= (modulo a-run 10) 0)
       (display #\. (current-error-port))
-      (flush-output (current-error-port))
-      (define result (with-output-to-string
-                       (lambda ()
-                         (with-input-from-string (format "~a" iters)
-                           (lambda ()
-                              (system (path->string exe-file)))))))
-      ;; Regular expression for the expected output
-      ;; parse? = `(,entire-output . ,float-string) or #f
-      (define parse? (regexp-match out-rx result))
-      (unless parse?
-        (error 'benchmark/fun-app
-               "failed to parse output of ~a\n\t~a\n"
-               exe-file result))
-      (define parsed-time? (string->number (cadr parse?)))
-      (unless parsed-time?
-        (error 'benchmark/fun-app
-               "failed to parse numeric output of ~a\n\t~a\n"
-               exe-file result))
-      (/ (unit->micro parsed-time?) iters)))
-  (define-values (mean-runs sdev-runs)
-    (values (mean run-results) (stddev run-results)))
-  (printf " mean: ~a sdev: ~a\n"
-          (real->decimal-string mean-runs 6)
-          (real->decimal-string sdev-runs 6))
-  ;; Return a pair containting mean and std-deviation
-  (list mean-runs sdev-runs))
+      (flush-output (current-error-port))) 
+    (define result (with-output-to-string
+                     (lambda ()
+                       (with-input-from-string (format "~a" iters)
+                         (lambda ()
+                           (system (path->string exe-file)))))))
+    ;; Regular expression for the expected output
+    ;; parse? = `(,entire-output . ,float-string) or #f
+    (define parse? (regexp-match out-rx result))
+    (unless parse?
+      (error 'benchmark/fun-app
+             "failed to parse output of ~a\n\t~a\n"
+             exe-file result))
+    (define parsed-time? (string->number (cadr parse?)))
+    (unless parsed-time?
+      (error 'benchmark/fun-app
+             "failed to parse numeric output of ~a\n\t~a\n"
+             exe-file result))
+    (unless (> parsed-time? epsilon)
+      (error 'benchmark/fun-app
+             "loop time not large enough for significance: ~a from ~a"
+             parsed-time? exe-file))
+    (define converted-time (unit->? parsed-time?))
+    (values converted-time (/ converted-time iters))))
 
 ;; Save the source code ./src/name.schml
 (define (write-source name prog)
@@ -163,8 +207,7 @@ it hard to find this directory.
                    (gbox-set! acc (run-test i (gunbox acc))))
            (timer-stop)
            (timer-report)
-           (let ([acc-value (gunbox acc)])
-             ,(use-acc-action 'acc-value)))))))
+           ,(use-acc-action '(gunbox acc)))))))
 
 (define timing-loop-example
   (make-timing-loop
