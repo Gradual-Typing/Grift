@@ -15,7 +15,6 @@
          "../language/data5.rkt"
          "../macros.rkt")
 
-
 ;; Only the pass is provided by this module
 (provide generate-c)
 
@@ -29,7 +28,9 @@
 (define C-EXIT "exit(-1)")
 
 (: C-INCLUDES (Listof String))
-(define C-INCLUDES '("stdio.h" "stdlib.h" "sys/time.h" "stdint.h"))
+(define C-INCLUDES
+  (let ([timer "sys/time.h"])
+    `("stdio.h" "stdlib.h" "stdint.h" ,"sys/time.h")))
 
 (: C-DECLARATIONS (Listof String))
 (define C-DECLARATIONS
@@ -98,14 +99,13 @@
     (display "    long newFree = result + n;")
     (display "    allocd_mem+=n;")
     (display "    if (newFree >= limit){")
-    (display "        printf(\"Requesting more memory\\n\");")
-    (display "          free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
-    (display s)
-    (display "), alloc_ptr);")
-    (display "          limit = free_ptr + ")
-    (display s)
-    (display ";")
-    (display "          return alloc (n);")
+    (display "        puts(\"Requesting more memory\\n\");")
+    (printf  "        free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);" s)
+    (display "        if (!free_ptr){\n")
+    (display "           fputs(\"couldn't allocate any more memory\", stderr);\n")
+    (display "        }\n")
+    (printf  "        limit = free_ptr + ~a;" s)
+    (display "        return alloc (n);")
     (display "    }")
     (display "    free_ptr = newFree;")
     (display "    return result;")
