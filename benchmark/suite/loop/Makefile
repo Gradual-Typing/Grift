@@ -1,5 +1,5 @@
 all:
-	./run.sh 5
+	./run.sh 2
 clean:
 	rm -rf tmp data
 
