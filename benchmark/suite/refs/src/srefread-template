@@ -1,7 +1,0 @@
-(let ([x (box 0)])
-  (time
-   (let loop ([i OP-COUNT])
-     (cond
-       [(zero? i) '()]
-       [else (unbox x) (loop (- i 1))]))
-   (current-output-port)))

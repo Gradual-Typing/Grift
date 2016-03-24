@@ -1,0 +1,8 @@
+(letrec ([add1 : Dyn (lambda ((x : Dyn)) (+ x 1))])
+  (let ([iters : Dyn (read-int)])
+    (begin
+      (timer-start)
+      (repeat (i (: 0 Dyn) iters) (add1 i))
+      (timer-stop)
+      (timer-report)
+      iters)))

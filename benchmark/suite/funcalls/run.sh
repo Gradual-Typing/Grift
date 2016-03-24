@@ -1,15 +1,15 @@
 #!/bin/sh
 
 
-gloop=999999
+gloop=99999
 casts=1
 loop=99999999
 schmldir=/u/dalmahal/Schml
 # --------------------------------------------------------------------
 
-name=ref
+name=call
 testdir=$schmldir/benchmark/suite
-dir=$testdir/refs
+dir=$testdir/funcalls
 datadir=$dir/data
 outdir=$dir/output
 tmpdir=$dir/tmp
@@ -37,7 +37,7 @@ cd $testdir/loop
 read sloop <<< $(while read -a line; do echo -e "${line[1]}"; done < $testdir/loop/data/loop.csv)
 read schmlloop <<< $(while read -a line; do echo -e "${line[2]}"; done < $testdir/loop/data/loop.csv)
 
-echo "Benchmarking reference read and write operations across many systems"
+echo "Benchmarking function calls across many systems"
 
 # compile Schml source files, then enter the tmp directory
 cd $schmldir
