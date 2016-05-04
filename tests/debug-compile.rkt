@@ -16,7 +16,7 @@
 (define (cc path)
   (let ([path (build-path path)])
     (parameterize ([current-log-port log]
-                   [traces '()])
+                   [traces '(All)])
       (run-tests (test-suite "debug" (test-compile "debug" path (debug)))))))
 
 (unless (directory-exists? test-tmp-path)
