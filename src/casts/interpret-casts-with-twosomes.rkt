@@ -196,6 +196,20 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; How to extract a dynamic value
   (: cast-dyn/twosome Cast-Rule/Cast-Rule)
   (define (cast-dyn/twosome cast-undyned v t1 t2 lbl)
+    #| This should be:
+       (typecase v
+        [n : t1 (cast-undyned v^ t1^ t2 lbl)])
+       ==> 
+       (case v
+        [(Dynamic v^ t1^) ...])
+       ==>
+       (
+       Efficient Implementation will require remove-let before
+       specify representation. TODO
+       For now I am going to implement this
+       (dyn-destruct v (v^ t1)
+        (cast-undyned v^ t1^ t2 lbl))
+    |#
     (let$* ([val v] [tag (Dyn-tag val)])
      (cond$
       [(op=? (Tag 'Int) tag)

@@ -483,19 +483,11 @@ T?l $ (_  ; )  = what here
       ((hybrid-fn-state n a* c*) : hybrid-fn-state <- get-state)
       (let*-values ([(c n^)
                     (run-state
-                     (do #;(bind-state : (State Nat BC.BC))
-                         (bind-state : (State Nat CoC1-Bnd-Code))
+                     (do (bind-state : (State Nat CoC1-Bnd-Code))
                          (let ([str (number->string arity)])           
-                           #;(a-u : Uid <-
-                                (uid-state (string-append "app_coerced" str)))
-                           (c-u : Uid <-
-                                (uid-state (string-append "coerce_fn_" str)))
-                           #;(a-c : CoC1-Code <- (mk-apply-code arity))
+                           (c-u : Uid <- (uid-state (string-append "coerce_fn_" str)))
                            (c-c : CoC1-Code <- (mk-coerce-code arity #;a-u))
-                           (return-state (cons c-u c-c)
-                            #;(cons (cons a-u a-c)
-                                  (cons c-u c-c)))))
-                     n)]
+                           (return-state (cons c-u c-c)))) n)]
                     #;[(a c) (values (car a.c) (cdr a.c))])
         (_ : Null <- (put-state
                       (hybrid-fn-state n a* #;(cons a a*) (hash-set c* arity c))))
@@ -518,7 +510,7 @@ T?l $ (_  ; )  = what here
              [code : CoC1-Code
               (Code (cons h-clos uid*)
                (Let (list (cons crcn (Fn-Proxy-Coercion h-clos-var)))
-                 (Interpreted-Coerce
+                (Interpreted-Coerce
                    (Fn-Coercion-Return crcn-var)
                    (App-Fn
                      (Fn-Proxy-Closure h-clos-var)

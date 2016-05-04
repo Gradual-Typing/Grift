@@ -108,6 +108,10 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; I think that something better could be done here
       ;; why recur there are only so many things that the underlying
       ;; sequence could be?
+
+      ;; This may be getting in the way of simple specializations
+      ;; May want come up with smaller versions of the cast/function
+      ;; For the specialized sub grammers.
       (let$* ([seq_fst (seq-fst$ c)]
               [seq_snd (seq-snd$ c)]
               [fst_cast_value (cast v seq_fst)])
@@ -134,12 +138,13 @@ form, to the shortest branch of the cast tree that is relevant.
           (App-Code (Fn-Caster v) (list v c)))]
      [(ref?$ c)
       (if$ (Guarded-Proxy-Huh v)
-           (let$* ([old_crcn (Guarded-Proxy-Coercion v)])
+           (let$* ([old_val  (Guarded-Proxy-Ref v)]
+                   [old_crcn (Guarded-Proxy-Coercion v)])
                   (let$* ([composed_crcn (comp-crcn old_crcn c)])
                          (if$ (id?$ composed_crcn)
-                              v
+                              old_val
                               (Guarded-Proxy
-                               (Guarded-Proxy-Ref v)
+                               old_val 
                                (Coercion composed_crcn)))))
            (Guarded-Proxy v (Coercion c)))]
      ;; the coercion must be failure
@@ -256,7 +261,7 @@ form, to the shortest branch of the cast tree that is relevant.
                           (compose comp_fst_pi final))]))]
          [(seq?$ c2)
           (cond$
-           [(fail?$ c1) c2]
+           [(fail?$ c1) c2] ;; TODO fix this it should be ID? 
            [else
             ;; must be c1 & (g;I?)
             (let$* ([seq_fst (seq-fst$ c2)]
