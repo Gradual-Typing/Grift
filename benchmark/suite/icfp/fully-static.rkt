@@ -15,14 +15,10 @@
 (define fn-app-test
   (make-timing-loop
    #:letrec-bnds '([add1 : (Int -> Int)
-                         (lambda ([x : Int]) (+ x 1))]
-                   [apply : ((Int -> Int) Int -> Int)
-                          (lambda ([f : (Int -> Int)]
-                                   [x : Int])
-                            (f x))])
+                         (lambda ([x : Int]) (+ x 1))])
    #:acc-type       'Int 
    #:acc-init       0
-   #:timed-action   (lambda (i acc) `(apply add1 acc))
+   #:timed-action   (lambda (i acc) `(add1 acc))
    #:use-acc-action (lambda (acc) acc)))
 
 (define fn-app-src-file (write-source "fully-static-fn-app" fn-app-test))

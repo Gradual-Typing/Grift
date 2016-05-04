@@ -43,16 +43,9 @@ Configuaration variables
 
 ;; Runs = the number of times the test is repeated in order to understand
 ;; how much volitility is coming from the system it is being run o
-(define iters 2000)
+(define iters 1000)
 (define runs  100)
-
-;; casts is a list of the number of casts to test in the benchmark
-(define casts (build-list 11 (lambda (i) (* 2 i))))
-
-;; The file is hard coded for each compiler configuration because
-;; it makes formatting the each new data file easier.
-
-(define decimals 4)
+(define decimals 0)
 
 (define timing-loop-test
   (make-timing-loop
@@ -60,6 +53,7 @@ Configuaration variables
    #:acc-type 'Int
    #:acc-init 0
    #:use-acc-action (lambda (acc) acc)))
+
 
 (define timing-loop-results
   (let ([src-file (write-source "timing-loop" timing-loop-test)]
@@ -93,7 +87,7 @@ Configuaration variables
       "  \\hline\n"
       "& Twosomes & Coercions \\\\\n"
       "  \\hline\n"
-      "  Iterations & \\multicolumn{2}{c|}{Time($\\mu s$)/Iteration}\\\\\n"
+      "  Iterations & \\multicolumn{2}{c|}{Time($n s$)/Iteration}\\\\\n"
       "  \\hline\n"))
     (for ([result (in-list timing-loop-results)])
       (match-let ([(list iters (list tmean tsdev) (list cmean csdev)) result])
@@ -209,7 +203,7 @@ Configuaration variables
       "  & Twosomes & Coercions \\\\\n"
       "  \\hline\n"
       "  Types/Coercion Size & "
-      "\\multicolumn{2}{c|}{Time($\\mu s$)/Iteration} \\\\\n"
+      "\\multicolumn{2}{c|}{Time($n s$)/Iteration} \\\\\n"
       "  \\hline\n"))
     (for ([l function-cast-results])
       (match-let ([(list name depth args st sc t1 t2
@@ -285,7 +279,7 @@ Configuaration variables
 
 (define function-app-tests
   (append*
-   (for/list ([casts (in-range 0 10)])
+   (for/list ([casts (in-range 0 20)])
      (list
       (make-app-timing-loop-record
       "Int-Dyn"
@@ -297,19 +291,19 @@ Configuaration variables
       '(lambda ([n : Int]) n)
       (lambda (u) `(,u 42)))
      (make-app-timing-loop-record
-      "Fn1"
-      casts
-      '((Int -> Int) -> (Int -> Int))
-      '((Dyn -> Dyn) -> (Dyn -> Dyn))
-      '(lambda ([n : (Int -> Int)]) n)
-      (lambda (u) `((,u (lambda (n) n)) 42)))
+     "Fn1"
+     casts
+     '((Int -> Int) -> (Int -> Int))
+     '((Dyn -> Dyn) -> (Dyn -> Dyn))
+     '(lambda ([n : (Int -> Int)]) n)
+     (lambda (u) `((,u (lambda (n) n)) 42)))
      (make-app-timing-loop-record
-      "Fn2"
-      casts
-      '(((Int -> Int) -> (Int -> Int)) -> ((Int -> Int) -> (Int -> Int)))
-      '(((Dyn -> Dyn) -> (Dyn -> Dyn)) -> ((Dyn -> Dyn) -> (Dyn -> Dyn)))
-      '(lambda ([n : ((Int -> Int) -> (Int -> Int))]) n)
-      (lambda (u) `(((,u (lambda (n) n)) (lambda (n) n)) 42)))))))
+     "Fn2"
+     casts
+     '(((Int -> Int) -> (Int -> Int)) -> ((Int -> Int) -> (Int -> Int)))
+     '(((Dyn -> Dyn) -> (Dyn -> Dyn)) -> ((Dyn -> Dyn) -> (Dyn -> Dyn)))
+     '(lambda ([n : ((Int -> Int) -> (Int -> Int))]) n)
+     (lambda (u) `(((,u (lambda (n) n)) (lambda (n) n)) 42)))))))
 
 (define function-app-results
   (let ([spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : 42\n$"])
@@ -379,7 +373,7 @@ Configuaration variables
       "  \\multicolumn{2}{|c|}{} & Twosomes & Coercions \\\\\n"
       "  \\hline\n"
       "  Casts & Types/Coercion Size & "
-      "     \\multicolumn{2}{c|}{Time($\\mu s$)/Interation} \\\\\n"
+      "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
       "  \\hline\n"))
     (for ([l function-app-results])
       (match-let ([(list name casts st sc t1 t2
@@ -394,7 +388,8 @@ Configuaration variables
     (display "\\end{tabular}\n")))
 
 (call-with-output-file
-  "partially-typed-function-app-results-coercions=63.txt"
+  #;"partially-typed-function-app-results-coercions=63.txt"
+  "partially-typed-function-app-results-coercions=15.txt"
   #:exists 'replace
   (lambda (coercion-p)
     (call-with-output-file
@@ -415,11 +410,16 @@ Configuaration variables
               (for ([trun truns] [titer titers] [crun  cruns] [citer citers])
                 (fprintf cast-p "~a ~a ~a ~a ~a ~a ~a\n"
                          casts st sc trun titer crun citer)))
-            (when (= sc 63)
+            (when (= sc 15) #;(= sc 63)
               (for ([trun truns] [titer titers] [crun  cruns] [citer citers])
                 (fprintf coercion-p "~a ~a ~a ~a ~a ~a ~a\n"
                          casts st sc trun titer crun citer)))))))))
 
+
+(define (symbolic-repeat n ctr base)
+  (if (<= n 0)
+      `(,ctr ,base)
+      `(,ctr ,(symbolic-repeat (sub1 n) ctr base))))
 
 (define (make-reference-cast-timing-loop-record depth)
   (define t1 (symbolic-repeat depth 'GRef 'Int))
@@ -434,11 +434,6 @@ Configuaration variables
          #:acc-init (symbolic-repeat depth 'gbox 42)
          #:use-acc-action (lambda (v) (symbolic-repeat depth 'gunbox v)))))
 
-(define (symbolic-repeat n ctr base)
-  (if (<= n 0)
-      `(,ctr ,base)
-      `(,ctr ,(symbolic-repeat (sub1 n) ctr base))))
-
 (define reference-cast-tests
   (for/list ([depth (in-range 0 6)])
     (make-reference-cast-timing-loop-record depth)))
@@ -450,49 +445,91 @@ Configuaration variables
         (define src-file (write-source name prog))
         (define name-twosomes   (string-append name "-twosomes"))
         (define name-coercions  (string-append name "-coercions"))
+        (match-define (list t-run-time* t-iter-time*)
+          (compile&run/iteration-time
+           #:base-name     name-twosomes
+           #:src-file      src-file
+           #:runs          runs
+           #:iterations    iters
+           #:cast-repr     'Twosomes
+           #:function-repr 'Functional
+           #:output-regexp spec
+           #:memory-limit  (* 4096 30000)
+           #:mean-of-runs? #f))
+        (match-define (list c-run-time* c-iter-time*)
+          (compile&run/iteration-time
+           #:base-name     name-coercions
+           #:src-file      src-file
+           #:runs          runs
+           #:iterations    iters
+           #:cast-repr     'Coercions
+           #:function-repr 'Hybrid
+           #:output-regexp spec
+           #:memory-limit  (* 4096 30000)
+           #:mean-of-runs?  #f))
+        (list
+         name st sc t1 t2
+         (mean-of-runs t-run-time* t-iter-time*)
+         (list t-run-time* t-iter-time*)
+         (mean-of-runs c-run-time* c-iter-time*)
+         (list c-run-time* c-iter-time*))
+        
+        #;
         (list name st sc t1 t2 
-              (compile&run/iteration-time
-               #:base-name     name-twosomes
-               #:src-file      src-file
-               #:runs          runs
-               #:iterations    iters
-               #:cast-repr     'Twosomes
-               #:function-repr 'Functional
-               #:output-regexp spec
-               #:memory-limit  (* 4096 20000))
-              (compile&run/iteration-time
-               #:base-name     name-coercions
-               #:src-file      src-file
-               #:runs          runs
-               #:iterations    iters
-               #:cast-repr     'Coercions
-               #:function-repr 'Hybrid
-               #:output-regexp spec
-               #:memory-limit  (* 4096 20000)))))))
+        (compile&run/iteration-time
+        #:base-name     name-twosomes
+        #:src-file      src-file
+        #:runs          runs
+        #:iterations    iters
+        #:cast-repr     'Twosomes
+        #:function-repr 'Functional
+        #:output-regexp spec
+        #:memory-limit  (* 4096 20000))
+      (compile&run/iteration-time
+       #:base-name     name-coercions
+       #:src-file      src-file
+       #:runs          runs
+       #:iterations    iters
+       #:cast-repr     'Coercions
+       #:function-repr 'Hybrid
+       #:output-regexp spec
+       #:memory-limit  (* 4096 20000)))))))
 
-(with-output-to-file
+(call-with-output-file
   "partially-typed-reference-cast.tex"
   #:exists 'replace
-  (lambda ()
-    (display
+  (lambda (tex-out)
+    (call-with-output-file
+      "partially-typed-reference-cast.txt"
+      #:exists 'replace
+      (lambda (data-out)
+        (display
      (string-append
       "\\begin{tabular}{| c | r | l |}\n"
       "  \\hline\n"
       "  & Twosomes & Coercions \\\\\n"
       "  \\hline\n"
       "  Types/Coercion Size & "
-      "     \\multicolumn{2}{c|}{Time($\\mu s$)/Interation} \\\\\n"
-      "  \\hline\n"))
-    (for ([l reference-cast-results])
-      (match-let ([(list name st sc t1 t2
-                         (list tmean tsdev)
-                         (list cmean csdev)) l])
-        (printf "  ~a / ~a & ~a & ~a\\\\\n"
-                st sc
-                (real->decimal-string tmean decimals)
-                (real->decimal-string cmean decimals))
-        (display "  \\hline\n")))
-    (display "\\end{tabular}\n")))
+      "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
+      "  \\hline\n")
+     tex-out)
+        (display "#type coercions twosome-runs twosome-iters coercions-runs coercion-iters\n"
+                 data-out)
+        (for ([l reference-cast-results])
+          (match-let ([(list name st sc t1 t2
+                             (list tmean tsdev) (list truns titers)
+                             (list cmean csdev) (list cruns citers)) l])
+            (fprintf tex-out
+                     "  ~a / ~a & ~a & ~a\\\\\n"
+                     st sc
+                     (real->decimal-string tmean decimals)
+                     (real->decimal-string cmean decimals))
+            (display "  \\hline\n" tex-out)
+            (for ([tr truns] [ti titers] [cr cruns] [ci citers])
+              (fprintf data-out
+                       "~a ~a ~a ~a ~a ~a\n"
+                       st sc tr ti cr ci))))
+        (display "\\end{tabular}\n" tex-out)))))
 
 #|
 (define (make-reference-read-timing-loop-record casts depth)
@@ -645,7 +682,7 @@ Configuaration variables
       "  \\multicolumn{2}{|c|}{} & Twosomes & Coercions & Twosomes & Coercions \\\\\n"
       "  \\hline\n"
       "  Casts & Types/Coercions Size & "
-      "     \\multicolumn{4}{c|}{Time($\\mu s$)/Interation} \\\\\n"
+      "     \\multicolumn{4}{c|}{Time($ns$)/Interation} \\\\\n"
       "  \\hline\n"))
     (for ([l reference-read/write-results])
       (match-let ([(list name casts st sc t1 t2
@@ -717,54 +754,92 @@ Configuaration variables
     (for/list ([test (in-list reference-wr-tests)])
       (match-let ([(list name  casts st sc t1 t2 prog) test])
         (define src-file (write-source name prog))
-        (define name-twosomes-functional
+        (define name-twosomes
           (string-append name "-twosomes-functional"))
-        (define name-coercions-hybrid
+        (define name-coercions
           (string-append name "-coercions-hybrid"))
-        (list
-          name casts st sc t1 t2
+           (match-define (list t-run-time* t-iter-time*)
           (compile&run/iteration-time
-           #:base-name     name-twosomes-functional
+           #:base-name     name-twosomes
            #:src-file      src-file
            #:runs          runs
            #:iterations    iters
            #:cast-repr     'Twosomes
            #:function-repr 'Functional
            #:output-regexp spec
-           #:memory-limit  (* 4096 20000))
+           #:memory-limit  (* 4096 30000)
+           #:mean-of-runs? #f))
+        (match-define (list c-run-time* c-iter-time*)
           (compile&run/iteration-time
-           #:base-name     name-coercions-hybrid
+           #:base-name     name-coercions
            #:src-file      src-file
            #:runs          runs
            #:iterations    iters
            #:cast-repr     'Coercions
            #:function-repr 'Hybrid
            #:output-regexp spec
-           #:memory-limit  (* 4096 20000)))))))
+           #:memory-limit  (* 4096 30000)
+           #:mean-of-runs?  #f))
+        (list
+         name casts st sc t1 t2
+         (mean-of-runs t-run-time* t-iter-time*)
+         (list t-run-time* t-iter-time*)
+         (mean-of-runs c-run-time* c-iter-time*)
+         (list c-run-time* c-iter-time*))))))
 
-(with-output-to-file
+(call-with-output-file
   "partially-typed-reference-write-read.tex"
   #:exists 'replace
-  (lambda ()
-    (display
-     (string-append
-      "\\begin{tabular}{| c | c | r | l |}\n"
-      "  \\hline\n"
-      "  \\multicolumn{2}{|c|}{} & Twosomes & Coercions \\\\\n"
-      "  \\hline\n"
-      "  Casts & Types/Coercion Size & "
-      "     \\multicolumn{2}{c|}{Time($\\mu s$)/Interation} \\\\\n"
-      "  \\hline\n"))
-    (for ([l reference-wr-results])
-      (match-let ([(list name casts st sc t1 t2
-                         (list tmean tsdev)
-                         (list cmean csdev)) l])
-        (printf "  ~a & ~a / ~a & ~a & ~a \\\\\n"
-                casts
-                st sc
-                (real->decimal-string tmean decimals)
-                (real->decimal-string cmean decimals))
-        (display "  \\hline\n")))
-    (display "\\end{tabular}\n")))
+  (lambda (tex-out)
+    (call-with-output-file
+      "partially-typed-reference-write-read-casts=1.txt"
+      #:exists 'replace
+      (lambda (data-out-casts=1)
+        (call-with-output-file
+          "partially-typed-reference-write-read-types=2.txt"
+          #:exists 'replace
+          (lambda (data-out-types=2)
+            (display
+             (string-append
+              "\\begin{tabular}{| c | c | r | l |}\n"
+              "  \\hline\n"
+              "  \\multicolumn{2}{|c|}{} & Twosomes & Coercions \\\\\n"
+              "  \\hline\n"
+              "  Casts & Types/Coercion Size & "
+              "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
+              "  \\hline\n")
+             tex-out)
+            (display
+             (string-append
+              "#casts type coercions twosome-runs twosome-iters "
+              "coercions-runs coercion-iters\n")
+             data-out-casts=1)
+            (display
+             (string-append
+              "#casts type coercions twosome-runs twosome-iters "
+              "coercions-runs coercion-iters\n")
+             data-out-types=2)
+            (for ([l reference-wr-results])
+              (match-let ([(list name casts st sc t1 t2
+                                 (list tmean tsdev) (list truns titers)
+                                 (list cmean csdev) (list cruns citers)) l])
+                (fprintf tex-out
+                         "  ~a & ~a / ~a & ~a & ~a \\\\\n"
+                         casts
+                         st sc
+                         (real->decimal-string tmean decimals)
+                         (real->decimal-string cmean decimals))
+                (display "  \\hline\n" tex-out)
+                (when (= casts 1)
+                  (for ([tr truns] [ti titers] [cr cruns] [ci citers])
+                    (fprintf data-out-casts=1
+                             "~a ~a ~a ~a ~a ~a ~a\n"
+                             casts st sc tr ti cr ci)))
+                (when (= st 2)
+                  (for ([tr truns] [ti titers] [cr cruns] [ci citers])
+                    (fprintf data-out-types=2
+                             "~a ~a ~a ~a ~a ~a ~a\n"
+                             casts st sc tr ti cr ci)))))
+            (display "\\end{tabular}\n" tex-out)))))))
 
 (system "python partially-typed.py")

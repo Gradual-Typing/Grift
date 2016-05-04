@@ -74,6 +74,7 @@ it hard to find this directory.
 
 #| SI Unit Conversions |#
 (define (unit->micro x) (* x (expt 10 6)))
+(define (unit->nano x) (* x (expt 10 9)))
 (define (unit->pico x) (* x (expt 10 12)))
 
 
@@ -85,6 +86,7 @@ it hard to find this directory.
                                     #:cast-repr     c-rep
                                     #:function-repr f-rep
                                     #:output-regexp out-rx
+                                    #:unit-conversion [unit-> unit->nano]
                                     #:memory-limit  [mem (* 4096 2000)]
                                     #:mean-of-runs? [mean-of-runs? #t])
 
@@ -103,7 +105,7 @@ it hard to find this directory.
            #:cc-opt "-w -O3"
            #:mem mem))
   (define-values (run-result* iter-result*)
-    (run-test-repeatedly exe-file runs iters out-rx))
+    (run-test-repeatedly exe-file runs iters out-rx #:unit-conversion unit->))
   (if mean-of-runs?
       (mean-of-runs run-result* iter-result*)
       (list run-result* iter-result*)))
@@ -113,6 +115,7 @@ it hard to find this directory.
                        #:runs      runs
                        #:iters     iters
                        #:out-rx    out-rx
+                       #:unit-conversion [unit-> unit->nano]
                        #:mean-of-runs? [mean-of-runs? #t])
   (define tmp-s (build-path tmp-dir (string-append name ".s")))
   (define exe-file (build-path exe-dir (string-append name ".out")))
@@ -120,7 +123,7 @@ it hard to find this directory.
               (path->string src-file)
               "-w -O3")
   (define-values (run-result* iter-result*)
-    (run-test-repeatedly exe-file runs iters out-rx))
+    (run-test-repeatedly exe-file runs iters out-rx #:unit-conversion unit->))
 
   (if mean-of-runs?
       (mean-of-runs run-result* iter-result*)
@@ -143,7 +146,7 @@ it hard to find this directory.
 ;; Produces a two values a list of time per run and a list of time per iteration
 ;; both results are in terms of whatever unit is specified.
 (define (run-test-repeatedly exe-file runs iters out-rx
-                             #:unit-conversion [unit->? unit->micro]
+                             #:unit-conversion [unit->? unit->nano]
                              #:epsilon-check   [epsilon (expt 10 -6)])
   
   ;; Run the test "runs" number of times and save the results
