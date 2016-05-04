@@ -21,6 +21,9 @@
 (define display-mem-statistics? : (Parameterof Boolean)
   (make-parameter #f))
 
+(define timer-uses-process-time? : (Parameterof Boolean)
+  (make-parameter #f))
+
 (: IMDT-C-TYPE String)
 (define IMDT-C-TYPE "int64_t")
 
@@ -29,8 +32,10 @@
 
 (: C-INCLUDES (Listof String))
 (define C-INCLUDES
-  (let ([timer "sys/time.h"])
-    `("stdio.h" "stdlib.h" "stdint.h" ,"sys/time.h")))
+  (let ([timer (if (timer-uses-process-time?)
+                   "time.h"
+                   "sys/time.h")])
+    `("stdio.h" "stdlib.h" "stdint.h" ,timer)))
 
 (: C-DECLARATIONS (Listof String))
 (define C-DECLARATIONS
@@ -64,28 +69,60 @@
     (display ";\n")
     (display "allocd_mem = 0;\n")))
 
-(define timer-boiler-plate
-  (concat-string-literal
-   "//This is the global state for the timer\n"
-   "struct timeval timer_start_time;\n"
-   "struct timeval timer_stop_time;\n"
-   "struct timeval timer_result_time;\n"
-   "int timer_started = 1;\n"
-   "int timer_stopped = 1;\n\n"
-   "void timer_report(){\n\n"
-   "    // some very minor error checking\n"
-   "    if(timer_started){\n"
-   "        printf(\"error starting timer\");\n"
-   "        exit(-1);\n"
-   "    }\n"
-   "    if(timer_stopped){\n"
-   "        printf(\"error stopping timer\");\n"
-   "        exit(-1);\n"
-   "    }\n\n"
-   "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);\n"
-   "double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);\n"
-   "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
-   "}\n"))
+(define-values (timer-start timer-stop timer-report timer-boiler-plate)
+  (cond
+   [(timer-uses-process-time?)
+    (values
+     "timer_started = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_start_time)"
+     "timer_stopped = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_stop_time)"
+     "timer_report()"
+     (concat-string-literal
+     "//This is the global state for the timer\n"
+     "struct timespec timer_start_time;\n"
+     "struct timespec timer_stop_time;\n"
+     "struct timespec timer_result_time;\n"
+     "int timer_started = 1;\n"
+     "int timer_stopped = 1;\n\n"
+     "void timer_report(){\n\n"
+     "    // some very minor error checking\n"
+     "    if(timer_started){\n"
+     "        printf(\"error starting timer\");\n"
+     "        exit(-1);\n"
+     "    }\n"
+     "    if(timer_stopped){\n"
+     "        printf(\"error stopping timer\");\n"
+     "        exit(-1);\n"
+     "    }\n\n"
+     "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_nsec / 1.0e9);\n"
+     "double t2 = timer_stop_time.tv_sec  + (timer_stop_time.tv_nsec  / 1.0e9);\n"
+     "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+     "}\n"))]
+   [else
+    (values
+     "timer_started = gettimeofday(&timer_start_time, NULL)"
+     "timer_stopped = gettimeofday(&timer_stop_time, NULL)"
+     "timer_report()"
+     (concat-string-literal
+       "//This is the global state for the timer\n"
+       "struct timeval timer_start_time;\n"
+       "struct timeval timer_stop_time;\n"
+       "struct timeval timer_result_time;\n"
+       "int timer_started = 1;\n"
+       "int timer_stopped = 1;\n\n"
+       "void timer_report(){\n\n"
+       "    // some very minor error checking\n"
+       "    if(timer_started){\n"
+       "        printf(\"error starting timer\");\n"
+       "        exit(-1);\n"
+       "    }\n"
+       "    if(timer_stopped){\n"
+       "        printf(\"error stopping timer\");\n"
+       "        exit(-1);\n"
+       "    }\n\n"
+       "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1.0e6);\n"
+       "double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1.0e6);\n"
+       "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+       "}\n"))]))
 
 
 (define (emit-source-comment name type)
@@ -323,12 +360,9 @@
                                 (emit-value exp)
                                 (display ")"))]
     [('Exit (list exp)) (begin (display "exit") (emit-wrap (emit-value exp)))]
-    [('timer-start (list))
-     (display "timer_started = gettimeofday(&timer_start_time, NULL)")]
-    [('timer-stop  (list))
-     (display "timer_stopped = gettimeofday(&timer_stop_time, NULL)")]
-    [('timer-report (list))
-     (display "timer_report()")]
+    [('timer-start (list)) (display timer-start)]
+    [('timer-stop  (list)) (display timer-stop)]
+    [('timer-report (list)) (display timer-report)]
     [('read-int (list)) (display "read_int()")]
     [(p (list exp1 exp2))
      (emit-wrap

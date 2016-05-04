@@ -42,7 +42,7 @@
  #:program "schml-test-runner"
  #:once-each
  [("-s" "--suite") choice
-  "specify which suite to run"
+  "specify suite: all most core box vector tool program large"
   (let* ([s? (assq (to-symbol choice) suite-choices)])
     (if s?
         (suite (cdr s?))
