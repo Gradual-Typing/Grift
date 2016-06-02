@@ -2,18 +2,17 @@
 
 (require/typed pkg/lib [pkg-directory (String . -> . (Option Path))])
 
+(require racket/runtime-path)
+
 (provide (all-defined-out))
 
 ;; This is currently only used for testing
 ;; but it determines the root directory for paths
-(: schml-path Path)
-(define schml-path (or (pkg-directory "schml") (current-directory)))
-
-(: test-path Path)
-(define test-path (build-path schml-path "tests"))
+(: tests-path Path)
+(define-runtime-path tests-path ".")
 
 (: test-suite-path Path)
-(define test-suite-path (build-path test-path "suite"))
+(define-runtime-path test-suite-path "suite")
 
 (: test-tmp-path Path)
-(define test-tmp-path (build-path test-path "tmp"))
+(define-runtime-path test-tmp-path "tmp")
