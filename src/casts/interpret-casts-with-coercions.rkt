@@ -261,7 +261,7 @@ form, to the shortest branch of the cast tree that is relevant.
                           (compose comp_fst_pi final))]))]
          [(seq?$ c2)
           (cond$
-           [(fail?$ c1) c2] ;; TODO fix this it should be ID? 
+           [(fail?$ c1) c1]
            [else
             ;; must be c1 & (g;I?)
             (let$* ([seq_fst (seq-fst$ c2)]
