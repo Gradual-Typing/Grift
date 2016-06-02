@@ -25,7 +25,7 @@ Configuaration variables
 (define runs 20)
 
 ;; casts is a list of the number of casts to test in the benchmark
-(define casts (build-list 11 ((curry *) 2)))
+(define casts (build-list 11 (lambda (i) (* 2 i))))
 
 ;; The file is hard coded for each compiler configuration because
 ;; it makes formatting the each new data file easier.
@@ -49,16 +49,22 @@ to test the efficiency of various representations.
 (define (generate-source out iters casts)
   (pretty-print
    `(letrec ([cast-loop : (Int (Int -> Int) -> (Int -> Int))
-              (lambda ([n : Int] [g : (Int -> Int)])
-                (if (= n 0)
-                    g 
-                    (cast-loop (- n 1) (: g (Dyn -> Dyn)))))])
+                        (lambda ([n : Int] [g : (Int -> Int)])
+                          (if (= n 0)
+                              g 
+                              (cast-loop (- n 1) (: g (Dyn -> Dyn)))))])
       (let ([f : (Int -> Int) (lambda ([n : Int]) n)])
         (begin
           (timer-start)
           (repeat (i 0 ,iters) (cast-loop ,casts f))
           (timer-stop)
           (timer-report))))
+   #|`(let ([f : (Int -> Int) (lambda ([n : Int]) n)])
+   (begin
+   (timer-start)
+   (repeat (i 0 ,iters) (: f (Dyn -> Dyn)))
+   (timer-stop)
+   (timer-report)))|#
    out 1))
 
 

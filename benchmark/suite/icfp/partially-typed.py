@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib as mpl
 
-latex_output = True
+latex_output = False
 
 if latex_output:
     mpl.use('PDF')
@@ -92,6 +92,7 @@ legend = plt.legend(handles=[ tdata_vplt_fake
 if latex_output:
     plt.savefig('partially-typed-fn-cast-results', bbox_inches='tight')
 
+plt.savefig('partially-typed-fn-cast-results.png', bbox_inches='tight')
 
 # Function application analysis on casts
 plt.figure(2)
@@ -152,7 +153,8 @@ legend = plt.legend(handles=[ tdata_vplt_fake
 
 if latex_output:
     plt.savefig('partially-typed-fn-app-by-casts', bbox_inches='tight')
-    
+
+plt.savefig('partially-typed-fn-app-by-casts.png', bbox_inches='tight')
 
 
 # Fn app by coercion size
@@ -212,6 +214,7 @@ legend = plt.legend(handles=[ tdata_vplt_fake
 if latex_output:
     plt.savefig('partially-typed-fn-app-by-types', bbox_inches='tight')
 
+plt.savefig('partially-typed-fn-app-by-types.png', bbox_inches='tight')    
 
 # Reference cast analysis
 plt.figure(4)
@@ -252,7 +255,7 @@ if cdata_lreg[1] < 0 :
 else:
     cdata_lplt_eq = "%.2f$N_c$ + %.2f" % (cdata_lreg[0], cdata_lreg[1])
 cdata_lplt_fake = mlines.Line2D([],[],color="red", label='Linear model of Coercions')
-cdata_lplt_txt  = plt.text(35, 150 , cdata_lplt_eq, color=cdata_lplt_fake.get_color())
+cdata_lplt_txt  = plt.text(160, 2000, cdata_lplt_eq, color=cdata_lplt_fake.get_color())
 
 plt.axis([min(cdata_pos) - 10, max(cdata_pos) + 10, -150, 5000])
 plt.xlabel('Number of nodes in Coercion resulting from types ($N_c$)')
@@ -268,6 +271,7 @@ legend = plt.legend(handles=[ tdata_vplt_fake
 if latex_output:
     plt.savefig('partially-typed-ref-cast-results', bbox_inches='tight')
 
+plt.savefig('partially-typed-ref-cast-results.png', bbox_inches='tight')    
 
 # Function application analysis by casts
 plt.figure(5)
@@ -327,6 +331,8 @@ legend = plt.legend(handles=[ tdata_vplt_fake
 
 if latex_output:
     plt.savefig('partially-typed-ref-write-read-by-casts', bbox_inches='tight')
+
+plt.savefig('partially-typed-ref-write-read-by-casts.png', bbox_inches='tight')    
     
 
 
@@ -366,11 +372,11 @@ cdata_lplt = plt.plot(data["coercions"]
                       , color="red")
 
 if cdata_lreg[1] < 0 :
-    cdata_lplt_eq = ".2%f$N_c$ - %.2f" % (cdata_lreg[0], (-1.0 * cdata_lreg[1]))
+    cdata_lplt_eq = "%.2f$N_c$ - %.2f" % (cdata_lreg[0], (-1.0 * cdata_lreg[1]))
 else:
-    cdata_lplt_eq = ".2%f$N_c$ + %.2f" % (cdata_lreg[0], cdata_lreg[1])
+    cdata_lplt_eq = "%.2f$N_c$ + %.2f" % (cdata_lreg[0], cdata_lreg[1])
 cdata_lplt_fake = mlines.Line2D([],[],color="red", label='Linear model of Coercions')
-cdata_lplt_txt  = plt.text(750, 150 , cdata_lplt_eq, color=cdata_lplt_fake.get_color())
+cdata_lplt_txt  = plt.text(160, 1200 , cdata_lplt_eq, color=cdata_lplt_fake.get_color())
 
 
 plt.axis([min(cdata_pos) - 10, max(cdata_pos) + 10, -250, 4000])
@@ -383,6 +389,8 @@ legend = plt.legend(handles=[ tdata_vplt_fake
                               ,cdata_lplt_fake]
                     , loc="upper left"
                     , shadow=True)
+
+plt.savefig('partially-typed-ref-write-read-by-types.png', bbox_inches='tight')
 
 if latex_output:
     plt.savefig('partially-typed-ref-write-read-by-types', bbox_inches='tight')

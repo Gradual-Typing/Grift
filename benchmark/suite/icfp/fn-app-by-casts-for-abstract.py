@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib as mpl
 
-latex_output = True
+latex_output = False
 
 if latex_output:
     mpl.use('PDF')

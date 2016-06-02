@@ -320,7 +320,7 @@
             (display " ; ")
             (display (uid->string i))
             (display " += 1 ) {\n")
-            (display "__asm__(\"\");")
+            ;;(display "__asm__(\"\");")
             (emit-begin e* (void))
             (display "}\n"))]
     [(Op p exp*)

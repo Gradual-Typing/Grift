@@ -2,14 +2,15 @@
 
 (require
  "helpers.rkt"
+ "code-templates.rkt"
  syntax/location)
 
 (initialize-dirs! (file-name-from-path (quote-source-file)))
 
 ;; Runs = the number of times the test is repeated in order to understand
 ;; how much volitility is coming from the system it is being run o
-(define iters 10000)
-(define runs  500)
+(define iters 1000)
+(define runs  100)
 (define spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : \\d+\n$")
 
 (define fn-app-test
@@ -21,7 +22,8 @@
    #:timed-action   (lambda (i acc) `(add1 acc))
    #:use-acc-action (lambda (acc) acc)))
 
-(define fn-app-src-file (write-source "fully-static-fn-app" fn-app-test))
+(define fn-app-src-file
+  (write-source "fully-static-fn-app" fn-app-test))
 
 (define-values (fn-app-twosomes fn-app-coercions)
   (values
@@ -42,6 +44,7 @@
     #:function-repr 'Hybrid
     #:output-regexp spec)))
 
+
 (define ref-write-read-test
   (make-timing-loop
    #:letrec-bnds  '([read  : ((GRef Int) -> Int)
@@ -58,6 +61,9 @@
                        (write ref (+ ,acc 1))
                        (read ref)))
    #:use-acc-action (lambda (acc) acc)))
+
+ ;; (define ref-write-read-test
+ ;;  (make-reference-wr-timing-loop '(GRef Int) '(GRef Dyn) 0 0))
 
 (define ref-write-read-src-file
   (write-source "fully-static-ref-write-read" ref-write-read-test))
@@ -140,4 +146,51 @@
                   #:iters     iters
                   #:out-rx    spec)))
 
+
+
+(define-values (results)
+  (list (list "Function Application" 
+              (list "Type-Based"
+                    fn-app-twosomes
+                    fn-app-twosomes-c)
+              (list "Coercions"
+                    fn-app-coercions
+                    fn-app-coercions-c))
+        (list "Reference Read and Write"
+              (list "Type-Based"
+                    ref-write-read-twosomes
+                    ref-write-read-twosomes-c)
+              (list "Coercions"
+                    ref-write-read-coercions
+                    ref-write-read-coercions-c))))
+
+(with-output-to-file
+  "fully-static-results.tex"
+  #:exists 'replace
+  (lambda ()
+    (display
+     (string-append
+      "\\begin{tabular}{| l | r | r | r | r | r |}\n"
+      "\\hline\n"
+      " & \\multicolumn{2}{c|}{Schml}"
+      "        & \\multicolumn{2}{c|}{C Edit} & \\\\\n"
+      "\\cline{2-6}\n"
+      "\\multicolumn{1}{|c|}{all units in $ns$} & time & stdev &"
+      "       time & stdev & overhead \\\\\n"
+      "\\hline\n")) 
+    (for ((r (in-list results)))
+      (match-define (list n b* ...) r)
+      (display
+       (string-append "\\multicolumn{6}{|l|}{ " n " }\\\\\n\\hline\n"))
+      (for ((b (in-list b*)))
+        (match-define `(,r (,s-mean ,s-sdev) (,c-mean ,c-sdev)) b)
+        (define percent-overhead (exact-round (* 100 (/ (- s-mean c-mean) c-mean))))
+        (printf "~a & ~a & ~a & ~a & ~a & ~a\\% \\\\\n\\hline\n"
+                r
+                (~r s-mean #:precision '(= 2))
+                (~r s-sdev #:precision '(= 2))
+                (~r c-mean #:precision '(= 2))
+                (~r c-sdev #:precision '(= 2))
+                percent-overhead)))
+    (display "\\end{tabular}\n")))
 

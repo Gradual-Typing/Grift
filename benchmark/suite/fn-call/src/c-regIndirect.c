@@ -38,7 +38,7 @@ int main (int argc, char* argv[]) {
   }
 
   // run test
-  for(long i = 0; i < iters; i++){
+  for(;iters; iters--){
     ifun(0);
   }
 

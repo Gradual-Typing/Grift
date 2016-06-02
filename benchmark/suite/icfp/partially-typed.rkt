@@ -2,6 +2,7 @@
 
 (require
  "helpers.rkt"
+ "code-templates.rkt"
  syntax/location
  math)
 
@@ -45,7 +46,8 @@ Configuaration variables
 ;; how much volitility is coming from the system it is being run o
 (define iters 1000)
 (define runs  100)
-(define decimals 0)
+(define decimals 2)
+(define prec `(= ,decimals))
 
 (define timing-loop-test
   (make-timing-loop
@@ -83,9 +85,9 @@ Configuaration variables
   (lambda ()
     (display
      (string-append
-      "\\begin{tabular}{| l | r | l |}\n"
+      "\\begin{tabular}{| l | r | r |}\n"
       "  \\hline\n"
-      "& Twosomes & Coercions \\\\\n"
+      "& Type-Based & Coercions \\\\\n"
       "  \\hline\n"
       "  Iterations & \\multicolumn{2}{c|}{Time($n s$)/Iteration}\\\\\n"
       "  \\hline\n"))
@@ -93,8 +95,8 @@ Configuaration variables
       (match-let ([(list iters (list tmean tsdev) (list cmean csdev)) result])
         (printf  "  ~a & ~a & ~a \\\\\n"
                  iters
-                 (real->decimal-string tmean decimals)
-                 (real->decimal-string cmean decimals))
+                 (~r tmean #:precision prec)
+                 (~r cmean #:precision prec))
         (display "  \\hline\n")))
     (display "\\end{tabular}\n")))
 
@@ -198,11 +200,11 @@ Configuaration variables
   (lambda ()
     (display
      (string-append
-      "\\begin{tabular}{| c | r | l |}\n"
+      "\\begin{tabular}{| c | r | r |}\n"
       "  \\hline\n"
-      "  & Twosomes & Coercions \\\\\n"
+      "  & Type-Based & Coercions \\\\\n"
       "  \\hline\n"
-      "  Types/Coercion Size & "
+      "  Type/Coercion Size & "
       "\\multicolumn{2}{c|}{Time($n s$)/Iteration} \\\\\n"
       "  \\hline\n"))
     (for ([l function-cast-results])
@@ -211,8 +213,8 @@ Configuaration variables
                          (list cmean csdev) c-points) l])
         (printf "  ~a / ~a & ~a & ~a \\\\\n"
                 st sc
-                (real->decimal-string tmean decimals)
-                (real->decimal-string cmean decimals))
+                (~r tmean #:precision prec)
+                (~r cmean #:precision prec))
         (display "  \\hline\n")))
     (display "\\end{tabular}\n")))
 
@@ -241,41 +243,15 @@ Configuaration variables
         (for ([time c-iter-times])
           (printf "~a ~a ~a\n" st sc time))))))
 
-
-
-
-
-
 (define (make-app-timing-loop-record name casts t1 t2 init use)
   (define id-type `(,t1 -> ,t1))
   (define id-type-inv `(,t2 -> ,t2))
-  (define-values (id-casted-type acc-type cl-invocation use-undyned)
-    (if (even? casts)
-        (values id-type t1  
-                `(cast-loop ,casts id)
-                (lambda (use) use))
-        (values id-type-inv t2
-                `(: (cast-loop ,(sub1 casts) id) (,t2 -> ,t2))
-                (lambda (use) (lambda (v) `(: ,(use v) Int))))))
   (list (format "fn-app-~a-~a" name casts)
         casts
         (sizeof-type* id-type id-type-inv)
         (sizeof-coercion-of-types id-type id-type-inv)
         id-type id-type-inv
-        (make-timing-loop
-         #:timed-action (lambda (i acc) `(id-casted ,acc))
-         #:letrec-bnds
-         `([cast-loop : (Int ,id-type -> ,id-type)
-            (lambda ([n : Int] [g : ,id-type])
-              (if (= n 0)
-                  g 
-                  (cast-loop (- n 2) (: g ,id-type-inv))))]
-           [id : ,id-type (lambda ([x : ,t1]) x)])
-         #:let-bnds
-         `([id-casted : ,id-casted-type ,cl-invocation])
-         #:acc-type acc-type
-         #:acc-init init
-         #:use-acc-action (use-undyned use))))
+        (make-app-timing-loop casts t1 t2 init use)))
 
 (define function-app-tests
   (append*
@@ -339,53 +315,44 @@ Configuaration variables
          (mean-of-runs t-run-time* t-iter-time*)
          (list t-run-time* t-iter-time*)
          (mean-of-runs c-run-time* c-iter-time*)
-         (list c-run-time* c-iter-time*))
-        #;
-        (list
-        name casts st sc t1 t2
-        (compile&run/iteration-time
-         #:base-name     name-twosomes-functional
-         #:src-file      src-file
-         #:runs          runs
-         #:iterations    iters
-         #:cast-repr     'Twosomes
-         #:function-repr 'Functional
-         #:output-regexp spec
-         #:memory-limit  (* 4096 20000))
-        (compile&run/iteration-time
-         #:base-name     name-coercions-hybrid
-         #:src-file      src-file
-         #:runs          runs
-         #:iterations    iters
-         #:cast-repr     'Coercions
-         #:function-repr 'Hybrid
-         #:output-regexp spec
-         #:memory-limit  (* 4096 20000)))))))
+         (list c-run-time* c-iter-time*))))))
 
-(with-output-to-file
-  "partially-typed-function-app.tex"
-  #:exists 'replace
-  (lambda ()
-    (display
-     (string-append
-      "\\begin{tabular}{| c | c | r | l |}\n"
-      "  \\hline\n"
-      "  \\multicolumn{2}{|c|}{} & Twosomes & Coercions \\\\\n"
-      "  \\hline\n"
-      "  Casts & Types/Coercion Size & "
-      "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
-      "  \\hline\n"))
-    (for ([l function-app-results])
-      (match-let ([(list name casts st sc t1 t2
-                         (list tmean tsdev) _
-                         (list cmean csdev) _) l])
-        (printf "  ~a & ~a / ~a & ~a & ~a \\\\\n"
-                casts
-                st sc
-                (real->decimal-string tmean decimals)
-                (real->decimal-string cmean decimals))
-        (display "  \\hline\n")))
-    (display "\\end{tabular}\n")))
+(define (latex-fn-app-data res name)
+  (with-output-to-file
+    (string-append "partially-typed-function-app-" name ".tex")
+    #:exists 'replace
+    (lambda ()
+      (display
+       (string-append
+        "\\begin{tabular}{| c | c | r | r |}\n"
+        "  \\hline\n"
+        "  \\multicolumn{2}{|c|}{} & Type-Based & Coercions \\\\\n"
+        "  \\hline\n"
+        "  Casts & Type/Coercion Size & "
+        "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
+        "  \\hline\n"))
+      (for ([l res])
+        (match-let ([(list name casts st sc t1 t2
+                           (list tmean tsdev) _
+                           (list cmean csdev) _) l])
+          (printf "  ~a & ~a / ~a & ~a & ~a \\\\\n"
+                  casts
+                  st sc
+                  (~r tmean #:precision prec)
+                  (~r cmean #:precision prec))
+          (display "  \\hline\n")))
+      (display "\\end{tabular}\n"))))
+
+(define ((app-res-casts<? n) r)
+  (match-let ([(list name casts _ ...) r])
+    (< casts n)))
+
+(define ((app-res-casts>=? n) r)
+  (not ((app-res-casts<? n) r)))
+
+(latex-fn-app-data (filter (app-res-casts<? 10)  function-app-results) "0-9")
+(latex-fn-app-data (filter (app-res-casts>=? 10) function-app-results) "10-19")
+
 
 (call-with-output-file
   #;"partially-typed-function-app-results-coercions=63.txt"
@@ -415,12 +382,6 @@ Configuaration variables
                 (fprintf coercion-p "~a ~a ~a ~a ~a ~a ~a\n"
                          casts st sc trun titer crun citer)))))))))
 
-
-(define (symbolic-repeat n ctr base)
-  (if (<= n 0)
-      `(,ctr ,base)
-      `(,ctr ,(symbolic-repeat (sub1 n) ctr base))))
-
 (define (make-reference-cast-timing-loop-record depth)
   (define t1 (symbolic-repeat depth 'GRef 'Int))
   (define t2 (symbolic-repeat depth 'GRef 'Dyn))
@@ -428,11 +389,7 @@ Configuaration variables
         (sizeof-type* t1 t2)
         (sizeof-coercion-of-types t1 t2)
         t1 t2
-        (make-timing-loop
-         #:timed-action (lambda (i acc) `(: (: acc ,t2) ,t1))
-         #:acc-type t1
-         #:acc-init (symbolic-repeat depth 'gbox 42)
-         #:use-acc-action (lambda (v) (symbolic-repeat depth 'gunbox v)))))
+        (make-reference-cast-timing-loop t1 t2 depth)))
 
 (define reference-cast-tests
   (for/list ([depth (in-range 0 6)])
@@ -472,28 +429,7 @@ Configuaration variables
          (mean-of-runs t-run-time* t-iter-time*)
          (list t-run-time* t-iter-time*)
          (mean-of-runs c-run-time* c-iter-time*)
-         (list c-run-time* c-iter-time*))
-        
-        #;
-        (list name st sc t1 t2 
-        (compile&run/iteration-time
-        #:base-name     name-twosomes
-        #:src-file      src-file
-        #:runs          runs
-        #:iterations    iters
-        #:cast-repr     'Twosomes
-        #:function-repr 'Functional
-        #:output-regexp spec
-        #:memory-limit  (* 4096 20000))
-      (compile&run/iteration-time
-       #:base-name     name-coercions
-       #:src-file      src-file
-       #:runs          runs
-       #:iterations    iters
-       #:cast-repr     'Coercions
-       #:function-repr 'Hybrid
-       #:output-regexp spec
-       #:memory-limit  (* 4096 20000)))))))
+         (list c-run-time* c-iter-time*))))))
 
 (call-with-output-file
   "partially-typed-reference-cast.tex"
@@ -505,11 +441,11 @@ Configuaration variables
       (lambda (data-out)
         (display
      (string-append
-      "\\begin{tabular}{| c | r | l |}\n"
+      "\\begin{tabular}{| c | r | r |}\n"
       "  \\hline\n"
-      "  & Twosomes & Coercions \\\\\n"
+      "  & Type-Based & Coercions \\\\\n"
       "  \\hline\n"
-      "  Types/Coercion Size & "
+      "  Type/Coercion Size & "
       "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
       "  \\hline\n")
      tex-out)
@@ -704,45 +640,17 @@ Configuaration variables
 |#
 
 
-
 (define (make-reference-wr-timing-loop-record casts depth)
   ;; cadr here subtracts on symbolic repeat
   (define t1 (symbolic-repeat depth 'GRef 'Int))
   (define t2 (symbolic-repeat depth 'GRef 'Dyn))
-  (define ref (symbolic-repeat depth 'gbox -22))
-  (define use (lambda (v)
-                `(+ ,(cadr (symbolic-repeat depth 'gunbox v))
-                    ,(symbolic-repeat depth 'gunbox 'guarded-ref))))
-  (define-values (acc-type cl-invocation acc-init)
-    (if (even? casts)
-        (values (cadr t1)
-                `(cast-loop ,casts ,ref)
-                (cadr (symbolic-repeat depth 'gbox 21)))
-        (values (cadr t2)
-                `(: (cast-loop ,(sub1 casts) ,ref) ,t2)
-                (cadr (symbolic-repeat depth 'gbox '(: 21 Dyn))))))
+  
   (list (format "ref-wr-~a-~a" casts depth)
         casts
         (sizeof-type* t1 t2)
         (sizeof-coercion-of-types t1 t2)
         t1 t2
-        (make-timing-loop
-         #:timed-action
-         (lambda (i acc)
-           `(begin
-              (gbox-set! guarded-ref acc)
-              (gunbox guarded-ref)))
-         #:letrec-bnds
-         `([cast-loop : (Int ,t1 -> ,t1)
-            (lambda ([n : Int] [g : ,t1])
-              (if (= n 0)
-                  g 
-                  (cast-loop (- n 2) (: g ,t2))))])
-         #:let-bnds
-         `([guarded-ref : (GRef ,acc-type) ,cl-invocation])
-         #:acc-type acc-type
-         #:acc-init acc-init
-         #:use-acc-action use))) 
+        (make-reference-wr-timing-loop t1 t2 casts depth))) 
 
 (define reference-wr-tests
   (for*/list ([casts (in-range 0 6)]
@@ -801,11 +709,11 @@ Configuaration variables
           (lambda (data-out-types=2)
             (display
              (string-append
-              "\\begin{tabular}{| c | c | r | l |}\n"
+              "\\begin{tabular}{| c | c | r | r |}\n"
               "  \\hline\n"
-              "  \\multicolumn{2}{|c|}{} & Twosomes & Coercions \\\\\n"
+              "  \\multicolumn{2}{|c|}{} & Type-Based & Coercions \\\\\n"
               "  \\hline\n"
-              "  Casts & Types/Coercion Size & "
+              "  Casts & Type/Coercion Size & "
               "     \\multicolumn{2}{c|}{Time($ns$)/Interation} \\\\\n"
               "  \\hline\n")
              tex-out)
@@ -843,3 +751,4 @@ Configuaration variables
             (display "\\end{tabular}\n" tex-out)))))))
 
 (system "python partially-typed.py")
+(system "python fn-app-by-casts-for-abstract.py")

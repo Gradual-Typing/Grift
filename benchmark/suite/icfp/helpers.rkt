@@ -82,7 +82,8 @@ it hard to find this directory.
 (define (compile&run/iteration-time #:base-name     name
                                     #:src-file      src-file
                                     #:runs          runs
-                                    #:iterations    iters 
+                                    #:iterations    iters
+                                    #:io-sequence   [io #f]
                                     #:cast-repr     c-rep
                                     #:function-repr f-rep
                                     #:output-regexp out-rx
@@ -105,7 +106,9 @@ it hard to find this directory.
            #:cc-opt "-w -O3"
            #:mem mem))
   (define-values (run-result* iter-result*)
-    (run-test-repeatedly exe-file runs iters out-rx #:unit-conversion unit->))
+    (run-test-repeatedly exe-file runs iters out-rx
+                         #:io-sequence io
+                         #:unit-conversion unit->))
   (if mean-of-runs?
       (mean-of-runs run-result* iter-result*)
       (list run-result* iter-result*)))
@@ -114,16 +117,22 @@ it hard to find this directory.
                        #:src-file  src-file
                        #:runs      runs
                        #:iters     iters
+                       #:io-sequence [io #f]
                        #:out-rx    out-rx
                        #:unit-conversion [unit-> unit->nano]
                        #:mean-of-runs? [mean-of-runs? #t])
   (define tmp-s (build-path tmp-dir (string-append name ".s")))
   (define exe-file (build-path exe-dir (string-append name ".out")))
+  (cc/runtime (path->string tmp-s)
+              (path->string src-file)
+              "-w -S -O3")
   (cc/runtime (path->string exe-file)
               (path->string src-file)
               "-w -O3")
   (define-values (run-result* iter-result*)
-    (run-test-repeatedly exe-file runs iters out-rx #:unit-conversion unit->))
+    (run-test-repeatedly exe-file runs iters out-rx
+                         #:io-sequence io
+                         #:unit-conversion unit->))
 
   (if mean-of-runs?
       (mean-of-runs run-result* iter-result*)
@@ -146,6 +155,7 @@ it hard to find this directory.
 ;; Produces a two values a list of time per run and a list of time per iteration
 ;; both results are in terms of whatever unit is specified.
 (define (run-test-repeatedly exe-file runs iters out-rx
+                             #:io-sequence [io #f]
                              #:unit-conversion [unit->? unit->nano]
                              #:epsilon-check   [epsilon (expt 10 -6)])
   
@@ -158,7 +168,13 @@ it hard to find this directory.
       (flush-output (current-error-port))) 
     (define result (with-output-to-string
                      (lambda ()
-                       (with-input-from-string (format "~a" iters)
+                       (with-input-from-string
+                         (if io
+                             (with-output-to-string
+                               (lambda ()
+                                 (for ([i (in-list io)])
+                                   (display i) (newline))))
+                             (format "~a" iters))
                          (lambda ()
                            (system (path->string exe-file)))))))
     ;; Regular expression for the expected output
@@ -211,6 +227,8 @@ it hard to find this directory.
            (timer-stop)
            (timer-report)
            ,(use-acc-action '(gunbox acc)))))))
+
+
 
 (define timing-loop-example
   (make-timing-loop

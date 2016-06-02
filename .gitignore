@@ -19,3 +19,7 @@ compiled/
 **/data/*
 **/output/*
 **/results/*
+
+
+# ignore model folder for now
+models

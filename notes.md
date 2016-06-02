@@ -19,3 +19,6 @@ allign* gather* no labels
 
 semantic package -- for inference rules
 mathpartir -- Isabelle uses this
+
+
+consider counting instructions in addition to timing
