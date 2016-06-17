@@ -49,9 +49,6 @@
   (define new-exp : CoC3.1-Expr
     (map-hoisting-thru-Expr type->immediate coercion->immediate exp))
 
-  (display type-table) (newline)
-  (display crcn-table) (newline)
-  
   ;; Compose the mapping with extracting the state of the computation
   ;; to build a new program.
   
