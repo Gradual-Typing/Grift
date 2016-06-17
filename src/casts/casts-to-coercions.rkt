@@ -22,6 +22,9 @@ should be able to compile programs this the twosome casts for future comparison.
          (all-from-out "../language/cast-with-pure-letrec.rkt"
                        "../language/coercion.rkt"))
 
+(define space-efficient? (make-parameter #t))
+(define optimize-first-order-coercions? (make-parameter #t))
+
 ;; The entry point for this pass it is called by impose-casting semantics
 (: casts->coercions (Cast/Pure-Letrec Config . -> . Coercion-Lang))
 (define (casts->coercions prgm config)
@@ -29,29 +32,34 @@ should be able to compile programs this the twosome casts for future comparison.
     (let ([exp (c2c-expr exp)])
       (Prog (list name next type) exp))))
 
-(: mk-coercion (Blame-Label ->
+(: mk-coercion (Blame-Label Boolean ->
                 (Schml-Type Schml-Type -> Schml-Coercion)))
-(define ((mk-coercion lbl) t1 t2)
-  (define recur (mk-coercion lbl))
+(define ((mk-coercion lbl space-efficient-normal-form?) t1 t2)
+  (define recur (mk-coercion lbl (space-efficient?)))
   (logging mk-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
   (define result : Schml-Coercion
-    (if (equal? t1 t2)
-        (Identity)
-        (match* (t1 t2)
-          [((Dyn)    t)  (Sequence (Project t lbl) (Identity))]
-          [(t    (Dyn))  (Sequence (Identity) (Inject t))]
-          [((Fn n1 a1* r1) (Fn n2 a2* r2)) #:when (= n1 n2)
-           ;; The arity check here means that all coercions have
-           ;; the correct arrity under the static type system.
-           ;; Notice that the argument types are reversed
-           ;; because of contravarience of functions.
-           (Fn n1 (map recur a2* a1*) (recur r1 r2))]
-          ;; It seems like we could get by without other coercions
-          [((GRef t1) (GRef t2))
-           (Ref (recur t1 t2) (recur t2 t1))]
-          [((GVect t1) (GVect t2))
-           (Ref (recur t1 t2) (recur t2 t1))]
-          [(_ _) (Failed lbl)])))
+    (match* (t1 t2)
+      [(t        t) IDENTITY]
+      [((Dyn)    t)
+       (if space-efficient-normal-form?
+           (Sequence (Project t lbl) (Identity))
+           (Project t lbl))]
+      [(t    (Dyn))
+       (if space-efficient-normal-form?
+           (Sequence (Identity) (Inject t))
+           (Inject t))]
+      [((Fn n1 a1* r1) (Fn n2 a2* r2)) #:when (= n1 n2)
+       ;; The arity check here means that all coercions have
+       ;; the correct arrity under the static type system.
+       ;; Notice that the argument types are reversed
+       ;; because of contravarience of functions.
+       (Fn n1 (map recur a2* a1*) (recur r1 r2))]
+      ;; It seems like we could get by without other coercions
+      [((GRef t1) (GRef t2))
+       (Ref (recur t1 t2) (recur t2 t1))]
+      [((GVect t1) (GVect t2))
+       (Ref (recur t1 t2) (recur t2 t1))]
+      [(_ _) (Failed lbl)]))
   (logging mk-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
 
@@ -62,7 +70,10 @@ should be able to compile programs this the twosome casts for future comparison.
   (match exp
     ;; The only Interesting Case
     [(Cast (app c2c-expr exp) (Twosome t1 t2 lbl))
-     (Cast exp (Coercion ((mk-coercion lbl) t1 t2)))]
+     (define normal-form?
+       (and (space-efficient?)
+            (not (optimize-first-order-coercions?))))
+     (Cast exp (Coercion ((mk-coercion lbl normal-form?) t1 t2)))]
     ;; Everything else should be really boring
     [(Lambda f* (app c2c-expr exp))
      (Lambda f* exp)]
