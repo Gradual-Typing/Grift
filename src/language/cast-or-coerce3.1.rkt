@@ -3,20 +3,21 @@
 
 (provide (all-defined-out)
          (all-from-out "forms.rkt"))
-#|-----------------------------------------------------------------------------+
-| Language/Cast3 created by interpret-casts                                    |
-+-----------------------------------------------------------------------------|#
 
-(define-type Cast-or-Coerce4-Lang
+#|------------------------------------------------------------------------------
+Cast-or-Coerce3.1-Lang is the product of hoist-types
+------------------------------------------------------------------------------|#
+
+(define-type Cast-or-Coerce3.1-Lang
   (Prog (List String Natural Schml-Type)
-        (Let-Static* CoC4-Bnd-Type*
-                     CoC4-Bnd-Crcn*
-                     CoC4-Expr)))
+        (Let-Static* CoC3.1-Bnd-Type*
+                     CoC3.1-Bnd-Crcn*
+                     CoC3.1-Expr)))
 
-(define-type CoC4-Expr
-  (Rec E (U ;; Code Labels 
+(define-type CoC3.1-Expr
+  (Rec E (U ;; Code Labels
           (Code-Label Uid)
-          (Labels CoC4-Bnd-Code* E)
+          (Labels CoC3.1-Bnd-Code* E)
           (App-Code E (Listof E))
           ;; Functions as an interface
           (Lambda Uid* (Castable (Option Uid) E))
@@ -30,7 +31,7 @@
           (Fn-Proxy-Coercion E)
           ;; Coercions
           (Quote-Coercion Immediate-Coercion)
-          ;;(Compose-Coercions E E)
+          (Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
           (Make-Fn-Coercion Uid E E E)
@@ -80,12 +81,12 @@
           (Dyn-value E)
           (Dyn-make E E)
           ;; Binding Forms - Lambda
-	  (Letrec CoC4-Bnd-Lambda* E)
-	  (Let CoC4-Bnd-Data* E)
+	  (Letrec CoC3.1-Bnd* E)
+	  (Let CoC3.1-Bnd* E)
           (Var Uid)
           ;; Controll Flow
           (If E E E)
-          (Begin CoC4-Expr* E)
+          (Begin CoC3.1-Expr* E)
           (Repeat Uid E E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
@@ -114,21 +115,13 @@
           (Guarded-Proxy-Blames E)
           (Guarded-Proxy-Coercion E))))
 
-
-
-(define-type CoC4-Expr* (Listof CoC4-Expr))
-(define-type CoC4-Code (Code Uid* CoC4-Expr))
-(define-type CoC4-Bnd-Code (Pairof Uid CoC4-Code))
-(define-type CoC4-Bnd-Code* (Listof CoC4-Bnd-Code))
-(define-type CoC4-Lambda (Lambda Uid* (Castable (Option Uid) CoC4-Expr)))
-(define-type CoC4-Bnd-Lambda  (Pairof Uid CoC4-Lambda))
-(define-type CoC4-Bnd-Lambda* (Listof CoC4-Bnd-Lambda))
-(define-type CoC4-Bnd-Data  (Pairof Uid CoC4-Expr))
-(define-type CoC4-Bnd-Data* (Listof CoC4-Bnd-Data))
-(define-type CoC4-Bnd-Type  (Pairof Uid Compact-Type))
-(define-type CoC4-Bnd-Type* (Listof CoC4-Bnd-Type))
-(define-type CoC4-Bnd-Crcn  (Pairof Uid Compact-Coercion))
-(define-type CoC4-Bnd-Crcn* (Listof CoC4-Bnd-Crcn))
-
-
-
+(define-type CoC3.1-Code (Code Uid* CoC3.1-Expr))
+(define-type CoC3.1-Expr* (Listof CoC3.1-Expr))
+(define-type CoC3.1-Bnd (Pairof Uid CoC3.1-Expr))
+(define-type CoC3.1-Bnd* (Listof CoC3.1-Bnd))
+(define-type CoC3.1-Bnd-Code (Pairof Uid CoC3.1-Code))
+(define-type CoC3.1-Bnd-Code* (Listof CoC3.1-Bnd-Code))
+(define-type CoC3.1-Bnd-Type (Pairof Uid Compact-Type))
+(define-type CoC3.1-Bnd-Type* (Listof CoC3.1-Bnd-Type))
+(define-type CoC3.1-Bnd-Crcn (Pairof Uid Compact-Coercion))
+(define-type CoC3.1-Bnd-Crcn* (Listof CoC3.1-Bnd-Crcn))

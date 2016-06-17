@@ -135,18 +135,20 @@ exposed as the effects that they truelly are.
 
 (: specify-representation (Cast-or-Coerce6-Lang Config -> Data0-Lang))
 (trace-define (specify-representation prgm comp-config)
-  (match-let ([(Prog (list name next type) (LetT* bndt* exp)) prgm])
-    (let* ([next  : (Boxof Nat) (box next)]
-           [bndc* : (Boxof D0-Bnd-Code*) (box '())]
-           [exp   : D0-Expr (sr-expr next bndc* (hash) empty-index-map exp)]
-           [init* : D0-Expr* (map (sr-bndt next) bndt*)]
-           [tid*  : Uid*     (map (inst car Uid Any) bndt*)]
-           [next  : Nat (unbox next)]
-           [bndc* : D0-Bnd-Code* (unbox bndc*)])
+  (match-let ([(Prog (list name next type) (Let-Static* bndt* bnd-crcn* exp)) prgm])
+    (let* ([next       : (Boxof Nat) (box next)]
+           [bnd-code*  : (Boxof D0-Bnd-Code*) (box '())]
+           [exp        : D0-Expr (sr-expr next bnd-code* (hash) empty-index-map exp)]
+           [init-type* : D0-Expr* (map (sr-bndt next) bndt*)]
+           [type-id*   : Uid*     (map (inst car Uid Any) bndt*)]
+           [init-crcn* : D0-Expr* (map (sr-bnd-coercion next) bnd-crcn*)]
+           [crcn-id*   : Uid*     (map (inst car Uid Any) bnd-crcn*)]
+           [next       : Nat (unbox next)]
+           [bnd-code*  : D0-Bnd-Code* (unbox bnd-code*)])
       (Prog (list name next type)
-       (GlobDecs tid*
-        (Labels bndc*
-         (Begin init* exp)))))))
+       (GlobDecs (append type-id* crcn-id*)
+        (Labels bnd-code*
+         (Begin (append init-type* init-crcn*) exp)))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
@@ -398,7 +400,8 @@ exposed as the effects that they truelly are.
             [else (TODO)])))
       |#
 
-  (: sr-coercion (Coercion/Prim-Type -> D0-Expr))
+
+      (: sr-coercion (Coercion/Prim-Type -> D0-Expr))
   (define (sr-coercion c)
     (match c
       [(Identity) IDENTITY-COERCION-IMDT]
@@ -431,6 +434,9 @@ exposed as the effects that they truelly are.
   (define ((recur-curry-env env cenv) exp)
     (recur/env exp env cenv))
 
+  
+
+  
   (: recur/env (CoC6-Expr Env IndexMap -> D0-Expr))
   (define (recur/env exp env cenv)
     (: recur* (CoC6-Expr* -> D0-Expr*))
@@ -519,7 +525,7 @@ exposed as the effects that they truelly are.
          (Op 'binary-and (list e TYPE-TAG-MASK))]
         ;; Coercions
         ;; Projection Coercions
-        [(Quote-Coercion c) (sr-coercion c)]
+        [(Quote-Coercion c) (sr-immediate-coercion c)]
         [(Project-Coercion (app recur t) (app recur l))
          (sr-alloc "project_coercion" l:PROJECT-COERCION-TAG
                    `(("type" . ,t) ("label" . ,l)))]
@@ -840,31 +846,82 @@ exposed as the effects that they truelly are.
     [(Bool) TYPE-BOOL-RT-VALUE]
     [(Dyn)  TYPE-DYN-RT-VALUE]
     [(Unit) TYPE-UNIT-RT-VALUE]
-    [(TypeId u) (Var u)]
+    [(Static-Id u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
-  (: sr-bndt ((Boxof Nat) -> (CoC6-Bnd-Type -> D0-Expr)))
-  (define ((sr-bndt next) bnd)
-    (define sr-alloc (sr-alloc/next next))
-    (: sr-type (Compact-Type -> D0-Expr))
-    (define (sr-type t)
-      (match t
-        [(GRef t)
-         (sr-alloc "GRefT" l:TYPE-GREF-TAG
-                   `(("type" . ,(sr-prim-type t))))]
-        [(GVect t)
-         (sr-alloc "GVect_Type" l:TYPE-GVECT-TAG
-                   `(("type" . ,(sr-prim-type t))))]      
-        [(Fn a f* r)
-         (sr-alloc "Fun_Type" l:TYPE-FN-TAG
-                   `(("arity" . ,(Quote a))
-                     ("return" . ,(sr-prim-type r)) .
-                     ,(map (lambda ([t : Prim-Type])
-                             (cons "argument" (sr-prim-type t)))
-                           f*)))]
+(: sr-bndt ((Boxof Nat) -> (CoC6-Bnd-Type -> D0-Expr)))
+(define ((sr-bndt next) bnd)
+  (define sr-alloc (sr-alloc/next next))
+  (: sr-type (Compact-Type -> D0-Expr))
+  (define (sr-type t)
+    (match t
+      [(GRef t)
+       (sr-alloc "GRefT" l:TYPE-GREF-TAG
+                 `(("type" . ,(sr-prim-type t))))]
+      [(GVect t)
+       (sr-alloc "GVect_Type" l:TYPE-GVECT-TAG
+                 `(("type" . ,(sr-prim-type t))))]      
+      [(Fn a f* r)
+       (sr-alloc "Fun_Type" l:TYPE-FN-TAG
+                 `(("arity" . ,(Quote a))
+                   ("return" . ,(sr-prim-type r)) .
+                   ,(map (lambda ([t : Prim-Type])
+                           (cons "argument" (sr-prim-type t)))
+                         f*)))]
+      [other (error 'specify-representation/type "unmatched ~a" other)]))
+  (match-let ([(cons u t) bnd])
+    (Assign u (sr-type t))))
+
+(: sr-immediate-coercion (Immediate-Coercion -> D0-Expr))
+(define (sr-immediate-coercion c)
+  (match c
+    [(Identity) IDENTITY-COERCION-IMDT]
+    [(Static-Id id) (Var id)]
+    [else (error 'sr-immediate-coercion "unhandled case in match")]))
+
+(: sr-bnd-coercion ((Boxof Nat) -> (CoC6-Bnd-Crcn -> D0-Expr)))
+(define (sr-bnd-coercion next)
+  (define sr-alloc (sr-alloc/next next))
+  (: sr-coercion (Compact-Coercion -> D0-Expr))
+  (define (sr-coercion t)
+    (match t
+      [(Identity) IDENTITY-COERCION-IMDT]
+      [(Project t l)
+       ;; TODO Make it possible to turn of type hoisting
+       (define t^ (sr-prim-type t))
+       (sr-alloc "project_coercion" l:PROJECT-COERCION-TAG
+                 `(("type" . ,t^) ("label" . ,(Quote l))))]
+      [(Inject (app sr-prim-type t))
+       (sr-alloc "inject-coercion" l:INJECT-COERCION-TAG
+                 `(("type" . ,t)))]
+      [(Sequence (app sr-immediate-coercion f)
+                 (app sr-immediate-coercion s))
+       (sr-alloc "sequence_coecion" l:SEQUENCE-COERCION-TAG
+                 `(("first" . ,f) (,"second" . ,s)))]
+      [(Fn l a* (app sr-immediate-coercion r))
+       (define len : Index (length a*))
+       (unless (= l len)
+         (error 'sr-coercion "length mismatch"))
+       (sr-alloc "fn_coercion" l:FN-COERCION-TAG
+                 `(("arity"  . ,(Quote len))
+                   ("return" . ,r) .
+                   ,(map (lambda ([a : Immediate-Coercion])
+                           (cons "argument" (sr-immediate-coercion a)))
+                         a*)))]
+      [(Ref (app sr-immediate-coercion r) (app sr-immediate-coercion w))
+       (sr-alloc "ref-coercion" l:REF-COERCION-TAG
+                 `(("read-coercion" . ,r)
+                   ("write-coercion" . ,w)))]
+      [(Failed l)
+       (sr-alloc "failed-coercion" l:FAILED-COERCION-TAG
+                 `(("label" . ,(Quote l))))]
         [other (error 'specify-representation/type "unmatched ~a" other)]))
-    (match-let ([(cons u t) bnd])
-      (Assign u (sr-type t))))
+  (lambda ([b : CoC6-Bnd-Crcn])
+    (match-let ([(cons u c) b])
+      (Assign u (sr-coercion c)))))
+      
+  
+
 
 (: untag-deref-gproxy (-> D0-Expr (-> D0-Expr D0-Expr)))
 (define ((untag-deref-gproxy index) proxy)
@@ -944,7 +1001,7 @@ exposed as the effects that they truelly are.
       [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
       [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
       [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
-      [else (TODO implement thing for reference types)]))
+      [else (error 'sr-observe "printing other things")]))
   (let* ([res (uid! "result")])
     (Let (list (cons res e))
       (Begin (list (generate-print res t)) (Success)))))

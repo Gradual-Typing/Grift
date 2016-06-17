@@ -11,7 +11,7 @@
 
 (define-type Cast-or-Coerce6-Lang
   (Prog (List String Natural Schml-Type)
-        (LetT* CoC6-Bnd-Type* CoC6-Expr)))
+        (Let-Static* CoC6-Bnd-Type* CoC6-Bnd-Crcn* CoC6-Expr)))
 
 (define-type CoC6-Expr
   (Rec E (U
@@ -41,7 +41,7 @@
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
-          (Quote-Coercion Coercion/Prim-Type)
+          (Quote-Coercion Immediate-Coercion)
           ;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
@@ -145,3 +145,9 @@
 (define-type CoC6-Bnd-Closure* (Listof CoC6-Bnd-Closure))
 (define-type CoC6-Bnd-Type  (Pairof Uid Compact-Type))
 (define-type CoC6-Bnd-Type* (Listof CoC6-Bnd-Type))
+(define-type CoC6-Bnd-Crcn  (Pairof Uid Compact-Coercion))
+(define-type CoC6-Bnd-Crcn* (Listof CoC6-Bnd-Crcn))
+
+;; TODO Many of these forms static forms are identical accrose passes
+;; should we lift them into a seperate file so they can be used
+;; over and over.

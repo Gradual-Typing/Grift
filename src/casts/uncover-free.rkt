@@ -21,10 +21,10 @@
 (: uncover-free (Cast-or-Coerce4-Lang Config . -> . Cast-or-Coerce5-Lang))
 (define (uncover-free prgm comp-config)
   (logging uncover-free (All) prgm)
-  (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
+  (match-let ([(Prog (list name count type) (Let-Static* tbnd* cbnd* exp)) prgm])
     (let-values ([(exp free*) (uf-expr exp)])
       (if (set-empty? free*)
-	  (Prog (list name count type) (LetT* tbnd* exp))
+	  (Prog (list name count type) (Let-Static* tbnd* cbnd* exp))
 	  (raise-pass-exn 'uncover-free "Free variables detect ~a" free*)))))
 
 (: uf-expr (CoC4-Expr -> (values CoC5-Expr (Setof Uid))))

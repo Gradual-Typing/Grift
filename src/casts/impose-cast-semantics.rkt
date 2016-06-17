@@ -6,7 +6,7 @@ This is a micro compiler that removes the cast language form.
 (require "../helpers.rkt"
          "../configuration.rkt"
          "./purify-letrec.rkt"
-         "./hoist-types.rkt"
+         "./hoist-types-and-coercions.rkt"
          "casts-to-coercions.rkt"
          "lower-function-casts.rkt"
          "lower-reference-casts.rkt"
@@ -79,7 +79,7 @@ This is a micro compiler that removes the cast language form.
   (if coercion-representation?
       interpret-casts/coercions
       interpret-casts/twosomes)
-  hoist-types
+  hoist-types-and-coercions
   label-lambdas
   uncover-free
   convert-closures

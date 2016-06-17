@@ -102,8 +102,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (Closure-code var)
   (Closure-ref this var)
   (Closure-caster this)
-  (TypeId id)
-  (LetT* bindings body)
+  (Let-Static* type-bindings crcn-bindings body)
+  (Static-Id id)
   (LetP bindings body)
   (LetC bindings body);; Can create cyclic immutable data
   (Procedure this params code caster bound-vars body)
@@ -679,22 +679,52 @@ Dyn --> Int Int --> Dyn
             (Fn Index (Listof C) C)
             (Ref C C))))
 
+(define IDENTITY : Identity (Identity))
+
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 
 (define-type Data-Literal (U Integer String))
 
 #|------------------------------------------------------------------------------
-  Compact Types are a sort of compile time hash-consing of types
+  Compact Types and Coercions are a compile time hash-consing of types
   They are introduced by hoist types in Language Cast-or-Coerce3.1
 ------------------------------------------------------------------------------|#
 
+;; Represents the shallow tree structure of types where all subtrees
+;; of the type are either and atomic type or a identifier for a type.
 (define-type Compact-Type
   (U (Fn Index (Listof Prim-Type) Prim-Type)
      (GRef Prim-Type) (MRef Prim-Type)
      (GVect Prim-Type) (MVect Prim-Type)))
 
-(define-type Prim-Type (U Atomic-Schml-Type (TypeId Uid)))
+;; Represent the shallow tree structure of coercions where all
+;; subtrees of the type are either atomic types, the identity coercion
+;; or coercion identifiers.
+(define-type Compact-Coercion
+  (U (Project Prim-Type Blame-Label)
+     (Inject Prim-Type)
+     (Sequence Immediate-Coercion Immediate-Coercion)
+     (Failed Blame-Label)
+     (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
+     (Ref Immediate-Coercion Immediate-Coercion)))
 
+;; TODO (andre) a more descriptive name for this would be
+;; Immediate-Type
+(define-type Prim-Type (U Atomic-Schml-Type (Static-Id Uid)))
+
+;; A type representing coercions that have already been
+;; allocated at runntime or are small enought to fit into
+;; a register at runtime. 
+;; TODO (andre) since types are completely static consider changing
+;; the type representation so that types are allocated as
+;; untagged values. Doing so would simplify type case and
+;; allow cheaper allocation of fails and injects at runtime.
+;; (NOTE) This should be done after implementation of the non
+;; N^2 implementation of guarded reference coercions because
+;; that may require injects to carry blame labels thus reducing
+;; the impact of this optimization.
+(define-type Immediate-Coercion (U Identity (Static-Id Uid)))
+ 
 (define-type Coercion/Prim-Type
   (Rec C (U Identity
             (Failed Blame-Label)

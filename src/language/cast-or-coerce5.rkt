@@ -9,7 +9,9 @@
 
 (define-type Cast-or-Coerce5-Lang
   (Prog (List String Natural Schml-Type)
-        (LetT* CoC5-Bnd-Type* CoC5-Expr)))
+        (Let-Static* CoC5-Bnd-Type*
+                     CoC5-Bnd-Crcn*
+                     CoC5-Expr)))
 
 (define-type CoC5-Expr
   (Rec E (U ;; Code Labels
@@ -27,7 +29,7 @@
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
-          (Quote-Coercion Coercion/Prim-Type)
+          (Quote-Coercion Immediate-Coercion)
           ;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
@@ -125,4 +127,6 @@
 (define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
 (define-type CoC5-Bnd-Type  (Pairof Uid Compact-Type))
 (define-type CoC5-Bnd-Type* (Listof CoC5-Bnd-Type))
+(define-type CoC5-Bnd-Crcn  (Pairof Uid Compact-Coercion))
+(define-type CoC5-Bnd-Crcn* (Listof CoC5-Bnd-Crcn))
 
