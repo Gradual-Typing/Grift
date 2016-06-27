@@ -63,6 +63,11 @@
           (Dyn-type E)
           (Dyn-value E)
           (Dyn-make E E)
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E CoC2-Expr* Schml-Type* Blame-Label)
           ;; Observations
           (Blame E)
           ;; Unguarded-Representation

@@ -20,7 +20,7 @@
           ;; replaced (Cast E Schml-Type Schml-Type Label) with next line
           (Cast E (Coercion Schml-Coercion))
           (Lambda Uid* E)
-	  (Letrec Crcn-Bnd-Lam* E)
+	  (Letrec Crcn-Bnd* E)
 	  (Let Crcn-Bnd* E)
 	  (App E (Listof E))
 	  (Op Schml-Primitive (Listof E))
@@ -36,10 +36,16 @@
           (Gvector-ref E E)
 	  ;; Terminals
 	  (Var Uid)
-	  (Quote Cast-Literal))))
+	  (Quote Cast-Literal)
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E Crcn-Expr* Schml-Type* Blame-Label)
+          )))
 
 (define-type Crcn-Expr* (Listof Crcn-Expr))
 (define-type Crcn-Bnd   (Pairof Uid Crcn-Expr))
 (define-type Crcn-Bnd*  (Listof Crcn-Bnd))
-(define-type Crcn-Bnd-Lam  (Pairof Uid (Lambda Uid* Crcn-Expr)))
-(define-type Crcn-Bnd-Lam*  (Listof Crcn-Bnd-Lam))
+

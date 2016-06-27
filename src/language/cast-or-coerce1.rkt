@@ -59,7 +59,13 @@
           (Gbox-set! E E)
           (Gvector E E)
           (Gvector-set! E E E)
-          (Gvector-ref E E))))
+          (Gvector-ref E E)
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E CoC1-Expr* Schml-Type* Blame-Label))))
 
 (define-type CoC1-Expr* (Listof CoC1-Expr))
 (define-type CoC1-Bnd   (Pairof Uid CoC1-Expr))

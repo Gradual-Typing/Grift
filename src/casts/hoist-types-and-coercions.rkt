@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 #|-----------------------------------------------------------------------------+
 |Pass: src/casts/hoist-types-and-coercions                                     |
 +------------------------------------------------------------------------------+
@@ -19,22 +19,25 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../growable-vector.rkt"
+         "../unique-counter.rkt"
          "../errors.rkt"
          "../configuration.rkt"
          "../language/cast-or-coerce3.rkt"
-         "../language/cast-or-coerce3.1.rkt")
+         "../language/lambda0.rkt"
+         racket/match
+         racket/list)
 
 ;; Only the pass is provided by this module
 (provide hoist-types-and-coercions)
 
 (: hoist-types-and-coercions :
-   Cast-or-Coerce3-Lang Config -> Cast-or-Coerce3.1-Lang)
+   Cast-or-Coerce3-Lang Config -> Lambda0-Lang)
 (define (hoist-types-and-coercions prgm config)
   (match-define (Prog (list prgm-name next-unique-number prgm-type) exp)
     prgm)
 
   ;; All mutable state of the pass
-  (define unique-state : Unique-State (make-unique-state next-unique-number))
+  (define unique-state : Unique-Counter (make-unique-counter next-unique-number))
   (define type-table   : Type-Table   (make-type-table))
   (define crcn-table   : Crcn-Table   (make-crcn-table))
   
@@ -46,13 +49,13 @@
   
   ;; Map through the expression mutating the above state to collect
   ;; all type and coercions.
-  (define new-exp : CoC3.1-Expr
+  (define new-exp : L0-Expr
     (map-hoisting-thru-Expr type->immediate coercion->immediate exp))
 
   ;; Compose the mapping with extracting the state of the computation
   ;; to build a new program.
   
-  (Prog (list prgm-name (unique-state-next! unique-state) prgm-type)
+  (Prog (list prgm-name (unique-counter-next! unique-state) prgm-type)
         (Let-Static* (type-table->list type-table)
                      (crcn-table->list crcn-table)
                      new-exp)))
@@ -68,31 +71,19 @@
 ;; for a larger vector to be used if the dependency tree grows too
 ;; deep.
 
-(define-type Unique-State (Boxof Nat))
-
-(: make-unique-state (Nat -> Unique-State))
-(define (make-unique-state x)
-  (box x))
-
-(: unique-state-next! (Unique-State -> Nat))
-(define (unique-state-next! u)
-  (define tmp (unbox u))
-  (set-box! u (add1 tmp))
-  tmp)
-
 ;; Type And Coercion State Setup
 
 (define-type Type-Table (Pair Type-Index Sorted-Bnd-Type*))
 
 (define-type Type-Index (HashTable Compact-Type (Static-Id Uid)))
 
-(define-type Sorted-Bnd-Type* (GVectorof CoC3.1-Bnd-Type*))
+(define-type Sorted-Bnd-Type* (GVectorof Bnd-Type*))
 
 (define-type Crcn-Table (Pair Crcn-Index Sorted-Bnd-Crcn*))
 
 (define-type Crcn-Index (HashTable Compact-Coercion (Static-Id Uid)))
 
-(define-type Sorted-Bnd-Crcn* (GVectorof CoC3.1-Bnd-Crcn*))
+(define-type Sorted-Bnd-Crcn* (GVectorof Bnd-Crcn*))
 
 (: make-type-table : -> Type-Table)
 (define (make-type-table)
@@ -104,11 +95,11 @@
   (cons (ann (make-hash) Crcn-Index) 
         (ann (make-gvector 8 '()) Sorted-Bnd-Crcn*)))
 
-(: type-table->list (Type-Table -> CoC3.1-Bnd-Type*))
+(: type-table->list (Type-Table -> Bnd-Type*))
 (define (type-table->list tt)
   (append* (gvector->list (cdr tt))))
 
-(: crcn-table->list : Crcn-Table -> CoC3.1-Bnd-Crcn*)
+(: crcn-table->list : Crcn-Table -> Bnd-Crcn*)
 (define (crcn-table->list x)
   (append* (gvector->list (cdr x))))
 
@@ -127,7 +118,7 @@
 ;; coercion registration
 (: table-identify!
    (All (A)
-    (Unique-State (HashTable A (Static-Id Uid)) (Sorted-Bnd* A)
+    (Unique-Counter (HashTable A (Static-Id Uid)) (Sorted-Bnd* A)
      -> (Nat A -> (Values (Static-Id Uid) Nat)))))
 (define ((table-identify! unique table sorted-bnd*) rank-1 val)
   (define sid? : (Option (Static-Id Uid)) (hash-ref table val #f))
@@ -135,7 +126,7 @@
   (cond
     [sid? (values sid? rank)]
     [else
-     (define uid (Uid "static" (unique-state-next! unique)))
+     (define uid (Uid "static" (unique-counter-next! unique)))
      (define tid (Static-Id uid))
      (sorted-bnd*-add! sorted-bnd* rank (cons uid val))
      (hash-set! table val tid)
@@ -143,7 +134,7 @@
 
 ;; Make all types of equal structure the same structure
 ;; this is essentially a compile time hash-consing of the types
-(: identify-type! (Unique-State Type-Table -> (Schml-Type -> Prim-Type)))
+(: identify-type! (Unique-Counter Type-Table -> (Schml-Type -> Prim-Type)))
 (define (identify-type! us tt)
   (match-define (cons ti sb) tt)
 
@@ -183,7 +174,7 @@
     (let-values ([(t r) (recur type)])
       t)))
 
-(: identify-coercion! : Unique-State Type-Table Crcn-Table
+(: identify-coercion! : Unique-Counter Type-Table Crcn-Table
    -> (Schml-Coercion -> Immediate-Coercion))
 (define (identify-coercion! us tt ct)
   ;; This is basically the same as identify-type! above.
@@ -221,36 +212,20 @@
          (values (cons t t*) (max n m))]))
     (let-values ([(c r) (recur crcn)])
       c)))
-  
-;; (: type-table-add! (Nat CoC3.1-Bnd-Type -> Void))
-;; ;; Add a binding to the type-table
-;; ;; possibly extending the type table it is not large enough
-;; (define (type-table-add! n b)
-  
-;;   (let* ((v (unbox type-table))
-;;          (l (vector-length v)))
-;;     (if (< n l)
-;;         (vector-set! v n (cons b (vector-ref v n))) 
-;;         ;; There is a subtle argument to the correctness of this bit
-;;         ;; essentially because of the nature of the the indicies used
-;;         ;; each new n can at most equal to l
-;;         (let ([new-v : (Vectorof CoC3.1-Bnd-Type*) (make-vector (* 2 l) '())])
-;;           (vector-copy! new-v 0 v 0 l)
-;;           (set-box! type-table new-v)
-;;           (vector-set! new-v n (cons b '()))))))
-  
+    
 (: map-hoisting-thru-Expr :
    (Schml-Type -> Prim-Type)
    (Schml-Coercion -> Immediate-Coercion)
    CoC3-Expr
-   -> CoC3.1-Expr)
+   -> L0-Expr)
 ;; Recur through all valid language forms collecting the types
 ;; in the type table and replacing them with references to the
 ;; global identifiers
 (define (map-hoisting-thru-Expr type->imdt crcn->imdt exp)
   ;; Recur through expression replacing types with their primitive counterparts
-  (: recur (CoC3-Expr -> CoC3.1-Expr))
+  (: recur (CoC3-Expr -> L0-Expr))
   (define (recur exp)
+    ;;(printf "ht: ~a\n" exp) (flush-output (current-output-port))
     (match exp
       ;; Interesting cases
       [(Type (app type->imdt t)) (Type t)]
@@ -258,7 +233,7 @@
       ;; Every other case is just a boring flow agnostic tree traversal
       [(Code-Label u)
        (Code-Label u)]
-      [(Labels (app recur-bndc* b*) (app recur e))
+      [(Labels (app recur-bnd-code* b*) (app recur e))
        (Labels b* e)]
       [(App-Code (app recur e) (app recur* e*))
        (App-Code e e*)]
@@ -376,8 +351,7 @@
        (Repeat i e1 e2 e3)]
       [(Op p (app recur* e*))
        (Op p e*)]
-      [(Quote k)
-       (Quote k)]
+      [(Quote k) (Quote k)]
       [(Blame (app recur e))
        (Blame e)]
       [(Observe (app recur e) t)
@@ -412,25 +386,24 @@
        (Guarded-Proxy-Blames exp)]
       [(Guarded-Proxy-Coercion (app recur exp))
        (Guarded-Proxy-Coercion exp)]
+      [(? string? x) (error 'hoist-types/string)]
       [other (error 'hoist-types/expr "unmatched ~a" other)]))
   ;; Recur through other type containing ast forms
-  (: recur* (CoC3-Expr* -> CoC3.1-Expr*))
+  (: recur* (CoC3-Expr* -> L0-Expr*))
   (define (recur* e*) (map recur e*))
   
-  (: recur-bnd* (CoC3-Bnd* -> CoC3.1-Bnd*))
+  (: recur-bnd* (CoC3-Bnd* -> L0-Bnd*))
   (define (recur-bnd* b*)
-    (map
-     (lambda ([b : CoC3-Bnd])
-       (cons (car b) (recur (cdr b))))
-     b*))
+    (map (lambda ([b : CoC3-Bnd])
+           (cons (car b) (recur (cdr b))))
+         b*))
 
-  (: recur-bndc* (CoC3-Bnd-Code* -> CoC3.1-Bnd-Code*))
-  (define (recur-bndc* b*)
-    (map
-     (lambda ([b : CoC3-Bnd-Code])
-       (match-let ([(cons a (Code u* (app recur e))) b])
-         (cons a (Code u* e))))
-     b*))
+  (: recur-bnd-code* (CoC3-Bnd-Code* -> L0-Bnd-Code*))
+  (define (recur-bnd-code* b*)
+    (map (lambda ([b : CoC3-Bnd-Code])
+           (match-let ([(cons a (Code u* e)) b])
+             (cons a (Code u* (recur e)))))
+         b*))
   
   ;; Body of ht-expr just start the expression traversal
   (recur exp))

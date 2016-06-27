@@ -65,15 +65,14 @@ form, to the shortest branch of the cast tree that is relevant.
     prgm)
 
   ;; Just a tad of mutable state to generate unique identifiers
-  (define next-unique-number : (Boxof Nat) (box prgm-next))
-  ;; And syntax for introducing bindings when needed
-  (define-syntax-let$* let$* next-unique-number)
-  ;; And unconditional binding introduction
+  (define unique : Unique-Counter (make-unique-counter prgm-next))
   (: next-uid! (String -> Uid))
-  (define (next-uid! x)
-    (let ([n (unbox next-unique-number)])
-      (set-box! next-unique-number (add1 n))
-      (Uid x n)))
+  (define next-uid! (make-next-uid! unique))
+  
+  ;; And syntax for introducing bindings when needed
+  (define-syntax-let$* let$* next-uid!)
+  ;; And unconditional binding introduction
+
   
   ;; These templates are used to build the code that performs
   ;; casting at runtime.
@@ -384,7 +383,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
   ;; body of interpret-casts
   (let* ([exp (ic-expr prgm-exp)]
-         [next (unbox next-unique-number)])
+         [next (unique-counter-next! unique)])
     (Prog (list prgm-name next prgm-type)
           (Labels (list interp-cast-binding)
                   (Observe exp prgm-type)))))

@@ -4,11 +4,14 @@
 - [ ] Simplify parser (make it untyped) and use macros (this could be done)
 
 # For Research
-- [ ] Add Hoist coercion constants
-- [ ] Add simplify known casts (v <id;T!> -> <T!> | tag v t)
-- [ ] Start using better timers that measure process time instead of wall-clock time
+- [X] Add Hoist coercion constants
+- [X] Add simplify known casts (v <id;T!> -> <T!> | tag v t)
 - [ ] Add Dynamic-Operation optimization (App-Dyn, Dyn-Gbox-ref, ...)
 - [ ] Fix letrec
+- [ ] Add closure optimizations
+- [ ] add inlining, constant propagation, common subexpression elimination
+      dead code elimination pass.
+- [ ] Start using better timers that measure process time instead of wall-clock time
 - [ ] Lower the letrec purification pass or raise unguarded boxes
 - [ ] Add Lazy Shadow Stack GC + Cheney Copy Collector + Bump Pointer Allocation + GC Statistics
 - [ ] Implement a switch construct for multiway branching endemic to gradual typing

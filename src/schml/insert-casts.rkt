@@ -24,12 +24,14 @@
           "../language/schml1.rkt"
           "../language/cast0.rkt"))
 
+(define dynamic-elimination-optimization? (make-parameter #t))
+
 (: insert-casts (Schml1-Lang Config . -> . Cast0-Lang))
 (define (insert-casts prgm comp-config)
   (match-let ([(Prog (list name next-uid type) exp) prgm])
     (Prog (list name next-uid type) (iic-expr exp))))
 
-(: mk-cast ((-> String) C0-Expr Schml-Type Schml-Type . -> . C0-Expr))
+(: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type . -> . C0-Expr))
 (define (mk-cast l-th e t1 t2)
   (if (equal? t1 t2) e (Cast e (Twosome t1 t2 (l-th)))))
 
@@ -39,7 +41,8 @@
     (match exp
       [(Lambda fml* (and (Ann _ (cons body-src body-type))
                          (app iic-expr body)))
-       (unless (Fn? type) (TODO error really big here))
+       (unless (Fn? type)
+         (error 'insert-casts "function type recieve non-function type"))
        (let* ([lbl-th (mk-label "lambda" body-src)]
               [body (mk-cast lbl-th body body-type (ann (Fn-ret type) Schml-Type))]
               [fml* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
@@ -79,68 +82,86 @@
        (cond
          [(GRef? e-ty) (Gunbox e)]
          [(Dyn? e-ty)
-          (Gunbox (mk-cast (mk-label "guarded unbox" e-src) e e-ty (GRef DYN-TYPE)))]
-         [else (TODO come up with an error)])]
+          (define lbl (mk-label "guarded unbox" e-src))
+          (cond
+            [(dynamic-elimination-optimization?)
+             (Dyn-GRef-Ref e (lbl))]
+            [else             
+             (Gunbox (mk-cast lbl e e-ty (GRef DYN-TYPE)))])]
+         [else
+          (error 'insert-casts/gunbox "unexexpected value for e-ty: ~a" e-ty)])]
       [(Gbox-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
                   (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
-       (let ([lbl1 (mk-label "guarded box-set!" e1-src)]
-             [lbl2 (mk-label "guarded box-set!" e2-src)])
-         (cond
-           [(GRef? e1-ty)
-            (Gbox-set! e1 (mk-cast lbl2 e2 e2-ty (GRef-arg e1-ty)))]
-           [(Dyn? e1-ty)
-            (Gbox-set! (mk-cast lbl1 e1 DYN-TYPE REF-DYN-TYPE)
-                       (mk-cast lbl2 e2 e2-ty DYN-TYPE))]
-           [else (TODO error message that is appropriate)]))]
-      #|;; These rules bastardizations of the rules found in Figure 6 of
-      ;; Monotonic references for efficient gradual typing
-      [(Mbox (and (Ann _ (cons e-src e-ty)) (app iic-expr e)))
-      (Mbox (Ann e (cons ((mk-label "monotonic box" e-src)) e-ty)))]
-      [(Munbox (and (Ann _ (cons e-src e-ty)) (app iic-expr e)))
-      (if (completely-static-type? e-ty)
-      ;; if the types are static then in order to typecheck they must have
-      ;; been consistent with (Ref type)
-      (Munbox e)
-      (Munbox
-      (Ann (mk-cast (mk-label "monotonic unbox" e-src) e e-ty (MRef type))
-      (cons ((mk-label "monotonic unbox" e-src)) type))))]
-      [(Mbox-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
-      (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
-      (TODO come up with a reasonable version of this)]
-      |#
-      [(Gvector (and (Ann _ (cons size-src size-ty)) (app iic-expr size)) (app iic-expr e))
+       (define lbl1 (mk-label "guarded box-set!" e1-src))
+       (define lbl2 (mk-label "guarded box-set!" e2-src))
+       (cond
+         [(GRef? e1-ty)
+          (Gbox-set! e1 (mk-cast lbl2 e2 e2-ty (GRef-arg e1-ty)))]
+         [(Dyn? e1-ty)
+          (cond
+            [(dynamic-elimination-optimization?)
+             (Dyn-GRef-Set! e1 e2 e2-ty (lbl1))]
+            [else             
+             (Gbox-set! (mk-cast lbl1 e1 DYN-TYPE REF-DYN-TYPE)
+                        (mk-cast lbl2 e2 e2-ty DYN-TYPE))])]
+         [else
+          (error 'insert-casts/gbox-set!
+                 "unexpected value for e1-ty: ~a"
+                 e1-ty)])]
+      [(Gvector (and (Ann _ (cons size-src size-ty))
+                     (app iic-expr size))
+                (app iic-expr e))
        (cond
          [(Dyn? size-ty)
-          (Gvector (mk-cast (mk-label "gvector index" size-src) size size-ty INT-TYPE) e)]
+          (define lbl (mk-label "gvector index" size-src))
+          (Gvector (mk-cast lbl size size-ty INT-TYPE) e)]
          [else (Gvector size e)])]
       [(Gvector-ref (and (Ann _ (cons e-src e-ty)) (app iic-expr e))
                     (and (Ann _ (cons i-src i-ty)) (app iic-expr i)))
-       (let ([e (if (Dyn? e-ty)
-                    (mk-cast (mk-label "gvector-ref" e-src) e e-ty (GVect DYN-TYPE))
-                    e)]
-             [i (if (Dyn? i-ty)
-                    (mk-cast (mk-label "gvector-ref index" i-src) i i-ty INT-TYPE)
-                    i)])
-         (Gvector-ref e i))]
+       (define i-exp
+         (cond
+           [(Dyn? i-ty)
+            (mk-cast (mk-label "gvector-ref index" i-src) i i-ty INT-TYPE)]
+           [else i]))
+       (cond
+         [(not (Dyn? e-ty)) (Gvector-ref e i-exp)]
+         [else
+          (define lbl (mk-label "gvector-ref" e-src))
+          (cond
+            [(dynamic-elimination-optimization?)
+             (Dyn-GVector-Ref e i-exp (lbl))]
+            [else (Gvector-ref (mk-cast lbl e e-ty (GVect DYN-TYPE)) i-exp)])])]
       [(Gvector-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
                      (and (Ann _ (cons i-src i-ty)) (app iic-expr i))
                      (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
-       (let ([lbl1 (mk-label "gvector-set!" e1-src)]
-             [lbl2 (mk-label "gvector-set!" e2-src)]
-             [i (if (Dyn? i-ty)
-                    (mk-cast (mk-label "gvector-ref index" i-src) i i-ty INT-TYPE)
-                    i)])
+       (define lbl1 (mk-label "gvector-set!" e1-src))
+       (define lbl2 (mk-label "gvector-set!" e2-src))
+       (define i-exp
          (cond
-           [(GVect? e1-ty)
-            (Gvector-set! e1 i (mk-cast lbl2 e2 e2-ty (GVect-arg e1-ty)))]
-           [(Dyn? e1-ty)
-            (Gvector-set! (mk-cast lbl1 e1 DYN-TYPE (GVect DYN-TYPE))
-                          i
-                          (mk-cast lbl2 e2 e2-ty DYN-TYPE))]
-           [else (TODO error message that is appropriate)]))]
-      [(Mvector e1 e2)         (TODO define vector insert implicit casts)]
-      [(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
-      [(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)])))
+           [(Dyn? i-ty)
+            (define lbl (mk-label "gvector-ref index" i-src))
+            (mk-cast lbl i i-ty INT-TYPE)]
+           [else i]))
+
+       (cond
+         [(GVect? e1-ty)
+          (Gvector-set! e1 i-exp (mk-cast lbl2 e2 e2-ty (GVect-arg e1-ty)))]
+         [(Dyn? e1-ty)
+          (cond
+            [(dynamic-elimination-optimization?)
+             (Dyn-GVector-Set! e1 i-exp e2 e2-ty (lbl1))]
+            [else
+             (Gvector-set! (mk-cast lbl1 e1 DYN-TYPE (GVect DYN-TYPE))
+                           i-exp
+                           (mk-cast lbl2 e2 e2-ty DYN-TYPE))])]
+         [else (error 'insert-casts/gvector-set!
+                      "unexpected value for e1 type: ~a"
+                      e1-ty)])]
+      ;; TODO add these cases when monotonic is finished
+      ;;[(Mvector e1 e2)         (TODO define vector insert implicit casts)]
+      ;;[(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
+      ;;[(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)]
+      [other (error 'insert-casts/expression "unmatched ~a" other)])))
 
 (: iic-bnd (S1-Bnd . -> . C0-Bnd))
 (define (iic-bnd b)
@@ -155,22 +176,17 @@
   (match-let ([(Ann _ (cons rator-src rator-type)) rator])
     (cond
       [(Dyn? rator-type)
-       (let*-values ([(exp* ty*) (iic-operands rand*)]
-                     [(needed-rator-type) (Fn (length ty*) ty* DYN-TYPE)]
-                     [(exp)          (iic-expr rator)]
-                     [(lbl) (mk-label "Application" src rator-src)])
-         (App (mk-cast lbl exp DYN-TYPE needed-rator-type) exp*))]
-      ;; This is what this code needs to do. I will talk to michael about this
-      ;; and see that this is really needed.
-      #|
-      [(Dyn? rator-type)
-      (let ([rator-type (make-dyn-fn-type (length rand*))])
-      (App (mk-cast (mk-label "Application" src rator-src)
-      (iic-expr rator)
-      rator-type
-      (make-dyn-fn-type (length rand*)))
-      (map (iic-operand/cast src) rand* (Fn-fmls rator-type))))]
-      |#
+       (cond
+         [(dynamic-elimination-optimization?)
+          (define-values (expr* type*) (iic-operands rand*))
+          (define expr (iic-expr rator))
+          (Dyn-Fn-App expr expr* type* ((mk-label "Application" src)))]
+         [else
+          (let*-values ([(exp* ty*) (iic-operands rand*)]
+                        [(needed-rator-type) (Fn (length ty*) ty* DYN-TYPE)]
+                        [(exp)          (iic-expr rator)]
+                        [(lbl) (mk-label "Application" src rator-src)])
+            (App (mk-cast lbl exp DYN-TYPE needed-rator-type) exp*))])]
       [(Fn? rator-type)
        ;(Ann type)
        (App (iic-expr rator)

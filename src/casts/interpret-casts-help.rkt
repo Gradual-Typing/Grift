@@ -83,41 +83,41 @@
       (let$*-help (cdr b*) (Let (list (car b*)) b))))
 |#
 
+(: make-trivialize :
+   (String -> Uid)
+   -> 
+   (String CoC3-Expr (Listof (Pairof Uid CoC3-Expr))
+           ->
+           (Values CoC3-Bnd* CoC3-Trivial)))
+(define ((make-trivialize next-uid!) name expr bnd*)
+  (if (or (Quote? expr) (Tag? expr) (Type? expr)
+          (Var? expr) (Quote-Coercion? expr))
+      (values bnd* expr)
+      (let ([uvar (next-uid! name)])
+        (values (cons (cons uvar expr) bnd*) (Var uvar)))))
 
 ;; createsCoC3-Expr let bindings for non-trivial CoC3-Expr expressions,
 ;; since non-trivial expressions must be evaluated only once.
 ;; This has to be a macro because it plays with what value is bound to
 ;; the t* variable in the code in order to reduce the number of cases
 ;; that must be handle
-(define-syntax-rule (define-syntax-let$* let$* next)
+(define-syntax-rule (define-syntax-let$* let$* next-uid!)
   (... ;; Quote-ellipsis
    (begin
-     (: trivialize (String CoC3-Expr (Listof (Pairof Uid CoC3-Expr))
-                           ->
-                           (Values CoC3-Bnd* CoC3-Trivial)))
-    (define (trivialize name expr bnd*)
-      (if (or (Quote? expr) (Tag? expr) (Type? expr)
-              (Var? expr) (Quote-Coercion? expr))
-          (values bnd* expr)
-          (let* ([unique (unbox next)]
-                 [uvar   (Uid name unique)])
-            (set-box! next (+ unique 1))
-            (values (cons (cons uvar expr) bnd*) (Var uvar)))))
-    (: let$*-help ((Listof (Pairof Uid CoC3-Expr)) CoC3-Expr -> CoC3-Expr))
-    (define (let$*-help b* b)
-      (if (null? b*)
-          b
-          (let$*-help (cdr b*) (Let (list (car b*)) b))))
-    (define-syntax let$*
-      (syntax-rules ()
-        [(_ () b) b]
-        [(_ ([t* v*] ...) b)
-         (let ([b* : (Listof (Pairof Uid CoC3-Expr)) '()])
-           (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
-             (let ([body : CoC3-Expr b])
-               (if (null? b*)
-                 body
-                 (let$*-help b* body)))))])))))
+     (define trivialize (make-trivialize next-uid!))
+     (: let$*-help ((Listof (Pairof Uid CoC3-Expr)) CoC3-Expr -> CoC3-Expr))
+     (define (let$*-help b* b)
+       (if (null? b*)
+           b
+           (let$*-help (cdr b*) (Let (list (car b*)) b))))
+     (define-syntax let$*
+       (syntax-rules ()
+         [(_ () b) b]
+         [(_ ([t* v*] ...) b)
+          (let ([b* : (Listof (Pairof Uid CoC3-Expr)) '()])
+            (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
+              (let ([body : CoC3-Expr b])
+                (let$*-help b* body))))])))))
 
 #|
        (do (bind-state : (State Nat CoC3-Expr))
