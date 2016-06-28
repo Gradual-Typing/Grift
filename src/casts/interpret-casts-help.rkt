@@ -14,7 +14,7 @@
 (: specialize-casts? (Parameterof Boolean))
 (define specialize-casts? (make-parameter #f))
 (: dynamic-operations? (Parameterof (U Boolean 'inline)))
-(define dynamic-operations? (make-parameter 'inline))
+(define dynamic-operations? (make-parameter #t))
 
 
 ;; inline-guarded-branch
