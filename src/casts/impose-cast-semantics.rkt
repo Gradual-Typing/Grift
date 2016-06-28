@@ -32,12 +32,11 @@ This is a micro compiler that removes the cast language form.
     (case (Config-cast-rep cfg)
       [(Twosomes)
        (define c2 (lower-function-casts c0 cfg))
-       (define c3 (lower-reference-casts c2 cfg))
-       (interpret-casts/twosomes c3 cfg)]
+       (interpret-casts/twosomes c2)]
       [(Coercions)
        (define c2 (casts->coercions c0 cfg))
        (define c3 (lower-function-casts c2 cfg))
-       (interpret-casts/coercions c3 cfg)]
+       (interpret-casts/coercions c3)]
       #;
       [(Super-Coercions)
        (define c2 (casts->super-coercions c0))

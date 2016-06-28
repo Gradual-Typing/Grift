@@ -1,16 +1,36 @@
-#lang typed/racket
+#lang typed/racket/base
 (require
  racket/match
  racket/format
+ racket/list
  "../helpers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
- "../language/cast-or-coerce2.rkt"
  "../language/cast-or-coerce3.rkt")
 
 (provide (all-defined-out))
 
+;; Configuration that spans multiple passes
+(: specialize-casts? (Parameterof Boolean))
+(define specialize-casts? (make-parameter #f))
+(: dynamic-operations? (Parameterof (U Boolean 'inline)))
+(define dynamic-operations? (make-parameter 'inline))
+
+
+;; inline-guarded-branch
+;; Parameter determining if the code generated for gbox-set! and gunbox
+;; performs the first check to see if the gref is a unguarded reference
+;; or delegates the entire operation to the runtime.
+;; This is only used for the twosome representation
+(: inline-guarded-branch? (Parameterof Boolean))
+(define inline-guarded-branch? (make-parameter #f))
+
 (define-type Function-Proxy-Rep (U 'Data 'Hybrid 'Functional))
+(: function-cast-representation (Parameterof Function-Proxy-Rep))
+(define function-cast-representation
+  (make-parameter 'Hybrid))
+
+
 
 ;; Expr$ and cond$ will prune branches if the condition is (Quote #t) or (Quote #f)
 ;; and generates If statements (to construct the cast tree)
@@ -293,3 +313,30 @@
         (if (GRef? x)
             (Type (GRef-arg x))
             (error 'gvect-of$ "given ~a" x)))))
+
+(: bnd-non-vars
+   (((String -> Uid) CoC3-Expr*) (#:names (Option (Listof String)))
+    . ->* .
+    (Values CoC3-Bnd* (Listof (Var Uid)))))
+(define (bnd-non-vars next-uid! e* #:names [names? #f])
+  (define names : (Listof String) (or names? (make-list (length e*) "tmp")))
+  (define-values (bnd* var*)
+    (for/fold ([bnd* : CoC3-Bnd* '()]
+               [var* : (Listof (Var Uid)) '()])
+              ([e : CoC3-Expr e*]
+               [n : String names])
+      (cond
+        [(Var? e) (values bnd* (cons e var*))]
+        [else
+         (let ([u (next-uid! n)])
+           (values (cons (cons u e) bnd*) (cons (Var u) var*)))])))
+  #;(printf "bnd-non-vars:\ne*=~a\nnames=~a\nbnd*=~a\nvar*=~a\n\n"
+          e* names? bnd* var*)
+  (values bnd* (reverse var*)))
+
+
+(: apply-code
+   (All (A)
+     (Uid -> (() #:rest A . ->* . (App-Code (Code-Label Uid) (Listof A))))))
+(define ((apply-code u) . a*)
+  (App-Code (Code-Label u) a*))

@@ -37,36 +37,12 @@ form, to the shortest branch of the cast tree that is relevant.
   "../language/cast-or-coerce1.rkt"
   "../language/cast-or-coerce3.rkt"))
 
-;; Configuration options that determine how code is generated
-(define casted-function-representation (make-parameter 'Hybrid))
-(: cast-representation (Parameterof Cast-Representation))
-(define cast-representation (make-parameter 'Coercions))
-(: specialize-casts? (Parameterof Boolean))
-(define specialize-casts? (make-parameter #f))
-(: recursive-dyn-cast? (Parameterof Boolean))
-(define recursive-dyn-cast? (make-parameter #t))
 (: space-efficient? (Parameterof Boolean))
 (define space-efficient? (make-parameter #t))
 
-(: dynamic-operations? (Parameterof (U Boolean 'inline)))
-(define dynamic-operations? (make-parameter 'inline))
 
-
-;; inline-guarded-branch
-;; Parameter determining if the code generated for gbox-set! and gunbox
-;; performs the first check to see if the gref is a unguarded reference
-;; or delegates the entire operation to the runtime.
-;; This is only used for the twosome representation
-(define inline-guarded-branch?
-  (make-parameter #f))
-
-(define fn-cast-representation
-  (make-parameter 'Hybrid))
-
-
-(: interpret-casts/coercions
-   (Cast-or-Coerce1-Lang Config  ->  Cast-or-Coerce3-Lang))
-(define (interpret-casts/coercions prgm config)
+(: interpret-casts/coercions : Cast-or-Coerce1-Lang ->  Cast-or-Coerce3-Lang)
+(define (interpret-casts/coercions prgm)
   ;; Desugaring the input program into its constituents 
   (match-define (Prog (list prgm-name prgm-next prgm-type) prgm-exp)
     prgm)
@@ -800,31 +776,6 @@ form, to the shortest branch of the cast tree that is relevant.
       [other (error 'interpret-casts "umatched ~a" other)]))
   (recur exp))
 
-(: bnd-non-vars
-   (((String -> Uid) CoC3-Expr*) (#:names (Option (Listof String)))
-    . ->* .
-    (Values CoC3-Bnd* (Listof (Var Uid)))))
-(define (bnd-non-vars next-uid! e* #:names [names? #f])
-  (define names : (Listof String) (or names? (make-list (length e*) "tmp")))
-  (define-values (bnd* var*)
-    (for/fold ([bnd* : CoC3-Bnd* '()]
-               [var* : (Listof (Var Uid)) '()])
-              ([e : CoC3-Expr e*]
-               [n : String names])
-      (cond
-        [(Var? e) (values bnd* (cons e var*))]
-        [else
-         (let ([u (next-uid! n)])
-           (values (cons (cons u e) bnd*) (cons (Var u) var*)))])))
-  #;(printf "bnd-non-vars:\ne*=~a\nnames=~a\nbnd*=~a\nvar*=~a\n\n"
-          e* names? bnd* var*)
-  (values bnd* (reverse var*)))
-
-(: apply-code
-   (All (A)
-     (Uid -> (() #:rest A . ->* . (App-Code (Code-Label Uid) (Listof A))))))
-(define ((apply-code u) . a*)
-  (App-Code (Code-Label u) a*))
 
 (define-type Smart-Cast-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
@@ -973,7 +924,7 @@ form, to the shortest branch of the cast tree that is relevant.
       (Let `([,tyi . ,(Type-Fn-arg (Var ty) (Quote i))])
         ($cast v (Type t) (Var tyi) l))))
   (define casts-apply : CoC3-Expr
-    (case (fn-cast-representation)
+    (case (function-cast-representation)
       [(Hybrid) (App-Fn (Var val) arg-casts)]
       [(Data) (error 'todo "implement coercions data representation")]
       [(Functional) (error 'todo "incompatible with coercions")]
