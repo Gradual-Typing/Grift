@@ -1,8 +1,0 @@
-(letrec ([f : Dyn (lambda ((x : Dyn)) (if (= x 0) 0 (f (- x 1))))])
-  (let ([iters : Dyn (read-int)])
-    (begin
-      (timer-start)
-      (f iters)
-      (timer-stop)
-      (timer-report)
-      iters)))
