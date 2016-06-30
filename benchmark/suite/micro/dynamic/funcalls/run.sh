@@ -1,6 +1,6 @@
 #!/bin/sh
 
-schmldir=/u/dalmahal/lattice/Schml
+schmldir=/home/andre/schml
 memlimit=9999999999
 # --------------------------------------------------------------------
 
@@ -26,7 +26,7 @@ echo "Benchmarking function calls"
 
 # compile Schml source files, then enter the tmp directory
 cd $schmldir
-racket benchmark.rkt $tmpdir $memlimit
+racket benchmark.rkt $tmpdir/ $memlimit
 cd $tmpdir
 
 # compile scheme source files
