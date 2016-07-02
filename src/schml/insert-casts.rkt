@@ -24,7 +24,7 @@
           "../language/schml1.rkt"
           "../language/cast0.rkt"))
 
-(define dynamic-elimination-optimization? (make-parameter #t))
+
 
 (: insert-casts (Schml1-Lang Config . -> . Cast0-Lang))
 (define (insert-casts prgm comp-config)
@@ -84,7 +84,7 @@
          [(Dyn? e-ty)
           (define lbl (mk-label "guarded unbox" e-src))
           (cond
-            [(dynamic-elimination-optimization?)
+            [(dynamic-operations?)
              (Dyn-GRef-Ref e (lbl))]
             [else             
              (Gunbox (mk-cast lbl e e-ty (GRef DYN-TYPE)))])]
@@ -99,7 +99,7 @@
           (Gbox-set! e1 (mk-cast lbl2 e2 e2-ty (GRef-arg e1-ty)))]
          [(Dyn? e1-ty)
           (cond
-            [(dynamic-elimination-optimization?)
+            [(dynamic-operations?)
              (Dyn-GRef-Set! e1 e2 e2-ty (lbl1))]
             [else             
              (Gbox-set! (mk-cast lbl1 e1 DYN-TYPE REF-DYN-TYPE)
@@ -128,7 +128,7 @@
          [else
           (define lbl (mk-label "gvector-ref" e-src))
           (cond
-            [(dynamic-elimination-optimization?)
+            [(dynamic-operations?)
              (Dyn-GVector-Ref e i-exp (lbl))]
             [else (Gvector-ref (mk-cast lbl e e-ty (GVect DYN-TYPE)) i-exp)])])]
       [(Gvector-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
@@ -148,7 +148,7 @@
           (Gvector-set! e1 i-exp (mk-cast lbl2 e2 e2-ty (GVect-arg e1-ty)))]
          [(Dyn? e1-ty)
           (cond
-            [(dynamic-elimination-optimization?)
+            [(dynamic-operations?)
              (Dyn-GVector-Set! e1 i-exp e2 e2-ty (lbl1))]
             [else
              (Gvector-set! (mk-cast lbl1 e1 DYN-TYPE (GVect DYN-TYPE))
@@ -177,7 +177,7 @@
     (cond
       [(Dyn? rator-type)
        (cond
-         [(dynamic-elimination-optimization?)
+         [(dynamic-operations?)
           (define-values (expr* type*) (iic-operands rand*))
           (define expr (iic-expr rator))
           (Dyn-Fn-App expr expr* type* ((mk-label "Application" src)))]

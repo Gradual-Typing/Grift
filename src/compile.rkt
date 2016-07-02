@@ -60,7 +60,8 @@
                  #:log    Path
                  #:mem    Natural
                  #:cast-rep Cast-Representation
-                 #:rt Path)
+                 #:rt Path
+                 #:dyn-ops (U Boolean 'inline))
                 Path))
 (define (compile path
                  #:semantics [smtc (semantics)]
@@ -71,7 +72,8 @@
                  #:log       [logp : (Option Path) (log-path)]
                  #:mem       [mem :  (Option Natural) (mem-dflt)]
                  #:cast-rep  [crep (cast-rep)]
-                 #:rt        [rt  : (Option Path) #f])
+                 #:rt        [rt  : (Option Path) #f]
+                 #:dyn-ops   [dyn-ops (dynamic-operations?)])
   (let* ([path  (simple-form-path (if (string? path)
                                       (string->path path)
                                       path))]
@@ -82,7 +84,8 @@
     
     (when logp
       (current-log-port (open-output-file logp #:exists 'replace #:mode 'text)))
-    (parameterize ([print-as-expression #t] [print-graph #t] [print-struct #t])
+    (parameterize ([print-as-expression #t] [print-graph #t] [print-struct #t]
+                   [dynamic-operations? dyn-ops])
       (compile/conf path (Config path smtc outp cpth kp-c opts kp-a crep mem rt)))))
 
 

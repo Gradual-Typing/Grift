@@ -1,11 +1,24 @@
-(letrec ([id : Dyn (lambda ((x : Dyn)) x)])
-  (let ([iters : Dyn (read-int)]
-        [acc : Dyn (gbox 0)])
-    (letrec ([run-test : Dyn (lambda (i acc) (id acc))])
+(letrec ([id : (Dyn -> Dyn) (lambda ((x : Dyn)) x)])
+  (let ([id : Dyn id]
+        [iters : Dyn (read-int)]
+        [acc : (GRef Dyn) (gbox 0)])
+    (letrec ([run-test : (Int Dyn -> Dyn)
+              (lambda (i acc) (id acc))])
       (begin
         (timer-start)
-        (repeat (i 0 iters)
-                (gbox-set! acc (run-test i (gunbox acc))))
+        (repeat (i 0 iters) (gbox-set! acc (run-test i (gunbox acc))))
         (timer-stop)
         (timer-report)
         (gunbox acc)))))
+
+;; (letrec ([id : Dyn (lambda ((x : Dyn)) x)])
+;;   (let ([iters : Dyn (read-int)]
+;;         [acc : Dyn (gbox 0)])
+;;     (letrec ([run-test : Dyn (lambda (i acc) (id acc))])
+;;       (begin
+;;         (timer-start)
+;;         (repeat (i 0 iters)
+;;                 (gbox-set! acc (run-test i (gunbox acc))))
+;;         (timer-stop)
+;;         (timer-report)
+;;         (gunbox acc)))))
