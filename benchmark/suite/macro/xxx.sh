@@ -4,8 +4,7 @@ iters=10000
 nsamples=1000
 deliverable=3
 usable=10
-nAnnotizerbin=/u/dalmahal/nAnnotizer/.stack-work/install/x86_64-linux/lts-6.1/7.10.3/bin/nAnnotizer
-schmldir=/nobackup/dalmahal/Schml
+schmldir=$SCHML_DIR
 # --------------------------------------------------------------------
 
 testdir=$schmldir/benchmark/suite/macro
@@ -22,8 +21,8 @@ LIN="set arrow from 1,$nx to 20,$nx nohead lt 3 dashtype 2 lc rgb \"brown\" lw 2
      set arrow from 10,graph(0,0) to 10,graph(1,1) nohead lc rgb \"orange\" lw 2; \
      set arrow from 3,graph(0,0) to 3,graph(1,1) nohead lc rgb \"green\" lw 2"
 
-# f=/nobackup/dalmahal/Schml/benchmark/suite/macro/tmp/quicksort_worstcase_static.schml
-f=/nobackup/dalmahal/Schml/benchmark/suite/macro/tmp/matmult_static.schml
+# f=$tmpdir/quicksort_worstcase_static.schml
+f=$tmpdir/matmult_static.schml
 path="${f%.*}";name=$(basename "$path")
 logfile1=$datadir/${name}1.log
 logfile2=$datadir/${name}1.csv
