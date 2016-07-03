@@ -1,8 +1,8 @@
-(let ([iters : Int (read-int)]
-      [acc : (GRef Dyn) (gbox (: 42 Dyn))]
+(let ([iters : Dyn (read-int)]
+      [acc : Dyn (gbox 0)]
       [guarded-ref : Dyn (gbox 0)])
-  (letrec ([run-test : (Int Dyn -> Dyn)
-            (lambda ([i : Int] [acc : Dyn])
+  (letrec ([run-test : Dyn
+            (lambda (i acc)
               (begin
                 (gbox-set! guarded-ref acc)
                 (gunbox guarded-ref)))])
@@ -12,4 +12,3 @@
       (timer-stop)
       (timer-report)
       (gunbox acc))))
-
