@@ -1,11 +1,12 @@
 #!/bin/sh
+set -euo pipefail
 
-iters=10000
+iters=1000
 nsamples=1000
 deliverable=3
 usable=10
-nAnnotizerbin=/u/dalmahal/nAnnotizer/.stack-work/install/x86_64-linux/lts-6.1/7.10.3/bin/nAnnotizer
-schmldir=/nobackup/dalmahal/Schml
+nAnnotizerbin=nAnnotizer
+schmldir=$SCHML_DIR
 # --------------------------------------------------------------------
 
 testdir=$schmldir/benchmark/suite/macro
@@ -102,24 +103,24 @@ for f in $tmpdir/*.schml; do
     done
     sort -g $logfile4 -o $logfile4
     
-    gnuplot -e "set datafile separator \",\"; set term tikz standalone color; "`
-	   `"set output '$outdir/${name}.tex'; "`
-	   `"set border back; "`
-	   `"set multiplot layout 2,2 rowsfirst;"`
-	   `"set title \"\"; "`
-	   `"set xrange [0:20]; set yrange [0:${n}]; "`
-	   `"set xtics nomirror (\"1x\" 1, \"6x\" 6, \"10x\" 10, \"15x\" 15, \"20x\" 20); "`
-	   `"set ytics nomirror; "`
-	   `"$LIN; plot '$logfile2' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative; "`
-	   `"$LIN; plot '$logfile4' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative"
+    # gnuplot -e "set datafile separator \",\"; set term tikz standalone color; "`
+    # 	   `"set output '$outdir/${name}.tex'; "`
+    # 	   `"set border back; "`
+    # 	   `"set multiplot layout 2,2 rowsfirst;"`
+    # 	   `"set title \"\"; "`
+    # 	   `"set xrange [0:20]; set yrange [0:${n}]; "`
+    # 	   `"set xtics nomirror (\"1x\" 1, \"6x\" 6, \"10x\" 10, \"15x\" 15, \"20x\" 20); "`
+    # 	   `"set ytics nomirror; "`
+    # 	   `"$LIN; plot '$logfile2' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative; "`
+    # 	   `"$LIN; plot '$logfile4' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative"
 
     # compile tex code
 
-    cp $miscdir/* $tmpdir
-    cp $outdir/${name}.tex $tmpdir
-    cd $tmpdir
-    lualatex --interaction=nonstopmode ${name}.tex
-    mv ${name}.pdf $outdir
+    # cp $miscdir/* $tmpdir
+    # cp $outdir/${name}.tex $tmpdir
+    # cd $tmpdir
+    # lualatex --interaction=nonstopmode ${name}.tex
+    # mv ${name}.pdf $outdir
 done
 
 # file duplicate files
