@@ -28,7 +28,7 @@
 (module+ main
   ;; 10 miliseconds is the smallest time we accept for this test
   (define epsilon-parameter (make-parameter 10))
-  (define iterations-parameter (make-parameter (* (expt 10 6) 1)))
+  (define iterations-parameter (make-parameter (* (expt 10 7) 1)))
   (define runs-parameter (make-parameter 100))
   (mem-dflt (expt 1024 3))
   (command-line
@@ -187,7 +187,7 @@
            (error 'run-benchmark "failed to run ~a" exe-path))))]))
 
 
-(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nDynamic : \\?")
+(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : 42")
 
 (define gambit-spec #px"(\\d+) ms real time")
 

@@ -1,4 +1,5 @@
 #!/bin/sh
+set -euo pipefail
 
 iters=10000
 nsamples=1000
