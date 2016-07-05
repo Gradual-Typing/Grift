@@ -1,4 +1,4 @@
-(let ([size : Int 5000])
+(let ([size : Int 2000])
   (let ([a : (GVect Int) (gvector size 1)])
     (begin
       (repeat (i 0 size)
