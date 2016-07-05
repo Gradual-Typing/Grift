@@ -1,7 +1,8 @@
-(let ([a : Dyn (gvector 10000 1)])
+(let ([size : Dyn 2000])
+ (let ([a : Dyn (gvector size 1)])
   (begin
-    (repeat (i 0 10000)
-    	    (gvector-set! a i (- 10000 i)))
+    (repeat (i 0 size)
+    	    (gvector-set! a i (- size i)))
     (timer-start)
     (letrec ([sort : Dyn
                    (lambda (a p r)
@@ -33,7 +34,7 @@
                                    (gvector-set! a i (gvector-ref a j))
                                    (gvector-set! a j t)
                                    0))))])
-      (sort a 0 9999))
+      (sort a 0 (- size 1)))
     (timer-stop)
-    (gvector-ref a 9999)
-    (timer-report)))
+    (gvector-ref a (- size 1))
+    (timer-report))))

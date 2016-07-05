@@ -1,6 +1,6 @@
 #!/u/dalmahal/bin/bin/gsi-script -:d0
-
-(let ([a (make-s16vector 10000)])
+(let ([size 2000])
+  (let ([a (make-s16vector 2000)])
   (letrec ([sort (lambda (a p r)
 		   (if (< p r)
 		       (let ([q (partition a p r)])
@@ -32,8 +32,8 @@
 			   (s16vector-set! a i (s16vector-ref a j))
 			   (s16vector-set! a j t)
 			   0))))]
-	   [init (lambda (n a) (if (= n 0) a (begin (s16vector-set! a (- 10000 n) n) (init (- n 1) a))))])
+	   [init (lambda (n a) (if (= n 0) a (begin (s16vector-set! a (- size n) n) (init (- n 1) a))))])
     (begin
-      (init 10000 a)
-      (time (sort a 0 9999) (current-output-port))
-      (pretty-print (s16vector-ref a 9999)))))
+      (init size a)
+      (time (sort a 0 (- size 1)) (current-output-port))
+      (pretty-print (s16vector-ref a (- size 1)))))))
