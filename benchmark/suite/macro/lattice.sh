@@ -7,6 +7,7 @@ deliverable=3
 usable=10
 nAnnotizerbin=nAnnotizer
 schmldir=$SCHML_DIR
+dyn_operations="--no-dyn-operations"
 # --------------------------------------------------------------------
 
 testdir=$schmldir/benchmark/suite/macro
@@ -39,7 +40,7 @@ mkdir -p $outdir
 
 cp src/static/* $tmpdir
 cd $schmldir
-racket benchmark.rkt $tmpdir/ 9999999999
+racket benchmark.rkt $dyn_operations $tmpdir/ 9999999999
 
 for f in $tmpdir/*.schml; do
     path="${f%.*}";name=$(basename "$path")
@@ -60,7 +61,7 @@ for f in $tmpdir/*.schml; do
     
     $nAnnotizerbin $path $nsamples
     cd $schmldir
-    racket benchmark.rkt $path/ 9999999999
+    racket benchmark.rkt $dyn_operations $path/ 9999999999 
     
     declare -A x1 x2
     for i in `seq 0 20`; do
@@ -71,7 +72,7 @@ for f in $tmpdir/*.schml; do
     n=0
     for b in $(find $path -name '*.o1'); do
 	let n=n+1
-	echo $b
+	echo $b $n
 	binpath="${b%.*}";bname=$(basename "$binpath")
 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
 	t=$(echo $iters | $b | sed -n 's/.*: \([0-9]\+\)/\1/p')
@@ -86,10 +87,12 @@ for f in $tmpdir/*.schml; do
     done
     sort -g $logfile2 -o $logfile2
 
+    n=0
     echo "name,precision,time,slowdown" > $logfile3
     for b in $(find $path -name '*.o2'); do
+	let n=n+1
 	binpath="${b%.*}"
-	echo $b
+	echo $b $n
 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
 	t=$(echo $iters | $b | sed -n 's/.*: \([0-9]\+\)/\1/p')
 	echo $t
@@ -103,24 +106,24 @@ for f in $tmpdir/*.schml; do
     done
     sort -g $logfile4 -o $logfile4
     
-    # gnuplot -e "set datafile separator \",\"; set term tikz standalone color; "`
-    # 	   `"set output '$outdir/${name}.tex'; "`
-    # 	   `"set border back; "`
-    # 	   `"set multiplot layout 2,2 rowsfirst;"`
-    # 	   `"set title \"\"; "`
-    # 	   `"set xrange [0:20]; set yrange [0:${n}]; "`
-    # 	   `"set xtics nomirror (\"1x\" 1, \"6x\" 6, \"10x\" 10, \"15x\" 15, \"20x\" 20); "`
-    # 	   `"set ytics nomirror; "`
-    # 	   `"$LIN; plot '$logfile2' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative; "`
-    # 	   `"$LIN; plot '$logfile4' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative"
+    gnuplot -e "set datafile separator \",\"; set term tikz standalone color; "`
+    	   `"set output '$outdir/${name}.tex'; "`
+    	   `"set border back; "`
+    	   `"set multiplot layout 2,2 rowsfirst;"`
+    	   `"set title \"\"; "`
+    	   `"set xrange [0:20]; set yrange [0:${n}]; "`
+    	   `"set xtics nomirror (\"1x\" 1, \"6x\" 6, \"10x\" 10, \"15x\" 15, \"20x\" 20); "`
+    	   `"set ytics nomirror; "`
+    	   `"$LIN; plot '$logfile2' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative; "`
+    	   `"$LIN; plot '$logfile4' using 1:2 with lines lw 3 lc rgb \"blue\" title '' smooth cumulative"
 
-    # compile tex code
 
-    # cp $miscdir/* $tmpdir
-    # cp $outdir/${name}.tex $tmpdir
-    # cd $tmpdir
-    # lualatex --interaction=nonstopmode ${name}.tex
-    # mv ${name}.pdf $outdir
+
+    cp $miscdir/* $tmpdir
+    cp $outdir/${name}.tex $tmpdir
+    cd $tmpdir
+    lualatex --interaction=nonstopmode ${name}.tex
+    mv ${name}.pdf $outdir
 done
 
 # file duplicate files
