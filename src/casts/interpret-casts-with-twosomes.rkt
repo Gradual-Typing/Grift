@@ -74,6 +74,9 @@ form, to the shortest branch of the cast tree that is relevant.
     (let ([n (unbox next-unique-number)])
       (set-box! next-unique-number (add1 n))
       (Uid x n)))
+
+  ;; The uid for the runtime interpreted cast
+  (define interp-cast-uid : Uid (next-uid! "interp_cast"))
   
   ;; These templates are used to build the code that performs
   ;; casting at runtime.
@@ -121,6 +124,8 @@ form, to the shortest branch of the cast tree that is relevant.
           (cast-gref/twosome value type1 type2 lbl)]
          [(op=? (Tag 'GVect) tag1)
           (cast-gvect/twosome value type1 type2 lbl)]
+         [(op=? (Tag 'STuple) tag1)
+          (cast-tuple/twosome value type1 type2 lbl)]
          [else (Blame (Quote "Unexpected Type1 in cast tree"))]))])))
 
   ;; How to cast a Guarded Reference to some other type
@@ -193,6 +198,38 @@ form, to the shortest branch of the cast tree that is relevant.
                       (Blame lbl)))
                 (Blame lbl))))))
 
+  (: cast-tuple/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+  (define (cast-tuple/twosome v t1 t2 lbl)
+    (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
+           (if$ (op=? (Type DYN-TYPE) type2)
+                (Dyn-make value type1)
+                (if (and (Type? t1) (Type? t2))
+                    (let ([t1t (Type-type t1)]
+                          [t2t (Type-type t2)])
+                      (if (and (STuple? t1t) (STuple? t2t))
+                          (let-values ([(bnd* arg*)
+                                        (for/fold ([b* : CoC3-Bnd* '()]
+                                                   [arg* : Uid* '()])
+                                                  ([i (in-range (STuple-num t2t))])
+                                          (unless (index? i)
+                                            (error 'interpret-casts-with-coercions "bad index"))
+                                          (let ([a (next-uid! "item_type")])
+                                            (values (cons (cons a (let$* ([item (Tuple-proj v i)]
+                                                                          [new-t1t (tuple-type-arg$ t1 i)]
+                                                                          [new-t2t (tuple-type-arg$ t2 i)])
+                                                                         (interpret-cast item new-t1t new-t2t lbl))) b*)
+                                                    (cons a arg*))))])
+                            (Let bnd* (Create-tuple (map (inst Var Uid) arg*))))
+                          (error 'cast-tuple/twosome)))
+                    (let$* ([tag2 (type-tag type2)])
+                           (if$ (op=? tag2 (Tag 'STuple))
+                                (let$* ([type1_num (type-tuple-num type1)]
+                                        [type2_num (type-tuple-num type2)])
+                                       (if$ (op<=? type2_num type1_num)
+                                            (Cast-Tuple interp-cast-uid v t1 t2 lbl)
+                                            (Blame type2_num)))
+                                (Blame lbl)))))))
+
   ;; How to extract a dynamic value
   (: cast-dyn/twosome Cast-Rule/Cast-Rule)
   (define (cast-dyn/twosome cast-undyned v t1 t2 lbl)
@@ -240,8 +277,6 @@ form, to the shortest branch of the cast tree that is relevant.
           ;; Either way we build a cast tree specific to this type.
           (cast-ground/twosome value type1 type2 label))))
 
-  ;; The uid for the runtime interpreted cast
-  (define interp-cast-uid : Uid (next-uid! "interp_cast"))
 
   ;; Build a call to the runtime interpreted cast code
   (: interpret-cast (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
@@ -354,6 +389,9 @@ form, to the shortest branch of the cast tree that is relevant.
        (Guarded-Proxy-Target (ic-expr e))]
       [(Guarded-Proxy-Blames e)
        (Guarded-Proxy-Blames (ic-expr e))]
+      [(Create-tuple e*)
+       (Create-tuple (map ic-expr e*))]
+      [(Tuple-proj e i) (Tuple-proj (ic-expr e) i)]
       ;; Coercions manipulation
       [other
        (if (or (Compose-Coercions? other)

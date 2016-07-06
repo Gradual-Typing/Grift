@@ -92,9 +92,9 @@
          (cons
           cp
           (Procedure hc a* cp #f (list clos-clos crcn-clos)
-           (Let `((,clos . ,(Closure-ref hc clos-clos))
-                  (,crcn . ,(Closure-ref hc crcn-clos)))
-            (cast-apply-cast cast (Var clos) v* (Var crcn))))))
+                     (Let `((,clos . ,(Closure-ref hc clos-clos))
+                            (,crcn . ,(Closure-ref hc crcn-clos)))
+                          (cast-apply-cast cast (Var clos) v* (Var crcn))))))
        (hash-set! new-bnd-procs i bnd)
        cp]))
 
@@ -382,6 +382,18 @@
          (Guarded-Proxy-Blames e)]
         [(Guarded-Proxy-Coercion (app recur e))
          (Guarded-Proxy-Coercion e)]
+        [(Create-tuple (app recur* e*)) (Create-tuple e*)]
+        [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+        [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+        [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+        [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+        [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+        [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+        [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+        [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+        [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+        [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+        [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
         [other (error 'Convert-Closures "unmatched ~a" other)]))
 
     ;; recur through a list of expressions
@@ -400,7 +412,7 @@
 (: mk-clos-ref : Uid -> (Uid -> CoC6-Expr))
 (define (mk-clos-ref clos)
   (lambda ([fvar : Uid]) : CoC6-Expr
-   (Closure-ref clos fvar)))
+          (Closure-ref clos fvar)))
 
 ;; Recur through bound data
 (: cc-bnd-data*

@@ -200,7 +200,6 @@ T?l $ (_  ; )  = what here
 (provide lower-function-casts
          (all-from-out
           "../language/cast-or-coerce0.rkt"
-          #;"../language/casts-or-coercions.rkt"
           "../language/cast-or-coerce1.rkt"))
 
 
@@ -355,8 +354,20 @@ T?l $ (_  ; )  = what here
          (i : CoC1-Expr <- (lfc-expr index))
          (e2 : CoC1-Expr <- (lfc-expr e2))
          (return-state (Gvector-set! e1 i e2))]
+        [(Create-tuple e*)
+         (e* : CoC1-Expr* <- (lfc-expr* e*))
+         (return-state (Create-tuple e*))]
+        [(Tuple-proj e i)
+         (e : CoC1-Expr <- (lfc-expr e))
+         (return-state (Tuple-proj e i))]
         [(Var id)    (return-state (Var id))]
-        [(Quote lit) (return-state (Quote lit))])))
+        [(Quote lit) (return-state (Quote lit))]
+        [(Create-tuple e*)
+         (e* : CoC1-Expr* <- (lfc-expr* e*))
+         (return-state (Create-tuple e*))]
+        [(Tuple-proj e i)
+         (e : CoC1-Expr <- (lfc-expr e))
+         (return-state (Tuple-proj e i))])))
 
 (: lfc-expr* (-> CoC0-Expr* (State LFC-State CoC1-Expr*)))
 (define (lfc-expr* e*) (map-state lfc-expr e*))

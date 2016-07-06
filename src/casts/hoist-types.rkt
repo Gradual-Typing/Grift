@@ -53,6 +53,7 @@
 
 (: ht-expr ((Boxof Nat) Type-Table Type-Index CoC3-Expr -> CoC3.1-Expr))
 (define (ht-expr next type-table type-index exp)
+  (logging ht-expr (All) "~v" exp)
   ;; create a new unique identifier
   (: next-uid! (String -> Uid))
   (define (next-uid! s)
@@ -115,6 +116,8 @@
          (find-type-identity! (GVect t) n)]
         [(MVect (app recur t n))
          (find-type-identity! (MVect t) n)]
+        [(STuple arity (app recur* t* n))
+         (find-type-identity! (STuple arity t*) n)]
         [other (error 'hoist-types/identify-types "unmatched ~a" other)]))
     (: recur* ((Listof Schml-Type) -> (Values (Listof Prim-Type) Nat)))
     (define (recur* t*)
@@ -146,6 +149,8 @@
        (Fn i a* r)]
       [(Ref (app ht-coercion r) (app ht-coercion w))
        (Ref r w)]
+      [(CTuple i (app ht-coercion* a*))
+       (CTuple i a*)]
       [other (error 'hoist-types/coercion "unmatched ~a" other)]))
   
   ;; Recur through expression replacing types with their primitive counterparts
@@ -315,6 +320,19 @@
        (Guarded-Proxy-Blames exp)]
       [(Guarded-Proxy-Coercion (app recur exp))
        (Guarded-Proxy-Coercion exp)]
+      [(Create-tuple (app recur* e*))
+       (Create-tuple e*)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [other (error 'hoist-types/expr "unmatched ~a" other)]))
   ;; Recur through other type containing ast forms
   (: recur* (CoC3-Expr* -> CoC3.1-Expr*))

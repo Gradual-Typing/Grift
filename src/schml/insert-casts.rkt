@@ -140,7 +140,22 @@
            [else (TODO error message that is appropriate)]))]
       [(Mvector e1 e2)         (TODO define vector insert implicit casts)]
       [(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
-      [(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)])))
+      [(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)]
+      [(Create-tuple e*) (Create-tuple (map iic-expr e*))]
+      [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app iic-expr e)) i)
+       (cond
+         [(Dyn? e-ty)
+          (let ([n (+ i 1)])
+            (unless (index? n) (error 'iic-expr "bad index"))
+            (Tuple-proj (mk-cast (mk-label "tuple-proj" e-src) e DYN-TYPE (STuple n (make-list n DYN-TYPE))) i))]
+         [(STuple? e-ty) (Tuple-proj e i)]
+         [else (TODO error message that is appropriate)])])))
+
+(: make-list (Integer Schml-Type -> (Listof Schml-Type)))
+(define (make-list n t)
+  (if (= n 0)
+      '()
+      (cons t (make-list (- n 1) t))))
 
 (: iic-bnd (S1-Bnd . -> . C0-Bnd))
 (define (iic-bnd b)

@@ -99,7 +99,11 @@
           (simple? e3 uid* (+ 1 depth) outer-lambda?))]
     [(Gvector-ref e1 e2)
      (and (simple? e1 uid* (+ 1 depth) outer-lambda?)
-          (simple? e2 uid* (+ 1 depth) outer-lambda?))]))
+          (simple? e2 uid* (+ 1 depth) outer-lambda?))]
+    [(Create-tuple e*)
+     (simple?* e* uid* (+ 1 depth) outer-lambda?)]
+    [(Tuple-proj e _)
+     (simple? e uid* (+ 1 depth) outer-lambda?)]))
 
 ;; Computes the intersection between two lists and the list of elements
 ;; that is in the first list but not in the second.
@@ -177,11 +181,12 @@
       [(Gvector-set! e1 e2 e3)
        (Gvector-set! (replace-ref e1 v*) (replace-ref e2 v*) (replace-ref e3 v*))]
       [(Gvector-ref e1 e2)
-       (Gvector-ref (replace-ref e1 v*) (replace-ref e2 v*))])))
+       (Gvector-ref (replace-ref e1 v*) (replace-ref e2 v*))]
+      [(Create-tuple e*) (Create-tuple (map recur/env e*))]
+      [(Tuple-proj e i) (Tuple-proj (replace-ref e v*) i)])))
 
 (: pl-expr (C0-Expr -> (State Nat C/PL-Expr)))
 (define (pl-expr exp)
-  (logging pl-expr (All) "~v" exp)
   (do (bind-state : (State Nat C/PL-Expr))
       (match exp
         [(Lambda f* exp)
@@ -287,5 +292,11 @@
         [(Gvector-ref e index) (lift-state (inst Gvector-ref C/PL-Expr C/PL-Expr) (pl-expr e) (pl-expr index))]
         [(Gvector-set! e1 index e2) (lift-state (inst Gvector-set! C/PL-Expr C/PL-Expr C/PL-Expr)
                                                 (pl-expr e1) (pl-expr index) (pl-expr e2))]
+        [(Create-tuple e*)
+         (e* : C/PL-Expr* <- (map-state pl-expr e*))
+         (return-state (Create-tuple e*))]
+        [(Tuple-proj e i)
+         (e  : C/PL-Expr <- (pl-expr e))
+         (return-state (Tuple-proj e i))]
         [(Var id)    (return-state (Var id))]
         [(Quote lit) (return-state (Quote lit))])))

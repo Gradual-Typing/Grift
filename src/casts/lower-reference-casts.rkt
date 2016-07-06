@@ -59,14 +59,14 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
 
 ;; The entry point for this pass it is called by impose-casting semantics
 (: lower-reference-casts (Cast-or-Coerce1-Lang Config -> Cast-or-Coerce2-Lang))
-(trace-define (lower-reference-casts prgm config)
-              (match-let (((Prog (list name next type) body) prgm))
-                (let ([next : (Boxof Nat) (box next)])
-                  (match-let ([(list gunbox gbox-set! gvect-ref gvect-set! build-runtime)
-                               (get-ref-helpers next (Config-cast-rep config))])
-                    (let* ([e : CoC2-Expr ((lrc-expr next gunbox gbox-set! gvect-ref gvect-set!) body)]
-                           [next : Nat (unbox next)])
-                      (Prog (list name next type) (build-runtime e)))))))
+(define (lower-reference-casts prgm config)
+  (match-let (((Prog (list name next type) body) prgm))
+    (let ([next : (Boxof Nat) (box next)])
+      (match-let ([(list gunbox gbox-set! gvect-ref gvect-set! build-runtime)
+                   (get-ref-helpers next (Config-cast-rep config))])
+        (let* ([e : CoC2-Expr ((lrc-expr next gunbox gbox-set! gvect-ref gvect-set!) body)]
+               [next : Nat (unbox next)])
+          (Prog (list name next type) (build-runtime e)))))))
 
 ;; Functions for use sites of guarded references with coercions
 (define-type GunboxT ((Var Uid) -> CoC2-Expr))
@@ -449,6 +449,8 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
       [(Type-Fn-arg (app recur t) (app recur o)) (Type-Fn-arg t o)]
       [(Fn-Caster (app recur e)) (Fn-Caster e)]
       [(Blame (app recur e)) (Blame e)]
+      [(Create-tuple (app recur* e*)) (Create-tuple e*)]
+      [(Tuple-proj (app recur e) i) (Tuple-proj e i)]
       [else (error 'lower-reference-casts "unmatched ~a" else)]))
   
   ;; recur over a list of expressions

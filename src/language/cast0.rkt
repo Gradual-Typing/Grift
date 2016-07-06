@@ -37,6 +37,9 @@
           (Gvector E E)
           (Gvector-set! E E E)
           (Gvector-ref E E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
 	  ;; Terminals
 	  (Var Uid)
 	  (Quote Cast-Literal))))

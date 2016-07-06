@@ -79,7 +79,10 @@
           (Guarded-Proxy-Source E)
           (Guarded-Proxy-Target E)
           (Guarded-Proxy-Blames E)
-          (Guarded-Proxy-Coercion E))))
+          (Guarded-Proxy-Coercion E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index))))
 
 (define-type CoC2-Code (Code Uid* CoC2-Expr))
 

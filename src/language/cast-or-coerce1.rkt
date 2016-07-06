@@ -59,7 +59,10 @@
           (Gbox-set! E E)
           (Gvector E E)
           (Gvector-set! E E E)
-          (Gvector-ref E E))))
+          (Gvector-ref E E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index))))
 
 (define-type CoC1-Expr* (Listof CoC1-Expr))
 (define-type CoC1-Bnd   (Pairof Uid CoC1-Expr))

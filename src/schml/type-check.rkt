@@ -55,7 +55,7 @@ Provide comments about where to find definitions of types and data
   (lambda () (raise-variable-not-found src id)))
 
 #|
-  The type rules for core forms that have interesting type rules
+The type rules for core forms that have interesting type rules
 |#
 
 ;; The type of a lambda that is annotated is the type of the annotation
@@ -65,18 +65,29 @@ Provide comments about where to find definitions of types and data
 			(Fn Index Schml-Type* Schml-Type)))
 (define (lambda-type-rule src ty-param* t-body return-ann)
   (cond
-   [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
-   [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
-   [else (raise-lambda-inconsistent src t-body return-ann)]))
+    [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
+    [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
+    [else (raise-lambda-inconsistent src t-body return-ann)]))
+
+(: tuple-type-rule (Schml-Type* -> Schml-Type))
+(define (tuple-type-rule t*)
+  (STuple (length t*) t*))
+
+(: tuple-proj-type-rule (Schml-Type Integer -> Schml-Type))
+(define (tuple-proj-type-rule ty i)
+  (match ty
+    [(Dyn) DYN-TYPE]
+    [(STuple l t*) (if (< i l) (list-ref t* i) (TODO index out of bound in tuple type))]
+    [otherwise (TODO raise an appropriate error here)]))
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
 (: let-binding-type-rule (-> Schml-Type? Schml-Type Uid Src Schml-Type))
 (define (let-binding-type-rule t-bnd t-exp id src)
   (cond
-   [(not t-bnd) t-exp]
-   [(consistent? t-bnd t-exp) t-bnd]
-   [else (raise-binding-inconsistent src id t-bnd t-exp)]))
+    [(not t-bnd) t-exp]
+    [(consistent? t-bnd t-exp) t-bnd]
+    [else (raise-binding-inconsistent src id t-bnd t-exp)]))
 
 ;; The type of a cast is the cast-type if the expression type and
 ;; the cast type are consistent.
@@ -96,11 +107,11 @@ Provide comments about where to find definitions of types and data
 		    Schml-Type))
 (define (if-type-rule t-tst t-csq t-alt src)
   (cond
-   [(not (consistent? t-tst BOOL-TYPE))
-    (raise-if-inconsistent-test src t-tst)]
-   [(not (consistent? t-csq t-alt))
-    (raise-if-inconsistent-branches src t-csq t-alt)]
-   [else (join t-csq t-alt)]))
+    [(not (consistent? t-tst BOOL-TYPE))
+     (raise-if-inconsistent-test src t-tst)]
+    [(not (consistent? t-csq t-alt))
+     (raise-if-inconsistent-branches src t-csq t-alt)]
+    [else (join t-csq t-alt)]))
 
 ;; The type of literal constants are staticly known
 (: const-type-rule (Schml-Literal . -> . (U Bool Int Unit)))
@@ -267,7 +278,7 @@ Provide comments about where to find definitions of types and data
 (define (tc-expr exp env)
   (define-syntax-rule (map-recur exp*)
     (for/lists ([e* : (Listof S1-Expr)] [t* : (Listof Schml-Type)])
-      ([e exp*]) (recur e)))
+               ([e exp*]) (recur e)))
   (: recur (-> S0-Expr (values S1-Expr Schml-Type)))
   (define (recur e)
     (let ((src (Ann-data e)))
@@ -370,7 +381,15 @@ Provide comments about where to find definitions of types and data
                        [(e2 t2) (recur e2)]
                        [(e3 t3) (recur e3)]
                        [(ty)    (mvector-set!-type-rule t1 t2 t3)])
-           (values (Ann (Mvector-set! e1 e2 e3) (cons src ty)) ty))])))
+           (values (Ann (Mvector-set! e1 e2 e3) (cons src ty)) ty))]
+        [(Create-tuple e*)
+         (let*-values ([(e* t*) (map-recur e*)]
+                       [(ty)    (tuple-type-rule t*)])
+           (values (Ann (Create-tuple e*) (cons src ty)) ty))]
+        [(Tuple-proj e i)
+         (let*-values ([(e1 t) (recur e)]
+                       [(ty)    (tuple-proj-type-rule t i)])
+           (values (Ann (Tuple-proj e1 i) (cons src ty)) ty))])))
   (recur exp))
 
 (: tc-lambda (-> Schml-Fml* Schml-Type? S0-Expr Src Env
@@ -385,39 +404,39 @@ Provide comments about where to find definitions of types and data
 (: unzip-formals (-> Schml-Fml* (values (Listof Uid) Schml-Type*)))
 (define (unzip-formals f*)
   (for/lists ([i* : (Listof Uid)] [t* : Schml-Type*])
-      ([f f*])
+             ([f f*])
     (values (Fml-identifier f) (Fml-type f))))
 
 
 (: tc-letrec (S0-Bnd* S0-Expr Src Env -> (values S1-Expr Schml-Type)))
 (define (tc-letrec bnd* body src env)
-    (: fold-env-extend/bnd (S0-Bnd* Env -> (values S0-Bnd* Env)))
+  (: fold-env-extend/bnd (S0-Bnd* Env -> (values S0-Bnd* Env)))
   (define (fold-env-extend/bnd b* env)
     (for/fold : (values S0-Bnd* Env) ([bnd* : S0-Bnd* '()] [env : Env env]) ([bnd : S0-Bnd b*])
-              (match bnd
-                [(Bnd id type (Ann exp src))
-                 (match exp
-                   [(Lambda f* (Ann b t^))
-                    (cond
-                      [type (values (cons bnd bnd*) (hash-set env id type))]
-                      [else
-                       (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
-                              [arity  (length arg-t*)])
-                         (cond
-                           [t^
-                            (values (cons bnd bnd*)
-                                    (hash-set env id (Fn arity arg-t* t^)))]
-                           [else
-                            ;; Function without return-type annotatin gets dyn return
-                            (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
-                                   [rhs : S0-Expr
-                                        (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
-                              (values (cons (Bnd id type rhs) bnd*)
-                                      (hash-set env id type)))]))])]
-                   [e (let* ([recur/env (lambda ([e : S0-Expr]) (tc-expr e env))]
-                            [e2 ((mk-tc-binding src recur/env) bnd)])
-                        (match-let ([(Bnd id type rhs) e2])
-                          (values (cons bnd bnd*) (hash-set env id type))))])])))
+      (match bnd
+        [(Bnd id type (Ann exp src))
+         (match exp
+           [(Lambda f* (Ann b t^))
+            (cond
+              [type (values (cons bnd bnd*) (hash-set env id type))]
+              [else
+               (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
+                      [arity  (length arg-t*)])
+                 (cond
+                   [t^
+                    (values (cons bnd bnd*)
+                            (hash-set env id (Fn arity arg-t* t^)))]
+                   [else
+                    ;; Function without return-type annotatin gets dyn return
+                    (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
+                           [rhs : S0-Expr
+                                (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
+                      (values (cons (Bnd id type rhs) bnd*)
+                              (hash-set env id type)))]))])]
+           [e (let* ([recur/env (lambda ([e : S0-Expr]) (tc-expr e env))]
+                     [e2 ((mk-tc-binding src recur/env) bnd)])
+                (match-let ([(Bnd id type rhs) e2])
+                  (values (cons bnd bnd*) (hash-set env id type))))])])))
   (let*-values
       ([(bnd* env) (fold-env-extend/bnd bnd* env)]
        [(recur/env) (lambda ([e : S0-Expr]) (tc-expr e env))]
@@ -443,8 +462,8 @@ Provide comments about where to find definitions of types and data
 		     (-> S0-Bnd S1-Bnd)))
 (define (mk-tc-binding src tc-expr)
   (lambda ([bnd : S0-Bnd]) : S1-Bnd
-    (match-let ([(Bnd id type rhs) bnd])
-      (let-values ([(rhs type-rhs) (tc-expr rhs)])
-	(Bnd id
-	     (let-binding-type-rule type type-rhs id src)
-	     rhs)))))
+          (match-let ([(Bnd id type rhs) bnd])
+            (let-values ([(rhs type-rhs) (tc-expr rhs)])
+              (Bnd id
+                   (let-binding-type-rule type type-rhs id src)
+                   rhs)))))

@@ -2,12 +2,12 @@
 
 gloop=999999
 loop=99999999
-schmldir=/u/dalmahal/Schml
+schmldir=/u/dalmahal/lattice/Schml
+memlimit=9999999999
 #---------------------------------------------------------------------
 
 name=loop
-testdir=$schmldir/benchmark/suite
-dir=$testdir/$name
+dir=$schmldir/benchmark/suite/micro/$name
 datadir=$dir/data
 outdir=$dir/output
 tmpdir=$dir/tmp
@@ -19,18 +19,11 @@ echo "Benchmarking empty loops"
 # create the data and tmp directories if they do not exist
 mkdir -p $datadir $tmpdir
 
-# specialize all source files templates to a concrete number of
-# iterations.
-# cd $testdir/loop/src
-# sed "s/OP-COUNT/$loop/" < c${name}-template> $tmpdir/c${name}.c
-# sed "s/OP-COUNT/$loop/" < s${name}-template> $tmpdir/s${name}.scm
-# sed "s/OP-COUNT/$gloop/" < ${name}-template> $tmpdir/${name}.schml
-
 cp $dir/src/* $tmpdir
 
 # compile Schml source files, then enter the src directory
 cd $schmldir
-racket benchmark.rkt $tmpdir
+racket benchmark.rkt $tmpdir $memlimit
 cd $tmpdir
 
 # compile scheme source files

@@ -70,6 +70,11 @@ And a type constructor "name" expecting the types of field1 and field2
   (Gvector len init-val)
   (Gvector-set! vector offset value)
   (Gvector-ref vector offset)
+  ;;
+  (Create-tuple values)
+  (Tuple-proj tuple index)
+  (Coerce-Tuple cast value coercion)
+  (Cast-Tuple cast value t1 t2 lbl)
   ;; various imediates markers
   (Quote literal)    ;; immediate data in general
   ;; Node that references a piece of code identified by the UID value
@@ -96,6 +101,9 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-GRef-Huh type)
   (Type-GRef-Of expression)
   (Type-GVect-Of expression)
+  (Type-Tuple-Huh type)
+  (Type-Tuple-num type)
+  (Type-Tuple-item type index)
   ;; closure Representation
   (App-Closure code data exprs)
   (Closure-Data code caster variables)
@@ -195,7 +203,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (MRef  arg)
   (MVect arg)
   (GRef  arg)
-  (GVect arg))
+  (GVect arg)
+  (STuple num items))
 
 ;; TODO I am unsure of if these are being used
 ;; find out and act appropriately
@@ -244,6 +253,11 @@ And a type constructor "name" expecting the types of field1 and field2
          (Fn? g)
          (equal? (Fn-arity t)
                  (Fn-arity g))))
+  (define (both-tuple? t g)  : Boolean
+    (and (STuple? t)
+         (STuple? g)
+         (equal? (STuple-num t)
+                 (STuple-num g))))
   (define (ref-shallow-consistent? t g) : Boolean
     (or (and (GRef? t) (GRef? g))
         (and (GVect? t) (GVect? g))
@@ -254,6 +268,7 @@ And a type constructor "name" expecting the types of field1 and field2
       (both-int? t g)
       (both-bool? t g)
       (both-fn? t g)
+      (both-tuple? t g)
       (ref-shallow-consistent? t g)))
 
 
@@ -266,6 +281,9 @@ And a type constructor "name" expecting the types of field1 and field2
     (and (Fn? t)
          (andmap completely-static-type? (Fn-fmls t))
          (completely-static-type? (Fn-ret t))))
+  (define (tuple-completely-static? [t : Schml-Type]): Boolean
+    (and (STuple? t)
+         (andmap completely-static-type? (STuple-items t))))
   (define (ref-completely-static? [t : Schml-Type])
     (or (and (GRef? t) (completely-static-type? (GRef-arg t)))
         (and (MRef? t) (completely-static-type? (MRef-arg t)))
@@ -274,6 +292,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (or (Int? t)
       (Bool? t)
       (fn-completely-static? t)
+      (tuple-completely-static? t)
       (ref-completely-static? t)))
 
 
@@ -469,10 +488,14 @@ And a type constructor "name" expecting the types of field1 and field2
   (U Dyn
      Base-Type
      Schml-Fn-Type
-     Schml-Ref-Type))
+     Schml-Ref-Type
+     Schml-Tuple-Type))
 
 (define-type Schml-Fn-Type
   (Fn Index Schml-Type* Schml-Type))
+
+(define-type Schml-Tuple-Type
+  (STuple Index Schml-Type*))
 
 (define-type Schml-Ref-Type
   (U (GRef  Schml-Type)
@@ -487,7 +510,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (or (Dyn? x)
       (base-type? x)
       (schml-fn? x)
-      (schml-ref? x)))
+      (schml-ref? x)
+      (schml-tuple? x)))
       
 
 (define-predicate schml-type*? Schml-Type*)
@@ -500,6 +524,7 @@ And a type constructor "name" expecting the types of field1 and field2
            (schml-type*? (cdr x)))))
 
 (define-predicate schml-fn? Schml-Fn-Type)
+(define-predicate schml-tuple? Schml-Tuple-Type)
 #;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
 #;(define (schml-fn? x)
    (and (Fn? x)
@@ -521,7 +546,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-type+ Schml-Fml ([Schml-Fml* Listof])
   (Fml Uid Schml-Type))
 
-(define-type ConsistentT (Schml-Type Schml-Type . -> . Boolean))
+(define-type ConsistentT (Schml-Type Schml-Type -> Boolean))
 (: consistent? ConsistentT)
 (define (consistent? t g)
   ;; Typed racket made me structure the code this way.
@@ -538,6 +563,11 @@ And a type constructor "name" expecting the types of field1 and field2
          (= (Fn-arity t) (Fn-arity g))
          (andmap consistent? (Fn-fmls t) (Fn-fmls g))
          (consistent? (Fn-ret t) (Fn-ret g))))
+  (: consistent-tuples? ConsistentT)
+  (define (consistent-tuples? t g)
+    (and (STuple? t) (STuple? g)
+         (= (STuple-num t) (STuple-num g))
+         (andmap consistent? (STuple-items t) (STuple-items g))))
   (: consistent-grefs? ConsistentT)
   (define (consistent-grefs? t g)
     (and (GRef? t) (GRef? g)
@@ -552,6 +582,7 @@ And a type constructor "name" expecting the types of field1 and field2
       (both-bool? t g)
       (both-int? t g)
       (consistent-fns? t g)
+      (consistent-tuples? t g)
       (consistent-grefs? t g)
       (consistent-gvects? t g)))
 
@@ -583,6 +614,9 @@ Dyn --> Int Int --> Dyn
      (Fn (Fn-arity t)
          (map join (Fn-fmls t) (Fn-fmls g))
          (join (Fn-ret t) (Fn-ret g)))]
+    [(and (STuple? t) (STuple? g) (= (STuple-num t) (STuple-num g)))
+     (STuple (STuple-num t)
+         (map join (STuple-items t) (STuple-items g)))]
     [(and (GRef? t) (GRef? g))
      (GRef (join (GRef-arg t) (GRef-arg g)))]
     [(and (GVect? t) (GVect? g))
@@ -627,6 +661,15 @@ Dyn --> Int Int --> Dyn
   (Fn-Coercion args return)
   (Fn-Coercion-Arg coercion index)
   (Fn-Coercion-Return coercion)
+  ;;
+  (CTuple num items)
+  (Tuple-Coercion items)
+  (Tuple-Coercion-Huh c)
+  (Tuple-Coercion-Num c)
+  (Tuple-Coercion-Item c indx)
+  (Make-Tuple-Coercion make-uid t1 t2 lbl)
+  (Compose-Tuple-Coercion Uid c1 c2)
+  (Mediating-Coercion-Huh? c)
   ;; Guarded Reference Coercion
   ;; "Proxy a Guarded Reference's Reads and writes"
   (Ref read write)
@@ -668,7 +711,7 @@ Dyn --> Int Int --> Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'STuple))
 
 (define-type Schml-Coercion
   (Rec C (U Identity
@@ -677,7 +720,8 @@ Dyn --> Int Int --> Dyn
             (Sequence C C)
             (Failed Blame-Label)
             (Fn Index (Listof C) C)
-            (Ref C C))))
+            (Ref C C)
+            (CTuple Index (Listof C)))))
 
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 
@@ -690,6 +734,7 @@ Dyn --> Int Int --> Dyn
 
 (define-type Compact-Type
   (U (Fn Index (Listof Prim-Type) Prim-Type)
+     (STuple Index (Listof Prim-Type))
      (GRef Prim-Type) (MRef Prim-Type)
      (GVect Prim-Type) (MVect Prim-Type)))
 
@@ -702,6 +747,7 @@ Dyn --> Int Int --> Dyn
             (Inject Prim-Type)
             (Sequence C C)
             (Fn Index (Listof C) C)
-            (Ref C C))))
+            (Ref C C)
+            (CTuple Index (Listof C)))))
 
 (define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))

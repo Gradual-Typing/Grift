@@ -110,7 +110,21 @@
           (Guarded-Proxy-Source E)
           (Guarded-Proxy-Target E)
           (Guarded-Proxy-Blames E)
-          (Guarded-Proxy-Coercion E))))
+          (Guarded-Proxy-Coercion E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
+          (Tuple-Coercion-Huh E)
+          (Tuple-Coercion-Num E)
+          (Tuple-Coercion-Item E Index)
+          (Coerce-Tuple Uid E E)
+          (Cast-Tuple Uid E E E E)
+          (Type-Tuple-Huh E)
+          (Type-Tuple-num E)
+          (Type-Tuple-item E Index)
+          (Make-Tuple-Coercion Uid E E E)
+          (Compose-Tuple-Coercion Uid E E)
+          (Mediating-Coercion-Huh? E))))
 
 
 

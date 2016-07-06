@@ -48,10 +48,10 @@
 
 ;; make sure that t is a trivial expression
 (define-type CoC3-Trivial (U (Quote-Coercion Schml-Coercion)
-                              (Quote Cast-Literal)
-                              (Tag Tag-Symbol)
-                              (Type Schml-Type)
-                              (Var Uid)))
+                             (Quote Cast-Literal)
+                             (Tag Tag-Symbol)
+                             (Type Schml-Type)
+                             (Var Uid)))
 #|
 ;(: trivial? (CoC3-Expr -> Boolean : Trivial))
 (define (trivial? x)
@@ -95,55 +95,66 @@
      (: trivialize (String CoC3-Expr (Listof (Pairof Uid CoC3-Expr))
                            ->
                            (Values CoC3-Bnd* CoC3-Trivial)))
-    (define (trivialize name expr bnd*)
-      (if (or (Quote? expr) (Tag? expr) (Type? expr)
-              (Var? expr) (Quote-Coercion? expr))
-          (values bnd* expr)
-          (let* ([unique (unbox next)]
-                 [uvar   (Uid name unique)])
-            (set-box! next (+ unique 1))
-            (values (cons (cons uvar expr) bnd*) (Var uvar)))))
-    (: let$*-help ((Listof (Pairof Uid CoC3-Expr)) CoC3-Expr -> CoC3-Expr))
-    (define (let$*-help b* b)
-      (if (null? b*)
-          b
-          (let$*-help (cdr b*) (Let (list (car b*)) b))))
-    (define-syntax let$*
-      (syntax-rules ()
-        [(_ () b) b]
-        [(_ ([t* v*] ...) b)
-         (let ([b* : (Listof (Pairof Uid CoC3-Expr)) '()])
-           (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
-             (let ([body : CoC3-Expr b])
-               (if (null? b*)
-                 body
-                 (let$*-help b* body)))))])))))
+     (define (trivialize name expr bnd*)
+       (if (or (Quote? expr) (Tag? expr) (Type? expr)
+               (Var? expr) (Quote-Coercion? expr))
+           (values bnd* expr)
+           (let* ([unique (unbox next)]
+                  [uvar   (Uid name unique)])
+             (set-box! next (+ unique 1))
+             (values (cons (cons uvar expr) bnd*) (Var uvar)))))
+     (: let$*-help ((Listof (Pairof Uid CoC3-Expr)) CoC3-Expr -> CoC3-Expr))
+     (define (let$*-help b* b)
+       (if (null? b*)
+           b
+           (let$*-help (cdr b*) (Let (list (car b*)) b))))
+     (define-syntax let$*
+       (syntax-rules ()
+         [(_ () b) b]
+         [(_ ([t* v*] ...) b)
+          (let ([b* : (Listof (Pairof Uid CoC3-Expr)) '()])
+            (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
+              (let ([body : CoC3-Expr b])
+                (if (null? b*)
+                    body
+                    (let$*-help b* body)))))])))))
 
 #|
-       (do (bind-state : (State Nat CoC3-Expr))
-           ((cons b* t*) : (Pair CoC3-Bnd* CoC3-Trivial)
-            <- (trivialize (~a 't*) v* b*)) ...
-           (b^ : CoC3-Expr <- b)
-           (if (null? b*)
-               (return-state b^)
-               (return-state (let$*-help b* b^))))|#
+(do (bind-state : (State Nat CoC3-Expr))
+    ((cons b* t*) : (Pair CoC3-Bnd* CoC3-Trivial)
+     <- (trivialize (~a 't*) v* b*)) ...
+     (b^ : CoC3-Expr <- b)
+     (if (null? b*)
+         (return-state b^)
+         (return-state (let$*-help b* b^))))|#
 
 
 
 ;; performs compile time folding of prim = on literals
 ;; todo convert this to using eq-huh
 ;; TODO this should be op=?$
-(: op=? (-> CoC3-Expr CoC3-Expr CoC3-Expr))
+(: op=? (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (op=? o x)
   (cond
-    [(and (Quote? o) (Quote? x) (Quote (eq? (Quote-literal o)
-                                            (Quote-literal x))))]
+    [(and (Quote? o) (Quote? x)) (Quote (eq? (Quote-literal o)
+                                             (Quote-literal x)))]
     [(and (Tag? o) (Tag? x)) (Quote (eq? (Tag-bits o) (Tag-bits x)))]
     [(and (Type? o) (Type? x)) (Quote (equal? (Type-type o) (Type-type x)))]
     [else (Op '= (list o x))]))
 
-  ;;These functions type to fold predicates in order to allow ifs to
-  ;;generate only checks that are actually needed
+(: op<=? (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define (op<=? o x)
+  (cond
+    [(and (Quote? o) (Quote? x))
+     (let ([n1 (Quote-literal o)]
+           [n2 (Quote-literal x)])
+       (if (and (integer? n1) (integer? n2))
+           (Quote (<= n1 n2))
+           (error 'interpret-casts/op<=? "Unexpected ~a ~a" n1 n2)))]
+    [else (Op '<= (list o x))]))
+
+;;These functions type to fold predicates in order to allow ifs to
+;;generate only checks that are actually needed
 (: type-tag (-> CoC3-Expr CoC3-Expr))
 (define (type-tag o)
   (if (Type? o)
@@ -154,37 +165,50 @@
           [(GRef? v) (Tag 'GRef)]
           [(GVect? v) (Tag 'GVect)]
           [(Fn? v) (Tag 'Fn)]
+          [(STuple? v) (Tag 'STuple)]
           [else (error 'interpret-casts/type-tag
                        "Unexpected ~a" v)]))
-        (Type-Tag o)))
+      (Type-Tag o)))
 
-  (: type-fn-arity (CoC3-Expr -> CoC3-Expr))
-  (define (type-fn-arity o)
-    (cond
-      [(not (Type? o)) (Type-Fn-arity o)]
-      [(Fn? (Type-type o)) (Quote (Fn-arity (Type-type o)))]
-      [else (error 'ic/type-fn-arity "bad value?: ~a" o)]))
+(: type-fn-arity (CoC3-Expr -> CoC3-Expr))
+(define (type-fn-arity o)
+  (cond
+    [(not (Type? o)) (Type-Fn-arity o)]
+    [(Fn? (Type-type o)) (Quote (Fn-arity (Type-type o)))]
+    [else (error 'ic/type-fn-arity "bad value?: ~a" o)]))
+
+(: type-tuple-num (CoC3-Expr -> CoC3-Expr))
+(define (type-tuple-num o)
+  (cond
+    [(not (Type? o)) (Type-Tuple-num o)]
+    [(STuple? (Type-type o))  (Quote (STuple-num (Type-type o)))]
+    [else (error 'ic/type-tuple-num "bad value?: ~a" o)]))
 
 (define-syntax-rule
   (define-smart-coercion? (name compile-time? run-time?) ...)
   (begin
     (: name (CoC3-Expr -> CoC3-Expr)) ...
     (define (name x)
-    (if (not (Quote-Coercion? x))
-        (run-time? x)
-        (let ([x (Quote-Coercion-const x)])
-          (if (compile-time? x)
-              (Quote #t)
-              (Quote #f))))) ...))
+      (if (not (Quote-Coercion? x))
+          (run-time? x)
+          (let ([x (Quote-Coercion-const x)])
+            (if (compile-time? x)
+                (Quote #t)
+                (Quote #f))))) ...))
 
 (define-smart-coercion?
-  (id?$   Identity? Id-Coercion-Huh)
-  (seq?$  Sequence? Sequence-Coercion-Huh)
-  (prj?$  Project?  Project-Coercion-Huh)
-  (inj?$  Inject?   Inject-Coercion-Huh)
-  (fail?$ Failed?   Failed-Coercion-Huh)
-  (fnC?$  Fn?       Fn-Coercion-Huh)
-  (ref?$  Ref?      Ref-Coercion-Huh))
+  (id?$              Identity?       Id-Coercion-Huh)
+  (seq?$             Sequence?       Sequence-Coercion-Huh)
+  (prj?$             Project?        Project-Coercion-Huh)
+  (inj?$             Inject?         Inject-Coercion-Huh)
+  (fail?$            Failed?         Failed-Coercion-Huh)
+  (fnC?$             Fn?             Fn-Coercion-Huh)
+  (ref?$             Ref?            Ref-Coercion-Huh)
+  (tuple?$           CTuple?         Tuple-Coercion-Huh)
+  (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh?))
+
+(define (mediating-crcn? x)
+  (or (CTuple? x) (Ref? x) (Fn? x)))
 
 (define-syntax-rule
   (define-smart-access (name check kuote compile-time run-time) ...)
@@ -206,8 +230,27 @@
   (prj-label$  Project?   Quote          Project-label Project-Coercion-Label)
   (inj-type$   Inject?    Type           Inject-type   Inject-Coercion-Type)
   (ref-read$   Ref?       Quote-Coercion Ref-read      Ref-Coercion-Read)
-  (ref-write$  Ref?       Quote-Coercion Ref-write     Ref-Coercion-Write)  
+  (ref-write$  Ref?       Quote-Coercion Ref-write     Ref-Coercion-Write)
+  (tuple-num$  CTuple?    Quote          CTuple-num    Tuple-Coercion-Num)
   (fail-label$ Failed?    Quote          Failed-label  Failed-Coercion-Label))
+
+(: tuple-crcn-arg$ (CoC3-Expr Index -> CoC3-Expr))
+(define (tuple-crcn-arg$ x i)
+  (if (not (Quote-Coercion? x))
+      (Tuple-Coercion-Item x i)
+      (let ([x (Quote-Coercion-const x)])
+        (if (CTuple? x)
+            (Quote-Coercion (list-ref (CTuple-items x) i))
+            (error 'interpret-casts "~a applied to ~a" 'tuple-crcn x)))))
+
+(: tuple-type-arg$ (CoC3-Expr Index -> CoC3-Expr))
+(define (tuple-type-arg$ x i)
+  (if (not (Type? x))
+      (Type-Tuple-item x i)
+      (let ([x (Type-type x)])
+        (if (STuple? x)
+            (Type (list-ref (STuple-items x) i))
+            (error 'interpret-casts "~a applied to ~a" 'tuple-type x)))))
 
 (define-syntax-rule
   (define-smart-coercion (name compile-time run-time field ...) ...)
@@ -254,18 +297,19 @@
   (begin
     (: name (CoC3-Expr -> CoC3-Expr)) ...
     (define (name x)
-    (if (not (Type? x))
-        (run-time? x)
-        (let ([x (Type-type x)])
-          (if (compile-time? x)
-              (Quote #t)
-              (Quote #f))))) ...))
+      (if (not (Type? x))
+          (run-time? x)
+          (let ([x (Type-type x)])
+            (if (compile-time? x)
+                (Quote #t)
+                (Quote #f))))) ...))
 
 (define-smart-type?
-  (dyn?$   Dyn?   Type-Dyn-Huh)
-  (fnT?$   Fn?    Type-Fn-Huh)
-  (gvect?$ GVect? Type-GVect-Huh)
-  (gref?$  GRef?  Type-GRef-Huh))
+  (dyn?$    Dyn?    Type-Dyn-Huh)
+  (fnT?$    Fn?     Type-Fn-Huh)
+  (gvect?$  GVect?  Type-GVect-Huh)
+  (gref?$   GRef?   Type-GRef-Huh)
+  (tupleT?$ STuple? Type-Tuple-Huh))
 
 (: fnT-arity$ (CoC3-Expr -> CoC3-Expr))
 (define (fnT-arity$ x)
@@ -275,6 +319,15 @@
         (if (Fn? x)
             (Quote (Fn-arity x))
             (error 'fnT-arity$ "given ~a" x)))))
+
+(: tupleT-num$ (CoC3-Expr -> CoC3-Expr))
+(define (tupleT-num$ x)
+  (if (not (Type? x))
+      (Type-Tuple-num x)
+      (let ([x (Type-type x)])
+        (if (STuple? x)
+            (Quote (STuple-num x))
+            (error 'tupleT-num$ "given ~a" x)))))
 
 (: gvect-of$ (CoC3-Expr -> CoC3-Expr))
 (define (gvect-of$ x)

@@ -47,7 +47,7 @@ exposed as the effects that they truelly are.
 (define FN-ARITY-INDEX        (Quote l:FN-ARITY-INDEX))
 (define FN-RETURN-INDEX       (Quote l:FN-RETURN-INDEX))
 (define FN-FMLS-OFFSET        (Quote l:FN-FMLS-OFFSET))
-                          
+
 (define TYPE-TAG-MASK         (Quote l:TYPE-TAG-MASK))
 (define TYPE-FN-TAG           (Quote l:TYPE-FN-TAG))
 (define TYPE-ATOMIC-TAG       (Quote l:TYPE-ATOMIC-TAG))
@@ -59,6 +59,7 @@ exposed as the effects that they truelly are.
 (define TYPE-GREF-TAG         (Quote l:TYPE-GREF-TAG))
 (define TYPE-GVECT-SIZE       (Quote l:TYPE-GVECT-SIZE))
 (define TYPE-GVECT-TAG        (Quote l:TYPE-GVECT-TAG))
+(define TYPE-TUPLE-TAG        (Quote l:TYPE-TUPLE-TAG))
 (define DYN-TAG-MASK          (Quote l:DYN-TAG-MASK))
 (define DYN-BOXED-TAG         (Quote l:DYN-BOXED-TAG))
 (define DYN-INT-TAG           (Quote l:DYN-INT-TAG))
@@ -73,7 +74,7 @@ exposed as the effects that they truelly are.
 (define UNDEF-IMDT            (Quote l:UNDEF-IMDT))
 (define UNIT-IMDT             (Quote l:UNIT-IMDT))
 (define GREP-TAG-MASK         (Quote l:GREP-TAG-MASK))
-(define UGBOX-TAG  (Quote l:UGBOX-TAG))
+(define UGBOX-TAG             (Quote l:UGBOX-TAG))
 (define UGBOX-SIZE            (Quote l:UGBOX-SIZE))
 (define UGBOX-VALUE-INDEX     (Quote l:UGBOX-VALUE-INDEX))
 (define UGVECT-SIZE-INDEX     (Quote l:UGVECT-SIZE-INDEX))
@@ -91,6 +92,8 @@ exposed as the effects that they truelly are.
 (define CLOS-FVAR-OFFSET      (Quote l:CLOS-FVAR-OFFSET))
 (define GREF-TO-INDEX         (Quote l:GREF-TO-INDEX))
 (define GVECT-TO-INDEX        (Quote l:GVECT-TO-INDEX))
+(define TUPLE-NUM-INDEX       (Quote l:TUPLE-NUM-INDEX))
+(define TUPLE-ITEMS-OFFSET    (Quote l:TUPLE-ITEMS-OFFSET))
 
 (define l:PROJECT-COERCION-TAG #b000)
 (define PROJECT-COERCION-TAG (Quote l:PROJECT-COERCION-TAG))
@@ -103,11 +106,16 @@ exposed as the effects that they truelly are.
 (define SEQUENCE-COERCION-TAG (Quote l:SEQUENCE-COERCION-TAG))
 (define SEQUENCE-COERCION-FST-INDEX (Quote 0))
 (define SEQUENCE-COERCION-SND-INDEX (Quote 1))
-(define COERCION-TAG-MASK (Quote #b111))
+(define COERCION-TAG-MASK (Quote #b111)) ;; the same for primary and secondary tags
 (define IDENTITY-COERCION-TAG (Quote #b011))
 (define IDENTITY-COERCION-IMDT IDENTITY-COERCION-TAG)
-(define l:FN-COERCION-TAG #b100)
-(define FN-COERCION-TAG (Quote l:FN-COERCION-TAG))
+;; (define l:FN-COERCION-TAG #b100)
+(define l:MEDIATING-COERCION-TAG #b100)
+(define MEDIATING-COERCION-TAG (Quote l:MEDIATING-COERCION-TAG))
+(define l:SECOND-FN-COERCION-TAG #b001)
+(define SECOND-FN-COERCION-TAG (Quote l:SECOND-FN-COERCION-TAG))
+(define l:SECOND-TUPLE-COERCION-TAG #b010)
+(define SECOND-TUPLE-COERCION-TAG (Quote l:SECOND-TUPLE-COERCION-TAG))
 
 (define l:FN-TAG-MASK #b111)
 (define FN-TAG-MASK (Quote l:FN-TAG-MASK))
@@ -123,30 +131,33 @@ exposed as the effects that they truelly are.
 (define HYBRID-PROXY-TAG (Quote l:HYBRID-PROXY-TAG))
 (define HYBRID-PROXY-CRCN-INDEX (Quote l:HYBRID-PROXY-CRCN-INDEX))
 (define HYBRID-PROXY-CLOS-INDEX (Quote l:HYBRID-PROXY-CLOS-INDEX))
-(define l:REF-COERCION-TAG #b101)
-(define REF-COERCION-TAG (Quote l:REF-COERCION-TAG))
-(define REF-COERCION-READ-INDEX (Quote 0))
-(define REF-COERCION-WRITE-INDEX (Quote 1))
+;; (define l:REF-COERCION-TAG #b101)
+(define l:SECOND-REF-COERCION-TAG #b000)
+(define SECOND-REF-COERCION-TAG (Quote l:SECOND-REF-COERCION-TAG))
+(define REF-COERCION-TAG-INDEX (Quote 0))
+(define REF-COERCION-READ-INDEX (Quote 1))
+(define REF-COERCION-WRITE-INDEX (Quote 2))
 (define l:FAILED-COERCION-TAG #b110)
 (define FAILED-COERCION-TAG (Quote l:FAILED-COERCION-TAG))
 (define FAILED-COERCION-LABEL-INDEX (Quote 0))
 
+(define SECOND-TAG-SHIFT (Quote l:SECOND-TAG-SHIFT))
 
 
 (: specify-representation (Cast-or-Coerce6-Lang Config -> Data0-Lang))
 (trace-define (specify-representation prgm comp-config)
-  (match-let ([(Prog (list name next type) (LetT* bndt* exp)) prgm])
-    (let* ([next  : (Boxof Nat) (box next)]
-           [bndc* : (Boxof D0-Bnd-Code*) (box '())]
-           [exp   : D0-Expr (sr-expr next bndc* (hash) empty-index-map exp)]
-           [init* : D0-Expr* (map (sr-bndt next) bndt*)]
-           [tid*  : Uid*     (map (inst car Uid Any) bndt*)]
-           [next  : Nat (unbox next)]
-           [bndc* : D0-Bnd-Code* (unbox bndc*)])
-      (Prog (list name next type)
-       (GlobDecs tid*
-        (Labels bndc*
-         (Begin init* exp)))))))
+              (match-let ([(Prog (list name next type) (LetT* bndt* exp)) prgm])
+                (let* ([next  : (Boxof Nat) (box next)]
+                       [bndc* : (Boxof D0-Bnd-Code*) (box '())]
+                       [exp   : D0-Expr (sr-expr next bndc* (hash) empty-index-map exp)]
+                       [init* : D0-Expr* (map (sr-bndt next) bndt*)]
+                       [tid*  : Uid*     (map (inst car Uid Any) bndt*)]
+                       [next  : Nat (unbox next)]
+                       [bndc* : D0-Bnd-Code* (unbox bndc*)])
+                  (Prog (list name next type)
+                        (GlobDecs tid*
+                                  (Labels bndc*
+                                          (Begin init* exp)))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
@@ -172,6 +183,19 @@ exposed as the effects that they truelly are.
 
   (: comp-fn-coercion-code-label? (Boxof (Option (Code-Label Uid))))
   (define comp-fn-coercion-code-label? (box #f))
+  
+  (: coerce-tuple-code-label? (Boxof (Option (Code-Label Uid))))
+  (define coerce-tuple-code-label? (box #f))
+
+  (: cast-tuple-code-label? (Boxof (Option (Code-Label Uid))))
+  (define cast-tuple-code-label? (box #f))
+
+  (: mk-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
+  (define mk-tuple-coercion-code-label? (box #f))
+
+  (: comp-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
+  (define comp-tuple-coercion-code-label? (box #f))
+  
 
   (: sr-alloc (String Fixnum (Listof (Pair String D0-Expr)) -> D0-Expr))
   (define sr-alloc (sr-alloc/next next))
@@ -207,19 +231,19 @@ exposed as the effects that they truelly are.
               [type-var (Var type)]
               [tag-var (Var tag)]
               [imm-var (Var imm)])
-       (Let `((,val . ,e1)
-              (,type . ,(sr-expr e2)))
-        (Let `((,tag . ,(Op 'binary-and `(,type-var ,TYPE-TAG-MASK))))
-         (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG))
-             (Let `((,imm . ,(Op '%<< (list val-var DYN-IMDT-SHIFT))))
-              (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
-                  (Op 'binary-or `(,imm-var ,DYN-INT-TAG))
-                  (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
-                      (Op 'binary-or `(,imm-var ,DYN-BOOL-TAG))
-                      (Op 'binary-or `(,imm-var ,DYN-UNIT-TAG)))))
-             (sr-alloc "dynamic_boxed" #b000
-                       `(("" . ,val-var)
-                         ("" . ,type-var)))))))]))
+         (Let `((,val . ,e1)
+                (,type . ,(sr-expr e2)))
+              (Let `((,tag . ,(Op 'binary-and `(,type-var ,TYPE-TAG-MASK))))
+                   (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG))
+                       (Let `((,imm . ,(Op '%<< (list val-var DYN-IMDT-SHIFT))))
+                            (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
+                                (Op 'binary-or `(,imm-var ,DYN-INT-TAG))
+                                (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
+                                    (Op 'binary-or `(,imm-var ,DYN-BOOL-TAG))
+                                    (Op 'binary-or `(,imm-var ,DYN-UNIT-TAG)))))
+                       (sr-alloc "dynamic_boxed" #b000
+                                 `(("" . ,val-var)
+                                   ("" . ,type-var)))))))]))
 
   (: get-mk-fn-crcn! (Uid -> (Code-Label Uid)))
   (define (get-mk-fn-crcn! mk-crcn)
@@ -239,6 +263,7 @@ exposed as the effects that they truelly are.
       (define c2-u    (next-uid! "resulting_coercion"))
       (define cr-u    (next-uid! "return-coercion"))
       (define ca-u    (next-uid! "argument-coercion"))
+      (define st-u    (next-uid! "second-tagged"))
       (define t1      (Var t1-u))
       (define t2      (Var t2-u))
       (define l       (Var l-u))
@@ -246,6 +271,7 @@ exposed as the effects that they truelly are.
       (define c2      (Var c2-u))
       (define i       (Var i-u))
       (define a       (Var a-u))
+      (define st      (Var st-u))
       (define mk-fn   (Code-Label mk-fn-u))
       (define mk-c    (Code-Label mk-crcn))
       ;; This code is carfully crafted so that the allocation occurs after
@@ -257,17 +283,19 @@ exposed as the effects that they truelly are.
                   (Let `((,t1r-u . ,(sr-tagged-array-ref t1 TYPE-FN-TAG FN-RETURN-INDEX))
                          (,t2r-u . ,(sr-tagged-array-ref t2 TYPE-FN-TAG FN-RETURN-INDEX)))
                        (Let `((,cr-u . ,(App-Code mk-c `(,(Var t1r-u) ,(Var t2r-u) ,l))))
-                            (Let `((,c1-u . ,(Op 'Alloc (list (sr-plus a (Quote 2))))))
+                            (Let `((,c1-u . ,(Op 'Alloc (list (sr-plus a (Quote 2)))))
+                                   (,st-u . ,(Op '+ (list (Op '%<< (list a SECOND-TAG-SHIFT))
+                                                              SECOND-FN-COERCION-TAG))))
                                  (Begin
-                                   `(,(sr-array-set! c1 FN-ARITY-INDEX a)
+                                   `(,(sr-array-set! c1 FN-ARITY-INDEX st)
                                      ,(sr-array-set! c1 FN-RETURN-INDEX (Var cr-u)))
-                                    (sr-tag-value c1 FN-COERCION-TAG)))))
+                                   (sr-tag-value c1 MEDIATING-COERCION-TAG)))))
                   (Let `((,t1a-u . ,(sr-tagged-array-ref t1 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i)))
                          (,t2a-u . ,(sr-tagged-array-ref t2 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i))))
                        (Let `((,ca-u . ,(App-Code mk-c `(,(Var t2a-u) ,(Var t1a-u) ,l))))
                             (Let `((,c2-u . ,(App-Code mk-fn `(,t1 ,t2 ,l ,(sr-plus (Quote 1) i) ,a))))
                                  (Begin
-                                   `(,(sr-tagged-array-set! c2 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i) (Var ca-u)))
+                                   `(,(sr-tagged-array-set! c2 MEDIATING-COERCION-TAG (sr-plus FN-FMLS-OFFSET i) (Var ca-u)))
                                    c2)))))))
       (add-new-code! (cons mk-fn-u mk-fn-c))
       (set-box! mk-fn-coercion-code-label? mk-fn)
@@ -294,6 +322,7 @@ exposed as the effects that they truelly are.
       (define ca-u      (next-uid! "argument-coercion"))
       (define id?1-u    (next-uid! "is_identity"))
       (define id?2-u    (next-uid! "is_still_identity"))
+      (define st-u      (next-uid! "secondary-tagged"))
       (define c1        (Var c1-u))
       (define c2        (Var c2-u))
       (define c3        (Var c3-u))
@@ -304,6 +333,7 @@ exposed as the effects that they truelly are.
       (define a         (Var a-u))
       (define id?1      (Var id?1-u))
       (define id?2      (Var id?2-u))
+      (define st        (Var st-u))
       (define comp-fn   (Code-Label comp-fn-u))
       (define comp-c    (Code-Label comp-crcn))
       ;; This code is carfully crafted so that the allocation occurs after
@@ -312,91 +342,231 @@ exposed as the effects that they truelly are.
       (define comp-fn-c : D0-Code
         (Code `(,c1-u ,c2-u ,i-u ,a-u ,id?1-u)
               (If (Op '= `(,i ,a))
-                  (Let `((,c1r-u . ,(sr-tagged-array-ref c1 FN-COERCION-TAG FN-RETURN-INDEX))
-                         (,c2r-u . ,(sr-tagged-array-ref c2 FN-COERCION-TAG FN-RETURN-INDEX)))
+                  (Let `((,c1r-u . ,(sr-tagged-array-ref c1 MEDIATING-COERCION-TAG FN-RETURN-INDEX))
+                         (,c2r-u . ,(sr-tagged-array-ref c2 MEDIATING-COERCION-TAG FN-RETURN-INDEX)))
                        (Let `((,cr-u . ,(App-Code comp-c `(,(Var c1r-u) ,(Var c2r-u)))))
                             (If (If id?1
                                     (sr-check-tag=? cr COERCION-TAG-MASK IDENTITY-COERCION-TAG)
                                     FALSE-IMDT)
                                 IDENTITY-COERCION-IMDT
-                                (Let `((,c3-u . ,(Op 'Alloc (list (sr-plus a (Quote 2))))))
-                                 (Begin
-                                   `(,(sr-array-set! c3 FN-RETURN-INDEX cr))
-                                    (sr-tag-value c3 FN-COERCION-TAG))))))
-                  (Let `((,c1a-u . ,(sr-tagged-array-ref c1 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i)))
-                         (,c2a-u . ,(sr-tagged-array-ref c2 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i))))
+                                (Let `((,c3-u . ,(Op 'Alloc (list (sr-plus a (Quote 2)))))
+                                       (,st-u . ,(Op '+ (list (Op '%<< (list a SECOND-TAG-SHIFT))
+                                                              SECOND-FN-COERCION-TAG))))
+                                     (Begin
+                                       ;; TODO: come up with a test case that fails if the arity is not set
+                                       `(,(sr-array-set! c3 FN-ARITY-INDEX st)
+                                         ,(sr-array-set! c3 FN-RETURN-INDEX cr))
+                                       (sr-tag-value c3 MEDIATING-COERCION-TAG))))))
+                  (Let `((,c1a-u . ,(sr-tagged-array-ref c1 MEDIATING-COERCION-TAG (sr-plus FN-FMLS-OFFSET i)))
+                         (,c2a-u . ,(sr-tagged-array-ref c2 MEDIATING-COERCION-TAG (sr-plus FN-FMLS-OFFSET i))))
                        (Let `((,ca-u . ,(App-Code comp-c `(,(Var c2a-u) ,(Var c1a-u)))))
-                        (Let `((,id?2-u . ,(If id?1
-                                               (sr-check-tag=? ca COERCION-TAG-MASK IDENTITY-COERCION-TAG)
-                                               FALSE-IMDT)))
-                         (Let `((,c4-u . ,(App-Code comp-fn `(,c1 ,c2 ,(sr-plus (Quote 1) i) ,a ,id?2))))
-                          (If (sr-check-tag=? c4 COERCION-TAG-MASK IDENTITY-COERCION-TAG)
-                              IDENTITY-COERCION-IMDT
-                              (Begin
-                                `(,(sr-tagged-array-set! c4 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i) ca))
-                                c4)))))))))
+                            (Let `((,id?2-u . ,(If id?1
+                                                   (sr-check-tag=? ca COERCION-TAG-MASK IDENTITY-COERCION-TAG)
+                                                   FALSE-IMDT)))
+                                 (Let `((,c4-u . ,(App-Code comp-fn `(,c1 ,c2 ,(sr-plus (Quote 1) i) ,a ,id?2))))
+                                      (If (sr-check-tag=? c4 COERCION-TAG-MASK IDENTITY-COERCION-TAG)
+                                          IDENTITY-COERCION-IMDT
+                                          (Begin
+                                            `(,(sr-tagged-array-set! c4 MEDIATING-COERCION-TAG (sr-plus FN-FMLS-OFFSET i) ca))
+                                            c4)))))))))
       (add-new-code! (cons comp-fn-u comp-fn-c))
       (set-box! comp-fn-coercion-code-label? comp-fn)
       comp-fn)
     (let ([cl? (unbox comp-fn-coercion-code-label?)])
       (or cl? (make-code! comp-crcn))))
 
-  
+  (: get-coerce-tuple! (Uid -> (Code-Label Uid)))
+  (define (get-coerce-tuple! cast)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! cast)
+      (define coerce-tuple-u (next-uid! "coerce-tuple"))
+      (define v-u            (next-uid! "tuple-val"))
+      (define c-u            (next-uid! "tuple-coercion"))
+      (define i-u            (next-uid! "index"))
+      (define a-u            (next-uid! "tuple-type-num"))
+      (define va-u           (next-uid! "tuple-val-item"))
+      (define ca-u           (next-uid! "tuple-coercion-item"))
+      (define v1-u           (next-uid! "resulting_tuple"))
+      (define v2-u           (next-uid! "resulting_tuple"))
+      (define cva-u          (next-uid! "item"))
+      (define v              (Var v-u))
+      (define c              (Var c-u))
+      (define v1             (Var v1-u))
+      (define v2             (Var v2-u))
+      (define i              (Var i-u))
+      (define a              (Var a-u))
+      (define coerce-tuple   (Code-Label coerce-tuple-u))
+      (define mk-c           (Code-Label cast))
+      (define coerce-tuple-c : D0-Code
+        (Code `(,v-u ,c-u ,i-u ,a-u)
+              (If (Op '= `(,i ,a))
+                  (Let `((,v1-u . ,(Op 'Alloc (list a))))
+                       v1)
+                  (Let `((,va-u . ,(Op 'Array-ref (list v i)))
+                         (,ca-u . ,(sr-tagged-array-ref c MEDIATING-COERCION-TAG (sr-plus TUPLE-ITEMS-OFFSET i))))
+                       (Let `((,cva-u . ,(App-Code mk-c `(,(Var va-u) ,(Var ca-u)))))
+                            (Let `((,v2-u . ,(App-Code coerce-tuple `(,v ,c ,(sr-plus (Quote 1) i) ,a))))
+                                 (Begin
+                                   `(,(Op 'Array-set! (list v2 i (Var cva-u))))
+                                   v2)))))))
+      (add-new-code! (cons coerce-tuple-u coerce-tuple-c))
+      (set-box! coerce-tuple-code-label? coerce-tuple)
+      coerce-tuple)
+    (let ([cl? (unbox coerce-tuple-code-label?)])
+      (or cl? (make-code! cast))))
 
-      #|(: sr-type (-> CoC6-Bnd-Type (State Nat D0-Expr)))
-      (define (sr-type b)
-        ;; lays down the data in the third list in continuous sequence
-        ;; of memory
-        (: array-set* (-> D0-Expr Integer (Listof D0-Expr) (Listof D0-Expr)))
-        (define (array-set* a i f*)
-          (if (null? f*)
-              '()
-              (cons
-               (Op 'Array-set! (list a (Quote i) (car f*)))
-               (array-set* a (add1 i) (cdr f*)))))
-        (match-let ([(cons i t) b])
-          (match t
-            ;; abstract over allocating so that all allocations
-            ;; are shorter than this.
-            [(GRef t)
-             (do (bind-state : (State Nat D0-Expr))
-                 (ty : D0-Expr <- (sr-prim-type t))
-               (let* ([alloc  : D0-Expr
-                              (Op 'Alloc (list TYPE-GREF-SIZE-VALUE))]
-                      [gref-init : D0-Expr (Assign i alloc)]
-                      [stmt : D0-Expr
-                            (Op 'Array-set! (list (Var i) GREF-TO-INDEX-VALUE ty))])
-                 (return-state
-                  (Begin (list gref-init stmt)
-                         (Assign i (Op 'binary-or (list (Var i) TYPE-GREF-TAG-VALUE)))))))]
-            ;; TODO: parametrize over the logic of GRef and GVect
-            [(GVect t)
-             (do (bind-state : (State Nat D0-Expr))
-                 (ty : D0-Expr <- (sr-prim-type t))
-               (let* ([alloc  : D0-Expr
-                              (Op 'Alloc (list TYPE-GVECT-SIZE-VALUE))]
-                      [gvect-init : D0-Expr (Assign i alloc)]
-                      [stmt   : D0-Expr
-                              (Op 'Array-set! (list (Var i) GVECT-TO-INDEX-VALUE ty))])
-                 (return-state
-                  (Begin (list gvect-init stmt)
-                         (Assign i (Op 'binary-or (list (Var i) TYPE-GVECT-TAG-VALUE)))))))]
-            [(Fn a f* r)
-             (do (bind-state : (State Nat D0-Expr))
-                 (f*  : D0-Expr* <- (map-state sr-prim-type f*))
-               (r   : D0-Expr  <- (sr-prim-type r))
-               (let* ([v (Var i)]
-                      [alloc (Op 'Alloc (list (Quote (+ a FN-FMLS-OFFSET))))]
-                      [fun-init (Assign i alloc)]
-                      [stmt1
-                       (Op 'Array-set! (list v (Quote FN-ARITY-INDEX) (Quote a)))]
-                      [stmt2
-                       (Op 'Array-set! (list v (Quote FN-RETURN-INDEX) r))]
-                      [stmt* (array-set* v FN-FMLS-OFFSET f*)])
-                 (return-state
-                  (Begin (append (list fun-init stmt1 stmt2) stmt*) v))))]
-            [else (TODO)])))
-      |#
+  (: get-cast-tuple! (Uid -> (Code-Label Uid)))
+  (define (get-cast-tuple! cast)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! cast)
+      (define cast-u     (next-uid! "cast"))
+      (define v-u        (next-uid! "val"))
+      (define t1-u       (next-uid! "tuple-type1"))
+      (define t2-u       (next-uid! "tuple-type2"))
+      (define l-u        (next-uid! "label"))
+      (define i-u        (next-uid! "index"))
+      (define a-u        (next-uid! "tuple-type-num"))
+      (define t1a-u      (next-uid! "tuple-type1-item"))
+      (define t2a-u      (next-uid! "tuple-type2-item"))
+      (define c1-u       (next-uid! "resulting_val"))
+      (define c2-u       (next-uid! "resulting_val"))
+      (define ca-u       (next-uid! "item-type"))
+      (define va-u       (next-uid! "item-val"))
+      (define v          (Var v-u))
+      (define t1         (Var t1-u))
+      (define t2         (Var t2-u))
+      (define l          (Var l-u))
+      (define c1         (Var c1-u))
+      (define c2         (Var c2-u))
+      (define va         (Var va-u))
+      (define i          (Var i-u))
+      (define a          (Var a-u))
+      (define cast-tuple (Code-Label cast-u))
+      (define mk-c       (Code-Label cast))
+      (define cast-tuple-c : D0-Code
+        (Code `(,v-u ,t1-u ,t2-u ,l-u ,i-u ,a-u)
+              (If (Op '= `(,i ,a))
+                  (Let `((,c1-u . ,(Op 'Alloc (list a))))
+                       c1)
+                  (Let `((,va-u . ,(Op 'Array-ref (list v i)))
+                         (,t1a-u . ,(sr-tagged-array-ref t1 TYPE-TUPLE-TAG (sr-plus TUPLE-ITEMS-OFFSET i)))
+                         (,t2a-u . ,(sr-tagged-array-ref t2 TYPE-TUPLE-TAG (sr-plus TUPLE-ITEMS-OFFSET i))))
+                       (Let `((,ca-u . ,(App-Code mk-c `(,va ,(Var t1a-u) ,(Var t2a-u) ,l))))
+                            (Let `((,c2-u . ,(App-Code cast-tuple `(,v ,t1 ,t2 ,l ,(sr-plus (Quote 1) i) ,a))))
+                                 (Begin
+                                   `(,(Op 'Array-set! (list c2 i (Var ca-u))))
+                                   c2)))))))
+      (add-new-code! (cons cast-u cast-tuple-c))
+      (set-box! cast-tuple-code-label? cast-tuple)
+      cast-tuple)
+    (let ([cl? (unbox cast-tuple-code-label?)])
+      (or cl? (make-code! cast))))
+
+  (: get-mk-tuple-crcn! (Uid -> (Code-Label Uid)))
+  (define (get-mk-tuple-crcn! mk-crcn)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! mk-crcn)
+      (define mk-tuple-u (next-uid! "make-tuple-coercion"))
+      (define t1-u       (next-uid! "tuple-type1"))
+      (define t2-u       (next-uid! "tuple-type2"))
+      (define l-u        (next-uid! "label"))
+      (define i-u        (next-uid! "index"))
+      (define a-u        (next-uid! "tuple-type-num"))
+      (define t1a-u      (next-uid! "tuple-type1-item"))
+      (define t2a-u      (next-uid! "tuple-type2-item"))
+      (define c1-u       (next-uid! "resulting_coercion"))
+      (define c2-u       (next-uid! "resulting_coercion"))
+      (define ca-u       (next-uid! "item-coercion"))
+      (define st-u       (next-uid! "second-tagged"))
+      (define t1         (Var t1-u))
+      (define t2         (Var t2-u))
+      (define l          (Var l-u))
+      (define c1         (Var c1-u))
+      (define c2         (Var c2-u))
+      (define i          (Var i-u))
+      (define a          (Var a-u))
+      (define st         (Var st-u))
+      (define mk-tuple   (Code-Label mk-tuple-u))
+      (define mk-c       (Code-Label mk-crcn))
+      (define mk-tuple-c : D0-Code
+        (Code `(,t1-u ,t2-u ,l-u ,i-u ,a-u)
+              (If (Op '= `(,i ,a))
+                  (Let `((,c1-u . ,(Op 'Alloc (list (sr-plus a (Quote 1)))))
+                         (,st-u . ,(Op '+ (list (Op '%<< (list a SECOND-TAG-SHIFT))
+                                                SECOND-TUPLE-COERCION-TAG))))
+                       (Begin
+                         `(,(sr-array-set! c1 TUPLE-NUM-INDEX st))
+                         (sr-tag-value c1 MEDIATING-COERCION-TAG)))
+                  (Let `((,t1a-u . ,(sr-tagged-array-ref t1 TYPE-TUPLE-TAG (sr-plus TUPLE-ITEMS-OFFSET i)))
+                         (,t2a-u . ,(sr-tagged-array-ref t2 TYPE-TUPLE-TAG (sr-plus TUPLE-ITEMS-OFFSET i))))
+                       (Let `((,ca-u . ,(App-Code mk-c `(,(Var t1a-u) ,(Var t2a-u) ,l))))
+                            (Let `((,c2-u . ,(App-Code mk-tuple `(,t1 ,t2 ,l ,(sr-plus (Quote 1) i) ,a))))
+                                 (Begin
+                                   `(,(sr-tagged-array-set! c2 MEDIATING-COERCION-TAG (sr-plus TUPLE-ITEMS-OFFSET i) (Var ca-u)))
+                                   c2)))))))
+      (add-new-code! (cons mk-tuple-u mk-tuple-c))
+      (set-box! mk-tuple-coercion-code-label? mk-tuple)
+      mk-tuple)
+    (let ([cl? (unbox mk-tuple-coercion-code-label?)])
+      (or cl? (make-code! mk-crcn))))
+
+  (: get-comp-tuple-crcn! (Uid -> (Code-Label Uid)))
+  (define (get-comp-tuple-crcn! comp-crcn)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! mk-crcn)
+      (define comp-tuple-u (next-uid! "compose-tuple-coercion"))
+      (define c1-u      (next-uid! "tuple-coercion1"))
+      (define c2-u      (next-uid! "tuple-coercion2"))
+      (define c3-u      (next-uid! "result-coercion"))
+      (define c4-u      (next-uid! "result-coercion"))
+      (define i-u       (next-uid! "index"))
+      (define a-u       (next-uid! "tuple-coercion-num"))
+      (define c1a-u     (next-uid! "tuple-coercion1-argument"))
+      (define c2a-u     (next-uid! "tuple-coercion2-argument"))
+      (define cr-u      (next-uid! "return-coercion"))
+      (define ca-u      (next-uid! "argument-coercion"))
+      (define id?1-u    (next-uid! "is_identity"))
+      (define id?2-u    (next-uid! "is_still_identity"))
+      (define st-u      (next-uid! "second-tagged"))
+      (define c1        (Var c1-u))
+      (define c2        (Var c2-u))
+      (define c3        (Var c3-u))
+      (define c4        (Var c4-u))
+      (define cr        (Var cr-u))
+      (define ca        (Var ca-u))
+      (define i         (Var i-u))
+      (define a         (Var a-u))
+      (define id?1      (Var id?1-u))
+      (define id?2      (Var id?2-u))
+      (define st        (Var st-u))
+      (define comp-tuple   (Code-Label comp-tuple-u))
+      (define comp-c    (Code-Label comp-crcn))
+      (define comp-tuple-c : D0-Code
+        (Code `(,c1-u ,c2-u ,i-u ,a-u ,id?1-u)
+              (If (Op '= `(,i ,a))
+                  (Let `((,c3-u . ,(Op 'Alloc (list (sr-plus a (Quote 1)))))
+                         (,st-u . ,(Op '+ (list (Op '%<< (list a SECOND-TAG-SHIFT))
+                                                SECOND-TUPLE-COERCION-TAG))))
+                       (Begin
+                         `(,(sr-array-set! c3 TUPLE-NUM-INDEX st))
+                         (sr-tag-value c3 MEDIATING-COERCION-TAG)))
+                  (Let `((,c1a-u . ,(sr-tagged-array-ref c1 MEDIATING-COERCION-TAG (sr-plus TUPLE-ITEMS-OFFSET i)))
+                         (,c2a-u . ,(sr-tagged-array-ref c2 MEDIATING-COERCION-TAG (sr-plus TUPLE-ITEMS-OFFSET i))))
+                       (Let `((,ca-u . ,(App-Code comp-c `(,(Var c1a-u) ,(Var c2a-u)))))
+                            (Let `((,id?2-u . ,(If id?1
+                                                   (sr-check-tag=? ca COERCION-TAG-MASK IDENTITY-COERCION-TAG)
+                                                   FALSE-IMDT)))
+                                 (Let `((,c4-u . ,(App-Code comp-tuple `(,c1 ,c2 ,(sr-plus (Quote 1) i) ,a ,id?2))))
+                                      (If (sr-check-tag=? c4 COERCION-TAG-MASK IDENTITY-COERCION-TAG)
+                                          IDENTITY-COERCION-IMDT
+                                          (Begin
+                                            `(,(sr-tagged-array-set! c4 MEDIATING-COERCION-TAG (sr-plus TUPLE-ITEMS-OFFSET i) ca))
+                                            c4)))))))))
+      (add-new-code! (cons comp-tuple-u comp-tuple-c))
+      (set-box! comp-tuple-coercion-code-label? comp-tuple)
+      comp-tuple)
+    (let ([cl? (unbox comp-tuple-coercion-code-label?)])
+      (or cl? (make-code! comp-crcn))))
 
   (: sr-coercion (Coercion/Prim-Type -> D0-Expr))
   (define (sr-coercion c)
@@ -412,16 +582,33 @@ exposed as the effects that they truelly are.
        (sr-alloc "sequence_coecion" l:SEQUENCE-COERCION-TAG
                  `(("first" . ,f) (,"second" . ,s)))]
       [(Fn _ a* (app sr-coercion r))
-       (sr-alloc "fn_coercion" l:FN-COERCION-TAG
-                 `(("arity"  . ,(Quote (length a*)))
-                   ("return" . ,r) .
-                   ,(map (lambda ([a : Coercion/Prim-Type])
-                           (cons "argument" (sr-coercion a)))
-                         a*)))]
+       (define st-u      (next-uid! "second-tagged"))
+       (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote (length a*)) SECOND-TAG-SHIFT))
+                                   SECOND-FN-COERCION-TAG))))
+            (sr-alloc "fn_coercion" l:MEDIATING-COERCION-TAG
+                      `(("arity"  . ,(Var st-u))
+                        ("return" . ,r) .
+                        ,(map (lambda ([a : Coercion/Prim-Type])
+                                (cons "argument" (sr-coercion a)))
+                              a*))))]
       [(Ref (app sr-coercion r) (app sr-coercion w))
-       (sr-alloc "ref-coercion" l:REF-COERCION-TAG
-                 `(("read-coercion" . ,r)
-                   ("write-coercion" . ,w)))]
+       (define st-u    (next-uid! "second-tagged"))
+       (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote 0) SECOND-TAG-SHIFT))
+                                     SECOND-REF-COERCION-TAG))))
+            (sr-alloc "ref-coercion" l:MEDIATING-COERCION-TAG
+                      `(("tag" . ,(Var st-u))
+                        ("read-coercion" . ,r)
+                        ("write-coercion" . ,w))))]
+      [(CTuple _ a*)
+       (define st-u      (next-uid! "second-tagged"))
+       (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote (length a*)) SECOND-TAG-SHIFT))
+                                     SECOND-TUPLE-COERCION-TAG))))
+            (sr-alloc "tuple_coercion" l:MEDIATING-COERCION-TAG
+                      `(("num"  . ,(Var st-u))
+                        .
+                        ,(map (lambda ([a : Coercion/Prim-Type])
+                                (cons "item" (sr-coercion a)))
+                              a*))))]
       [(Failed l)
        (sr-alloc "failed-coercion" l:FAILED-COERCION-TAG
                  `(("label" . ,(Quote l))))]
@@ -514,7 +701,7 @@ exposed as the effects that they truelly are.
          (Op 'Array-ref (list arg GVECT-TO-INDEX))]
         [(Type-Dyn-Huh (app recur e))
          (Op '= (list TYPE-DYN-RT-VALUE e))]
-       
+        
         [(Type-Tag (app recur e))
          (Op 'binary-and (list e TYPE-TAG-MASK))]
         ;; Coercions
@@ -550,26 +737,37 @@ exposed as the effects that they truelly are.
         ;; Identity Coercions can only be created by coercion quoting
         ;; But  their representation is just (Quote ID-COERCION-TAG)
         [(Id-Coercion-Huh (app recur e))
-         ;;(Op '= (list e ID-COERCION))
          (sr-check-tag=? e COERCION-TAG-MASK IDENTITY-COERCION-TAG)]
         ;; Function Coercions
         [(Fn-Coercion-Huh (app recur e))
-         (sr-check-tag=? e COERCION-TAG-MASK FN-COERCION-TAG)]
+         (define tmp (next-uid! "crcn_tmp"))
+         (define tag (next-uid! "crcn_tag"))
+         (define tmp-var (Var tmp))
+         (define tag-var (Var tag))
+         (Let `((,tmp . ,(sr-tagged-array-ref e MEDIATING-COERCION-TAG FN-ARITY-INDEX)))
+              (Let `((,tag . ,(Op 'binary-and `(,tmp-var ,COERCION-TAG-MASK))))
+                   (Op '= (list tag-var SECOND-FN-COERCION-TAG))))]
         [(Fn-Coercion-Arity (app recur e))
-         (sr-tagged-array-ref e FN-COERCION-TAG FN-ARITY-INDEX)]
+         (define tmp (next-uid! "tagged_arity"))
+         (define tmp-var (Var tmp))
+         (Let `((,tmp . ,(sr-tagged-array-ref e MEDIATING-COERCION-TAG FN-ARITY-INDEX)))
+              (Op '%>> (list tmp-var SECOND-TAG-SHIFT)))]
         [(Fn-Coercion-Arg (app recur e) (app recur i))
-         (sr-tagged-array-ref e FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i))]
+         (sr-tagged-array-ref e MEDIATING-COERCION-TAG (sr-plus FN-FMLS-OFFSET i))]
         [(Fn-Coercion-Return (app recur e))
-         (sr-tagged-array-ref e FN-COERCION-TAG FN-RETURN-INDEX)]
+         (sr-tagged-array-ref e MEDIATING-COERCION-TAG FN-RETURN-INDEX)]
         ;; TODO either repurpose or get rid of the arrity field
         ;; One could immagine that we use it to dynamically dispatch on compose
         [(Fn-Coercion (app recur* e*) (app recur e))
-         (sr-alloc "fn_coercion" l:FN-COERCION-TAG
-                   `(("arity" . ,(Quote (length e*)))
-                     ("return" . ,e) .
-                     ,(map (lambda ([e : D0-Expr])
-                             (cons "argument" e))
-                           e*)))]
+         (define st-u    (next-uid! "second-tagged"))
+         (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote (length e*)) SECOND-TAG-SHIFT))
+                                       SECOND-FN-COERCION-TAG))))
+              (sr-alloc "fn_coercion" l:MEDIATING-COERCION-TAG
+                        `(("arity" . ,(Var st-u))
+                          ("return" . ,e) .
+                          ,(map (lambda ([e : D0-Expr])
+                                  (cons "argument" e))
+                                e*))))]
         [(Make-Fn-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (: invoke-mk-fn-crcn ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr -> D0-Expr))
          (define (invoke-mk-fn-crcn mk-fn t1 t2 l)
@@ -586,12 +784,15 @@ exposed as the effects that they truelly are.
         [(Compose-Fn-Coercion compose (app recur c1) (app recur c2))
          (: invoke-comp ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
          (define (invoke-comp comp-fn c1 c2)
-           (App-Code
-            comp-fn
-            (list c1 c2
-                  (Quote 0)
-                  (sr-tagged-array-ref c1 FN-COERCION-TAG FN-ARITY-INDEX)
-                  TRUE-IMDT)))
+           (define tmp (next-uid! "tagged_arity"))
+           (define tmp-var (Var tmp))
+           (define a (next-uid! "untagged_arity"))
+           (define a-var (Var a))
+           (Let `((,tmp . ,(sr-tagged-array-ref c1 MEDIATING-COERCION-TAG FN-ARITY-INDEX)))
+                (Let `((,a . ,(Op '%>> (list tmp-var SECOND-TAG-SHIFT))))
+                     (App-Code
+                      comp-fn
+                      (list c1 c2 (Quote 0) a-var TRUE-IMDT)))))
          (let ([mk-fn-crcn (get-comp-fn-crcn! compose)])
            (if (Var? c1)
                (invoke-comp mk-fn-crcn c1 c2)
@@ -600,15 +801,25 @@ exposed as the effects that they truelly are.
                       (invoke-comp mk-fn-crcn (Var u) c2)))))]
 
         [(Ref-Coercion-Huh (app recur e))
-         (sr-check-tag=? e COERCION-TAG-MASK REF-COERCION-TAG)]
+         (define tmp (next-uid! "crcn_tmp"))
+         (define tag (next-uid! "crcn_tag"))
+         (define tmp-var (Var tmp))
+         (define tag-var (Var tag))
+         (Let `((,tmp . ,(sr-tagged-array-ref e MEDIATING-COERCION-TAG REF-COERCION-TAG-INDEX)))
+              (Let `((,tag . ,(Op 'binary-and `(,tmp-var ,COERCION-TAG-MASK))))
+                   (Op '= (list tag-var SECOND-REF-COERCION-TAG))))]
         [(Ref-Coercion (app recur r) (app recur w))
-         (sr-alloc "ref-coercion" l:REF-COERCION-TAG
-                   `(("read-coercion" . ,r)
-                     ("write-coercion" . ,w)))]
+         (define st-u    (next-uid! "second-tagged"))
+         (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote 0) SECOND-TAG-SHIFT))
+                                       SECOND-REF-COERCION-TAG))))
+              (sr-alloc "ref-coercion" l:MEDIATING-COERCION-TAG
+                        `(("tag" . ,(Var st-u))
+                          ("read-coercion" . ,r)
+                          ("write-coercion" . ,w))))]        
         [(Ref-Coercion-Read (app recur e))
-         (sr-tagged-array-ref e REF-COERCION-TAG REF-COERCION-READ-INDEX)]
+         (sr-tagged-array-ref e MEDIATING-COERCION-TAG REF-COERCION-READ-INDEX)]
         [(Ref-Coercion-Write (app recur e))
-         (sr-tagged-array-ref e REF-COERCION-TAG REF-COERCION-WRITE-INDEX)]
+         (sr-tagged-array-ref e MEDIATING-COERCION-TAG REF-COERCION-WRITE-INDEX)]
         [(Failed-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK FAILED-COERCION-TAG)]
         ;; For now I am allocating the blame label in a box.
@@ -767,10 +978,98 @@ exposed as the effects that they truelly are.
          ((untag-deref-gproxy GPROXY-BLAMES-INDEX) e)]
         [(Guarded-Proxy-Coercion (app recur e))
          ((untag-deref-gproxy GPROXY-COERCION-INDEX) e)]
+        [(Create-tuple (app recur* e*))
+         (sr-alloc "tuple" 0
+                   (map (lambda ([e : D0-Expr])
+                          (cons "element" e))
+                        e*))]
+        [(Tuple-proj (app recur e) i)
+         (Op 'Array-ref (list e (Quote i)))]
+        [(Tuple-Coercion-Huh (app recur e))
+         (define tmp (next-uid! "crcn_tmp"))
+         (define tag (next-uid! "crcn_tag"))
+         (define tmp-var (Var tmp))
+         (define tag-var (Var tag))
+         (Let `((,tmp . ,(sr-tagged-array-ref e MEDIATING-COERCION-TAG TUPLE-NUM-INDEX)))
+              (Let `((,tag . ,(Op 'binary-and `(,tmp-var ,COERCION-TAG-MASK))))
+                   (Op '= (list tag-var SECOND-TUPLE-COERCION-TAG))))]
+        [(Tuple-Coercion-Num (app recur e))
+         (define tmp (next-uid! "tagged_num"))
+         (define tmp-var (Var tmp))
+         (Let `((,tmp . ,(sr-tagged-array-ref e MEDIATING-COERCION-TAG TUPLE-NUM-INDEX)))
+              (Op '%>> (list tmp-var SECOND-TAG-SHIFT)))]
+        [(Tuple-Coercion-Item (app recur e) i)
+         (sr-tagged-array-ref e MEDIATING-COERCION-TAG (sr-plus TUPLE-ITEMS-OFFSET (Quote i)))]
+        [(Type-Tuple-Huh (app recur e))
+         (sr-check-tag=? e TYPE-TAG-MASK TYPE-TUPLE-TAG)]
+        [(Type-Tuple-num (app recur e))
+         (sr-tagged-array-ref e TYPE-TUPLE-TAG TUPLE-NUM-INDEX)]
+        [(Type-Tuple-item (app recur e) i)
+         (sr-tagged-array-ref e TYPE-TUPLE-TAG (sr-plus TUPLE-ITEMS-OFFSET (Quote i)))]
+        [(Coerce-Tuple uid (app recur v) (app recur c))
+         (: invoke-coerce-tuple ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
+         (define (invoke-coerce-tuple coerce-tuple v c)
+           (define tmp (next-uid! "tagged_num"))
+           (Let `((,tmp . ,(sr-tagged-array-ref c MEDIATING-COERCION-TAG TUPLE-NUM-INDEX)))
+                (App-Code
+                 coerce-tuple
+                 (list v c (Quote 0)
+                       (Op '%>> (list (Var tmp) SECOND-TAG-SHIFT))))))
+         (let ([coerce-tuple (get-coerce-tuple! uid)])
+           (if (Var? v)
+               (invoke-coerce-tuple coerce-tuple v c)
+               (let ([u (next-uid! "tuple_val1")])
+                 (Let `((,u . ,v))
+                      (invoke-coerce-tuple coerce-tuple (Var u) c)))))]
+        [(Cast-Tuple uid (app recur v) (app recur t1) (app recur t2) (app recur lbl))
+         (: invoke-cast-tuple ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr D0-Expr -> D0-Expr))
+         (define (invoke-cast-tuple cast-tuple v t1 t2 lbl)
+           (define num (next-uid! "num"))
+           (Let `((,num . ,(sr-tagged-array-ref t2 TYPE-TUPLE-TAG TUPLE-NUM-INDEX)))
+                (App-Code
+                 cast-tuple
+                 (list v t1 t2 lbl (Quote 0) (Var num)))))
+         (let ([cast-tuple (get-cast-tuple! uid)])
+           (if (Var? v)
+               (invoke-cast-tuple cast-tuple v t1 t2 lbl)
+               (let ([u (next-uid! "tuple_val1")])
+                 (Let `((,u . ,v))
+                      (invoke-cast-tuple cast-tuple (Var u) t1 t2 lbl)))))]
+        [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
+         (: invoke-mk-tuple-crcn ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr -> D0-Expr))
+         (define (invoke-mk-tuple-crcn mk-tuple-crcn t1 t2 l)
+           (App-Code
+            mk-tuple-crcn
+            (list t1 t2 l (Quote 0)
+                  (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TUPLE-NUM-INDEX))))
+         (let ([mk-tuple-crcn (get-mk-tuple-crcn! mk-crcn)])
+           (if (Var? t1)
+               (invoke-mk-tuple-crcn mk-tuple-crcn t1 t2 l)
+               (let ([u (next-uid! "tuple_type1")])
+                 (Let `((,u . ,t1))
+                      (invoke-mk-tuple-crcn mk-tuple-crcn (Var u) t2 l)))))]
+        [(Compose-Tuple-Coercion compose (app recur c1) (app recur c2))
+         (: invoke-comp ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
+         (define (invoke-comp comp-tuple c1 c2)
+           (define tmp (next-uid! "tagged_num"))
+           (define tmp-var (Var tmp))
+           (define a (next-uid! "untagged_num"))
+           (define a-var (Var a))
+           (Let `((,tmp . ,(sr-tagged-array-ref c2 MEDIATING-COERCION-TAG TUPLE-NUM-INDEX)))
+                (Let `((,a . ,(Op '%>> (list tmp-var SECOND-TAG-SHIFT))))
+                     (App-Code
+                      comp-tuple
+                      (list c1 c2 (Quote 0) a-var TRUE-IMDT)))))
+         (let ([mk-tuple-crcn (get-comp-tuple-crcn! compose)])
+           (if (Var? c1)
+               (invoke-comp mk-tuple-crcn c1 c2)
+               (let ([u (next-uid! "tuple_coercion1")])
+                 (Let `((,u . ,c1))
+                      (invoke-comp mk-tuple-crcn (Var u) c2)))))]
+        [(Mediating-Coercion-Huh? (app recur e))
+         (sr-check-tag=? e COERCION-TAG-MASK MEDIATING-COERCION-TAG)]
         [other (error 'specify-representation "unmatched ~a" other)]))
-
-
-
+    
     (recur exp))
 
 
@@ -786,7 +1085,7 @@ exposed as the effects that they truelly are.
 ;; though it does eliminate any form that it can based on it's input
 (: sr-alloc/next ((Boxof Nat) ->
                   (String Fixnum (Listof (Pair String D0-Expr)) ->
-                   D0-Expr)))
+                          D0-Expr)))
 (define ((sr-alloc/next next) name tag slots)
   (: next-uid! (String -> Uid))
   (define (next-uid! x)
@@ -798,7 +1097,7 @@ exposed as the effects that they truelly are.
   (: sr-alloc-init ((Var Uid) -> (Index (Var Uid) -> D0-Expr)))
   (define ((sr-alloc-init mem) offset value)
     (Op 'Array-set! (list mem (Quote offset) value)))
-  ;; Take a list of variables and expressions paired with there names
+  ;; Take a list of variables and expressions paired with their names
   ;; make variables that are bound to the expressions and the bindings
   (: get-bnd/var ((Listof (Pair String D0-Expr)) -> (Values D0-Bnd* (Listof (Var Uid)))))
   (define (get-bnd/var b*)
@@ -843,28 +1142,35 @@ exposed as the effects that they truelly are.
     [(TypeId u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
-  (: sr-bndt ((Boxof Nat) -> (CoC6-Bnd-Type -> D0-Expr)))
-  (define ((sr-bndt next) bnd)
-    (define sr-alloc (sr-alloc/next next))
-    (: sr-type (Compact-Type -> D0-Expr))
-    (define (sr-type t)
-      (match t
-        [(GRef t)
-         (sr-alloc "GRefT" l:TYPE-GREF-TAG
-                   `(("type" . ,(sr-prim-type t))))]
-        [(GVect t)
-         (sr-alloc "GVect_Type" l:TYPE-GVECT-TAG
-                   `(("type" . ,(sr-prim-type t))))]      
-        [(Fn a f* r)
-         (sr-alloc "Fun_Type" l:TYPE-FN-TAG
-                   `(("arity" . ,(Quote a))
-                     ("return" . ,(sr-prim-type r)) .
-                     ,(map (lambda ([t : Prim-Type])
-                             (cons "argument" (sr-prim-type t)))
-                           f*)))]
-        [other (error 'specify-representation/type "unmatched ~a" other)]))
-    (match-let ([(cons u t) bnd])
-      (Assign u (sr-type t))))
+(: sr-bndt ((Boxof Nat) -> (CoC6-Bnd-Type -> D0-Expr)))
+(define ((sr-bndt next) bnd)
+  (define sr-alloc (sr-alloc/next next))
+  (: sr-type (Compact-Type -> D0-Expr))
+  (define (sr-type t)
+    (match t
+      [(GRef t)
+       (sr-alloc "GRefT" l:TYPE-GREF-TAG
+                 `(("type" . ,(sr-prim-type t))))]
+      [(GVect t)
+       (sr-alloc "GVect_Type" l:TYPE-GVECT-TAG
+                 `(("type" . ,(sr-prim-type t))))]      
+      [(Fn a f* r)
+       (sr-alloc "Fun_Type" l:TYPE-FN-TAG
+                 `(("arity" . ,(Quote a))
+                   ("return" . ,(sr-prim-type r)) .
+                   ,(map (lambda ([t : Prim-Type])
+                           (cons "argument" (sr-prim-type t)))
+                         f*)))]
+      [(STuple n a*)
+       (sr-alloc "Tuple_Type" l:TYPE-TUPLE-TAG
+                 `(("num" . ,(Quote n))
+                   .
+                   ,(map (lambda ([t : Prim-Type])
+                           (cons "argument" (sr-prim-type t)))
+                         a*)))]
+      [other (error 'specify-representation/type "unmatched ~a" other)]))
+  (match-let ([(cons u t) bnd])
+    (Assign u (sr-type t))))
 
 (: untag-deref-gproxy (-> D0-Expr (-> D0-Expr D0-Expr)))
 (define ((untag-deref-gproxy index) proxy)
@@ -884,14 +1190,14 @@ exposed as the effects that they truelly are.
   (define var   (Var proxy))
   (Let `((,ref . ,ref-e) (,src . ,src-e)
          (,tar . ,tar-e) (,lbl . ,lbl-e))
-   (Let `((,proxy . ,(Op 'Alloc (list GPROXY/TWOSOME-SIZE))))
-    (Begin
-      (list
-       (Op 'Array-set! (list var GPROXY-FOR-INDEX    (Var ref)))
-       (Op 'Array-set! (list var GPROXY-FROM-INDEX   (Var src)))
-       (Op 'Array-set! (list var GPROXY-TO-INDEX     (Var tar)))
-       (Op 'Array-set! (list var GPROXY-BLAMES-INDEX (Var lbl))))
-      (Op 'binary-or (list var GPROXY-TAG))))))
+       (Let `((,proxy . ,(Op 'Alloc (list GPROXY/TWOSOME-SIZE))))
+            (Begin
+              (list
+               (Op 'Array-set! (list var GPROXY-FOR-INDEX    (Var ref)))
+               (Op 'Array-set! (list var GPROXY-FROM-INDEX   (Var src)))
+               (Op 'Array-set! (list var GPROXY-TO-INDEX     (Var tar)))
+               (Op 'Array-set! (list var GPROXY-BLAMES-INDEX (Var lbl))))
+              (Op 'binary-or (list var GPROXY-TAG))))))
 
 (: alloc-tag-set-gproxy/coercion
    ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
@@ -901,12 +1207,12 @@ exposed as the effects that they truelly are.
   (define crcn  (uid! "coercion"))
   (define var   (Var proxy))
   (Let `((,ref . ,ref-e) (,crcn . ,crcn-e))
-   (Let `((,proxy . ,(Op 'Alloc (list GPROXY/COERCION-SIZE))))
-    (Begin
-      (list
-       (Op 'Array-set! (list var GPROXY-FOR-INDEX      (Var ref)))
-       (Op 'Array-set! (list var GPROXY-COERCION-INDEX (Var crcn))))
-      (Op 'binary-or (list var GPROXY-TAG))))))
+       (Let `((,proxy . ,(Op 'Alloc (list GPROXY/COERCION-SIZE))))
+            (Begin
+              (list
+               (Op 'Array-set! (list var GPROXY-FOR-INDEX      (Var ref)))
+               (Op 'Array-set! (list var GPROXY-COERCION-INDEX (Var crcn))))
+              (Op 'binary-or (list var GPROXY-TAG))))))
 
 
 ;; fold map through bindings
@@ -943,11 +1249,12 @@ exposed as the effects that they truelly are.
       [(Fn? t) (Op 'Print (list (Quote "Function : ?\n")))]
       [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
       [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
+      [(STuple? t) (Op 'Print (list (Quote "Tuple : ?\n")))]
       [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
       [else (TODO implement thing for reference types)]))
   (let* ([res (uid! "result")])
     (Let (list (cons res e))
-      (Begin (list (generate-print res t)) (Success)))))
+         (Begin (list (generate-print res t)) (Success)))))
 
 #;(TODO GET RID OF TAGS IN THE COMPILER)
 (: sr-tag (Tag-Symbol -> (Quote Integer)))
@@ -960,7 +1267,8 @@ exposed as the effects that they truelly are.
     [(Fn)     TYPE-FN-TAG]
     [(GRef)   TYPE-GREF-TAG]
     [(GVect)  TYPE-GVECT-TAG]
-    [(Boxed)  DYN-BOXED-TAG]))
+    [(Boxed)  DYN-BOXED-TAG]
+    [(STuple) TYPE-TUPLE-TAG]))
 
 
 
@@ -974,7 +1282,7 @@ exposed as the effects that they truelly are.
              [closv  (Var cp)]
              [env (for/hash : Env ([fvar fvar*]
                                    [i (in-naturals offset)])
-                  (values fvar (Op 'Array-ref (list closv (Quote i)))))]
+                    (values fvar (Op 'Array-ref (list closv (Quote i)))))]
              [env (extend* env param* (map var param*))]
              [cenv (index-closure offset cp fvar*)])
         (cons u (Code (cons cp param*) (sr-expr exp env cenv))))))
