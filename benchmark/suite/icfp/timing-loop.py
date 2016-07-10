@@ -35,7 +35,7 @@ loop_data = np.genfromtxt('loop-fn-app.txt',
                           names="apps, t_time, c_time",
                           usecols=("apps, t_time, c_time"))
 
-def violin_plot_data(data, x_key, y_key, color, name,
+def violin_plot_data(data, x_key, y_key, color, name
                      , violin_widths=.35
                      , violin_showextrema=False
                      , violin_showmedians=False
@@ -51,7 +51,7 @@ def violin_plot_data(data, x_key, y_key, color, name,
                           , showmedians=violin_showmedians
                           , showmeans=violin_showmeans)
     vplt_fake = set_violin_color_label(vplt, color, name)
-    if 0 = reg_poly:
+    if 0 == reg_poly:
         return vplt_fake
     else:
         reg  = np.polyfit(data[x_key], data[y_key], reg_poly)
@@ -64,8 +64,8 @@ def violin_plot_data(data, x_key, y_key, color, name,
         else:
             eq = "%.2f$A$ + %.2f\t" % (reg[0], reg[1])
         reg_fake = mlines.Line2D([],[],color=reg_color, label=reg_label)
-        if reg_text
-        reg_eq_txt  = plt.text(reg_label, 8 , cdata_lplt_eq, color=cdata_lplt_fake.get_color())
+        if reg_text:
+            reg_eq_txt  = plt.text(reg_label, 8 , cdata_lplt_eq, color=cdata_lplt_fake.get_color())
         return vplt_fake, reg_fake
 
 # Twosomes cast introduction analysis
@@ -97,17 +97,17 @@ cdata_vplt = plt.violinplot(cdata_times
 cdata_vplt_fake = set_violin_color_label(cdata_vplt, "green", "Coercions")
 
 
-cdata_lreg = np.polyfit(loop_data["apps"], loop_data["c_time"], 1, full=True)
+cdata_lreg = np.polyfit(loop_data["apps"], loop_data["c_time"], 1)
 cdata_lplt = plt.plot(loop_data["apps"]
                       , np.polyval(cdata_lreg, loop_data["apps"])
                       , linestyle="-"
                       , color="red")
 
 if cdata_lreg[1] < 0 :
-    cdata_lplt_eq = "%.2f$A$ - %.2f\tR² = %.2f" % \
-                    (cdata_lreg[0], (-1.0 * cdata_lreg[1]), R2)
+    cdata_lplt_eq = "%.2f$A$ - %.2f" % \
+                    (cdata_lreg[0], (-1.0 * cdata_lreg[1]))
 else:
-    cdata_lplt_eq = "%.2f$A$ + %.2f\tR² = %.2f" % (cdata_lreg[0], cdata_lreg[1], R2)
+    cdata_lplt_eq = "%.2f$A$ + %.2f" % (cdata_lreg[0], cdata_lreg[1])
 cdata_lplt_fake = mlines.Line2D([],[],color="red", label='Linear model of Coercions')
 cdata_lplt_txt  = plt.text(5, 8 , cdata_lplt_eq, color=cdata_lplt_fake.get_color())
 

@@ -30,7 +30,7 @@
    #:use-acc-action (lambda (acc) acc)))
 
 (define results
-  (for/list ([i (in-range 1 15)])
+  (for/list ([i (in-range 1 100)])
     (define base (format "loop-fn-app-~a" i))
     (define src-file
       (write-source base (mk-fn-app-loop i)))

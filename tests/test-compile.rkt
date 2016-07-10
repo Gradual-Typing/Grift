@@ -81,9 +81,10 @@
                                      (blame #t (exn-message e))
                                      "static type error")))])
          (define ast0 (reduce-to-cast-calculus path config))
+         #;
          (when (intermediate-checks?)
            (nop ast0 "cast 0")            
-           (define ast1 (test-impose-cast-semantics ast0 config nop))
+           (define ast1 (impose-cast-semantics ast0 config))
            (define ast2 (convert-representation ast1 config))
            (c-backend-generate-code ast2 config)
            (parameterize ([current-input-port (open-test-input path)])

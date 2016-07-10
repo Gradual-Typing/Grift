@@ -1,0 +1,12 @@
+(let ([iters : Int (read-int)]
+      [acc : (GRef Dyn) (gbox (: 42 Dyn))]
+      [guarded-ref : Dyn (gbox 0)])
+  (letrec ([run-test : (Int Dyn -> Dyn)
+            (lambda ([i : Int] [acc : Dyn]) acc)])
+    (begin
+      (timer-start)
+      (repeat (i 0 iters) (gbox-set! acc (run-test i (gunbox acc))))
+      (timer-stop)
+      (timer-report)
+      (: (gunbox acc) Int))))
+

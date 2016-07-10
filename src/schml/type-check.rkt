@@ -144,8 +144,8 @@ The type rules for core forms that have interesting type rules
 (: repeat-type-rule (Schml-Type Schml-Type Schml-Type -> Schml-Type))
 (define (repeat-type-rule tstart tstop teffect)
   (cond
-    [(not (consistent? tstart INT-TYPE)) (TODO error message we tstart not int)]
-    [(not (consistent? tstop INT-TYPE)) (TODO error message when tstop not INT)]
+    [(not (consistent? tstart INT-TYPE)) (error 'type-check/todo)]
+    [(not (consistent? tstop INT-TYPE)) (error 'type-check/todo)]
     [else UNIT-TYPE]))
 
 ;; The type of wrapping a value in a gaurded box is a
@@ -161,7 +161,7 @@ The type rules for core forms that have interesting type rules
   (match ty
     [(Dyn) DYN-TYPE]
     [(GRef g) g]
-    [otherwise (TODO raise an appropriate error here)]))
+    [otherwise (error 'type-check/todo)]))
 
 ;; The type of setting a reference is always unit
 (: gbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
@@ -170,8 +170,8 @@ The type rules for core forms that have interesting type rules
     [(Dyn) UNIT-TYPE]
     [(GRef g) (if (consistent? g val-ty)
                   UNIT-TYPE
-                  (TODO raise an error about type inconsistency between g and val-ty))]
-    [otherwise (TODO raise an error about box-type being type-incorrect)]))
+                  (error 'type-check/todo))]
+    [otherwise (error 'type-check/todo)]))
 
 ;; The type of wrapping a value in a monotonic box is a
 ;; MRef of the value's type
@@ -186,7 +186,7 @@ The type rules for core forms that have interesting type rules
   (match ty
     [(Dyn) DYN-TYPE]
     [(MRef m) m]
-    [otherwise (TODO raise an error about there a type error here)]))
+    [otherwise (error 'type-check/todo)]))
 
 ;; The type of setting a dyn value is dyn
 ;; The type of setting a MRef value is the type of the armurment
@@ -196,8 +196,8 @@ The type rules for core forms that have interesting type rules
     [(Dyn) DYN-TYPE]
     [(MRef m) (if (consistent? m val-ty)
                   val-ty
-                  (TODO raise an error about type inconsistency between m and val-ty))]
-    [otherwise (TODO raise an error about box-type beinm type-incorrect)]))
+                  (error 'type-check/todo))]
+    [otherwise (error 'type-check/todo)]))
 
 ;; The type of creating an array is Vect of the type of the initializing argument
 ;; The size argument must be consistent with Int
@@ -205,7 +205,7 @@ The type rules for core forms that have interesting type rules
 (define (gvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (GVect init-ty)
-      (TODO come up with an error for being inconsistent with int here)))
+      (error 'type-check/todo)))
 
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
@@ -216,8 +216,8 @@ The type rules for core forms that have interesting type rules
       (match vect-ty
         [(Dyn) DYN-TYPE]
         [(GVect g) g]
-        [otherwise (TODO raise inconsistent with GVECT 'a here)])
-      (TODO raise inconsistent with INT here)))
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 ;; The type of setting a guarded vector of type T is the type of
 ;; The new value as long as the new value is consistent with the old value
@@ -232,9 +232,9 @@ The type rules for core forms that have interesting type rules
         [(Dyn) DYN-TYPE]
         [(GVect g) (if (consistent? g val-ty)
                        val-ty
-                       (TODO raise a error about consistency between g and val-ty))]
-        [otherwise (TODO raise an error about consistency between (Gvect val-ty))])
-      (TODO raise an error about consistency between index-ty and int)))
+                       (error 'type-check/todo))]
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 
 ;; The type of creating an array is Vect of the type of the initializing argument
@@ -243,7 +243,7 @@ The type rules for core forms that have interesting type rules
 (define (mvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (MVect init-ty)
-      (TODO come up with an error for being inconsistent with int here)))
+      (error 'type-check/todo)))
 
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
@@ -254,8 +254,8 @@ The type rules for core forms that have interesting type rules
       (match vect-ty
         [(Dyn) DYN-TYPE]
         [(MVect g) g]
-        [otherwise (TODO raise inconsistent with MVECT 'a here)])
-      (TODO raise inconsistent with INT here)))
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 ;; The type of setting a monotonic vector of type T is the type of
 ;; The new value as long as the new value is consistent with the old value
@@ -268,9 +268,9 @@ The type rules for core forms that have interesting type rules
         [(Dyn) DYN-TYPE]
         [(MVect g) (if (consistent? g val-ty)
                        val-ty
-                       (TODO raise a error about consistency between g and val-ty))]
-        [otherwise (TODO raise an error about consistency between (Mvect val-ty))])
-      (TODO raise an error about consistency between index-ty and int)))
+                       (error 'type-check/todo))]
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 
 ;;; Procedures that destructure and restructure the ast

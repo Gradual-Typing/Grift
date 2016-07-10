@@ -27,8 +27,14 @@
 (: IMDT-C-TYPE String)
 (define IMDT-C-TYPE "int64_t")
 
-(: C-EXIT String)
-(define C-EXIT "exit(-1)")
+(: ~exit : Any -> String)
+(define (~exit error)
+  (format "exit(~a)" error))
+
+(define C-EXIT : String (~exit "EXIT_FAILURE"))
+(define ERROR-OUT-OF-MEMORY : String "EXIT_FAILURE")
+(define ERROR-INDEX-OUT-OF-BOUNDS : String "EXIT_FAILURE")
+(define ERROR-CAST-ERROR : String "EXIT_FAILURE")
 
 (: C-INCLUDES (Listof String))
 (define C-INCLUDES
@@ -60,14 +66,10 @@
 
 (: init-mem (Natural -> Void))
 (define (init-mem n)
-  (let ([s (number->string n)])
-    (display "free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
-    (display s)
-    (display "), alloc_ptr);")
-    (display "limit = free_ptr + ")
-    (display s)
-    (display ";\n")
-    (display "allocd_mem = 0;\n")))
+  (printf
+   "free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);\n" n)
+  (printf "limit = free_ptr + ~a;\n" n)
+  (display "allocd_mem = 0;\n"))
 
 (define-values (timer-start timer-stop timer-report timer-boiler-plate)
   (cond
@@ -134,12 +136,13 @@
     (display "long alloc(int n){")
     (display "    long result = free_ptr;")
     (display "    long newFree = result + n;")
-    (display "    allocd_mem+=n;")
+    (display "    allocd_mem += n;")
     (display "    if (newFree >= limit){")
     (display "        puts(\"Requesting more memory\\n\");")
     (printf  "        free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);" s)
-    (display "        if (!free_ptr){\n")
+    (display "        if (free_ptr == (long)NULL){\n")
     (display "           fputs(\"couldn't allocate any more memory\", stderr);\n")
+    (printf  "           exit(~a);" ERROR-OUT-OF-MEMORY)
     (display "        }\n")
     (printf  "        limit = free_ptr + ~a;" s)
     (display "        return alloc (n);")
@@ -262,7 +265,7 @@
             (newline))]
     [(Return e)
      (if (Success? e)
-         (display "return 0;")
+         (display "return EXIT_SUCCESS;")
          (begin
            (display "return ")
            (emit-value e)

@@ -108,6 +108,7 @@
    (test-file "core" "blame11.schml" (blame #f (not-lbl "Fail")))
    (test-file "core" "blame12.schml" (blame #f "Pass"))
    (test-file "core" "blame13.schml" (blame #f "Pass"))
-
+   (test-file "core" "blame14.schml" (blame #f "Pass"))
+   
 
    ))

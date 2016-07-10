@@ -1,16 +1,35 @@
-#lang typed/racket
+#lang typed/racket/base
 (require
  racket/match
  racket/format
+ racket/list
  "../helpers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
- "../language/cast-or-coerce2.rkt"
  "../language/cast-or-coerce3.rkt")
 
 (provide (all-defined-out))
 
+;; Configuration that spans multiple passes
+(: specialize-casts? (Parameterof Boolean))
+(define specialize-casts? (make-parameter #f))
+
+
+
+;; inline-guarded-branch
+;; Parameter determining if the code generated for gbox-set! and gunbox
+;; performs the first check to see if the gref is a unguarded reference
+;; or delegates the entire operation to the runtime.
+;; This is only used for the twosome representation
+(: inline-guarded-branch? (Parameterof Boolean))
+(define inline-guarded-branch? (make-parameter #f))
+
 (define-type Function-Proxy-Rep (U 'Data 'Hybrid 'Functional))
+(: function-cast-representation (Parameterof Function-Proxy-Rep))
+(define function-cast-representation
+  (make-parameter 'Hybrid))
+
+
 
 ;; Expr$ and cond$ will prune branches if the condition is (Quote #t) or (Quote #f)
 ;; and generates If statements (to construct the cast tree)
@@ -83,26 +102,28 @@
       (let$*-help (cdr b*) (Let (list (car b*)) b))))
 |#
 
+(: make-trivialize :
+   (String -> Uid)
+   -> 
+   (String CoC3-Expr (Listof (Pairof Uid CoC3-Expr))
+           ->
+           (Values CoC3-Bnd* CoC3-Trivial)))
+(define ((make-trivialize next-uid!) name expr bnd*)
+  (if (or (Quote? expr) (Tag? expr) (Type? expr)
+          (Var? expr) (Quote-Coercion? expr))
+      (values bnd* expr)
+      (let ([uvar (next-uid! name)])
+        (values (cons (cons uvar expr) bnd*) (Var uvar)))))
 
 ;; createsCoC3-Expr let bindings for non-trivial CoC3-Expr expressions,
 ;; since non-trivial expressions must be evaluated only once.
 ;; This has to be a macro because it plays with what value is bound to
 ;; the t* variable in the code in order to reduce the number of cases
 ;; that must be handle
-(define-syntax-rule (define-syntax-let$* let$* next)
+(define-syntax-rule (define-syntax-let$* let$* next-uid!)
   (... ;; Quote-ellipsis
    (begin
-     (: trivialize (String CoC3-Expr (Listof (Pairof Uid CoC3-Expr))
-                           ->
-                           (Values CoC3-Bnd* CoC3-Trivial)))
-     (define (trivialize name expr bnd*)
-       (if (or (Quote? expr) (Tag? expr) (Type? expr)
-               (Var? expr) (Quote-Coercion? expr))
-           (values bnd* expr)
-           (let* ([unique (unbox next)]
-                  [uvar   (Uid name unique)])
-             (set-box! next (+ unique 1))
-             (values (cons (cons uvar expr) bnd*) (Var uvar)))))
+     (define trivialize (make-trivialize next-uid!))
      (: let$*-help ((Listof (Pairof Uid CoC3-Expr)) CoC3-Expr -> CoC3-Expr))
      (define (let$*-help b* b)
        (if (null? b*)
@@ -115,9 +136,7 @@
           (let ([b* : (Listof (Pairof Uid CoC3-Expr)) '()])
             (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
               (let ([body : CoC3-Expr b])
-                (if (null? b*)
-                    body
-                    (let$*-help b* body)))))])))))
+                (let$*-help b* body))))])))))
 
 #|
 (do (bind-state : (State Nat CoC3-Expr))
@@ -346,3 +365,30 @@
         (if (GRef? x)
             (Type (GRef-arg x))
             (error 'gvect-of$ "given ~a" x)))))
+
+(: bnd-non-vars
+   (((String -> Uid) CoC3-Expr*) (#:names (Option (Listof String)))
+    . ->* .
+    (Values CoC3-Bnd* (Listof (Var Uid)))))
+(define (bnd-non-vars next-uid! e* #:names [names? #f])
+  (define names : (Listof String) (or names? (make-list (length e*) "tmp")))
+  (define-values (bnd* var*)
+    (for/fold ([bnd* : CoC3-Bnd* '()]
+               [var* : (Listof (Var Uid)) '()])
+              ([e : CoC3-Expr e*]
+               [n : String names])
+      (cond
+        [(Var? e) (values bnd* (cons e var*))]
+        [else
+         (let ([u (next-uid! n)])
+           (values (cons (cons u e) bnd*) (cons (Var u) var*)))])))
+  #;(printf "bnd-non-vars:\ne*=~a\nnames=~a\nbnd*=~a\nvar*=~a\n\n"
+          e* names? bnd* var*)
+  (values bnd* (reverse var*)))
+
+
+(: apply-code
+   (All (A)
+     (Uid -> (() #:rest A . ->* . (App-Code (Code-Label Uid) (Listof A))))))
+(define ((apply-code u) . a*)
+  (App-Code (Code-Label u) a*))

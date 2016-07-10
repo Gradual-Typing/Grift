@@ -101,12 +101,12 @@
                 [(if)     (parse-if rand* src env next)]
                 [(:)      (parse-ascription rand* src env next)]
                 [(begin)  (run-state (parse-begin rand* src env) next)]
-                [(box)          (TODO parse box-unbox forms)]
-                [(box-set!)     (TODO parse box-unbox forms)]
-                [(unbox)        (TODO parse box-unbox forms)]
-                [(vector)       (TODO parse vector forms)]
-                [(vector-set!)  (TODO parse vector forms)]
-                [(vector-ref)   (TODO parse vector forms)]
+                [(box)          (error 'syntax->schml0/todo)]
+                [(box-set!)     (error 'syntax->schml0/todo)]
+                [(unbox)        (error 'syntax->schml0/todo)]
+                [(vector)       (error 'syntax->schml0/todo)]
+                [(vector-set!)  (error 'syntax->schml0/todo)]
+                [(vector-ref)   (error 'syntax->schml0/todo)]
                 [(gbox)         (run-state (parse-gbox rand* src env) next)]
                 [(gunbox)       (run-state (parse-gunbox rand* src env) next)]
                 [(gbox-set!)    (run-state (parse-gbox-set! rand* src env) next)]
@@ -158,7 +158,7 @@
 (define (parse-begin stx* src env)
   (let* ([s* (reverse stx*)])
     (if (null? s*)
-        (TODO the right error message and fixing the double reverse)
+        (error 'syntax->schml0/todo)
         (do (bind-state : (State Natural S0-Expr))
             (e* : S0-Expr* <- (parse-expr* (reverse (cdr s*)) env #f))
           (e  : S0-Expr  <- (parse-expr  (car s*) env #f))
@@ -171,7 +171,7 @@
       (do (bind-state : (State Natural S0-Expr))
           (e : S0-Expr <- (parse-expr (car stx*) env #f))
         (return-state (Ann (Gbox e) src)))
-      (TODO come up with better error message)))
+      (error 'syntax->schml0/todo "come up with a better error msg")))
 
 (: parse-gunbox (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-gunbox stx* src env)
@@ -179,7 +179,7 @@
       (do (bind-state : (State Natural S0-Expr))
           (e : S0-Expr <- (parse-expr (car stx*) env #f))
         (return-state (Ann (Gunbox e) src)))
-      (TODO come up with better error message)))
+      (error 'syntax->schml0/todo "come up with a better error")))
 
 (: parse-gbox-set! (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-gbox-set! stx* src env)
@@ -189,7 +189,7 @@
          (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (return-state (Ann (Gbox-set! e1 e2) src)))]
-    [otherwise (TODO emit error message)]))
+    [otherwise (error 'syntax->schml0/todo)]))
 
 ;; parsing code for monotonic references
 (: parse-mbox (-> Stx* Src Env (State Natural S0-Expr)))
@@ -198,7 +198,7 @@
       (do (bind-state : (State Natural S0-Expr))
           (e : S0-Expr <- (parse-expr (car stx*) env #f))
         (return-state (Ann (Mbox e) src)))
-      (TODO come up with better error message)))
+      (error 'syntax->schml0/todo)))
 
 (: parse-munbox (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-munbox stx* src env)
@@ -206,7 +206,7 @@
       (do (bind-state : (State Natural S0-Expr))
           (e : S0-Expr <- (parse-expr (car stx*) env #f))
         (return-state (Ann (Munbox e) src)))
-      (TODO come up with better error message)))
+      (error 'syntax->schml0/todo)))
 
 (: parse-mbox-set! (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-mbox-set! stx* src env)
@@ -216,7 +216,7 @@
          (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (return-state (Ann (Mbox-set! e1 e2) src)))]
-    [otherwise (TODO emit error message)]))
+    [otherwise (error 'syntax->schml0/todo)]))
 
 ;; parsing guarded vectors
 (: parse-gvector (-> Stx* Src Env (State Natural S0-Expr)))
@@ -227,7 +227,7 @@
          (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (return-state (Ann (Gvector e1 e2) src)))]
-    [else (TODO come up with an error message)]))
+    [else (error 'syntax->schml0/todo)]))
 
 (: parse-gvector-ref (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-gvector-ref stx* src env)
@@ -237,7 +237,7 @@
          (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (return-state (Ann (Gvector-ref e1 e2) src)))]
-    [else (TODO come up with an error message)]))
+    [else (error 'syntax->schml0/todo)]))
 
 (: parse-gvector-set! (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-gvector-set! stx* src env)
@@ -248,7 +248,7 @@
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (e3 : S0-Expr <- (parse-expr s3 env #f))
        (return-state (Ann (Gvector-set! e1 e2 e3) src)))]
-    [else (TODO come up with an error message)]))
+    [else (error 'syntax->schml0/todo)]))
 
 ;; parsing monotonic vectors
 (: parse-mvector (-> Stx* Src Env (State Natural S0-Expr)))
@@ -259,7 +259,7 @@
          (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (return-state (Ann (Mvector e1 e2) src)))]
-    [else (TODO come up with an error message)]))
+    [else (error 'syntax->schml0/todo)]))
 
 (: parse-mvector-ref (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-mvector-ref stx* src env)
@@ -269,7 +269,7 @@
          (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (return-state (Ann (Mvector-ref e1 e2) src)))]
-    [else (TODO come up with an error message)]))
+    [else (error 'syntax->schml0/todo)]))
 
 (: parse-mvector-set! (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-mvector-set! stx* src env)
@@ -280,7 +280,7 @@
        (e2 : S0-Expr <- (parse-expr s2 env #f))
        (e3 : S0-Expr <- (parse-expr s3 env #f))
        (return-state (Ann (Mvector-set! e1 e2 e3) src)))]
-    [else (TODO come up with an error message)]))
+    [else (error 'syntax->schml0/todo)]))
 
 
 
@@ -302,7 +302,7 @@
                                    (cons bound-fml*-type bound-return-type))]
                                 [(or (eq? bound-type #f) (eq? bound-type DYN-TYPE))
                                  (cons (make-list (length f*) #f) #f)]
-                                [else (TODO there are no other compatible types for a function value)])])
+                                [else (error 'syntax->schml0/todo)])])
               (if (eq? (length (car bound-type)) (length f*))
                   (match-let ([(list f* _ e n) (foldr parse-fml a f* (car bound-type))])
                     (let ([t (and t (parse-type t))])
@@ -394,7 +394,7 @@
 (: id-check (Any (Listof Symbol) Src -> (Listof Symbol) : #:+ Symbol))
 (define (id-check x bnds src)
   (define (raise-non-identifier x s)
-    (TODO raise a better error message))
+    (error 'syntax->schml0/todo))
   (and (or (symbol? x) (raise-non-identifier x src))
        (or (not (memq x bnds)) (raise-duplicate-binding x src))
        (or (not (reserved-symbol? x)) (raise-reserved-symbol x src))

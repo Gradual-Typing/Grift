@@ -37,7 +37,12 @@
           (Gvector E E)
           (Gvector-set! E E E)
           (Gvector-ref E E)
-          ;;
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E C0-Expr* Schml-Type* Blame-Label)
           (Create-tuple (Listof E))
           (Tuple-proj E Index)
 	  ;; Terminals

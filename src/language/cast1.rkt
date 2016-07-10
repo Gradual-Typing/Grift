@@ -48,7 +48,12 @@
           (Gbox-set! E E)
           (Gvector E E)
           (Gvector-set! E E E)
-          (Gvector-ref E E))))
+          (Gvector-ref E E)
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref! E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E C1-Expr* Schml-Type* Blame-Label))))
 
 (define-type C1-Expr* (Listof C1-Expr))
 (define-type C1-Bnd   (Pairof Uid C1-Expr))

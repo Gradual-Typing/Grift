@@ -1,4 +1,4 @@
 all:
-	./run.sh 30
+	racket run.rkt
 clean:
 	rm -rf tmp output data

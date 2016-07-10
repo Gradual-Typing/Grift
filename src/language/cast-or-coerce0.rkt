@@ -23,7 +23,7 @@
 (define-type CoC0-Expr
   (Rec E (U ;; Non-Terminals
 	  (Lambda Uid* E)
-	  (Letrec CoC0-Bnd-Lam* E)
+	  (Letrec CoC0-Bnd* E)
 	  (Let CoC0-Bnd* E)
 	  (App E (Listof E))
 	  (Op Schml-Primitive (Listof E))
@@ -39,11 +39,17 @@
           (Gvector E E)
           (Gvector-set! E E E)
           (Gvector-ref E E)
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E CoC0-Expr* Schml-Type* Blame-Label)
           ;;
           (Create-tuple (Listof E))
           (Tuple-proj E Index)
 	  ;; Terminals
-	  (Var Uid)
+          (Var Uid)
 	  (Quote Cast-Literal))))
 
 (define-type CoC0-Expr* (Listof CoC0-Expr))

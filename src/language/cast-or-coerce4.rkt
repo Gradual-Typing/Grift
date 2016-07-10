@@ -9,7 +9,9 @@
 
 (define-type Cast-or-Coerce4-Lang
   (Prog (List String Natural Schml-Type)
-        (LetT* CoC4-Bnd-Type* CoC4-Expr)))
+        (Let-Static* CoC4-Bnd-Type*
+                     CoC4-Bnd-Crcn*
+                     CoC4-Expr)))
 
 (define-type CoC4-Expr
   (Rec E (U ;; Code Labels 
@@ -27,7 +29,7 @@
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
-          (Quote-Coercion Coercion/Prim-Type)
+          (Quote-Coercion Immediate-Coercion)
           ;;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
@@ -139,12 +141,8 @@
 (define-type CoC4-Bnd-Data* (Listof CoC4-Bnd-Data))
 (define-type CoC4-Bnd-Type  (Pairof Uid Compact-Type))
 (define-type CoC4-Bnd-Type* (Listof CoC4-Bnd-Type))
+(define-type CoC4-Bnd-Crcn  (Pairof Uid Compact-Coercion))
+(define-type CoC4-Bnd-Crcn* (Listof CoC4-Bnd-Crcn))
 
-
-
-
-;(define-type Type-Ctr (U 'Dyn 'Bool 'Int 'Unit 'Fn 'GRef 'GVect))
-;(define-type (Type-Ctr-Clause x) (Pair Type-Ctr x))
-;(define-type (Type-Ctr-Clause* x) (Listof (Type-Ctr-Clause x)))
 
 

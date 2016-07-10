@@ -5,19 +5,18 @@
          "../language/data5.rkt"
          "../helpers.rkt"
          "./generate-c.rkt"
-         syntax/location)
+         syntax/location
+         (for-syntax racket/system)
+         (for-syntax "runtime-location.rkt")
+         "runtime-location.rkt")
 
 (provide (all-defined-out))
 
-;; TODO find a better way of doing this
-(define runtime.o-path
-  (let* ([cgpath (or (path-only (string->path (quote-source-file)))
-                (error 'code-generator "runtime.o-path"))]
-         [rtpath (build-path cgpath 'up "runtime.o")])
-    (or (and rtpath (file-exists? rtpath) rtpath)
-        (if (system (format "cc ~a -c -o ~a" (build-path cgpath 'up "runtime.c") rtpath))
-            rtpath
-            (error "cc compile error")))))
+(begin-for-syntax
+  (define runtime.o-str (path->string runtime.o-path))
+  (define runtime.c-str (path->string runtime.c-path))
+  (unless (system (format "cc ~a -c -o ~a" runtime.c-str runtime.o-str))
+    (error 'schml/backend-c/code-generator "error compiling the runtime")))
 
 ;; Basic driver for the entire backend
 (: c-backend-generate-code (Data5-Lang Config . -> . Path))

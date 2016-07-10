@@ -49,72 +49,20 @@ Configuaration variables
 (define decimals 2)
 (define prec `(= ,decimals))
 
-(define timing-loop-test
-  (make-timing-loop
-   #:timed-action  (lambda (i acc) `(+ ,i ,acc))
-   #:acc-type 'Int
-   #:acc-init 0
-   #:use-acc-action (lambda (acc) acc)))
 
-
-(define timing-loop-results
-  (let ([src-file (write-source "timing-loop" timing-loop-test)]
-        [spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : \\d+\n$"])
-    (for/list ([iters (range 2000 3000 1000)]) 
-      (list iters
-            (compile&run/iteration-time
-             #:base-name     "timing-loop-functional-twosome"
-             #:src-file      src-file
-             #:runs          runs
-             #:iterations    iters
-             #:cast-repr     'Twosomes
-             #:function-repr 'Functional
-             #:output-regexp spec)
-            (compile&run/iteration-time
-             #:base-name     "timing-loop-hybrid-coercions"
-             #:src-file      src-file
-             #:runs          runs
-             #:iterations    iters
-             #:cast-repr     'Coercions
-             #:function-repr 'Hybrid
-             #:output-regexp spec)))))
-
-(with-output-to-file
-  "timing-loop.tex"
-  #:exists 'replace
-  (lambda ()
-    (display
-     (string-append
-      "\\begin{tabular}{| l | r | r |}\n"
-      "  \\hline\n"
-      "& Type-Based & Coercions \\\\\n"
-      "  \\hline\n"
-      "  Iterations & \\multicolumn{2}{c|}{Time($n s$)/Iteration}\\\\\n"
-      "  \\hline\n"))
-    (for ([result (in-list timing-loop-results)])
-      (match-let ([(list iters (list tmean tsdev) (list cmean csdev)) result])
-        (printf  "  ~a & ~a & ~a \\\\\n"
-                 iters
-                 (~r tmean #:precision prec)
-                 (~r cmean #:precision prec))
-        (display "  \\hline\n")))
-    (display "\\end{tabular}\n")))
-
-(define (make-function-types/init/use depth args)
+;; Casts can cast the same function over and over because the code
+;; that is running will be the cast code.
+;; Unfortunately this casts code is going to have unlikely cache performance.
+;; This could be seen as best case cast behavior.
+(define (make-function-types/init/use depth)
   (let loop ([depth depth])
     (cond
       [(<= depth 0)
-       (define t1 (append (make-list args 'Int) '(-> Int)))
-       (define t2 (append (make-list args 'Dyn) '(-> Dyn)))
-       (define-values (init use)
-         (if (<= args 0)
-             (values `(lambda () 42) (lambda (f) `(,f)))
-             (let* ([args (cons 42 (make-list (sub1 args) -1))] 
-                    [fmls (for/list ([a args]) (gensym 'x))]
-                    [bnds (for/list ([x fmls]) `[,x : Int])])
-               (values
-                `(lambda ,bnds ,(car fmls)) (lambda (f) `(,f ,@args))))))
-       (values t1 t2 init use)]
+       (values
+        '(Int -> Int)
+        '(Dyn -> Dyn)
+        '(lambda ([x : Int]) x)
+        (lambda (f) (,f 42)))]
       [else
        (let-values ([(t1 t2 init use) (loop (sub1 depth))])
          (define t1^ `(,t1 -> ,t1))
@@ -123,33 +71,41 @@ Configuaration variables
          (define init^ `(lambda ([x : ,t1]) x))
          (values t1^ t2^ init^ use^))])))
 
-(define (make-cast-timing-loop-record depth args)
+(define (make-cast-timing-loop-record depth n-casts)
+  (unless (and (exact-nonnegative-integer? n-casts)
+               (even? n-casts))
+    (error 'cast-timing-loop "no way to loop with odd number of casts"))
   (define-values (t1 t2 init use)
-    (make-function-types/init/use depth args))
-  (list (format "fn-cast-~a-~a" depth args)
-        depth args
-        (sizeof-type* t1 t2) (sizeof-coercion-of-types t1 t2)
+    (make-function-types/init/use depth))
+  (define (cast-back-forth acc n)
+    (if (zero? n)
+        acc
+        `(: (: ,(cast-back-forth acc (- n 2)) ,t2) ,t1)))
+  (list (format "fn-cast-~a-~a" depth n-casts)
+        depth n-casts
+        (sizeof-type* t1 t2)
+        (sizeof-coercion-of-types t1 t2)
         t1 t2
         (make-timing-loop
-         #:timed-action  (lambda (i acc) `(: (: acc ,t2) ,t1))
+         #:timed-action
+         (lambda (i acc)
+           (cast-back-forth acc number))
          #:letrec-bnds  `([f : ,t1 ,init])
          #:acc-type t1
          #:acc-init 'f
          #:use-acc-action use)))
 
-(define function-cast-tests
-  (for*/list ([depth (in-range 0 5)]
-              [args  (in-range 1 2)]) ;; Just 1 for now
-    (make-cast-timing-loop-record depth args)))
-
 (define function-cast-results
-  (let ([spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : 42\n$"])
-    (for/list ([test (in-list function-cast-tests)])
-      (match-let ([(list name depth args st sc t1 t2 prog) test])
-        (define src-file (write-source name prog))
-        (define name-twosomes-functional (string-append name "-twosomes-functional"))
-        (define name-coercions-hybrid    (string-append name "-coercions-hybrid"))
-        (match-define (list t-run-time* t-iter-time*)
+  ;; Generate the paramerter to the test itself
+  (for/list ([depth (in-range 0 5)])
+    (for/list ([n-casts (in-range 0 21 2)])
+      (match-define (list name d nc st sc t1 t2 prog)
+        (make-cast-timing-loop-record depth n-casts))
+      (define-values (src-file name-twosomes name-coercions)
+        (values (write-source name prog)
+                (string-append name "-twosomes-functional")
+                (string-append name "-coercions-hybrid")))
+      (match-define (list t-run-time* t-iter-time*)
           (compile&run/iteration-time
            #:base-name     name-twosomes-functional
            #:src-file      src-file
@@ -176,7 +132,17 @@ Configuaration variables
          (mean-of-runs t-run-time* t-iter-time*)
          (list t-run-time* t-iter-time*)
          (mean-of-runs c-run-time* c-iter-time*)
-         (list c-run-time* c-iter-time*))))))
+         (list c-run-time* c-iter-time*)))
+    
+
+    ))
+
+(define function-cast-results
+  (let ([spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : 42\n$"])
+    (for/list ([test (in-list function-cast-tests)])
+      (match-let ([(list name depth args st sc t1 t2 prog) test])
+        
+        ))))
 
 (with-output-to-file
   "partially-typed-general-statistics.txt"

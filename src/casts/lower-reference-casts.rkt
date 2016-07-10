@@ -70,51 +70,67 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
 
 ;; Functions for use sites of guarded references with coercions
 (define-type GunboxT ((Var Uid) -> CoC2-Expr))
-(define-type Gbox-setT ((Var Uid) (U (Quote Cast-Literal) (Var Uid)) ->
-                        CoC2-Expr))
-(define-type Gvect-refT ((Var Uid) (U (Quote Integer) (Var Uid)) -> CoC2-Expr))
-(define-type Gvect-setT ((Var Uid)
-                         (U (Quote Integer) (Var Uid))
-                         (U (Quote Cast-Literal) (Var Uid))
-                         -> CoC2-Expr))
+(define-type Gbox-setT 
+   ((Var Uid) (U (Quote Cast-Literal) (Var Uid)) -> CoC2-Expr))
+(define-type Gvect-refT
+  ((Var Uid) (U (Quote Integer) (Var Uid)) -> CoC2-Expr))
+(define-type Gvect-setT
+  ((Var Uid)
+   (U (Quote Integer) (Var Uid))
+   (U (Quote Cast-Literal) (Var Uid))
+   -> CoC2-Expr))
 
-(: gunbox/coercion GunboxT)
-(define (gunbox/coercion gref)
-  (If (Guarded-Proxy-Huh gref)
-      (Interpreted-Cast
-       (Unguarded-Box-Ref (Guarded-Proxy-Ref gref))
-       (Coercion (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))))
-      (Unguarded-Box-Ref gref)))
+(: gunbox/coercion ((Option Uid) -> GunboxT))
+(define ((gunbox/coercion gunbox) gref)
+  (cond
+    [gunbox (App-Code (Code-Label gunbox) (list gref))]
+    [else
+     (If (Guarded-Proxy-Huh gref)
+         (Interpreted-Cast
+          (Unguarded-Box-Ref (Guarded-Proxy-Ref gref))
+          (Coercion (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))))
+         (Unguarded-Box-Ref gref))]))
 
-(: gbox-set!/coercion Gbox-setT)
-(define (gbox-set!/coercion gref val)
-  (If (Guarded-Proxy-Huh gref)
+(: gbox-set!/coercion ((Option Uid) -> Gbox-setT))
+(define ((gbox-set!/coercion gbox-set!) gref val)
+  (cond
+    [gbox-set! (App-Code (Code-Label gbox-set!) (list gref val))]
+    [else
+     (If (Guarded-Proxy-Huh gref)
       (Unguarded-Box-Set!
        (Guarded-Proxy-Ref gref)
        (Interpreted-Cast
         val
         (Coercion (Ref-Coercion-Write (Guarded-Proxy-Coercion gref)))))
-      (Unguarded-Box-Set! gref val)))
+      (Unguarded-Box-Set! gref val))]))
 
-(: gvect-ref/coercion Gvect-refT)
-(define (gvect-ref/coercion gref index)
-  (If (Guarded-Proxy-Huh gref)
-      (Interpreted-Cast
-       (Unguarded-Vect-Ref (Guarded-Proxy-Ref gref) index)
-       (Coercion (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))))
-      (Unguarded-Vect-Ref gref index)))
-
-(: gvect-set!/coercion Gvect-setT)
-(define (gvect-set!/coercion gref index val)
-  (let ([index (if (integer? index) (Quote index) index)])
-    (If (Guarded-Proxy-Huh gref)
-        (Unguarded-Vect-Set!
-         (Guarded-Proxy-Ref gref)
-         index
+(: gvect-ref/coercion ((Option Uid) -> Gvect-refT))
+(define ((gvect-ref/coercion gvect-ref) gref index)
+  (cond
+    [gvect-ref (App-Code (Code-Label gvect-ref) (list gref index))]
+    [else
+     (If (Guarded-Proxy-Huh gref)
          (Interpreted-Cast
+          (Unguarded-Vect-Ref (Guarded-Proxy-Ref gref) index)
+          (Coercion (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))))
+         (Unguarded-Vect-Ref gref index))]))
+
+(: gvect-set!/coercion ((Option Uid) -> Gvect-setT))
+(define ((gvect-set!/coercion gvect-set!) gref index val)
+  (: index-exp CoC2-Expr)
+  (define index-exp (if (integer? index) (Quote index) index))
+  (cond
+    [gvect-set!
+     (App-Code (Code-Label gvect-set!) (list gref index val))]
+    [else
+     (If (Guarded-Proxy-Huh gref)
+         (Unguarded-Vect-Set!
+          (Guarded-Proxy-Ref gref)
+          index-exp
+          (Interpreted-Cast
           val
           (Coercion (Ref-Coercion-Write (Guarded-Proxy-Coercion gref)))))
-        (Unguarded-Vect-Set! gref index val))))
+         (Unguarded-Vect-Set! gref index-exp val))]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; How we implement the guarded runtime routines
@@ -193,84 +209,139 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
     (let ([n (unbox next)])
       (set-box! next (+ n 1))
       (Uid s n)))
-  ;; Template to Build the GRef Read Runtime Code
-  ;; The current implementation recursively removes proxies until
-  ;; it finds an unguarded box, reads the value from the box, and
-  ;; returns through each proxying stack frame casting the value
-  ;; as specified by the previously traversed proxy.
-  
-  ;; As noted above this definition just allocates the unique
-  ;; names and calls off to the call site generator.
-  (define gunbox-template
-    (let ([gunbox (next-uid! "rt_gunbox")]
-          [gref (next-uid! "rt_gref")])
-      (parameterize ([inline-guarded-branch? #t])
-        (cons
-         gunbox
-         (Code (list gref)
-               ((gunbox/twosome (Code-Label gunbox)) (Var gref)))))))
-  ;; A template to build the GRef Write Runtime Code
-  ;; The current implementation recursively removes proxies
-  ;; casting the value to be written as specified by each traversed
-  ;; proxy. When a unguarded proxy is found the value is written.
-  ;; The invarient of guarded guarantees that the unguarded box will
-  ;; always contain the same type as thera value at this point.
-  (define gbox-set!-template
-    (let ([gbox-set! (next-uid! "rt_gbox_set")]
-          [gref (next-uid! "rt_gref")]
-          [val (next-uid! "rt_write_val")])
-      (parameterize ([inline-guarded-branch? #t])
-        (cons
-         gbox-set!
-         (Code (list gref val)
-               ((gbox-set!/twosome (Code-Label gbox-set!))
-                (Var gref) (Var val)))))))
-
-  (define gvect-ref-template
-    (let ([gvect-ref (next-uid! "rt_gvect_ref")]
-          [vect (next-uid! "rt_gvect")]
-          [ind (next-uid!  "rt_index")])
-      (parameterize ([inline-guarded-branch? #t])
-        (cons
-         gvect-ref
-         (Code (list vect ind)
-               ((gvect-ref/twosome (Code-Label gvect-ref))
-                (Var vect) (Var ind)))))))
-
-  (define gvect-set!-template
-    (let ([gvect-set! (next-uid! "rt_gvect_set")]
-          [vect (next-uid! "rt_gvect")]
-          [ind (next-uid! "rt_index")]
-          [val (next-uid! "rt_write_val")])
-      (parameterize ([inline-guarded-branch? #t])
-        (cons
-         gvect-set!
-         (Code (list vect ind val)
-               ((gvect-set!/twosome (Code-Label gvect-set!))
-                (Var vect) (Var ind) (Var val)))))))
-  
   ;; body of get-ref-helpers
   (match rep
     ['Twosomes
+     ;; Template to Build the GRef Read Runtime Code
+     ;; The current implementation recursively removes proxies until
+     ;; it finds an unguarded box, reads the value from the box, and
+     ;; returns through each proxying stack frame casting the value
+     ;; as specified by the previously traversed proxy.
+     
+     ;; As noted above this definition just allocates the unique
+     ;; names and calls off to the call site generator.
+     (: gunbox-u Uid)
+     (: gunbox-c CoC2-Code)
+     (define-values (gunbox-u gunbox-c)
+       (let ([gunbox (next-uid! "rt_gunbox")]
+             [gref (next-uid! "rt_gref")])
+         (parameterize ([inline-guarded-branch? #t])
+           (values
+            gunbox
+            (Code (list gref)
+                  ((gunbox/twosome (Code-Label gunbox)) (Var gref)))))))
+     ;; A template to build the GRef Write Runtime Code
+     ;; The current implementation recursively removes proxies
+     ;; casting the value to be written as specified by each traversed
+     ;; proxy. When a unguarded proxy is found the value is written.
+     ;; The invarient of guarded guarantees that the unguarded box will
+     ;; always contain the same type as thera value at this point.
+     (: gbox-set-u Uid)
+     (: gbox-set-c CoC2-Code)
+     (define-values (gbox-set-u gbox-set-c)
+       (let ([gbox-set! (next-uid! "rt_gbox_set")]
+             [gref (next-uid! "rt_gref")]
+             [val (next-uid! "rt_write_val")])
+         (parameterize ([inline-guarded-branch? #t])
+           (values
+            gbox-set!
+            (Code (list gref val)
+                  ((gbox-set!/twosome (Code-Label gbox-set!))
+                   (Var gref) (Var val)))))))
+
+     (: gvec-ref-u Uid)
+     (: gvec-ref-c CoC2-Code)
+     (define-values (gvec-ref-u gvec-ref-c)
+       (let ([gvect-ref (next-uid! "rt_gvect_ref")]
+             [vect (next-uid! "rt_gvect")]
+             [ind (next-uid!  "rt_index")])
+         (parameterize ([inline-guarded-branch? #t])
+           (values
+            gvect-ref
+            (Code (list vect ind)
+                  ((gvect-ref/twosome (Code-Label gvect-ref))
+                   (Var vect) (Var ind)))))))
+
+     (: gvec-set-u Uid)
+     (: gvec-set-c CoC2-Code)
+     (define-values (gvec-set-u gvec-set-c)
+       (let ([gvect-set! (next-uid! "rt_gvect_set")]
+             [vect (next-uid! "rt_gvect")]
+             [ind (next-uid! "rt_index")]
+             [val (next-uid! "rt_write_val")])
+         (parameterize ([inline-guarded-branch? #t])
+           (values
+            gvect-set!
+            (Code (list vect ind val)
+                  ((gvect-set!/twosome (Code-Label gvect-set!))
+                   (Var vect) (Var ind) (Var val)))))))
+     (list
+      (gunbox/twosome (Code-Label gunbox-u))
+      (gbox-set!/twosome (Code-Label gbox-set-u))
+      (gvect-ref/twosome (Code-Label gvec-ref-u))
+      (gvect-set!/twosome (Code-Label gvec-set-u))
+      (lambda ([e : CoC2-Expr])
+        (Labels (list (cons gunbox-u gunbox-c)
+                      (cons gbox-set-u gbox-set-c)
+                      (cons gvec-ref-u gvec-ref-c)
+                      (cons gvec-set-u gvec-set-c))
+                e)))
+
+     #;
      (match-let ([(cons gunbox-u gunbox-c) gunbox-template]
                  [(cons gbox-set-u gbox-set-c) gbox-set!-template]
                  [(cons gvec-ref-u gvec-ref-c) gvect-ref-template]
                  [(cons gvec-set-u gvec-set-c) gvect-set!-template])
-       (list
-        (gunbox/twosome (Code-Label gunbox-u))
-        (gbox-set!/twosome (Code-Label gbox-set-u))
-        (gvect-ref/twosome (Code-Label gvec-ref-u))
-        (gvect-set!/twosome (Code-Label gvec-set-u))
-        (lambda ([e : CoC2-Expr])
-          (Labels (list (cons gunbox-u gunbox-c)
-                        (cons gbox-set-u gbox-set-c)
-                        (cons gvec-ref-u gvec-ref-c)
-                        (cons gvec-set-u gvec-set-c))
-                  e))))]
+       )]
     ['Coercions
-     (list gunbox/coercion gbox-set!/coercion
-           gvect-ref/coercion gvect-set!/coercion
-           (lambda ([e : CoC2-Expr]) e))]
+     (if (inline-guarded-branch?)
+         (list (gunbox/coercion #f)
+               (gbox-set!/coercion #f)
+               (gvect-ref/coercion #f)
+               (gvect-set!/coercion #f)
+               (lambda ([e : CoC2-Expr]) e))
+         (let* ([gunbox-u   (next-uid! "rt_gunbox")]
+                [gbox-set-u  (next-uid! "rt_gbox_set")]
+                [gvect-ref-u (next-uid! "rt_gvect_ref")]
+                [gvect-set-u (next-uid! "rt_gvect_set")]
+                [bindings
+                 (parameterize ([inline-guarded-branch? #f]) 
+                   (list
+                    (cons
+                     gunbox-u
+                     (let ([gbox (next-uid! "gbox")])
+                       (Code (list gbox)
+                             ((gunbox/coercion #f)
+                              (Var gbox)))))
+                    (cons
+                     gbox-set-u
+                     (let ([gbox (next-uid! "gbox")]
+                           [val  (next-uid! "val")])
+                       (Code (list gbox val)
+                             ((gbox-set!/coercion #f)
+                              (Var gbox) (Var val)))))
+                    (cons
+                     gvect-ref-u
+                     (let ([vect (next-uid! "vect")]
+                           [ind  (next-uid! "ind")])
+                       (Code (list vect ind)
+                             ((gvect-ref/coercion #f)
+                              (Var vect) (Var ind)))))
+                    (cons
+                     gvect-set-u
+                     (let ([vect (next-uid! "vect")]
+                           [ind  (next-uid! "ind")]
+                           [val  (next-uid! "val")])
+                       (Code (list vect ind val)
+                             ((gvect-set!/coercion #f)
+                              (Var vect) (Var ind) (Var val)))))))])
+           (list
+            (gunbox/coercion gunbox-u)
+            (gbox-set!/coercion gbox-set-u)
+            (gvect-ref/coercion gvect-ref-u)
+            (gvect-set!/coercion gvect-set-u)
+            (lambda ([e : CoC2-Expr])
+              (Labels bindings e)))))]
     [other (error 'lrc/get-ref-help "unmatched ~a" other)]))
 
 

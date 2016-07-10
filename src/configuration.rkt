@@ -5,6 +5,9 @@
 (define-type Semantics (U 'Lazy-D))
 (define-type Cast-Representation (U 'Twosomes 'Coercions))
 
+(: dynamic-operations? (Parameterof (U Boolean 'inline)))
+(define dynamic-operations? (make-parameter #t))
+
 (struct Config
   ([source-path : Path]
    [semantics : Semantics]

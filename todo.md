@@ -2,14 +2,18 @@
 - [ ] Add an ast pretty printer (ast -> sexp)
 - [ ] normalize context to before specify representation
 - [ ] Simplify parser (make it untyped) and use macros (this could be done)
+- [ ] switch twosomes to type-based every where
 
 # For Research
-- [ ] Add Hoist coercion constants
-- [ ] Add simplify known casts (v <id;T!> -> <T!> | tag v t)
-- [ ] Start using better timers that measure process time instead of wall-clock time
-- [ ] Add Dynamic-Operation optimization (App-Dyn, Dyn-Gbox-ref, ...)
-- [ ] Fix letrec
-- [ ] Lower the letrec purification pass or raise unguarded boxes
+- [X] Add Hoist coercion constants
+- [X] Add simplify known casts (v <id;T!> -> <T!> | tag v t)
+- [X] Add Dynamic-Operation optimization (App-Dyn, Dyn-Gbox-ref, ...)
+- [ ] Fix letrec (ie add letrec* and optimizations)
+- [ ] Add closure optimizations
+- [ ] add inlining, constant propagation, common subexpression elimination
+      dead code elimination pass. (remove specialization of casts)
+- [?] Start using better timers that measure process time instead of wall-clock time
+- [X] Lower the letrec purification pass or raise unguarded boxes
 - [ ] Add Lazy Shadow Stack GC + Cheney Copy Collector + Bump Pointer Allocation + GC Statistics
 - [ ] Implement a switch construct for multiway branching endemic to gradual typing
 - [ ] Add no-optimize annotations for testing purposes
@@ -20,15 +24,13 @@
 - [ ] Manually specialize the code for the fast cases of make coercion
       in compose.
 - [ ] Add hoisting of constants in general
-- [ ] add inlining, constant propagation, common subexpression elimination
-      dead code elimination pass.
 - [ ] Tail coercions optimization.
 - [ ] Custom backend that allows us to play with the return register
 
 # For Language 
 - [ ] add define, include, define-type,
 - [ ] recursive types
-- [ ] product types (tuples and structs)
+- [X] product types (tuples and structs)
 - [ ] parametric polymorphism
 - [ ] unions (tagged?, untagged)
 - [ ] Structural Objects 

@@ -19,20 +19,21 @@
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
-         "../language/cast-or-coerce3.rkt"
+         "../language/cast-or-coerce3.1.rkt"
          "../language/cast-or-coerce4.rkt")
 (provide label-lambdas
          (all-from-out
-          "../language/cast-or-coerce3.rkt"
+          "../language/cast-or-coerce3.1.rkt"
           "../language/cast-or-coerce4.rkt"))
 
 (: label-lambdas (Cast-or-Coerce3.1-Lang Config  -> Cast-or-Coerce4-Lang))
 (define (label-lambdas prgm comp-config)
-  (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
+  (match-let ([(Prog (list name count type)
+                     (Let-Static* tbnd* cbnd* exp)) prgm])
     (let* ([next : (Boxof Nat) (box count)]
            [exp  : CoC4-Expr (ll-expr! next exp)]
            [next : Nat (unbox next)])
-      (Prog (list name next type) (LetT* tbnd* exp)))))
+      (Prog (list name next type) (Let-Static* tbnd* cbnd* exp)))))
 
 (: ll-expr! ((Boxof Nat) CoC3.1-Expr -> CoC4-Expr))
 (define (ll-expr! next exp)
