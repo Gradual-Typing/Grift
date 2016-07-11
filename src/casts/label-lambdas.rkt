@@ -26,8 +26,8 @@
           "../language/cast-or-coerce3.1.rkt"
           "../language/cast-or-coerce4.rkt"))
 
-(: label-lambdas (Cast-or-Coerce3.1-Lang Config  -> Cast-or-Coerce4-Lang))
-(define (label-lambdas prgm comp-config)
+(: label-lambdas (Cast-or-Coerce3.1-Lang  -> Cast-or-Coerce4-Lang))
+(define (label-lambdas prgm)
   (match-let ([(Prog (list name count type)
                      (Let-Static* tbnd* cbnd* exp)) prgm])
     (let* ([next : (Boxof Nat) (box count)]

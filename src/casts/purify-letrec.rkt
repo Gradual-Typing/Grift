@@ -13,7 +13,6 @@
 +------------------------------------------------------------------------------|#
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/lambda0.rkt"
          "../language/lambda1.rkt"
          racket/match
@@ -27,8 +26,8 @@
   "../language/lambda0.rkt"
   "../language/lambda1.rkt"))
 
-(: purify-letrec (Lambda0-Lang Config -> Lambda1-Lang))
-(define (purify-letrec prgm comp-config)
+(: purify-letrec (Lambda0-Lang -> Lambda1-Lang))
+(define (purify-letrec prgm)
   (match-define (Prog (list prgm-name prgm-next prgm-type)
                   (Let-Static* prgm-type-bnd* prgm-crcn-bnd* prgm-expr))
     prgm)

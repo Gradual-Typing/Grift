@@ -25,8 +25,8 @@
          "../helpers.rkt")
 
 (provide flatten-values)
-(: flatten-values (Data3-Lang Config -> Data4-Lang))
-(define (flatten-values prog config)
+(: flatten-values (Data3-Lang -> Data4-Lang))
+(define (flatten-values prog)
   (match-let ([(Prog (list name count ty) (GlobDecs d* (Labels bnd* body))) prog])
     (let*-values ([(body count) (run-state (fv-body body) count)]
                   [(bnd* count) (run-state (map-state fv-bnd-code bnd*) count)])

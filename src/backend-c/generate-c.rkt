@@ -47,13 +47,13 @@
 (define C-DECLARATIONS
   '("int64_t read_int();"))
 
-(: generate-c (-> Data5-Lang Config Void))
-(define (generate-c prgm config)
+(: generate-c (-> Data5-Lang Path Void))
+(define (generate-c prgm out-path)
   (match-let ([(Prog (list name count type) (GlobDecs d* (Labels lbl* exp))) prgm])
-    (call-with-output-file (Config-c-path config) #:exists 'replace #:mode 'text
+    (call-with-output-file out-path #:exists 'replace #:mode 'text
       (lambda ([p : Output-Port])
         (parameterize ([current-output-port p])
-          (emit-program name type lbl* d* exp (Config-mem-limit config)))))))
+          (emit-program name type lbl* d* exp (init-heap-kilobytes)))))))
 
 (: emit-program (-> String Schml-Type D5-Bnd-Code* (Listof Uid) D5-Body Natural Void))
 (define (emit-program name type code* d* body mem-limit)

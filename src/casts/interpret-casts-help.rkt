@@ -177,8 +177,8 @@
                        "Unexpected ~a" v)]))
         (Type-Tag o)))
 
-  (: type-fn-arity (CoC3-Expr -> CoC3-Expr))
-  (define (type-fn-arity o)
+(: type-fn-arity (CoC3-Expr -> CoC3-Expr))
+(define (type-fn-arity o)
     (cond
       [(not (Type? o)) (Type-Fn-arity o)]
       [(Fn? (Type-type o)) (Quote (Fn-arity (Type-type o)))]
@@ -336,6 +336,6 @@
 
 (: apply-code
    (All (A)
-     (Uid -> (() #:rest A . ->* . (App-Code (Code-Label Uid) (Listof A))))))
+     (Uid -> (->* () #:rest A (App-Code (Code-Label Uid) (Listof A))))))
 (define ((apply-code u) . a*)
   (App-Code (Code-Label u) a*))

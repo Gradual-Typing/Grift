@@ -26,8 +26,8 @@
 
 
 
-(: insert-casts (Schml1-Lang Config . -> . Cast0-Lang))
-(define (insert-casts prgm comp-config)
+(: insert-casts (Schml1-Lang . -> . Cast0-Lang))
+(define (insert-casts prgm)
   (match-let ([(Prog (list name next-uid type) exp) prgm])
     (Prog (list name next-uid type) (iic-expr exp))))
 

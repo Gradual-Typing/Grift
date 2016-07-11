@@ -691,14 +691,6 @@ Dyn --> Int Int --> Dyn
 
 (define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))
 
-
-
-
-#;(define-type (Map-Bnd E1 E2)
-  (case->
-   [(Bnd Uid Schml-Type E1) -> (Bnd Uid Schml-Type E2)]
-   [(Pair Uid E1) -> (Pair Uid E2)]))
-
 #;(define-type (Map-Expr E1 E2)
   (case->
    [(Type Schml-Type) -> (Type Schml-Type)]
@@ -875,14 +867,15 @@ Dyn --> Int Int --> Dyn
     [(Dyn-value e) (Dyn-value (f e))]
     [other (error 'forms/map-expr "match failed: ~a" other)]))
 
-#;(: map-bnd (All (A B) (A -> B) -> (Map-Bnd A B)))
-#;(define ((map-bnd f) b)
+(define-type (Map-Bnd E1 E2)
+  (case->
+   [(Bnd Uid Schml-Type E1) -> (Bnd Uid Schml-Type E2)]
+   [(Pair Uid E1) -> (Pair Uid E2)]))
+
+(: map-bnd (All (A B) (A -> B) -> (Map-Bnd A B)))
+(define ((map-bnd f) b)
   (match b
     [(Bnd i t e) (Bnd i t (f e))]
     [(cons i e) (cons i (f e))]))
 
-(: map-bnd-code
-   (All (A B) (A -> B) -> ((cons Uid (Code Uid* A)) -> (cons Uid (Code Uid* B)))))
-(define ((map-bnd-code f) b)
-  (match-define (cons i (Code i* e)) b)
-  (cons i (Code i* (f e))))
+

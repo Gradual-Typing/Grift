@@ -11,15 +11,14 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/cast-or-coerce4.rkt"
          "../language/cast-or-coerce5.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-free)
 
-(: uncover-free (Cast-or-Coerce4-Lang Config . -> . Cast-or-Coerce5-Lang))
-(define (uncover-free prgm comp-config)
+(: uncover-free (Cast-or-Coerce4-Lang . -> . Cast-or-Coerce5-Lang))
+(define (uncover-free prgm)
   (logging uncover-free (All) prgm)
   (match-let ([(Prog (list name count type) (Let-Static* tbnd* cbnd* exp)) prgm])
     (let-values ([(exp free*) (uf-expr exp)])

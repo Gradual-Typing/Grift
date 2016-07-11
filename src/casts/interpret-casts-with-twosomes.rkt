@@ -906,11 +906,12 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (: make-dyn-fn-app-code : (String -> Uid) Cast-Type -> Dyn-Fn-App-Type)
 (define ((make-dyn-fn-app-code next-uid! cast) v v* t* l)
-  (define-values (val ty ret-val ret-ty)
+  (define-values (val ty ret-val ret-ty arity)
     (values (next-uid! "dyn_fn_val")
             (next-uid! "dyn_fn_ty")
             (next-uid! "dyn_fn_ret_val")
-            (next-uid! "dyn_fn_ret_ty")))
+            (next-uid! "dyn_fn_ret_ty")
+            (length v*)))
   (define arg-casts : CoC3-Expr*
     (for/list : (Listof CoC3-Expr)
               ([v : CoC3-Expr v*]
@@ -927,8 +928,24 @@ form, to the shortest branch of the cast tree that is relevant.
       [else (error 'interp-cast-with-coercions/dyn-fn-app "unexpected value")]))
   (Let `([,val . ,(Dyn-value v)]
          [,ty . ,(Dyn-type v)])
-    (If (Type-Fn-Huh (Var ty))
+    (If (If (Type-Fn-Huh (Var ty))
+            (Op '= (list (Type-Fn-arity (Var ty)) (Quote arity)))
+            (Quote #f))
         (Let `([,ret-val . ,casts-apply]
                [,ret-ty . ,(Type-Fn-return (Var ty))])
           (cast (Var ret-val) (Var ret-ty) (Type DYN-TYPE) l))
         (Blame l))))
+
+;; TODO (andre) consider this tranform instead
+;; (dyn-app f (42) (Int) L1)
+;; =>
+;; (let ([v (dyn-value f)] [t (dyn-type f)])
+;;   (if (eq? t (Int -> Dyn))
+;;       (v 42)
+;;       (if (and (fn-type? t) (= (fn-type-arity t) 1))
+;;           (let ([a (cast 42 Int (fn-type-arg t 0) L1)])
+;;             (cast (v t) (fn-type-return t) L1))
+;;           (blame L1))))
+
+
+  

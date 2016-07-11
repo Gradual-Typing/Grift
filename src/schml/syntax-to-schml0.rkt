@@ -24,8 +24,8 @@
          syntax->schml0
          parse-type)
 
-(: syntax->schml0 (Syntax-Lang Config . -> . Schml0-Lang))
-(define (syntax->schml0 prgm config)
+(: syntax->schml0 (Syntax-Lang . -> . Schml0-Lang))
+(define (syntax->schml0 prgm)
   (match-let ([(Prog name stx*) prgm])
     (let-values
 	([((exp : S0-Expr) (next : Natural))

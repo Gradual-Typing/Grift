@@ -27,8 +27,8 @@ should be able to compile programs this the twosome casts for future comparison.
 (define optimize-first-order-coercions? (make-parameter #t))
 
 ;; The entry point for this pass it is called by impose-casting semantics
-(: casts->coercions (Cast0-Lang Config . -> . Coercion-Lang))
-(define (casts->coercions prgm config)
+(: casts->coercions (Cast0-Lang . -> . Coercion-Lang))
+(define (casts->coercions prgm)
   (match-let ([(Prog (list name next type) exp) prgm])
     (let ([exp (c2c-expr exp)])
       (Prog (list name next type) exp))))

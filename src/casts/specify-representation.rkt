@@ -133,8 +133,8 @@ exposed as the effects that they truelly are.
 
 
 
-(: specify-representation (Cast-or-Coerce6-Lang Config -> Data0-Lang))
-(trace-define (specify-representation prgm comp-config)
+(: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))
+(trace-define (specify-representation prgm)
   (match-let ([(Prog (list name next type) (Let-Static* bndt* bnd-crcn* exp)) prgm])
     (let* ([next       : (Boxof Nat) (box next)]
            [bnd-code*  : (Boxof D0-Bnd-Code*) (box '())]

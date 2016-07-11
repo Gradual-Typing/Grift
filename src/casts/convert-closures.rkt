@@ -28,12 +28,9 @@
 (define optimize-well-known?
   (make-parameter #f))
 
-(define use-code-casters?
-  (make-parameter #f))
-
-(: convert-closures (Cast-or-Coerce5-Lang Config -> Cast-or-Coerce6-Lang))
-(define (convert-closures prgm conf)
-  (define cr  (Config-cast-rep conf))
+(: convert-closures (Cast-or-Coerce5-Lang -> Cast-or-Coerce6-Lang))
+(define (convert-closures prgm)
+  (define cr  (cast-representation))
   (define fr 'Hybrid)
   (match-let ([(Prog (list name count type)
                      (Let-Static* tbnd* cbnd* exp)) prgm])

@@ -37,8 +37,8 @@ Provide comments about where to find definitions of types and data
           "../language/schml0.rkt"
           "../language/schml1.rkt"))
 
-(: type-check (Schml0-Lang Config . -> . Schml1-Lang))
-(define (type-check prgm config)
+(: type-check (Schml0-Lang . -> . Schml1-Lang))
+(define (type-check prgm)
   (match-let ([(Prog (list name next-uid) exp) prgm])
     (let-values ([(exp type) (tc-expr exp (hash))])
       (Prog (list name next-uid type) exp))))

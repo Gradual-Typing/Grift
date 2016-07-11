@@ -30,8 +30,8 @@
       A perhaps everything in the body should be in the state
       monad.)
 
-(: remove-let (-> Data1-Lang Config Data2-Lang))
-(define (remove-let prgm comp-config)
+(: remove-let (-> Data1-Lang Data2-Lang))
+(define (remove-let prgm)
   (match-let ([(Prog (list name count type) (GlobDecs d* (Labels bnd-code* tail))) prgm])
     (let ([bnd-code* : D2-Bnd-Code* (rl-bnd-code* bnd-code*)]
           [body : D2-Body (rl-body tail)])

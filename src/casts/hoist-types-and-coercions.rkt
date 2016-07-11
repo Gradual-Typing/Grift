@@ -21,7 +21,6 @@
          "../growable-vector.rkt"
          "../unique-counter.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/cast-or-coerce3.rkt"
          "../language/lambda0.rkt"
          racket/match
@@ -30,9 +29,8 @@
 ;; Only the pass is provided by this module
 (provide hoist-types-and-coercions)
 
-(: hoist-types-and-coercions :
-   Cast-or-Coerce3-Lang Config -> Lambda0-Lang)
-(define (hoist-types-and-coercions prgm config)
+(: hoist-types-and-coercions : Cast-or-Coerce3-Lang -> Lambda0-Lang)
+(define (hoist-types-and-coercions prgm)
   (match-define (Prog (list prgm-name next-unique-number prgm-type) exp)
     prgm)
 
