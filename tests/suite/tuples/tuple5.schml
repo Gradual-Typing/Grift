@@ -1,0 +1,1 @@
+(+ (tuple-proj (tuple (lambda (x) x) 2 3) 2) 39)

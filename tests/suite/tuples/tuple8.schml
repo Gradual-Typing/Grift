@@ -1,0 +1,3 @@
+((lambda ([x : (Tuple (Int -> Int) Int Int)]) : Int
+         ((tuple-proj x 0) (+ (tuple-proj x 1) (tuple-proj x 2))))
+ (tuple (lambda (x) (* x 2)) 10 11))

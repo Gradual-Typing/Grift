@@ -5,10 +5,13 @@
 | The Constants for the representation of casts                                |
 +-----------------------------------------------------------------------------|#
 ;; The Representation of functional types is an array
-(define FN-TYPE-TAG #b000)
 (define FN-ARITY-INDEX 0)
 (define FN-RETURN-INDEX 1)
 (define FN-FMLS-OFFSET 2)
+
+;; The representation of tuple types is an array
+(define TUPLE-NUM-INDEX 0)
+(define TUPLE-ITEMS-OFFSET 1)
 
 ;; The representation of tagged structure types
 ;; My thought is that types can be allocated statically
@@ -19,6 +22,7 @@
 (define TYPE-FN-TAG #b000)
 (define TYPE-GREF-TAG #b001)
 (define TYPE-GVECT-TAG #b010)
+(define TYPE-TUPLE-TAG #b011)
 ;; Hypothetical extensions to type tags
 ;; Though more organization could le
 ;;(define TYPE-GVECT-TAG #b010)
@@ -72,6 +76,8 @@
 (define UGVECT-SIZE-INDEX 0)
 (define UGVECT-OFFSET 1)
 
+(define TUPLE-TAG #b000)
+
 ;; GREF Type Representation
 (define TYPE-GREF-SIZE  1)
 (define GREF-TO-INDEX 0)
@@ -90,3 +96,6 @@
 (define HYBRID-PROXY-CODE-INDEX 0)
 (define HYBRID-PROXY-CLOS-INDEX 1)
 (define HYBRID-PROXY-CRCN-INDEX 2)
+
+;; Shifting for secondary tags
+(define SECOND-TAG-SHIFT 3)

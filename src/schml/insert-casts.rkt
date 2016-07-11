@@ -142,7 +142,6 @@
             (define lbl (mk-label "gvector-ref index" i-src))
             (mk-cast lbl i i-ty INT-TYPE)]
            [else i]))
-
        (cond
          [(GVect? e1-ty)
           (Gvector-set! e1 i-exp (mk-cast lbl2 e2 e2-ty (GVect-arg e1-ty)))]
@@ -157,11 +156,28 @@
          [else (error 'insert-casts/gvector-set!
                       "unexpected value for e1 type: ~a"
                       e1-ty)])]
+      [(Create-tuple e*) (Create-tuple (map iic-expr e*))]
+      [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app iic-expr e)) i)
+       (cond
+         [(Dyn? e-ty)
+          (let ([n (+ i 1)])
+            (unless (index? n) (error 'iic-expr "bad index"))
+            (Tuple-proj (mk-cast (mk-label "tuple-proj" e-src)
+                                 e DYN-TYPE
+                                 (STuple n (make-list n DYN-TYPE))) i))]
+         [(STuple? e-ty) (Tuple-proj e i)]
+         [else (TODO error message that is appropriate)])]
       ;; TODO add these cases when monotonic is finished
       ;;[(Mvector e1 e2)         (TODO define vector insert implicit casts)]
       ;;[(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
       ;;[(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)]
       [other (error 'insert-casts/expression "unmatched ~a" other)])))
+
+(: make-list (Integer Schml-Type -> (Listof Schml-Type)))
+(define (make-list n t)
+  (if (= n 0)
+      '()
+      (cons t (make-list (- n 1) t))))
 
 (: iic-bnd (S1-Bnd . -> . C0-Bnd))
 (define (iic-bnd b)

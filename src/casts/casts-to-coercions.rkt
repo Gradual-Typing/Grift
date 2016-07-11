@@ -60,6 +60,8 @@ should be able to compile programs this the twosome casts for future comparison.
        (Ref (recur t1 t2) (recur t2 t1))]
       [((GVect t1) (GVect t2))
        (Ref (recur t1 t2) (recur t2 t1))]
+      [((STuple n1 t1*) (STuple n2 t2*)) #:when (= n1 n2)
+       (CTuple n1 (map recur t1* t2*))]
       [(_ _) (Failed lbl)]))
   (logging mk-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
@@ -116,6 +118,10 @@ should be able to compile programs this the twosome casts for future comparison.
      (Dyn-GVector-Ref (c2c-expr e) (c2c-expr i) l)]
     [(Dyn-GVector-Set! e1 i e2 t l)
      (Dyn-GVector-Set! (c2c-expr e1) (c2c-expr i) (c2c-expr e2) t l)]
+    [(Create-tuple e*)
+     (Create-tuple (c2c-expr* e*))]
+    [(Tuple-proj e i)
+     (Tuple-proj (c2c-expr e) i)]
     [(Var id)    (Var id)]
     [(Quote lit) (Quote lit)]))
 
@@ -129,8 +135,3 @@ should be able to compile programs this the twosome casts for future comparison.
    (lambda ([b : C0-Bnd])
      (cons (car b) (c2c-expr (cdr b))))
    b*))
-
-
-
-
-

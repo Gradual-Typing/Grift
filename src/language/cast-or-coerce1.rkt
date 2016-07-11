@@ -65,7 +65,10 @@
           (Dyn-GVector-Ref E E Blame-Label)
           (Dyn-GRef-Set! E E Schml-Type Blame-Label)
           (Dyn-GRef-Ref E Blame-Label)
-          (Dyn-Fn-App E CoC1-Expr* Schml-Type* Blame-Label))))
+          (Dyn-Fn-App E CoC1-Expr* Schml-Type* Blame-Label)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index))))
 
 (define-type CoC1-Expr* (Listof CoC1-Expr))
 (define-type CoC1-Bnd   (Pairof Uid CoC1-Expr))

@@ -45,7 +45,10 @@
      (Gbox-set! E E)
      (Gvector E E)
      (Gvector-set! E E E)
-     (Gvector-ref E E)))
+     (Gvector-ref E E)
+     ;;
+     (Create-tuple (Listof E))
+     (Tuple-proj E Index)))
 
 (define-type S0-Expr
   (Rec E (Ann (S0-Form E) Src)))

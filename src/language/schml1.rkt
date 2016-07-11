@@ -37,7 +37,10 @@
                  (Gbox-set! E E)
                  (Gvector E E)
                  (Gvector-set! E E E)
-                 (Gvector-ref E E))
+                 (Gvector-ref E E)
+                 ;;
+                 (Create-tuple (Listof E))
+                 (Tuple-proj E Index))
 	      (Pair Src Schml-Type)))))
 
 (define-type S1-Bnd (Bnd Uid Schml-Type S1-Expr))

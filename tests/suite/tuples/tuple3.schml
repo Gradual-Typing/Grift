@@ -1,0 +1,1 @@
+(tuple-proj (tuple (lambda (x) x) #f 3) 2)

@@ -253,7 +253,6 @@ T?l $ (_  ; )  = what here
 #;(define ((get-bnd i) s)
   (match-let ([(cons n h) s])
     (values (hash-ref h i #f) s)))
-
 (: lfc-expr :
    (Nat -> Uid)
    (CoC1-Expr CoC1-Expr* -> CoC1-Expr)
@@ -317,6 +316,19 @@ T?l $ (_  ; )  = what here
        (Dyn-GVector-Ref e i l)]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (Dyn-GVector-Set! e1 i e2 t l)]
+      [(Create-tuple (app recur* e*))
+       (Create-tuple e*)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [(Var id)    (Var id)]
       [(Quote lit) (Quote lit)]
       [other (error 'lower-function-casts/expr "unmatched ~a" other)]))

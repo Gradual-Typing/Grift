@@ -24,7 +24,7 @@
     (define tmp-path
       (build-path (string-append "tmp" (number->string i) suffix)))
     (cond
-      [(file-exists? tmp-path) tmp-path]
+      [(not (file-exists? tmp-path)) tmp-path]
       [else (loop (add1 i))])))
 
 ;; Basic driver for the entire backend

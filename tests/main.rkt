@@ -34,6 +34,7 @@
     (core    . ,core-tests)
     (box     . ,box-tests)
     (vector  . ,vector-tests)
+    (tuples  . ,tuple-tests)
     (tool    . ,tool-tests)
     (program . ,program-tests)
     (large   . ,large-tests)))
