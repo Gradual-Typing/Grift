@@ -55,7 +55,6 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; Desugaring the input program into its constituents 
   (match-define (Prog (list prgm-name prgm-next prgm-type) prgm-exp)
     prgm)
-
   (define unique-counter (make-unique-counter prgm-next))
   (define next-uid! (make-next-uid! unique-counter))
 
@@ -85,7 +84,8 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (: bindings-needed-for-casts CoC3-Bnd-Code*)
   (: cast : Cast-Type)
-  (define-values (bindings-needed-for-casts cast)
+  (: cast-u : Uid)
+  (define-values (bindings-needed-for-casts cast cast-u)
     (cond
       [(use-simple-cast-interp?)
        (let*-values
@@ -105,11 +105,13 @@ form, to the shortest branch of the cast tree that is relevant.
              (inline-or-bnd-cast
               b* 'project "project_cast"
               (make-project-code cast)
-              CoC3-Expr "value" "type" "blame_info")])
-         (inline-or-bnd-cast
-          b* 'cast cast-uid
-          (make-cast-code next-uid! inject project ho-cast)
-          CoC3-Expr "value" "type1" "type2" "blame_info"))]
+              CoC3-Expr "value" "type" "blame_info")]
+            [(b* cast)
+             (inline-or-bnd-cast
+              b* 'cast cast-uid
+              (make-cast-code next-uid! inject project ho-cast)
+              CoC3-Expr "value" "type1" "type2" "blame_info")])
+         (values b* cast cast-uid))]
       [else
        (let*-values
            ([(b* cast-fn)
@@ -127,27 +129,34 @@ form, to the shortest branch of the cast tree that is relevant.
               b* 'cast-gvec "cast_gvec"
               (make-cast-gvect-code next-uid!)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
+            [(cast-uid) (next-uid! "interp_cast")]
+            [(cast) (ann (apply-code cast-uid) Cast-Type)]
+            [(b* cast-tuple)
+             (inline-or-bnd-cast
+              b* 'cast-tuple "cast_tuple"
+              (make-cast-tuple-code next-uid! cast-uid cast)
+              CoC3-Expr "value" "type1" "type2" "blame_info")]
             [(b* cast-ground)
              (inline-or-bnd-cast
               b* 'cast-ground "cast_ground"
-              (make-cast-ground-code next-uid! cast-fn cast-gbox cast-gvec)
+              (make-cast-ground-code next-uid! cast-fn cast-gbox cast-gvec cast-tuple)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
             [(b* cast-undyned)
              (inline-or-bnd-cast
               b* 'cast-undyned "cast_undyned"
               (make-cast-undyned-code next-uid! cast-ground)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
-            [(cast-uid) (next-uid! "interp_cast")]
-            [(cast) (apply-code cast-uid)]
             [(b* cast-dyn)
              (inline-or-bnd-cast
               b* 'cast-dyn "cast_dyn"
               (make-cast-dyn-code next-uid! cast-undyned)
+              CoC3-Expr "value" "type1" "type2" "blame_info")]
+            [(b* cast)
+             (inline-or-bnd-cast
+              b* 'cast cast-uid
+              (make-cast-any-code next-uid! cast-dyn cast-ground)
               CoC3-Expr "value" "type1" "type2" "blame_info")])
-         (inline-or-bnd-cast
-          b* 'cast cast-uid
-          (make-cast-any-code next-uid! cast-dyn cast-ground)
-          CoC3-Expr "value" "type1" "type2" "blame_info"))]))
+         (values b* cast cast-uid))]))
   
   ;; ;; Initialize all the state for guarded operations
   (: gbox-ref : GBox-Ref-Type)
@@ -362,8 +371,9 @@ form, to the shortest branch of the cast tree that is relevant.
      [else (cast-ground v type1 type2 lbl)])))
 
 (: make-cast-ground-code :
-   (String -> Uid) Cast-Type Cast-Type Cast-Type -> Cast-Type)
-(define ((make-cast-ground-code next-uid! cast-fn cast-gref cast-gvect) v t1 t2 lbl)
+   (String -> Uid) Cast-Type Cast-Type Cast-Type Cast-Type -> Cast-Type)
+(define ((make-cast-ground-code next-uid! cast-fn cast-gref
+                                cast-gvect cast-tuple) v t1 t2 lbl)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([value v] [type1 t1] [type2 t2])
     (cond$
@@ -388,6 +398,8 @@ form, to the shortest branch of the cast tree that is relevant.
           (cast-gref value type1 type2 lbl)]
          [(op=? (Tag 'GVect) tag1)
           (cast-gvect value type1 type2 lbl)]
+         [(op=? (Tag 'STuple) tag1)
+          (cast-tuple value type1 type2 lbl)]
          [else (Blame (Quote "Unexpected Type1 in cast tree"))]))])))
 
 ;; How to cast a Guarded Reference to some other type
@@ -463,6 +475,39 @@ form, to the shortest branch of the cast tree that is relevant.
                                  (list value t1 type2 lbl))
                        (Blame lbl)))
                 (Blame lbl))))))
+
+(: make-cast-tuple-code : (String -> Uid) Uid Cast-Type -> Cast-Type)
+(define ((make-cast-tuple-code next-uid! cast-u interpret-cast) v t1 t2 lbl)
+  (define-syntax-let$* let$* next-uid!)
+  (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
+         (if$ (op=? (Type DYN-TYPE) type2)
+              (Dyn-make value type1)
+              (if #f #;(and (Type? t1) (Type? t2))
+                  (let ([t1t (Type-type t1)]
+                        [t2t (Type-type t2)])
+                    (if (and (STuple? t1t) (STuple? t2t))
+                        (let-values ([(bnd* arg*)
+                                      (for/fold ([b* : CoC3-Bnd* '()]
+                                                 [arg* : Uid* '()])
+                                                ([i (in-range (STuple-num t2t))])
+                                        (unless (index? i)
+                                          (error 'make-cast-tuple-code "bad index"))
+                                        (let ([a (next-uid! "item_type")])
+                                          (values (cons (cons a (let$* ([item (Tuple-proj v i)]
+                                                                        [new-t1t (tuple-type-arg$ t1 i)]
+                                                                        [new-t2t (tuple-type-arg$ t2 i)])
+                                                                       (interpret-cast item new-t1t new-t2t lbl))) b*)
+                                                  (cons a arg*))))])
+                          (Let bnd* (Create-tuple (map (inst Var Uid) arg*))))
+                        (error 'make-cast-tuple-code)))
+                  (let$* ([tag2 (type-tag type2)])
+                         (if$ (op=? tag2 (Tag 'STuple))
+                              (let$* ([type1_num (type-tuple-num type1)]
+                                      [type2_num (type-tuple-num type2)])
+                                     (if$ (op<=? type2_num type1_num)
+                                          (Cast-Tuple cast-u v t1 t2 lbl)
+                                          (Blame type2_num)))
+                              (Blame lbl)))))))
 
 ;; How to extract a dynamic value
 (: make-cast-dyn-code : (String -> Uid) Cast-Type -> Cast-Type)
@@ -570,7 +615,7 @@ form, to the shortest branch of the cast tree that is relevant.
    ->
    CoC3-Expr)
 (define (interpret-casts-in-expr next-uid!
-                                 #;interp-uid interp-cast 
+                                 interp-cast 
                                  gbox-set! gbox-ref gvect-set! gvect-ref
                                  dyn-gbox-set! dyn-gbox-ref
                                  dyn-gvec-set! dyn-gvec-ref
@@ -720,6 +765,9 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; Proxies for functions
       [(Fn-Caster e)
        (Fn-Caster (recur e))]
+      [(Create-tuple e*)
+       (Create-tuple (map recur e*))]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
       ;; Coercions manipulation
       [(or (Fn-Proxy-Coercion _) 
            (Compose-Coercions _ _)
@@ -906,11 +954,12 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (: make-dyn-fn-app-code : (String -> Uid) Cast-Type -> Dyn-Fn-App-Type)
 (define ((make-dyn-fn-app-code next-uid! cast) v v* t* l)
-  (define-values (val ty ret-val ret-ty)
+  (define-values (val ty ret-val ret-ty arity)
     (values (next-uid! "dyn_fn_val")
             (next-uid! "dyn_fn_ty")
             (next-uid! "dyn_fn_ret_val")
-            (next-uid! "dyn_fn_ret_ty")))
+            (next-uid! "dyn_fn_ret_ty")
+            (length v*)))
   (define arg-casts : CoC3-Expr*
     (for/list : (Listof CoC3-Expr)
               ([v : CoC3-Expr v*]
@@ -927,8 +976,24 @@ form, to the shortest branch of the cast tree that is relevant.
       [else (error 'interp-cast-with-coercions/dyn-fn-app "unexpected value")]))
   (Let `([,val . ,(Dyn-value v)]
          [,ty . ,(Dyn-type v)])
-    (If (Type-Fn-Huh (Var ty))
+    (If (If (Type-Fn-Huh (Var ty))
+            (Op '= (list (Type-Fn-arity (Var ty)) (Quote arity)))
+            (Quote #f))
         (Let `([,ret-val . ,casts-apply]
                [,ret-ty . ,(Type-Fn-return (Var ty))])
           (cast (Var ret-val) (Var ret-ty) (Type DYN-TYPE) l))
         (Blame l))))
+
+;; TODO (andre) consider this tranform instead
+;; (dyn-app f (42) (Int) L1)
+;; =>
+;; (let ([v (dyn-value f)] [t (dyn-type f)])
+;;   (if (eq? t (Int -> Dyn))
+;;       (v 42)
+;;       (if (and (fn-type? t) (= (fn-type-arity t) 1))
+;;           (let ([a (cast 42 Int (fn-type-arg t 0) L1)])
+;;             (cast (v t) (fn-type-return t) L1))
+;;           (blame L1))))
+
+
+  

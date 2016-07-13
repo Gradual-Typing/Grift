@@ -11,15 +11,14 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/cast-or-coerce4.rkt"
          "../language/cast-or-coerce5.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-free)
 
-(: uncover-free (Cast-or-Coerce4-Lang Config . -> . Cast-or-Coerce5-Lang))
-(define (uncover-free prgm comp-config)
+(: uncover-free (Cast-or-Coerce4-Lang . -> . Cast-or-Coerce5-Lang))
+(define (uncover-free prgm)
   (logging uncover-free (All) prgm)
   (match-let ([(Prog (list name count type) (Let-Static* tbnd* cbnd* exp)) prgm])
     (let-values ([(exp free*) (uf-expr exp)])
@@ -196,6 +195,24 @@
      (values (Guarded-Proxy-Blames e) fv)]
     [(Guarded-Proxy-Coercion (app uf-expr e fv))
      (values (Guarded-Proxy-Coercion e) fv)]
+    [(Create-tuple (app uf-expr* e* e*-fvars)) (values (Create-tuple e*) e*-fvars)]
+    [(Tuple-proj (app uf-expr e e-fvars) i) (values (Tuple-proj e i) e-fvars)]
+    [(Tuple-Coercion-Huh (app uf-expr e e-fvars)) (values (Tuple-Coercion-Huh e) e-fvars)]
+    [(Tuple-Coercion-Num (app uf-expr e e-fvars)) (values (Tuple-Coercion-Num e) e-fvars)]
+    [(Tuple-Coercion-Item (app uf-expr e e-fvars) i) (values (Tuple-Coercion-Item e i) e-fvars)]
+    [(Cast-Tuple uid
+                 (app uf-expr e1 fv1) (app uf-expr e2 fv2)
+                 (app uf-expr e3 fv3) (app uf-expr e4 fv4))
+     (values (Cast-Tuple uid e1 e2 e3 e4) (set-union fv1 fv2 fv3 fv4))]
+    [(Coerce-Tuple uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Coerce-Tuple uid e1 e2) (set-union fv1 fv2))]
+    [(Type-Tuple-Huh (app uf-expr e e-fvars)) (values (Type-Tuple-Huh e) e-fvars)]
+    [(Type-Tuple-num (app uf-expr e e-fvars)) (values (Type-Tuple-num e) e-fvars)]
+    [(Make-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
+     (values (Make-Tuple-Coercion uid e1 e2 e3) (set-union fv1 fv2 fv3))]
+    [(Compose-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Compose-Tuple-Coercion uid e1 e2) (set-union fv1 fv2))]
+    [(Mediating-Coercion-Huh? (app uf-expr e fv)) (values (Mediating-Coercion-Huh? e) fv)]
     [other (error 'uncover-free "unmatched ~a" other)]))
 
 
@@ -241,14 +258,14 @@
 
 #|
 
-  (if (null? b*)
-      (values (set) '() (set))
-      (let ([a (car b*)] [d (cdr b*)]) ;; free the list
-        (let-values ([(u* b* f*) (uf-bnd-lambda* d)])
-          (match-let ([(cons u (app uf-lambda rhs rhs-f*)) a])
-            (values (set-add u* u)
-                    (cons (cons u rhs) b*)
-                    (set-union f* rhs-f*))))))|#
+(if (null? b*)
+    (values (set) '() (set))
+    (let ([a (car b*)] [d (cdr b*)]) ;; free the list
+      (let-values ([(u* b* f*) (uf-bnd-lambda* d)])
+        (match-let ([(cons u (app uf-lambda rhs rhs-f*)) a])
+          (values (set-add u* u)
+                  (cons (cons u rhs) b*)
+                  (set-union f* rhs-f*))))))|#
 
 (: uf-bnd-data*
    (-> CoC4-Bnd-Data*

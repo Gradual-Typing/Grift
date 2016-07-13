@@ -24,8 +24,8 @@
           "../language/data0.rkt"
           "../language/data1.rkt"))
 
-(: normalize-context (-> Data0-Lang Config Data1-Lang))
-(define (normalize-context prgm comp-config)
+(: normalize-context (-> Data0-Lang Data1-Lang))
+(define (normalize-context prgm)
   (match-let ([(Prog (list name count type) (GlobDecs d* prog)) prgm])
     (let* ([bndc* : (Boxof D1-Bnd-Code*) (box '())]
            [prog  (nc-prog bndc* prog)]

@@ -520,6 +520,8 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
       [(Type-Fn-arg (app recur t) (app recur o)) (Type-Fn-arg t o)]
       [(Fn-Caster (app recur e)) (Fn-Caster e)]
       [(Blame (app recur e)) (Blame e)]
+      [(Create-tuple (app recur* e*)) (Create-tuple e*)]
+      [(Tuple-proj (app recur e) i) (Tuple-proj e i)]
       [else (error 'lower-reference-casts "unmatched ~a" else)]))
   
   ;; recur over a list of expressions

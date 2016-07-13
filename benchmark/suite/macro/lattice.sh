@@ -2,7 +2,7 @@
 set -euo pipefail
 
 iters=1000
-nsamples=1000
+nsamples=10
 deliverable=3
 usable=10
 nAnnotizerbin=nAnnotizer
@@ -15,6 +15,7 @@ datadir=$testdir/data
 outdir=$testdir/output
 tmpdir=$testdir/tmp
 miscdir=$testdir/misc
+srcdir=$testdir/src
 TIMEFORMAT=%R
 let "nx=nsamples*6/10"
 
@@ -38,9 +39,9 @@ mkdir -p $datadir
 mkdir -p $tmpdir
 mkdir -p $outdir
 
-cp src/static/* $tmpdir
+cp $srcdir/*.schml $tmpdir
 cd $schmldir
-racket benchmark.rkt $dyn_operations $tmpdir/ 9999999999
+racket $schmldir/benchmark/benchmark.rkt $dyn_operations $tmpdir/ 9999999999
 
 for f in $tmpdir/*.schml; do
     path="${f%.*}";name=$(basename "$path")
@@ -61,7 +62,7 @@ for f in $tmpdir/*.schml; do
     
     $nAnnotizerbin $path $nsamples
     cd $schmldir
-    racket benchmark.rkt $dyn_operations $path/ 9999999999 
+    racket $schmldir/benchmark/benchmark.rkt $dyn_operations $path/ 9999999999
     
     declare -A x1 x2
     for i in `seq 0 20`; do

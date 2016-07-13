@@ -8,8 +8,8 @@
 
 (provide remove-complex-opera)
 
-(: remove-complex-opera (Data2-Lang Config -> Data3-Lang))
-(define (remove-complex-opera prog config)
+(: remove-complex-opera (Data2-Lang -> Data3-Lang))
+(define (remove-complex-opera prog)
   (match-let ([(Prog (list name count ty) (GlobDecs d* (Labels bnd* body))) prog])
     (let*-values ([(body count) (run-state (rco-body body) count)]
                   [(bnd* count) (run-state (map-state rco-bnd-code bnd*) count)])

@@ -5,95 +5,144 @@
          "./schml/reduce-to-cast-calculus.rkt"
          "./casts/impose-cast-semantics.rkt"
          "./data/convert-representation.rkt"
-         "./backend-c/code-generator.rkt")
+         "./backend-c/code-generator.rkt"
+         racket/logging)
 
-(provide (all-defined-out))
-(provide (struct-out Config))
+(provide (all-defined-out) (all-from-out "./configuration.rkt"))
 
-;; Default places for everything, but there is no default source
-(define c-path : (Parameterof Path)
-  (make-parameter (build-path "a.c")))
-(define keep-c? : (Parameterof Boolean)
-  (make-parameter #f))
-(define asm-path : (Parameterof (Option Path))
-  (make-parameter #f))
-(define target-path : (Parameterof Path)
-  (make-parameter (build-path "a.out")))
-(define log-path : (Parameterof (Option Path))
-  (make-parameter #f))
-(define mem-dflt : (Parameterof (Option Natural))
-  (make-parameter 100000000))
+(define-type Log-Level (U 'none 'fatal 'error 'warning 'info 'debug))
 
-;; Semantic Option
-(define semantics : (Parameterof Semantics)
-  (make-parameter 'Lazy-D))
+;; These ports only effect function how logging is configured during
+;; calls to compile exported from this file. Otherwise the standard
+;; environment flags are used.
+(define schml-log-level : (Parameterof Log-Level) (make-parameter 'none))
+(define schml-log-port : (Parameterof (Option Output-Port)) (make-parameter #f))
 
-;; Cast Represtentation
-(define cast-rep : (Parameterof Cast-Representation)
-  (make-parameter 'Twosomes))
-
-;; Interaction with the c compiler
-(define c-flags : (Parameterof (Listof String))
-  (make-parameter '()))
 
 ;; This is the main compiler it is composed of several micro
 ;; compilers for successivly lower level languages.
-(: compile/conf (Path Config . -> . Path))
-(trace-define (compile/conf path config)
+(: compile/current-parameterization : (Path -> Path))
+(define (compile/current-parameterization path)
   (let* (;; read(lex), parse, typecheck, insert-implicit-casts
-         [c0  : Cast0-Lang  (reduce-to-cast-calculus path config)]
+         [c0  : Cast0-Lang  (reduce-to-cast-calculus path)]
          ;; specify behavior/representation of casts, and all language constructs
-         [d0  : Data0-Lang (impose-cast-semantics c0 config)]
+         [d0  : Data0-Lang (impose-cast-semantics c0)]
          ;; change how the language represents expressions to get a c like ast
-         [uil : Data5-Lang (convert-representation d0 config)])
+         [uil : Data5-Lang (convert-representation d0)])
     ;; generate c code and compile it
-    (c-backend-generate-code uil config)))
+    (c-backend-generate-code uil)))
 
 ;; compile file at path
 ;; exec-path = path/name of final executable
 (: compile (->* ((U String Path))
-                (#:semantics Semantics
-                 #:output Path
-                 #:keep-c Path
-                 #:keep-a Path
-                 #:cc-opt (U String (Listof String))
-                 #:log    Path
-                 #:mem    Natural
-                 #:cast-rep Cast-Representation
-                 #:rt Path
-                 #:dyn-ops (U Boolean 'inline))
+                (#:output   (Option (U String Path))
+                 #:keep-c   (Option (U String Path)) 
+                 #:keep-s   (Option (U String Path))
+                 #:blame    Blame-Semantics
+                 #:cast     Cast-Representation
+                 #:cc-opts  (U String (Listof String))
+                 #:mem      Natural
+                 #:rt       (Option (U String Path))
+                 #:log-level Log-Level
+                 #:log-port  (Option (U String Path Output-Port)))
                 Path))
-(define (compile path
-                 #:semantics [smtc (semantics)]
-                 #:output    [outp (target-path)]
-                 #:keep-c    [kp-c : (Option Path) (if (keep-c?) (c-path) #f)]
-                 #:keep-a    [kp-a : (Option Path) (asm-path)]
-                 #:cc-opt    [opts : (U String (Listof String)) (c-flags)]
-                 #:log       [logp : (Option Path) (log-path)]
-                 #:mem       [mem :  (Option Natural) (mem-dflt)]
-                 #:cast-rep  [crep (cast-rep)]
-                 #:rt        [rt  : (Option Path) #f]
-                 #:dyn-ops   [dyn-ops (dynamic-operations?)])
-  (let* ([path  (simple-form-path (if (string? path)
-                                      (string->path path)
-                                      path))]
-         [opts (if (string? opts) (list opts) opts)]
-         [cpth (or kp-c (c-path))]
-         [kp-c (true? kp-c)]
-         [mem (if (number? mem) mem 0)])
-    
-    (when logp
-      (current-log-port (open-output-file logp #:exists 'replace #:mode 'text)))
-    (parameterize ([print-as-expression #t] [print-graph #t] [print-struct #t]
-                   [dynamic-operations? dyn-ops])
-      (compile/conf path (Config path smtc outp cpth kp-c opts kp-a crep mem rt)))))
+(define (compile target
+                 #:output    [output    (output-path)]
+                 #:keep-c    [keep-c    (c-path)]
+                 #:keep-s    [keep-s    (s-path)]
+                 #:blame     [blame     (blame-semantics)]
+                 #:cast      [cast      (cast-representation)]
+                 #:cc-opts   [cc-opts   (c-flags)]
+                 #:mem       [mem       (init-heap-kilobytes)]
+                 #:rt        [rt        (runtime-path)]
+                 #:log-level [log-level (schml-log-level)]
+                 #:log-port  [log-port  (schml-log-port)])
+  ;; convert all strings to paths
+  (let* ([target  (if (string? target) (build-path target) target)]
+         [output  (if (string? output) (build-path output) output)]
+         [keep-c  (if (string? keep-c) (build-path keep-c) keep-c)]
+         [keep-s  (if (string? keep-s) (build-path keep-s) keep-s)]
+         [cc-opts (if (string? cc-opts) (list cc-opts) cc-opts)] 
+         [log-port : (U #f Output-Port Path)
+                   (if (string? log-port) (build-path log-port) log-port)])
+    ;; Setup compile time parameters based off of these flags
+    (parameterize ([output-path output]
+                   [c-path      keep-c]
+                   [s-path      keep-s]
+                   [c-flags     cc-opts]
+                   [print-as-expression #t]
+                   [print-graph #t]
+                   [print-struct #t])
+      (define (compile-target) : Path (compile/current-parameterization target))
+      (define (compile/log-port [p : Output-Port]) : Path
+        (with-logging-to-port p compile-target log-level 'schml))
+      (cond
+        [(not log-port) (compile-target)]
+        [(output-port? log-port) (compile/log-port log-port)]
+        [else (call-with-output-file log-port
+                #:exists 'replace
+                compile/log-port)]))))
 
 
-(: envoke-compiled-program
-   (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))
-(define (envoke-compiled-program #:exec-path [path #f] #:config [config #f])
-  (cond
-    [config (system (path->string (Config-exec-path config)))]
-    [path   (system (path->string path))]
-    [else   (system (path->string (target-path)))]))
+;; (: envoke-compiled-program
+;;    (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))
+;; (define (envoke-compiled-program #:exec-path [path #f] #:config [config #f])
+;;   (cond
+;;     [config (system (path->string (Config-exec-path config)))]
+;;     [path   (system (path->string path))]
+;;     [else   (system (path->string target))]))
 
+;; We are currently only supporting .schml files
+(: schml-path? :  Path -> Boolean)
+(define (schml-path? path-searched)
+  (equal? #"schml" (filename-extension path-searched)))
+
+(define output-suffix : (Parameterof String) (make-parameter ""))
+
+(define-syntax-rule (debug v ...)
+    (begin (printf "~a=~v\n" 'v v) ... (newline)))
+
+;; Compile all .schml files in a directory and sub-directories
+(: compile-directory : Path -> (Listof Path))
+(define (compile-directory compile-dir)
+  ;; The directory should exist if we are going to compile it
+  (unless (directory-exists? compile-dir)
+    (error 'compile-directory "no such directory: ~a" compile-dir))
+
+  (define (path?-valid-dir! [dir : (Option Path)]) : (Option Path)
+    (cond
+      [(not dir) (void)]
+      [(file-exists? dir)
+       (error 'compile-directory "not a directory ~a" dir)]
+      [(not (directory-exists? dir)) (make-directory* dir)])
+    dir)
+  
+  (define c-dir (path?-valid-dir! (c-path)))
+  (define s-dir (path?-valid-dir! (s-path)))
+  (define out-suffix (output-suffix))
+
+  ;; filename to output file paths
+  (: renaming-output-files : Path -> (Values Path (Option Path) (Option Path))) 
+  (define (renaming-output-files file-name)
+    (define out-name (path-replace-suffix file-name out-suffix))
+    (define c-path (and c-dir (build-path c-dir (path-add-suffix out-name #".c"))))
+    (define s-path (and s-dir (build-path s-dir (path-add-suffix out-name #".s"))))
+    (values (build-path compile-dir out-name) c-path s-path))
+
+ 
+  
+  (debug compile-dir c-dir s-dir)
+  
+  ;; Iterate over all schml files in directory and subdirectories
+  (for/list ((fl (find-files schml-path? compile-dir)))
+    (debug fl)
+
+    ;; generate actual file paths instead of directory paths
+    (define-values (out-path c-path? s-path?)
+      (let ([p? (file-name-from-path fl)])
+        (unless (path? p?)
+          (error 'schml-path? "this should never happen"))
+        (renaming-output-files p?)))
+
+    ;; Use current parameterization plus new file names to compile the file
+    (compile fl #:output out-path #:keep-c c-path? #:keep-s s-path?)))

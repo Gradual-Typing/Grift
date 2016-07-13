@@ -45,6 +45,9 @@
           (Dyn-GRef-Set! E E Schml-Type Blame-Label)
           (Dyn-GRef-Ref E Blame-Label)
           (Dyn-Fn-App E CoC0-Expr* Schml-Type* Blame-Label)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
 	  ;; Terminals
           (Var Uid)
 	  (Quote Cast-Literal))))

@@ -26,8 +26,8 @@
           "../language/cast-or-coerce3.1.rkt"
           "../language/cast-or-coerce4.rkt"))
 
-(: label-lambdas (Cast-or-Coerce3.1-Lang Config  -> Cast-or-Coerce4-Lang))
-(define (label-lambdas prgm comp-config)
+(: label-lambdas (Cast-or-Coerce3.1-Lang  -> Cast-or-Coerce4-Lang))
+(define (label-lambdas prgm)
   (match-let ([(Prog (list name count type)
                      (Let-Static* tbnd* cbnd* exp)) prgm])
     (let* ([next : (Boxof Nat) (box count)]
@@ -207,7 +207,19 @@
       [(Ref-Coercion-Read e)
        (Ref-Coercion-Read (recur e))]
       [(Ref-Coercion-Write e)
-       (Ref-Coercion-Write (recur e))]  
+       (Ref-Coercion-Write (recur e))]
+      [(Create-tuple e*) (Create-tuple (map recur e*))]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [other (error 'll-expr "~a" other)]))
   ;; recur through a code binding
   (: ll-bndc  (CoC3.1-Bnd-Code -> CoC4-Bnd-Code))

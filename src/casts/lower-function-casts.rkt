@@ -206,8 +206,8 @@ T?l $ (_  ; )  = what here
 (define direct-fn-cast-optimization? (make-parameter #t))
 
 ;; The entry point for this pass it is called by impose-casting semantics
-(: lower-function-casts (Cast-or-Coerce0-Lang Config . -> . Cast-or-Coerce1-Lang))
-(define (lower-function-casts prgm config)
+(: lower-function-casts (Cast-or-Coerce0-Lang -> Cast-or-Coerce1-Lang))
+(define (lower-function-casts prgm)
   (match-define (Prog (list name next type) exp) prgm)
 
   (define ucount (make-unique-counter next))
@@ -215,11 +215,11 @@ T?l $ (_  ; )  = what here
     (make-hasheq)) 
   
   (define new-expression
-    (case (Config-cast-rep config)
-      [(Twosomes)
-       (define get-fn-cast!/twosome
-         (get-fn-cast! ucount fn-casts "fn_cast_" build-fn-cast/twosome))
-       (lfc-expr get-fn-cast!/twosome build-apply/twosome exp)]
+    (case (cast-representation)
+      [(Type-Based)
+       (define get-fn-cast!/type-based-cast
+         (get-fn-cast! ucount fn-casts "fn_cast_" build-fn-cast/type-based-cast))
+       (lfc-expr get-fn-cast!/type-based-cast build-apply/type-based-cast exp)]
       [(Coercions)
        (define get-fn-cast!/coercion
          (get-fn-cast! ucount fn-casts "fn_coerce_" build-fn-cast/coercion))
@@ -229,7 +229,7 @@ T?l $ (_  ; )  = what here
         (Labels (hash-values fn-casts) new-expression)))
   
   ;; (match 
-  ;;   ['Twosomes
+  ;;   ['Type-Based
   ;;    (match-define-values (e (naive-fn-state n c*))
   ;;      (run-state (lfc-expr exp) (naive-fn-state next (hasheq))))
   ;;    (Prog (list name n type) (Labels (hash-values c*) e))]
@@ -253,7 +253,6 @@ T?l $ (_  ; )  = what here
 #;(define ((get-bnd i) s)
   (match-let ([(cons n h) s])
     (values (hash-ref h i #f) s)))
-
 (: lfc-expr :
    (Nat -> Uid)
    (CoC1-Expr CoC1-Expr* -> CoC1-Expr)
@@ -317,6 +316,19 @@ T?l $ (_  ; )  = what here
        (Dyn-GVector-Ref e i l)]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (Dyn-GVector-Set! e1 i e2 t l)]
+      [(Create-tuple (app recur* e*))
+       (Create-tuple e*)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [(Var id)    (Var id)]
       [(Quote lit) (Quote lit)]
       [other (error 'lower-function-casts/expr "unmatched ~a" other)]))
@@ -376,8 +388,8 @@ T?l $ (_  ; )  = what here
          (hash-set! fn-casts arity caster-bnd)
          caster-uid]))))
 
-(: build-fn-cast/twosome : (String -> Uid) -> (Nat Uid -> CoC1-Code))
-(define ((build-fn-cast/twosome next-uid!) ary name)
+(: build-fn-cast/type-based-cast : (String -> Uid) -> (Nat Uid -> CoC1-Code))
+(define ((build-fn-cast/type-based-cast next-uid!) ary name)
   (match-define (and caster-fmls (list fn t1 t2 lbl))
     (map next-uid! '("f" "t1" "t2" "lbl")))
   (match-define (list fn-var t1-var t2-var lbl-var)
@@ -398,8 +410,8 @@ T?l $ (_  ; )  = what here
   (define then-cast (Lambda uid* (Castable name cast-call)))
   (Code caster-fmls then-cast))
 
-(: build-apply/twosome : CoC1-Expr CoC1-Expr* -> CoC1-Expr)
-(define (build-apply/twosome exp exp*)
+(: build-apply/type-based-cast : CoC1-Expr CoC1-Expr* -> CoC1-Expr)
+(define (build-apply/type-based-cast exp exp*)
   (App-Fn exp exp*))
 
 (: build-fn-cast/coercion : (String -> Uid) -> (Nat Uid -> CoC1-Code))

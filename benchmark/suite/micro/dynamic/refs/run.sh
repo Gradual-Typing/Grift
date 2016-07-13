@@ -1,10 +1,7 @@
 #!/bin/sh
-set -euo pipefail
 
-schmldir=$SCHML_DIR
+schmldir=/u/dalmahal/lattice/Schml
 memlimit=9999999999
-schmlflags=""
-
 # --------------------------------------------------------------------
 
 name=ref
@@ -29,7 +26,7 @@ echo "Benchmarking mutable references read and write"
 
 # compile Schml source files, then enter the tmp directory
 cd $schmldir
-racket benchmark.rkt $schmlflags $tmpdir $memlimit
+racket benchmark.rkt $tmpdir $memlimit
 cd $tmpdir
 
 # compile scheme source files

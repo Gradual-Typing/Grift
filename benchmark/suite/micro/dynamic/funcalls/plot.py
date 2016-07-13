@@ -115,5 +115,4 @@ plt.legend(loc="upper right"
 if latex_output:
     plt.savefig('output/schml_vs_gambit_funcall_dyn2', bbox_inches='tight')
 else:
-    plt.savefig('output/schml_vs_gambit_funcall_dyn2', bbox_inches='tight')
     plt.show()

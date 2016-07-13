@@ -75,7 +75,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
   ;; Code generators for the coercion casting runtime
   (define gen-interp-cast-code
-    (make-cast-code next-uid! interp-cast make-coercion compose-coercions))
+    (make-cast-code next-uid! interp-cast interp-cast-uid make-coercion compose-coercions))
   (define gen-compose-coercions-code
     (make-compose-coercions-code next-uid! compose-coercions
                                  compose-coercions-uid make-coercion))
@@ -310,10 +310,10 @@ form, to the shortest branch of the cast tree that is relevant.
   (define-type Cast-Type (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
 
   (: make-cast-code :
-     (String -> Uid) Cast-Type Make-Coercion-Type Compose-Coercions-Type
+     (String -> Uid) Cast-Type Uid Make-Coercion-Type Compose-Coercions-Type
      ->
      Cast-Type)
-  (define ((make-cast-code next-uid! cast mk-crcn comp-crcn) v c)
+  (define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn) v c)
     (define-syntax-let$* let$* next-uid!)
     ;; apply-cast is normally specified in terms of inspecting the
     ;; value. But in a world were value reflection on values is limited
@@ -348,21 +348,42 @@ form, to the shortest branch of the cast tree that is relevant.
              (let$* ([projected_type (mk-crcn dyn_type prj_type prj_label)])
                     (cast dyn_value projected_type)))]
      [(inj?$ c) (Dyn-make v (inj-type$ c))]
-     [(fnC?$ c)
-      (If (Fn-Proxy-Huh v)
-          (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
-          (App-Code (Fn-Caster v) (list v c)))]
-     [(ref?$ c)
-      (if$ (Guarded-Proxy-Huh v)
-           (let$* ([old_val  (Guarded-Proxy-Ref v)]
-                   [old_crcn (Guarded-Proxy-Coercion v)])
-                  (let$* ([composed_crcn (comp-crcn old_crcn c)])
-                         (if$ (id?$ composed_crcn)
-                              old_val
-                              (Guarded-Proxy
-                               old_val 
-                               (Coercion composed_crcn)))))
-           (Guarded-Proxy v (Coercion c)))]
+     [(mediating-crcn?$ c)
+      (cond$
+       [(fnC?$ c)
+        (If (Fn-Proxy-Huh v)
+            (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
+            (App-Code (Fn-Caster v) (list v c)))]
+       [(ref?$ c)
+        (if$ (Guarded-Proxy-Huh v)
+             (let$* ([old_val  (Guarded-Proxy-Ref v)]
+                     [old_crcn (Guarded-Proxy-Coercion v)])
+                    (let$* ([composed_crcn (comp-crcn old_crcn c)])
+                           (if$ (id?$ composed_crcn)
+                                old_val
+                                (Guarded-Proxy
+                                 old_val 
+                                 (Coercion composed_crcn)))))
+             (Guarded-Proxy v (Coercion c)))]
+       [(tuple?$ c)
+        (if (Quote-Coercion? c)
+            (let ([ctuple (Quote-Coercion-const c)])
+              (if (CTuple? ctuple)
+                  (let-values ([(bnd* arg*)
+                                (for/fold ([b* : CoC3-Bnd* '()]
+                                           [arg* : Uid* '()])
+                                          ([i (in-range (CTuple-num ctuple))])
+                                  (unless (index? i)
+                                    (error 'interpret-casts-with-coercions "bad index"))
+                                  (let ([a (next-uid! "item_coercion")])
+                                    (values (cons (cons a (let$* ([item (Tuple-proj v i)]
+                                                                  [crcn (tuple-crcn-arg$ c i)])
+                                                                 (cast item crcn))) b*)
+                                            (cons a arg*))))])
+                    (Let bnd* (Create-tuple (map (inst Var Uid) arg*))))
+                  (error 'cast/coercion)))
+            (Coerce-Tuple cast-u v c))]
+       [else (Blame (Quote "bad implemention of mediating coercions"))])]
      ;; the coercion must be failure
      [else (Blame (fail-label$ c))]))
 
@@ -373,16 +394,16 @@ form, to the shortest branch of the cast tree that is relevant.
    (String -> Uid) Make-Coercion-Type Uid -> Make-Coercion-Type)
 (define ((make-make-coercion-code next-uid! mk-crcn mk-crcn-uid) t1 t2 lbl)
   (define-syntax-let$* let$* next-uid!)
+  (: help-comp :
+     CoC3-Trivial -> (Schml-Type Schml-Type -> Schml-Coercion))
+  (define ((help-comp lbl) t g)
+    (let ([c : CoC3-Expr (mk-crcn (Type t) (Type g) lbl)])
+      (unless (Quote-Coercion? c)
+        (error 'interpret-casts-with-coercions/mk-fn-crcn$/help-comp
+               "This should always be possible if all the code is correct"))
+      (Quote-Coercion-const c)))
   (: make-make-fn-crcn-code Make-Coercion-Type)
   (define (make-make-fn-crcn-code t1 t2 lbl)
-    (: help-comp :
-       CoC3-Trivial -> (Schml-Type Schml-Type -> Schml-Coercion))
-    (define ((help-comp lbl) t g)
-      (let ([c : CoC3-Expr (mk-crcn (Type t) (Type g) lbl)])
-        (unless (Quote-Coercion? c)
-          (error 'interpret-casts-with-coercions/mk-fn-crcn$/help-comp
-                 "This should always be possible if all the code is correct"))
-        (Quote-Coercion-const c)))
     (cond
       [(and (Type? t1) (Type? t2))
        (define-values (t1^ t2^)
@@ -432,7 +453,19 @@ form, to the shortest branch of the cast tree that is relevant.
             [gr2_of (gref-of$ t2)]
             [read_crcn  (mk-crcn gr1_of gr2_of lbl)]
             [write_crcn (mk-crcn gr2_of gr1_of lbl)])
-      (ref$ read_crcn write_crcn))]
+           (ref$ read_crcn write_crcn))]
+   [(and$ (tupleT?$ t1) (tupleT?$ t2))
+      (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
+           (if (and (Type? t1) (Type? t2))
+               (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
+                 (if (and (STuple? t1) (STuple? t2))
+                     (let* ([t1-args (STuple-items t1)]
+                            [t2-args (STuple-items t2)]
+                            [item* (map (help-comp lbl) t1-args t2-args)])
+                       (Quote-Coercion (CTuple (STuple-num t2) item*)))
+                     (error 'make-coercion)))
+               (Make-Tuple-Coercion mk-crcn-uid t1 t2 lbl))
+           (Blame lbl))]
    ;; This is absolutly necisarry
    ;; While Injections and Projections are never made by
    ;; source code coercions composition can create new
@@ -452,6 +485,12 @@ form, to the shortest branch of the cast tree that is relevant.
    -> Compose-Coercions-Type)
 (define ((make-compose-coercions-code next-uid! compose compose-uid mk-crcn) c1 c2)
   (define-syntax-let$* let$* next-uid!)
+  (: help-comp : Schml-Coercion Schml-Coercion -> Schml-Coercion)
+  (define (help-comp s t)
+    (let ([c (compose (Quote-Coercion s) (Quote-Coercion t))])
+      (unless (Quote-Coercion? c)
+        (error 'interpret-casts-with-coercions/help-comp))
+      (Quote-Coercion-const c)))
   (cond$
    ;; Eliminating the Identities cuts down on the number of branches
    ;; and should be fast
@@ -492,35 +531,43 @@ form, to the shortest branch of the cast tree that is relevant.
    ;; All Branches from here out will have to check if c2 is failure
    ;; so we do it once to eliminate the possibility
    [(fail?$ c2) (if$ (fail?$ c1) c1 c2)]
-   [(fnC?$ c1) ;; c2 must be a Function Coercion
-    (cond
-      [(and (Quote-Coercion? c1) (Quote-Coercion? c2))
-       (: help-comp : Schml-Coercion Schml-Coercion -> Schml-Coercion)
-       (define (help-comp s t)
-         (let ([c (compose (Quote-Coercion s) (Quote-Coercion t))])
-           (unless (Quote-Coercion? c)
-             (error 'interpret-casts-with-coercions/help-comp))
-           (Quote-Coercion-const c)))
-       (let* ([c1 (Quote-Coercion-const c1)]
-              [c2 (Quote-Coercion-const c2)])
-         (unless (and (Fn? c1) (Fn? c2))
-           (error 'compose-fn-crcn$ "given ~a ~a" c1 c2))
-         (match-define-values ((Fn _ c1-args c1-ret) (Fn _ c2-args c2-ret))
-           (values c1 c2))
-         (define arg* (map help-comp c2-args c1-args))
-         (define ret  (help-comp c1-ret c2-ret))
-         (Quote-Coercion (Fn (Fn-arity c1) arg* ret)))]
-      [else (Compose-Fn-Coercion compose-uid c1 c2)])]
-   [(ref?$ c1) ;; c2 must also be a reference coercion
-    (let$* ([ref1_read  (ref-read$  c1)]
-            [ref1_write (ref-write$ c1)]
-            [ref2_read  (ref-read$  c2)]
-            [ref2_write (ref-write$ c2)]
-            [read  (compose ref1_read  ref2_read)]
-            [write (compose ref2_write ref1_write)])
-      (if$ (and$ (id?$ read) (id?$ write))
-           (Quote-Coercion (Identity))
-           (ref$ read write)))]
+   [(mediating-crcn?$ c1)
+    (cond$
+     [(fnC?$ c1) ;; c2 must be a Function Coercion
+      (cond
+        [(and (Quote-Coercion? c1) (Quote-Coercion? c2))
+         (let* ([c1 (Quote-Coercion-const c1)]
+                [c2 (Quote-Coercion-const c2)])
+           (unless (and (Fn? c1) (Fn? c2))
+             (error 'compose-fn-crcn$ "given ~a ~a" c1 c2))
+           (match-define-values ((Fn _ c1-args c1-ret) (Fn _ c2-args c2-ret))
+                                (values c1 c2))
+           (define arg* (map help-comp c2-args c1-args))
+           (define ret  (help-comp c1-ret c2-ret))
+           (Quote-Coercion (Fn (Fn-arity c1) arg* ret)))]
+        [else (Compose-Fn-Coercion compose-uid c1 c2)])]
+     [(ref?$ c1) ;; c2 must also be a reference coercion
+      (let$* ([ref1_read  (ref-read$  c1)]
+              [ref1_write (ref-write$ c1)]
+              [ref2_read  (ref-read$  c2)]
+              [ref2_write (ref-write$ c2)]
+              [read  (compose ref1_read  ref2_read)]
+              [write (compose ref2_write ref1_write)])
+             (if$ (and$ (id?$ read) (id?$ write))
+                  (Quote-Coercion (Identity))
+                  (ref$ read write)))]
+     [(tuple?$ c1)
+      (if (and (Quote-Coercion? c1) (Quote-Coercion? c2))
+          (let* ([c1 (Quote-Coercion-const c1)]
+                 [c2 (Quote-Coercion-const c2)])
+            (if (and (CTuple? c1) (CTuple? c2))
+                (let* ([c1-args (CTuple-items c1)]
+                       [c2-args (CTuple-items c2)]
+                       [arg*    (map help-comp c1-args c2-args)])
+                  (Quote-Coercion (CTuple (CTuple-num c2) arg*)))
+                (error 'compose-coercions "given ~a ~a" c1 c2)))
+          (Compose-Tuple-Coercion compose-uid c1 c2))]
+       [else (Blame (Quote "bad implemention of mediating coercions"))])]
    ;; C1 must be a failed coercion
    [else (Blame (fail-label$ c1))]))
 
@@ -747,28 +794,9 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; Proxies for functions
       [(Fn-Proxy-Coercion e)
        (Fn-Proxy-Coercion (recur e))]
-      ;; Unguarded references
-      [(Unguarded-Box e)
-       (Unguarded-Box (recur e))]
-      [(Unguarded-Box-Ref e)
-       (Unguarded-Box-Ref (recur e))]
-      [(Unguarded-Box-Set! e1 e2)
-       (Unguarded-Box-Set! (recur e1) (recur e2))]
-      [(Unguarded-Vect e1 e2)
-       (Unguarded-Vect (recur e1) (recur e2))]
-      [(Unguarded-Vect-Ref e1 e2)
-       (Unguarded-Vect-Ref (recur e1) (recur e2))]
-      [(Unguarded-Vect-Set! e1 e2 e3)
-       (Unguarded-Vect-Set! (recur e1) (recur e2) (recur e3))]
-      ;; Proxies for references
-      [(Guarded-Proxy-Huh e)
-       (Guarded-Proxy-Huh (recur e))]
-      [(Guarded-Proxy e (Coercion c))
-       (Guarded-Proxy (recur e) (Coercion (recur c)))]
-      [(Guarded-Proxy-Ref e)
-       (Guarded-Proxy-Ref (recur e))]
-      [(Guarded-Proxy-Coercion e)
-       (Guarded-Proxy-Coercion (recur e))]
+      [(Create-tuple e*)
+       (Create-tuple (map recur e*))]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
       ;; Coercions manipulation
       [(or (Guarded-Proxy-Source _) (Guarded-Proxy-Target _)
            (Guarded-Proxy-Blames _))

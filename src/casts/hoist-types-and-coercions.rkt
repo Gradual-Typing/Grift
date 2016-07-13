@@ -21,7 +21,6 @@
          "../growable-vector.rkt"
          "../unique-counter.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/cast-or-coerce3.rkt"
          "../language/lambda0.rkt"
          racket/match
@@ -30,9 +29,8 @@
 ;; Only the pass is provided by this module
 (provide hoist-types-and-coercions)
 
-(: hoist-types-and-coercions :
-   Cast-or-Coerce3-Lang Config -> Lambda0-Lang)
-(define (hoist-types-and-coercions prgm config)
+(: hoist-types-and-coercions : Cast-or-Coerce3-Lang -> Lambda0-Lang)
+(define (hoist-types-and-coercions prgm)
   (match-define (Prog (list prgm-name next-unique-number prgm-type) exp)
     prgm)
 
@@ -163,6 +161,8 @@
          (ti! n (GVect t))]
         [(MVect (app recur t n))
          (ti! n (MVect t))]
+        [(STuple arity (app recur* t* n))
+         (ti! n (STuple arity t*))]
         [other (error 'hoist-types/identify-type! "unmatched ~a" other)]))
     (: recur* ((Listof Schml-Type) -> (Values (Listof Prim-Type) Nat)))
     (define (recur* t*)
@@ -180,7 +180,7 @@
   ;; This is basically the same as identify-type! above.
   (match-define (cons ci sb*) ct)
   (define ti! (identify-type! us tt))
-
+  ;; the firs arg represents the max depth of the dependency tree of sub coercions.
   (: ci! : Nat Compact-Coercion -> (values (Static-Id Uid) Nat))
   (define ci! (table-identify! us ci sb*))
   
@@ -202,7 +202,9 @@
         [(Fn i (app recur* a* m) (app recur r n))
          (ci! (max m n) (Fn i a* r))]
         [(Ref (app recur r m) (app recur w n))
-         (ci! (max m n) (Ref r w)) ]
+         (ci! (max m n) (Ref r w))]
+        [(CTuple i (app recur* a* m))
+         (ci! m (CTuple i a*))]
         [other (error 'hoist-types/coercion "unmatched ~a" other)]))
     (: recur* (Schml-Coercion* -> (Values (Listof Immediate-Coercion) Nat)))
     (define (recur* t*)
@@ -386,6 +388,19 @@
        (Guarded-Proxy-Blames exp)]
       [(Guarded-Proxy-Coercion (app recur exp))
        (Guarded-Proxy-Coercion exp)]
+      [(Create-tuple (app recur* e*))
+       (Create-tuple e*)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [(? string? x) (error 'hoist-types/string)]
       [other (error 'hoist-types/expr "unmatched ~a" other)]))
   ;; Recur through other type containing ast forms

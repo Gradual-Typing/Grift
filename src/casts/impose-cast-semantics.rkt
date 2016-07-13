@@ -26,27 +26,24 @@ This is a micro compiler that removes the cast language form.
           "../language/cast0.rkt"
           "../language/data0.rkt"))
 
-(: impose-cast-semantics : Cast0-Lang Config -> Data0-Lang)
-(define (impose-cast-semantics c0 cfg)
-  (define c4
-    (case (Config-cast-rep cfg)
-      [(Twosomes)
-       (define c2 (lower-function-casts c0 cfg))
-       (interpret-casts/twosomes c2)]
+(: impose-cast-semantics : Cast0-Lang -> Data0-Lang)
+(define (impose-cast-semantics c0)
+  (define c1
+    (case (cast-representation)
+      [(Type-Based)
+       (interpret-casts/twosomes (lower-function-casts c0))]
       [(Coercions)
-       (define c2 (casts->coercions c0 cfg))
-       (define c3 (lower-function-casts c2 cfg))
-       (interpret-casts/coercions c3)]
+       (interpret-casts/coercions (lower-function-casts (casts->coercions c0)))]
       #;
       [(Super-Coercions)
        (define c2 (casts->super-coercions c0))
        (interpret-casts/super-coercions (error 'impose-cast-semantics/todo))]))
-  (define c5 (hoist-types-and-coercions c4 cfg))
-  (define c5.5 (purify-letrec c5 cfg))
-  (define c6 (label-lambdas c5.5 cfg))
-  (define c7 (uncover-free c6 cfg))
-  (define c8 (convert-closures c7 cfg))
-  (specify-representation c8 cfg))
+  (define c5 (hoist-types-and-coercions c1))
+  (define c5.5 (purify-letrec c5))
+  (define c6 (label-lambdas c5.5))
+  (define c7 (uncover-free c6))
+  (define c8 (convert-closures c7))
+  (specify-representation c8))
 
 #;
 (define-compiler impose-cast-semantics : (Cast0-Lang Config -> Data0-Lang)

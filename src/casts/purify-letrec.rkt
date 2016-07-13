@@ -13,7 +13,6 @@
 +------------------------------------------------------------------------------|#
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/lambda0.rkt"
          "../language/lambda1.rkt"
          racket/match
@@ -27,8 +26,8 @@
   "../language/lambda0.rkt"
   "../language/lambda1.rkt"))
 
-(: purify-letrec (Lambda0-Lang Config -> Lambda1-Lang))
-(define (purify-letrec prgm comp-config)
+(: purify-letrec (Lambda0-Lang -> Lambda1-Lang))
+(define (purify-letrec prgm)
   (match-define (Prog (list prgm-name prgm-next prgm-type)
                   (Let-Static* prgm-type-bnd* prgm-crcn-bnd* prgm-expr))
     prgm)
@@ -168,6 +167,18 @@
     [(Guarded-Proxy-Target e) (recur e)]
     [(Guarded-Proxy-Blames e) (recur e)]
     [(Guarded-Proxy-Coercion e) (recur e)]
+    [(Create-tuple e*) (recur* e*)]
+    [(Tuple-proj e i) (recur e)]
+    [(Tuple-Coercion-Huh e) (recur e)]
+    [(Tuple-Coercion-Num e) (recur e)]
+    [(Tuple-Coercion-Item e i) (recur e)]
+    [(Coerce-Tuple uid e1 e2) (recur-all e1 e2)]
+    [(Cast-Tuple uid e1 e2 e3 e4) (recur-all e1 e2 e3 e4)]
+    [(Type-Tuple-Huh e) (recur e)]
+    [(Type-Tuple-num e) (recur e)]
+    [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
+    [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
+    [(Mediating-Coercion-Huh? e) (recur e)]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
 
 ;; Computes the intersection between two lists and the list of elements
@@ -221,28 +232,12 @@
      (define (recur-bnd-lambda [b : L1-Bnd-Lambda])
        (match-let ([(cons i (Lambda i* (Castable c? e))) e])
          (cons i (Lambda i* (Castable c? (recur e))))))
-     (Letrec (map recur-bnd-lambda b*) (recur e))
-     #;;; Get rid of this once we know it works
-     (let-values ([(no* yes*) (diff1-intersect bnd* v*)])
-       (let* ([nob* (map (inst car Uid L1-Lambda) no*)]
-              [no* (map (lambda ([e : L1-Lambda]) : L1-Lambda
-                                (replace-ref-lam e v*))
-                        (map (inst cdr Uid L1-Lambda) no*))]
-              [no* (map (inst cons Uid L1-Lambda) nob* no*)]
-              [v* (diff2 (map (inst car Uid L1-Lambda) bnd*) v*)]
-              [e (if (> (length v*) 0) (replace-ref e v*) e)])
-         (Letrec (append no* yes*) e)))]
+     (Letrec (map recur-bnd-lambda b*) (recur e))]
     [(Let b* e)
      (define (recur-bnd [b : L1-Bnd])
        (match-let ([(cons i e) b])
          (cons i (recur e))))
-     (Let (map recur-bnd b*) (recur e))
-     #;;; Get rid of this once we know it works
-     (let* ([b* (map (inst car Uid L1-Expr) bnd*)]
-            [bnd* (map (inst cons Uid L1-Expr) b* (map recur/env (map (inst cdr Uid L1-Expr) bnd*)))]
-            [v* (diff2 b* v*)]
-            [e (if (> (length v*) 0) (replace-ref e v*) e)])
-       (Let bnd* e))]
+     (Let (map recur-bnd b*) (recur e))]
     [(Labels b* e)
      (define (recur-bnd-code [b : L1-Bnd-Code])
        (match-let ([(cons i (Code i* e)) b])
@@ -390,6 +385,8 @@
      (Guarded-Proxy-Blames expr)]
     [(Guarded-Proxy-Coercion (app recur expr))
      (Guarded-Proxy-Coercion expr)]
+    [(Create-tuple e*) (Create-tuple (recur* e*))]
+    [(Tuple-proj e i) (Tuple-proj (recur e) i)]
     [other (error 'purify-letrec/replace-ref "unmatched ~a" other)]))
 
 
@@ -615,6 +612,18 @@
        (Guarded-Proxy-Blames expr)]
       [(Guarded-Proxy-Coercion (app recur expr))
        (Guarded-Proxy-Coercion expr)]
+      [(Create-tuple e*) (Create-tuple (recur* e*))]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [other (error 'purify-letrec/expr "unmatched ~a" other)]))
 
   (: recur* (-> L0-Expr* L1-Expr*))
@@ -716,4 +725,3 @@
        
         
   |#
-
