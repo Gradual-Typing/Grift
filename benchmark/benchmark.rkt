@@ -6,7 +6,7 @@
 
 (require "../src/errors.rkt"
          "../src/compile.rkt"
-         "../tests/values.rkt"
+         
          "../src/configuration.rkt"
          "../tests/paths.rkt")
 
@@ -52,11 +52,11 @@
     (compile fl
              #:output coercion-f-o
              #:keep-c coercion-f-c
-             #:cast-rep 'Coercions)
+             #:cast 'Coercions)
     (compile fl
              #:output twosome-f-o
              #:keep-c twosome-f-c
-             #:cast-rep 'Twosomes)))
+             #:cast 'Type-Based)))
 
 (module+ main
   (command-line
@@ -67,14 +67,14 @@
    #:args (directory memory-limit)
 
    ;; set the default memory limit for the compiler
-   (mem-dflt
+   (init-heap-kilobytes
     (or (string->number memory-limit)
         (error 'command-line
                "couldn't parse ~a as a number" memory-limit)))
    (compile-directory
     (or (string->path directory)
         (error 'benchmark-main "could parse ~v as a path" directory)))))
-=======
+
 ;; (define compiler-config : (Parameterof Config) 
 ;;   (make-parameter
 ;;    (Config (build-path "test")
