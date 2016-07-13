@@ -1,6 +1,8 @@
 #lang racket
 
-(require "../src/compile.rkt" math/statistics)
+(require "../src/compile.rkt"
+         math/statistics
+         racket/date)
 
 (provide (all-defined-out))
 
@@ -32,3 +34,10 @@
     [(not (list? brss)) (error 'benchmark-results-ref)]
     [(findf this-one? brss) => cddr]
     [else (error 'benchmark-result-ref "invalid index ~a ~a" test opts)]))
+
+(define (date-str)
+  (parameterize ([date-display-format 'iso-8601])
+    (date->string (current-date))))
+
+(define (new-command name output)
+    (format "\\newcommand{~a}{~a}\n" name output))
