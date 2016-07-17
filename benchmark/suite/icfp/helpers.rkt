@@ -88,14 +88,14 @@ Directory Structure
   (define s-file   (build-path tmp-dir (string-append name ".s")))
   (define exe-file (build-path exe-dir (string-append name ".out")))
 
-  (printf "compiling ~a\n" (path->string (find-relative-path run-file-dir src-file)))
+  #;(printf "compiling ~a\n" (path->string (find-relative-path run-file-dir src-file)))
   (time
    (compile src-file
            #:output exe-file
            #:keep-c c-file
-           #:keep-a s-file
-           #:cast-rep c-rep
-           #:cc-opt "-w -O3"
+           #:keep-s s-file
+           #:cast c-rep
+           #:cc-opts "-w -O3"
            #:mem mem))
   (define-values (run-result* iter-result*)
     (run-test-repeatedly exe-file runs iters out-rx
@@ -188,92 +188,4 @@ Directory Structure
     (define converted-time (unit->? parsed-time?))
     (values converted-time (/ converted-time iters))))
 
-;; Save the source code ./src/name.schml
-(define (write-source name prog)
-  (define src-file (build-path src-dir (string-append name ".schml")))
-  (call-with-output-file src-file #:exists 'replace #:mode 'text
-    (lambda (file-port)
-      (define print-without-quote 1)
-      (pretty-print prog file-port print-without-quote)))
-  src-file)
 
-(define (make-timing-loop
-         #:letrec-bnds    [letrec-bnds '()]
-         #:let-bnds       [let-bnds '()]
-         #:acc-type       acc-type
-         #:acc-init       acc-init
-         #:use-acc-action use-acc-action ; (Symbol -> Schml-Expr)
-         #:timed-action   timed-action)   ; (Symbol Symbol -> Schml-Expr)
-  `(letrec ,letrec-bnds 
-     (let ([iters : Int (read-int)]
-           [acc   : (GRef ,acc-type) (gbox ,acc-init)]
-           ,@let-bnds)
-       (letrec ([run-test
-                 : (Int ,acc-type -> ,acc-type)
-                 (lambda ([i : Int] [acc : ,acc-type])
-                   ,(timed-action 'i 'acc))])
-         (begin
-           (timer-start)
-           (repeat (i 0 iters)
-                   (gbox-set! acc (run-test i (gunbox acc))))
-           (timer-stop)
-           (timer-report)
-           ,(use-acc-action '(gunbox acc)))))))
-
-
-
-(define timing-loop-example
-  (make-timing-loop
-   #:letrec-bnds '(FUNC-BND ...)
-   #:let-bnds    '(DATA-BND ...)
-   #:acc-type    'TYPE-OF-ACCUMULATOR
-   #:acc-init    'ACCUMULATOR-INIT
-   #:timed-action   (lambda (i acc) 'TIMED-CODE)
-   #:use-acc-action (lambda (acc) 'USE-OF-ACCUMULATOR)))
-
-(define (sizeof-type t)
-  (match t
-    [`(,t* ... -> ,t)
-     (+ (for/sum ([t t*]) (sizeof-type t))
-        (sizeof-type t)
-        1)]
-    [(or `(GRef ,t) `(GVect ,t)) (+ 1 (sizeof-type t))]
-    [(or (? symbol?) (? null?)) 1]))
-
-(define (sizeof-type* t1 t2)
-  (cond
-    [(equal? t1 t2) 1]
-    [else
-     (match* (t1 t2)
-       [(`(,t1* ... -> ,t1) `(,t2* ... -> ,t2))
-        (+ (for/sum ([t1 t1*] [t2 t2*]) (sizeof-type* t1 t2))
-           (sizeof-type* t1 t2)
-           1)]
-       [(`(GRef ,t1) `(GRef ,t2)) 
-        (+ 1 (sizeof-type* t1 t2))]
-       [(`(GVect ,t1) `(GVect ,t2))
-        (+ 1 (sizeof-type* t1 t2))]
-       [((or (? symbol?) (? null?)) _) 1]
-       [(_ (or (? symbol?) (? null?))) 1])]))
-
-(define (sizeof-coercion c)
-  (match c
-    [(Identity) 1]
-    [(Project ty lbl) 1]
-    [(Inject ty) 1]
-    [(Sequence fst snd)
-     (+ 1 (sizeof-coercion fst) (sizeof-coercion snd))]
-    [(Failed label) 1]
-    [(Fn arr args ret)
-     (+ 1
-        (for/sum ([c args]) (sizeof-coercion c))
-        (sizeof-coercion ret))]
-    [(Ref r w)
-     (+ 1 (sizeof-coercion r) (sizeof-coercion w))]
-    [else (error 'sizeof-coercion "unmatched ~a" c)]))
-
-(define (sizeof-coercion-of-types t1 t2)
-  (sizeof-coercion
-   ((mk-coercion "")
-    (parse-type (datum->syntax #'foo t1))
-    (parse-type (datum->syntax #'foo t2)))))
