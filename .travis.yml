@@ -15,8 +15,8 @@ before_install:
 install:
 
 script:
-- raco make ~/schml/main.rkt
-- raco make ~/schml/tests/main.rkt
-- racket ~/schml/tests/main.rkt -s all
+- raco make main.rkt
+- raco make tests/main.rkt
+- racket tests/main.rkt -s all
 
 after_script:
