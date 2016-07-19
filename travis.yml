@@ -1,0 +1,22 @@
+sudo: false
+
+language: c
+
+env:
+- PATH=~/racket/bin:$PATH
+
+before_install:
+- "export DISPLAY=:99.0"
+- "sh -e /etc/init.d/xvfb start"
+- curl -L -o installer.sh http://plt.eecs.northwestern.edu/snapshots/current/installers/racket-test-current-x86_64-linux-precise.sh
+- sh installer.sh --in-place --dest ~/racket/
+- export PATH=~/racket/bin:$PATH
+
+install:
+
+script:
+- raco make ~/schml/main.rkt
+- raco make ~/schml/tests/main.rkt
+- racket ~/schml/tests/main.rkt -s all
+
+after_script:

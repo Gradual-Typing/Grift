@@ -63,25 +63,26 @@
          [keep-c  (if (string? keep-c) (build-path keep-c) keep-c)]
          [keep-s  (if (string? keep-s) (build-path keep-s) keep-s)]
          [cc-opts (if (string? cc-opts) (list cc-opts) cc-opts)] 
+         [rt      (if (string? rt) (build-path rt) rt)]
          [log-port : (U #f Output-Port Path)
                    (if (string? log-port) (build-path log-port) log-port)])
     ;; Setup compile time parameters based off of these flags
     (parameterize ([output-path output]
                    [c-path      keep-c]
                    [s-path      keep-s]
+                   [blame-semantics blame]
+                   [cast-representation cast]
                    [c-flags     cc-opts]
-                   [print-as-expression #t]
-                   [print-graph #t]
-                   [print-struct #t])
+                   [init-heap-kilobytes mem]
+                   [runtime-path rt])
       (define (compile-target) : Path (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
         (with-logging-to-port p compile-target log-level 'schml))
       (cond
         [(not log-port) (compile-target)]
         [(output-port? log-port) (compile/log-port log-port)]
-        [else (call-with-output-file log-port
-                #:exists 'replace
-                compile/log-port)]))))
+        [else
+         (call-with-output-file log-port #:exists 'replace compile/log-port)]))))
 
 
 ;; (: envoke-compiled-program

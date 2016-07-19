@@ -33,6 +33,7 @@
 (define runtime-path : (Parameterof (Option Path)) (make-parameter #f))
 
 
+#;
 (struct Config
   ([source-path : Path]
    [blame-semantics : Blame-Semantics]

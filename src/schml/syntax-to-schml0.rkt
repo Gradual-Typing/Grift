@@ -342,7 +342,7 @@
 (: parse-tuple (-> Stx* Src Env (State Natural S0-Expr)))
 (define (parse-tuple stx* src env)
   (if (null? stx*)
-      (TODO the right error message)
+      (error 'schml/syntax-to-schml0/todo)
       (do (bind-state : (State Natural S0-Expr))
           (e* : S0-Expr* <- (parse-expr* stx* env #f))
         (return-state (Ann (Create-tuple e*) src)))))
@@ -355,8 +355,8 @@
          (do (bind-state : (State Natural S0-Expr))
              (e : S0-Expr <- (parse-expr s1 env #f))
            (return-state (Ann (Tuple-proj e s2) src)))
-         (TODO not integer))]
-    [else (TODO come up with an error message)]))
+         (error 'schml/syntax-to-schml0/todo "not an integer: ~a" s2))]
+    [else (error 'schml/syntax-to-schml0/todo)]))
 
 
 (define-syntax-rule (parse-let-form sym ctor env env-body env-bnd)

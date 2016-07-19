@@ -8,7 +8,7 @@ This is a micro compiler that removes the cast language form.
          "./purify-letrec.rkt"
          "./hoist-types-and-coercions.rkt"
          "lower-function-casts.rkt"
-         "lower-reference-casts.rkt"
+         #;"lower-reference-casts.rkt"
          "interpret-casts-with-twosomes.rkt"
          "casts-to-coercions.rkt"
          "interpret-casts-with-coercions.rkt"
@@ -45,19 +45,4 @@ This is a micro compiler that removes the cast language form.
   (define c8 (convert-closures c7))
   (specify-representation c8))
 
-#;
-(define-compiler impose-cast-semantics : (Cast0-Lang Config -> Data0-Lang)
-  purify-letrec
-  (when coercion-representation?
-    casts->coercions)
-  lower-function-casts
-  (when (not ()))
-  (if coercion-representation?
-      interpret-casts/coercions
-      interpret-casts/twosomes)
 
-  ;; todo put purify-letrec here to take advantage
-  label-lambdas
-  uncover-free
-  convert-closures
-  specify-representation)

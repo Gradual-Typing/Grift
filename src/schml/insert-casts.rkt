@@ -166,7 +166,7 @@
                                  e DYN-TYPE
                                  (STuple n (make-list n DYN-TYPE))) i))]
          [(STuple? e-ty) (Tuple-proj e i)]
-         [else (TODO error message that is appropriate)])]
+         [else (error 'schml/insert-casts/iic-expr/Tuple-proj "unmatched: ~a" e-ty)])]
       ;; TODO add these cases when monotonic is finished
       ;;[(Mvector e1 e2)         (TODO define vector insert implicit casts)]
       ;;[(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
