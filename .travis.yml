@@ -11,13 +11,12 @@ before_install:
 - curl -L -o installer.sh http://plt.eecs.northwestern.edu/snapshots/current/installers/racket-test-current-x86_64-linux-precise.sh
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
-- export export PLTSTDERR="error debug@tr-timing"
 
 install:
 
 script:
-- raco make main.rkt
-- raco make tests/main.rkt
+- raco make -v -j 4 main.rkt
+- raco make -v -j 4 tests/main.rkt
 - racket tests/main.rkt -s all
 
 after_script:
