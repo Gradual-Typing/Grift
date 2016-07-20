@@ -14,8 +14,8 @@ before_install:
 
 
 install:
-- raco make -v -j 4 main.rkt
-- raco make -v -j 4 tests/main.rkt
+- travis_wait raco make -v -j 4 main.rkt
+- travis_wait raco make -v -j 4 tests/main.rkt
 
 script:
 - racket tests/main.rkt -s all
