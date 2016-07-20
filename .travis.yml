@@ -11,6 +11,7 @@ before_install:
 - curl -L -o installer.sh http://plt.eecs.northwestern.edu/snapshots/current/installers/racket-test-current-x86_64-linux-precise.sh
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
+- export export PLTSTDERR="error debug@tr-timing"
 
 install:
 
