@@ -12,11 +12,12 @@ before_install:
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
 
-install:
 
-script:
+install:
 - raco make -v -j 4 main.rkt
 - raco make -v -j 4 tests/main.rkt
+
+script:
 - racket tests/main.rkt -s all
 
 after_script:
