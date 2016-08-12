@@ -51,93 +51,75 @@
 
 (: ul-body ((Setof Uid) D1-Tail -> D2-Body))
 (define (ul-body gdecs tail)
-  (let-values ([(tail^ vars) (ul-tail tail (set))])
-    (Locals (set->list (set-subtract vars gdecs)) tail)))
+  (Locals (set->list (set-subtract (ul-tail tail (set)) gdecs)) tail))
 
-(: ul-tail (-> D1-Tail (Setof Uid) (values D2-Tail (Setof Uid))))
+(: ul-tail (D1-Tail (Setof Uid) -> (Setof Uid)))
 (define (ul-tail tail lv*)
   (logging ul-tail (Vomit) "~v" tail)
   (match tail
     [(If t c a)
-     (let*-values ([(t lv*) (ul-pred t lv*)]
-                   [(c lv*) (ul-tail c lv*)]
-                   [(a lv*) (ul-tail a lv*)])
-       (values  (If t c a) lv*))]
+     (let*-values ([(lv*) (ul-pred t lv*)]
+                   [(lv*) (ul-tail c lv*)]
+                   [(lv*) (ul-tail a lv*)])
+       lv*)]
     [(Begin stm* tail)
-     (let*-values ([(stm* lv*)  (ul-effect* stm* lv*)]
-                   [(tail lv*)  (ul-tail tail lv*)])
-       (values (Begin stm* tail) lv*))]
+     (let*-values ([(lv*) (ul-effect* stm* lv*)]
+                   [(lv*)  (ul-tail tail lv*)])
+       lv*)]
     [(App-Code exp exp*)
-     (let*-values ([(exp  lv*) (ul-value exp lv*)]
-                   [(exp* lv*) (ul-value* exp* lv*)])
-       (values (App-Code exp exp*) lv*))]
-    [(Op p exp*)
-     (let*-values ([(exp* lv*) (ul-value* exp* lv*)])
-       (values (Op p exp*) lv*))]
-    [(Var i) (values (Var i) lv*)]
-    [(Code-Label i) (values (Code-Label i) lv*)]
-    [(Quote k) (values (Quote k) lv*)]
-    [(Halt) (values (Halt) lv*)]
-    [(Success) (values (Success) lv*)]
-    [other (error 'uncover-locals/ul-tail "~a" other)]))
+     (let*-values ([(lv*) (ul-value exp lv*)]
+                   [(lv*) (ul-value* exp* lv*)])
+       lv*)]
+    [(Op p exp*) (ul-value* exp* lv*)]
+    [other lv*]))
 
-(: ul-value (-> D1-Value (Setof Uid) (values D2-Value (Setof Uid))))
+(: ul-value (D1-Value (Setof Uid) -> (Setof Uid)))
 (define (ul-value exp lv*)
   (logging ul-value (Vomit) "~v" exp)
   (match exp
     [(If t c a)
-     (let*-values ([(t lv*) (ul-pred t lv*)]
-                   [(c lv*) (ul-value c lv*)]
-                   [(a lv*) (ul-value a lv*)])
-         (values (If t c a) lv*))]
+     (let*-values ([(lv*) (ul-pred t lv*)]
+                   [(lv*) (ul-value c lv*)]
+                   [(lv*) (ul-value a lv*)])
+       lv*)]
     [(Begin stm* exp)
-     (let*-values ([(exp lv*) (ul-value exp lv*)]
-                   [(stm* lv*) (ul-effect* stm* lv*)])
-       (values (Begin stm* exp) lv*))]
+     (let*-values ([(lv*) (ul-value exp lv*)]
+                   [(lv*) (ul-effect* stm* lv*)])
+       lv*)]
     [(App-Code exp exp*)
-     (let*-values ([(exp lv*) (ul-value exp lv*)]
-                   [(exp* lv*) (ul-value* exp* lv*)])
-       (values (App-Code exp exp*) lv*))]
+     (let*-values ([(lv*) (ul-value exp lv*)]
+                   [(lv*) (ul-value* exp* lv*)])
+       lv*)]
     [(Op p exp*)
-     (let*-values ([(exp* lv*) (ul-value* exp* lv*)])
-       (values (Op p exp*) lv*))]
-    [(Halt) (values (Halt) lv*)]
-    [(Var i) (values (Var i) lv*)]
-    [(Code-Label i) (values (Code-Label i) lv*)]
-    [(Quote k) (values (Quote k) lv*)]
-    [other (error 'uncover-locals/ul-value "~a" other)]))
+     (let*-values ([(lv*) (ul-value* exp* lv*)])
+       lv*)]
+    [other lv*]))
 
-(: ul-pred (-> D1-Pred (Setof Uid) (values D2-Pred (Setof Uid))))
+(: ul-pred (D1-Pred (Setof Uid) -> (Setof Uid)))
 (define (ul-pred exp lv*)
   (logging ul-pred (Vomit) "~v" exp)
   (match exp
     [(If t c a)
-     (let*-values ([(t lv*) (ul-pred t lv*)]
-                   [(c lv*) (ul-pred c lv*)]
-                   [(a lv*) (ul-pred a lv*)])
-         (values (If t c a) lv*))]
+     (let*-values ([(lv*) (ul-pred t lv*)]
+                   [(lv*) (ul-pred c lv*)]
+                   [(lv*) (ul-pred a lv*)])
+       lv*)]
     [(Begin stm* pred)
-     (let*-values ([(pred lv*) (ul-pred pred lv*)]
-                   [(stm* lv*) (ul-effect* stm* lv*)])
-       (values (Begin stm* pred) lv*))]
+     (let*-values ([(lv*) (ul-pred pred lv*)]
+                   [(lv*) (ul-effect* stm* lv*)])
+       lv*)]
     [(Relop p e1 e2)
-     (let*-values ([(e1 lv*) (ul-value e1 lv*)]
-                   [(e2 lv*) (ul-value e2 lv*)])
-       (values (Relop p e1 e2) lv*))]
+     (let*-values ([(lv*) (ul-value e1 lv*)]
+                   [(lv*) (ul-value e2 lv*)])
+       lv*)]
     [(App-Code exp exp*)
-     (let*-values ([(exp lv*) (ul-value exp lv*)]
-                   [(exp* lv*) (ul-value* exp* lv*)])
-       (values (App-Code exp exp*) lv*))]
+     (let*-values ([(lv*) (ul-value exp lv*)]
+                   [(lv*) (ul-value* exp* lv*)])
+       lv*)]
     [other (error 'uncover-locals/ul-pred "~a" other)]))
 
-(: ul-value* (-> (Listof D1-Value) (Setof Uid) (values (Listof D2-Value) (Setof Uid))))
-(define (ul-value* exp* lv*)
-  (if (null? exp*)
-      (values '() lv*)
-      (let*-values ([(a d) (values (car exp*) (cdr exp*))]
-                    [(e  lv*) (ul-value a lv*)]
-                    [(e* lv*) (ul-value* d lv*)])
-        (values (cons e e*) lv*))))
+(: ul-value* (-> (Listof D1-Value) (Setof Uid) (Setof Uid)))
+(define (ul-value* exp* lv*) (foldl ul-value lv* exp*))
 
 #|
 (: ul-bnd (->  D1-Bnd Uid* (values D2-Effect (Setof Uid))))
@@ -157,43 +139,28 @@
         (values (cons a a*) lv*))))
 |#
 
-(: ul-effect (D1-Effect (Setof Uid) -> (values D2-Effect (Setof Uid))))
+(: ul-effect (D1-Effect (Setof Uid) ->  (Setof Uid)))
 (define (ul-effect eff lv*)
   (match eff
-    [(Assign u e1)
-     (let-values ([(e2 lv*) (ul-value e1 lv*)])
-       (values (Assign u e2) (set-add lv* u)))]
-    [(Halt) (values (Halt) lv*)]
+    [(Assign u e1) (set-add (ul-value e1 lv*) u)]
     [(If t c a)
-     (let*-values ([(t lv*) (ul-pred t lv*)]
-                   [(c lv*) (ul-effect c lv*)]
-                   [(a lv*) (ul-effect a lv*)])
-         (values (If t c a) lv*))]
-    [(Begin stm* _)
-     (let*-values ([(stm2* lv*) (ul-effect* stm* lv*)])
-       (values (Begin stm2* NO-OP) lv*))]
+     (let*-values ([(lv*) (ul-pred t lv*)]
+                   [(lv*) (ul-effect c lv*)]
+                   [(lv*) (ul-effect a lv*)])
+       lv*)]
+    [(Begin stm* _) (ul-effect* stm* lv*)]
     [(Repeat i e1 e2 #f #f e3)
-     (let*-values ([(e1 lv*) (ul-value e1 lv*)]
-                   [(e2 lv*) (ul-value e2 lv*)]
+     (let*-values ([(lv*) (ul-value e1 lv*)]
+                   [(lv*) (ul-value e2 lv*)]
                    [(lv*)    (set-add lv* i)]
-                   [(e3 lv*) (ul-effect e3 lv*)])
-       (values (Repeat i e1 e2 #f #f e3) lv*))]
+                   [(lv*) (ul-effect e3 lv*)])
+       lv*)]
     [(App-Code exp exp*)
-     (let*-values ([(exp lv*)   (ul-value exp lv*)]
-                   [(exp* lv*) (ul-value* exp* lv*)])
-       (values (App-Code exp exp*) lv*))]
-    [(Op p exp*)
-     (let*-values ([(exp* lv*) (ul-value* exp* lv*)])
-      (values (Op p exp*) lv*))]
-    [(No-Op) (values NO-OP lv*)]
-    [other (error 'uncover-locals/ul-value "~a" other)]))
+     (let*-values ([(lv*)   (ul-value exp lv*)]
+                   [(lv*) (ul-value* exp* lv*)])
+       lv*)]
+    [(Op p exp*) (ul-value* exp* lv*)]
+    [other lv*]))
 
-(: ul-effect* (-> D1-Effect* (Setof Uid) (values D2-Effect* (Setof Uid))))
-(define (ul-effect* stm* lv*)
-  (if (null? stm*)
-      (values stm* lv*)
-      (let*-values ([(a) (car stm*)]
-                    [(d) (cdr stm*)]
-                    [(a lv*) (ul-effect a lv*)]
-                    [(a* lv*) (ul-effect* d lv*)])
-        (values (cons a a*) lv*))))
+(: ul-effect* (D1-Effect* (Setof Uid) -> (Setof Uid)))
+(define (ul-effect* stm* lv*) (foldl ul-effect lv* stm*))
