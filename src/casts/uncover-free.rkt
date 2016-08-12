@@ -43,9 +43,8 @@
     ;; I do not think that labels need to be treated like variables
     [(Labels (app uf-bnd-code* b*) (app uf-expr e fv))
      (values (Labels b* e) fv)]
-    [(Repeat i (app uf-expr e1 f1) (app uf-expr e2 f2) (app uf-expr e3 f3))
-     (values (Repeat i e1 e2 e3) (set-subtract (set-union f1 f2 f3) (set i)))]
-    
+    [(Repeat i (app uf-expr e1 f1) (app uf-expr e2 f2) a (app uf-expr e3 f3) (app uf-expr e4 f4))
+     (values (Repeat i e1 e2 a e3 e4) (set-subtract (set-union f1 f2 f3 f4) (set i a)))]
     [(If (app uf-expr t t-fv) (app uf-expr c c-fv) (app uf-expr a a-fv))
      (values (If t c a) (set-union t-fv c-fv a-fv))]
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]

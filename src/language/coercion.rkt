@@ -26,7 +26,7 @@
 	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
           (Begin Crcn-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;; Guarded effects
           (Gbox E)
           (Gunbox E)

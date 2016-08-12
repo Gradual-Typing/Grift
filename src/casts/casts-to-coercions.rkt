@@ -92,8 +92,8 @@ should be able to compile programs this the twosome casts for future comparison.
      (If (c2c-expr tst) (c2c-expr csq) (c2c-expr alt))]
     [(Begin e* e)
      (Begin (c2c-expr* e*) (c2c-expr e))]
-    [(Repeat i e1 e2 e3)
-     (Repeat i (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
+    [(Repeat i e1 e2 a e3 e4)
+     (Repeat i (c2c-expr e1) (c2c-expr e2) a (c2c-expr e3) (c2c-expr e4))]
     [(Gbox e)
      (Gbox (c2c-expr e))]
     [(Gunbox e)

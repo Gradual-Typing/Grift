@@ -275,8 +275,8 @@
         [(Dyn-make (app recur e1) (app recur e2)) (Dyn-make e1 e2)]
         ;; control flow for effects
         [(Begin (app recur* e*) (app recur e)) (Begin e* e)]
-        [(Repeat i (app recur e1) (app recur e2) (app recur e3))
-         (Repeat i e1 e2 e3)]
+        [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))
+         (Repeat i e1 e2 a e3 e4)]
 
         ;; Type Representation
         [(Type t) (Type t)]

@@ -1,4 +1,1 @@
-(let ([a (gbox 0)])
- (begin 
-  (repeat (i 0 10) (gbox-set! a i))
-  (gunbox a)))
+(repeat (i 0 10) (a : Int 0) i)

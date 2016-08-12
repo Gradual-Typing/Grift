@@ -104,7 +104,7 @@
       [(Type t) (Type t)]
       [(Quote k) (Quote k)]
       [(Begin exp* exp) (Begin (map recur exp*) (recur exp))]
-      [(Repeat i e1 e2 e3) (Repeat i (recur e1) (recur e2) (recur e3))]
+      [(Repeat i e1 e2 a e3 e4) (Repeat i (recur e1) (recur e2) a (recur e3) (recur e4))]
       [(Tag s) (Tag s)]
       [(Dyn-tag e) (Dyn-tag (recur e))]
       [(Dyn-immediate e) (Dyn-immediate (recur e))]

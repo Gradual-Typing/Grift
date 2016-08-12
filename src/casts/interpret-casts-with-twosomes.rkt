@@ -760,8 +760,8 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Quote k) (Quote k)]
       [(Begin e* e)
        (Begin (map recur e*) (recur e))]
-      [(Repeat i e1 e2 e3)
-       (Repeat i (recur e1) (recur e2) (recur e3))]
+      [(Repeat i e1 e2 a e3 e4)
+       (Repeat i (recur e1) (recur e2) a (recur e3) (recur e4))]
       ;; Proxies for functions
       [(Fn-Caster e)
        (Fn-Caster (recur e))]

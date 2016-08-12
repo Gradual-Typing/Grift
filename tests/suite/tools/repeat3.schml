@@ -1,4 +1,4 @@
 (let ([a (gbox #f)])
- (begin
-  (repeat (n 0 1) (gbox-set! a #t))
+  (begin
+  (repeat (n 0 1) (_ ()) (gbox-set! a #t))
   (gunbox a)))

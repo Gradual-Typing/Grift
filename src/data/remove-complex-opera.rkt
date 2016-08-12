@@ -113,7 +113,7 @@
      (do (bind-state : (State RcoSt D3-Effect))
          (e* : D3-Effect* <- (rco-effect* e*))
          (return-state (make-begin e* NO-OP)))]
-    [(Repeat i v1 v2 e)
+    [(Repeat i v1 v2 #f #f e)
      (do (bind-state : (State RcoSt D3-Effect))
          ((cons s*1 t1) : Triv-Value <- (trivialize-value v1))
          ((cons s*2 t2) : Triv-Value <- (trivialize-value v2))
@@ -126,7 +126,7 @@
              s*1 s*2
              (list (Assign i1 t1)
                    (Assign i2 t2)
-                   (Repeat i (Var i1) (Var i2) e))) NO-OP)))]
+                   (Repeat i (Var i1) (Var i2) #f #f e))) NO-OP)))]
     [(App-Code v v*)
      (do (bind-state : (State RcoSt D3-Effect))
          ((cons s*  t)  : Triv-Value  <- (trivialize-value v))

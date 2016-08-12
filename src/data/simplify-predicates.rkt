@@ -141,12 +141,12 @@
            e*
            (If t (Begin c* NO-OP) (Begin a* NO-OP)))))]
     [(Begin e* _) (sp-effect* e*)]
-    [(Repeat i t1 t2 e)
+    [(Repeat i t1 t2 #f #f e)
      (do (bind-state : (State SpSt D5-Effect*))
          (t1 : D5-Trivial <- (sp-trivial t1))
          (t2 : D5-Trivial <- (sp-trivial t2))
          (e* : D5-Effect* <- (sp-effect  e))
-         (return-state (list (Repeat i t1 t2 (Begin e* NO-OP)))))]
+         (return-state (list (Repeat i t1 t2  #f #f (Begin e* NO-OP)))))]
     [(Op p t*)
      (do (bind-state : (State SpSt D5-Effect*))
          (t* : D5-Trivial* <- (sp-trivial* t*))

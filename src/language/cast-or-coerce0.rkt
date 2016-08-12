@@ -31,7 +31,7 @@
 	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
           (Cast E (Coercion Schml-Coercion))
           (Begin CoC0-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;; Guarded effects
           (Gbox E)
           (Gunbox E)

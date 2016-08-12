@@ -69,7 +69,7 @@
     [(mbox munbox mbox-set! mvector mvector-ref mvector-set!) #t]
     [(tuple tuple-proj) #t]
     [(+ - * binary-and binary-or < <= = >= > %/ %<< %>>) #t]
-    [(timer-start timer-stop timer-report repeat) #t]
+    [(time timer-start timer-stop timer-report repeat) #t]
     [(read-int) #t]
     [else #f]))
 
@@ -101,12 +101,12 @@
                 [(if)     (parse-if rand* src env next)]
                 [(:)      (parse-ascription rand* src env next)]
                 [(begin)  (run-state (parse-begin rand* src env) next)]
-                [(box)          (error 'syntax->schml0/todo)]
-                [(box-set!)     (error 'syntax->schml0/todo)]
-                [(unbox)        (error 'syntax->schml0/todo)]
-                [(vector)       (error 'syntax->schml0/todo)]
-                [(vector-set!)  (error 'syntax->schml0/todo)]
-                [(vector-ref)   (error 'syntax->schml0/todo)]
+                [(box)          (error 'syntax->schml0/box "unimplemented")]
+                [(box-set!)     (error 'syntax->schml0/box-set! "unimplemented")]
+                [(unbox)        (error 'syntax->schml0/unbox "unimplemented")]
+                [(vector)       (error 'syntax->schml0/vecotor "unimplemented")]
+                [(vector-set!)  (error 'syntax->schml0/vector-set! "unimplemented")]
+                [(vector-ref)   (error 'syntax->schml0/vector-ref "unimplemented")]
                 [(gbox)         (run-state (parse-gbox rand* src env) next)]
                 [(gunbox)       (run-state (parse-gunbox rand* src env) next)]
                 [(gbox-set!)    (run-state (parse-gbox-set! rand* src env) next)]
@@ -122,6 +122,7 @@
                 [(tuple)        (run-state (parse-tuple rand* src env) next)]
                 [(tuple-proj)   (run-state (parse-tuple-proj rand* src env) next)]
                 [(repeat)       (run-state (parse-repeat rand* src env) next)]
+                [(time) (run-state (parse-time rand* src env) next)]
                 [else
                  (if (schml-primitive? exp^)
                      (run-state (parse-primitive exp^ rand* src env) next)
@@ -134,15 +135,54 @@
 (: parse-repeat ((Listof Stx) Src Env . -> . (State Nat S0-Expr)))
 (define (parse-repeat s* s e)
   (match s*
-    [(list (app stx->list (list (app syntax-e id) snd trd)) eff)
-     (let ([_ (id-check id '() s)])
+    [(list (app stx->list (list (app syntax-e index-id) snd trd))
+           (app stx->list (cons (app syntax-e acc-id) acc-rest))
+           exp)
+     (let* ([e1 (id-check index-id '() s)]
+            [e2 (id-check acc-id '() s)])
        (do (bind-state : (State Nat S0-Expr))
-           (uid   : Uid <- (uid-state (symbol->string id)))
-         (start : S0-Expr <- (parse-expr snd e #f))
-         (stop  : S0-Expr <- (parse-expr trd e #f))
-         (eff   : S0-Expr <- (parse-expr eff (env-extend e id uid) #f))
-         (return-state (Ann (Repeat uid start stop eff) s))))]
+           (index-uid   : Uid <- (uid-state (symbol->string index-id)))
+           (acc-uid : Uid <- (uid-state (symbol->string acc-id)))
+           (let ([e^ (env-extend (env-extend e index-id index-uid)
+                                 acc-id acc-uid)])
+             (start : S0-Expr <- (parse-expr snd e #f))
+           (stop  : S0-Expr <- (parse-expr trd e #f))
+           (exp   : S0-Expr <- (parse-expr exp e^ #f))
+           (match acc-rest
+             [(list (? colon?) acc-type acc-init)
+              (acc-init : S0-Expr <- (parse-expr acc-init e #f))
+              (let ([acc-type (parse-type acc-type)])
+                (return-state
+                 (Ann (Repeat index-uid start stop (Ann acc-uid acc-type)
+                              acc-init exp) s)))]
+             [(list acc-init)
+              (acc-init : S0-Expr <- (parse-expr acc-init e #f))
+              (return-state
+               (Ann (Repeat index-uid start stop (Ann acc-uid #f) acc-init exp) s))]
+             [other (error 'parse/repeat
+                           "invalid syntax in accumulator binding: ~a ~a ~a"
+                           s* s e)]))))]
     [other (error 'parse/repeat "invalid syntax with iritants ~a ~a ~a" s* s e)]))
+
+(: parse-time ((Listof Stx) Src Env . -> . (State Nat S0-Expr)))
+(define (parse-time s* s e)
+  (match s*
+    [(list exp)
+     (do (bind-state : (State Nat S0-Expr))
+         (exp : S0-Expr <- (parse-expr exp e #f))
+         (uid : Uid <- (uid-state "time_tmp"))
+         (return-state
+          (Ann
+           (Begin (list (Ann (Op 'timer-start '()) s))
+                  (Ann
+                   (Let (list (Bnd uid #f exp))
+                     (Ann (Begin (list (Ann (Op 'timer-stop '()) s)
+                                       (Ann (Op 'timer-report '()) s))
+                                 (Ann (Var uid) s))
+                          s))
+                   s))
+           s)))]
+    [other (error 'parse/time "invalid syntax with iritants ~a ~a ~a" s* s e)]))
 
 (: parse-variable (Symbol Src Env . -> . (State Nat S0-Expr)))
 (define (parse-variable v s e)
@@ -158,7 +198,7 @@
 (define (parse-begin stx* src env)
   (let* ([s* (reverse stx*)])
     (if (null? s*)
-        (error 'syntax->schml0/todo)
+        (error 'syntax->schml0/begin "invalid syntax empty begin at ~a" src)
         (do (bind-state : (State Natural S0-Expr))
             (e* : S0-Expr* <- (parse-expr* (reverse (cdr s*)) env #f))
           (e  : S0-Expr  <- (parse-expr  (car s*) env #f))
@@ -394,8 +434,9 @@
 (: id-check (Any (Listof Symbol) Src -> (Listof Symbol) : #:+ Symbol))
 (define (id-check x bnds src)
   (define (raise-non-identifier x s)
-    (error 'syntax->schml0/todo))
-  (and (or (symbol? x) (raise-non-identifier x src))
+    (error 'syntax->schml0/id-check "not symbol: ~a" x))
+  (and (or (symbol? x)
+           (raise-non-identifier x src))
        (or (not (memq x bnds)) (raise-duplicate-binding x src))
        (or (not (reserved-symbol? x)) (raise-reserved-symbol x src))
        (cons x bnds)))

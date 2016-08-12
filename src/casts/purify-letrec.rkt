@@ -100,7 +100,7 @@
     [(Op _ e*) (recur* e*)]
     [(If e1 e2 e3) (recur-all e1 e2 e3)]
     [(Begin e* e)  (and (recur e) (recur* e*))]
-    [(Repeat i e1 e2 e3) (recur-all e1 e2 e3)]
+    [(Repeat i e1 e2 a e3 e4) (recur-all e1 e2 e3 e4)]
     [(App-Code e e*) (and (recur e) (recur* e*))]
     [(Lambda f* (Castable c e)) (recur e)]
     [(Fn-Caster e) (recur e)]
@@ -347,8 +347,8 @@
      (If t c a)]
     [(Begin (app recur* e*) (app recur e))
      (Begin e* e)]
-    [(Repeat i (app recur e1) (app recur e2) (app recur e3))
-     (Repeat i e1 e2 e3)]
+    [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))
+     (Repeat i e1 e2 a e3 e4)]
     [(Op p (app recur* e*))
      (Op p e*)]
     [(Blame (app recur e))
@@ -572,8 +572,8 @@
        (If t c a)]
       [(Begin (app recur* e*) (app recur e))
        (Begin e* e)]
-      [(Repeat i (app recur e1) (app recur e2) (app recur e3))
-       (Repeat i e1 e2 e3)]
+      [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))
+       (Repeat i e1 e2 a e3 e4)]
       [(Op p (app recur* e*))
        (Op p e*)]
       [(Quote k)

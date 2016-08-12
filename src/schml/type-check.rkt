@@ -144,12 +144,22 @@ The type rules for core forms that have interesting type rules
 (: begin-type-rule (-> Schml-Type* Schml-Type Schml-Type))
 (define (begin-type-rule t* ty) ty)
 
-(: repeat-type-rule (Schml-Type Schml-Type Schml-Type -> Schml-Type))
-(define (repeat-type-rule tstart tstop teffect)
+(: repeat-type-rule (Schml-Type Schml-Type Schml-Type Schml-Type -> Schml-Type))
+(define (repeat-type-rule tstart tstop tacc tbody)
   (cond
-    [(not (consistent? tstart INT-TYPE)) (error 'type-check/todo)]
-    [(not (consistent? tstop INT-TYPE)) (error 'type-check/todo)]
-    [else UNIT-TYPE]))
+    [(not (consistent? tstart INT-TYPE))
+     (error 'type-check/repeat-type-rule
+            "Index initialization must be consistent with Int, actual type: ~a"
+            tstart)]
+    [(not (consistent? tstop INT-TYPE))
+     (error 'type-check/repeat-type-rule
+            "Index limit must be consistent with Int, actual type: ~a"
+            tstop)]
+    [(not (consistent? tacc tbody))
+     (error 'type-check/repeat-type-rule
+            "Accumulator and body inconsistent with types:\n accumulator: ~a\n body: ~a"
+            tacc tbody)]
+    [else tacc]))
 
 ;; The type of wrapping a value in a gaurded box is a
 ;; Gref of the value's type
@@ -171,10 +181,16 @@ The type rules for core forms that have interesting type rules
 (define (gbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) UNIT-TYPE]
-    [(GRef g) (if (consistent? g val-ty)
-                  UNIT-TYPE
-                  (error 'type-check/todo))]
-    [otherwise (error 'type-check/todo)]))
+    [(GRef g)
+     (if (consistent? g val-ty)
+         UNIT-TYPE
+         (error 'type-error
+                "incompatible types in guarded assignment: ~a ~a"
+                g val-ty))]
+    [otherwise
+     (error 'type-error
+            "attempt to make guarded box assignment to non guarded box: ~a"
+            box-ty)]))
 
 ;; The type of wrapping a value in a monotonic box is a
 ;; MRef of the value's type
@@ -189,7 +205,7 @@ The type rules for core forms that have interesting type rules
   (match ty
     [(Dyn) DYN-TYPE]
     [(MRef m) m]
-    [otherwise (error 'type-check/todo)]))
+    [otherwise (error 'type-error "attempt to unbox non-monotonic box: ~a" ty)]))
 
 ;; The type of setting a dyn value is dyn
 ;; The type of setting a MRef value is the type of the armurment
@@ -316,12 +332,15 @@ The type rules for core forms that have interesting type rules
 		    (values (Ann (Var id) (cons src ty)) ty))]
 	[(Quote lit) (let* ([ty (const-type-rule lit)])
 		       (values (Ann (Quote lit) (cons src ty)) ty))]
-        [(Repeat id start stop eff)
+        [(Repeat index start stop (Ann acc type?) acc-init exp)
          (let*-values ([(start tstart) (recur start)]
                        [(stop  tstop)  (recur stop)]
-                       [(eff   teff)   (tc-expr eff (hash-set env id INT-TYPE))]
-                       [(ty) (repeat-type-rule tstart tstop teff)])
-           (values (Ann (Repeat id start stop eff) (cons src ty)) ty))]
+                       [(acc-init tacc-init) (recur acc-init)]
+                       [(tacc) (let-binding-type-rule type? tacc-init acc src)]
+                       [(exp texp) (tc-expr exp (hash-set (hash-set env index INT-TYPE)
+                                                          acc tacc))]
+                       [(ty) (repeat-type-rule tstart tstop tacc texp)])
+           (values (Ann (Repeat index start stop acc acc-init exp) (cons src ty)) ty))]
         [(Begin e* e)
          (let*-values ([(e  t1) (recur e)]
                        [(e* t*) (map-recur e*)]

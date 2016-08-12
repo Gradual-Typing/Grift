@@ -120,11 +120,11 @@ becuse it is actually more of a stmt contexts itself.
              [a (fv-effect a)])
          (If t c a))]
       [(Begin e* _) (Begin (fv-effect* e*) NO-OP)]
-      [(Repeat i t1 t2 e)
+      [(Repeat i t1 t2 #f #f e)
        (let ([t1 (fv-trivial t1)]
              [t2 (fv-trivial t2)]
              [e  (fv-effect  e)])
-         (Repeat i t1 t2 e))]
+         (Repeat i t1 t2 #f #f e))]
       [(App-Code t t*)
        (let ([t (fv-trivial t)]
              [t* (fv-trivial* t*)]
@@ -135,8 +135,7 @@ becuse it is actually more of a stmt contexts itself.
       [other (error 'remove-complex-opera/effect "~a" other)]))
 
   (: fv-effect* (D3-Effect* -> D4-Effect*))
-  (define (fv-effect* effect*)
-    (map (lambda ([e : D3-Effect]) : D4-Effect (fv-effect e)) effect*))
+  (define (fv-effect* effect*) (map fv-effect effect*))
 
   (: simplify-assignment (Uid D3-Value -> D4-Effect))
   (define (simplify-assignment var val)

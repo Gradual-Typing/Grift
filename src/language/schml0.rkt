@@ -31,7 +31,7 @@
      (Var Uid)
      (Quote Schml-Literal)
      (Begin (Listof E) E)
-     (Repeat Uid E E E)
+     (Repeat Uid E E (Ann Uid (Option Schml-Type)) E E)
      ;; Monotonic effects
      (Mbox E)
      (Munbox E)

@@ -1,6 +1,13 @@
 all:
-	raco make -v -j 3 main.rkt
+	raco make -v -j 4 main.rkt
+
+timed:
+	time raco make -v -j 4 main.rkt
+
+test:
+	raco make -v -j 4 tests/main.rkt
+	racket tests/main.rkt
 
 clean:
-	find src/ -path '*/compiled/*' -delete
-	find src/ -type d -name "compiled" -delete
+	find . -path '*/compiled/*' -delete
+	find . -type d -name "compiled" -delete

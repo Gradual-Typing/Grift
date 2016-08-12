@@ -83,7 +83,7 @@
           ;; Controll Flow
           (If E E E)
           (Begin CoC3-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
           (Quote Cast-Literal)

@@ -29,7 +29,7 @@
 	  (If E E E)
 	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
           (Begin C0-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;; Guarded effects
           (Gbox E)
           (Gunbox E)

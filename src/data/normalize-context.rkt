@@ -47,10 +47,14 @@
        (If (nc-pred t) (nc-tail c) (nc-tail a))]
       [(Begin eff* exp)
        (Begin (nc-effect* eff*) (nc-tail exp))]
-      [(Repeat i e1 e2 e3)
+      [(Repeat i e1 e2 a e3 e4)
+       ;; This breaks SSA but we don't rely on SSA currently
        (Begin
-         (list (Repeat i (nc-value e1) (nc-value e2) (nc-effect e3)))
-         (Quote UNIT-IMDT))]
+         (list
+          (Assign a (nc-value e3))
+          (Repeat i (nc-value e1) (nc-value e2) #f #f
+                  (Assign a (nc-value e4))))
+         (Var a))]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p (app nc-value* v*))
@@ -79,10 +83,13 @@
        (If (nc-pred t) (nc-value c) (nc-value a))]
       [(Begin eff* exp)
        (Begin (nc-effect* eff*) (nc-value exp))]
-      [(Repeat i e1 e2 e3)
+      [(Repeat i e1 e2 a e3 e4)
        (Begin
-         (list (Repeat i (nc-value e1) (nc-value e2) (nc-effect e3)))
-         (Quote UNIT-IMDT))]
+         (list
+          (Assign a (nc-value e3))
+          (Repeat i (nc-value e1) (nc-value e2) #f #f
+                  (Assign a (nc-value e4))))
+         (Var a))]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p (app nc-value* v*))
@@ -110,8 +117,13 @@
        (If t c a)]
       [(Begin eff* exp)
        (Begin (append (nc-effect* eff*) (list (nc-effect exp))) NO-OP)]
-      [(Repeat i e1 e2 e3)
-       (Repeat i (nc-value e1) (nc-value e2) (nc-effect e3))]
+      [(Repeat i e1 e2 a e3 e4)
+       (Begin
+         (list
+          (Assign a (nc-value e3))
+          (Repeat i (nc-value e1) (nc-value e2) #f #f
+                  (Assign a (nc-value e4))))
+         NO-OP)]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p exp*)
@@ -129,13 +141,17 @@
       [(Labels bndc* exp)
        (nc-bnd-code* bndc*)
        (nc-pred exp)]
-      [(Let (app nc-bnd* bnd*) (app nc-pred tail))
-       (Let bnd* tail)]
       [(If (app nc-pred t) (app nc-pred c) (app nc-pred a))
        (If t c a)]
       [(Begin eff* exp)
        (Begin (nc-effect* eff*) (nc-pred exp))]
-      [(Repeat i e1 e2 e3) (error 'nc-pred/unsuported)]          
+      [(Repeat i e1 e2 a e3 e4)
+       (Begin
+         (list
+          (Assign a (nc-value e3))
+          (Repeat i (nc-value e1) (nc-value e2) #f #f
+                  (Assign a (nc-value e4))))
+         (Relop '= (Quote TRUE-IMDT) (Var a)))]          
       [(Assign u e) (error 'nc-pred/unsuported/assign)]
       [(Op p (app nc-value* val*))
        (if (IntxInt->Bool-primitive? p)

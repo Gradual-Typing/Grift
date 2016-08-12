@@ -311,7 +311,7 @@
             (emit-begin a (void))
             (display "}")
             (newline))]
-    [(Repeat i st sp (Begin e* _))
+    [(Repeat i st sp #f #f (Begin e* _))
      (begin (display "for(")
             (display (uid->string i))
             (display " = ")

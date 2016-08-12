@@ -22,7 +22,7 @@
 	  (If E E E)
           ;; Terminals
           (Begin CoC1-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
 	  (Var Uid)
           (Quote-Coercion Schml-Coercion)
           (Type Schml-Type)
