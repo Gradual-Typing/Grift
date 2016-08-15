@@ -17,7 +17,8 @@
   (cond
     [(not (list? brs)) (error 'benchmark-results-ref)]
     [(findf this-one? brs) => benchmark-result-trial-times]
-    [else (error 'benchmark-result-ref "invalid index ~a ~a" name opts)]))
+    [else
+     (error 'benchmark-result-ref "invalid index ~a ~a into ~a" name opts brs)]))
 
 (define (benchmark-results-stats brs)
   (for/list ([br brs])
@@ -31,9 +32,9 @@
     (and (pair? x) (equal? test (car x))
          (pair? (cdr x)) (equal? opts (cadr x))))
   (cond
-    [(not (list? brss)) (error 'benchmark-results-ref)]
+    [(not (list? brss)) (error 'benchmark-results-stats-ref)]
     [(findf this-one? brss) => cddr]
-    [else (error 'benchmark-result-ref "invalid index ~a ~a" test opts)]))
+    [else (error 'benchmark-result-stats-ref "invalid index ~a ~a" test opts)]))
 
 (define (date-str)
   (parameterize ([date-display-format 'iso-8601])

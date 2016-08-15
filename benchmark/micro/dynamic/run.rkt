@@ -6,8 +6,9 @@
          math/statistics
          benchmark
          racket/date
-         "../../../../../src/compile.rkt"
-         "../../../../helpers.rkt")
+         (rename-in  "../../../src/compile.rkt"
+                     [dynamic-operations? dynamic-operations?-param])
+         "../../helpers.rkt")
 
 ;; runtime-paths are relative to this file when it is compiled
 (define-runtime-path data-dir "data")
@@ -17,13 +18,13 @@
 
 ;; These keys are what are iterated over to control the benchmark
 (define tests               '(Ref RefOverhead Call CallOverhead))
-(define compilers           '(Gambit Coercions Twosomes))
+(define compilers           '(Gambit Coercions Type-Based))
 (define dynamic-operations? '(#f #t))
 
 (define (benchmark-configuration->string t c d?)
   (case c
     [(Gambit) (string-append (test->string t) (compiler->string c))]
-    [(Twosomes Coercions)
+    [(Type-Based Coercions)
      (string-append (test->string t)
                     (compiler->string c)
                     (dynamic-operations?->string d?))]))
@@ -45,7 +46,7 @@
 
 (module+ main
   ;; 10 miliseconds is the smallest time we accept for this test
-  (mem-dflt (expt 1024 3))
+  (init-heap-kilobytes 1024)
   (command-line
    #:once-each
    [("-i" "--iterations") number-of-iterations
@@ -60,7 +61,7 @@
          (error 'dynamic-write-read-benchmark "bad runs argument")))]
    [("-m" "--memory") memory-start-size
     "size in bytes of schml and gambit starting memory"
-    (mem-dflt
+    (init-heap-kilobytes
      (or (string->exact-integer memory-start-size)
          (error 'dynamic-write-read-benchmark "bad memory argument")))]
    [("-e" "--epsilon") epsilon
@@ -184,7 +185,7 @@
 (define (make-src-path test-name compiler)
   (define ext (case compiler
                  [(Gambit) ".scm"]
-                 [(Twosomes Coercions) ".schml"]))
+                 [(Type-Based Coercions) ".schml"]))
   (build-path src-dir (string-append (symbol->string test-name) ext)))
 
 (define (build-benchmark test compiler dyn-ops?)
@@ -196,27 +197,27 @@
      (define src-file (path->string src-path))
      (unless (system* gambit
                       ;; set minimum heap size to same as schml
-                      (format "-:m~a" (/ (mem-dflt) 1024))
+                      (format "-:m~a" (init-heap-kilobytes))
                       ;; Compile to a standalone executable optimized
                       "-exe" "-cc-options" "-O3"            
                       "-o" out-file 
                       src-file)
        (error 'build-benchmarks/gambit
               "failed to compile gambit program: ~a" src-file))]
-    [(Twosomes Coercions)
-            (define (help p m s) (format "~a.~a.~a" p m s))
-       (define tmp-c-path
-         (build-path tmp-dir (help test compiler "c")))
-       (define tmp-a-path
-         (build-path tmp-dir (help test compiler "s")))
+    [(Type-Based Coercions)
+     (define (help p m s) (format "~a.~a.~a" p m s))
+     (define tmp-c-path
+       (build-path tmp-dir (help test compiler "c")))
+     (define tmp-a-path
+       (build-path tmp-dir (help test compiler "s")))
+     (parameterize ([dynamic-operations?-param dyn-ops?])
        (compile src-path
                 #:output out-path
                 #:keep-c tmp-c-path
-                #:keep-a tmp-a-path
-                #:cast-rep compiler
-                #:mem (mem-dflt)
-                #:cc-opt "-w -O3"
-                #:dyn-ops dyn-ops?)]))
+                #:keep-s tmp-a-path
+                #:cast compiler
+                #:mem (init-heap-kilobytes)
+                #:cc-opts "-w -O3"))]))
 
 (define ((run-benchmark iterations) test compiler dyn-ops)
   (define exe-path (make-exe-path test compiler dyn-ops))
@@ -230,7 +231,7 @@
          (unless (system* (path->string exe-path))
            (error 'run-benchmark "failed to run ~a" exe-path))))]))
 
-(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : \\d")
+(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : 42")
 (define gambit-spec #px"(\\d+) ms real time")
 
 (define ((parse-output iterations epsilon) str)

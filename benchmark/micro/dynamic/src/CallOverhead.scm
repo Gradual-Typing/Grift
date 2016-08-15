@@ -1,28 +1,16 @@
-#!/u/dalmahal/bin/bin/gsi-script -:d0
+#!gsi-script
 
 (define (main arg)
-  (letrec ([f (lambda (x) x)]
-	   [g (lambda (x) 42)])
-    (let ([iters (string->number arg)]
-	  [acc (box 0)])
-      (let ([r (box (if (> iters 0) f g))])
-	(let ([id (unbox r)])
-	  (letrec ([run-test (lambda (i acc) i)])
-	    (time
-	     (let loop ([i iters])
-	       (cond
-		[(zero? i) (unbox acc)]
-		[else (set-box! acc (run-test i (unbox acc))) (loop (- i 1))]))
-	     (current-output-port))))))))
+  (letrec ([id (lambda (x) x)]
+	   [const (lambda (x) -1)])
+    (let* ([iters (string->number arg)]
+           [id-ref (box (if (> iters 0) id const))]
+           [id-dynamic (unbox id-ref)])
+      (letrec ([run-test (lambda (i acc) acc)])
+        (time
+         (let loop ([i iters] [acc 42])
+           (cond
+            [(zero? i) acc]
+            [else (loop (- i 1) (run-test i acc))]))
+         (current-output-port))))))
 
-;; (define (main arg)
-;;   (let ([iters (string->number arg)])
-;;     (letrec ([f (lambda (x)
-;; 		  (if (= x 0)
-;; 		      0
-;; 		      (+ 0 (f (- x 1)))))]
-;; 	     [g (lambda (x) 42)])
-;;       (let ([r (box (if (> iters 0) f g))])
-;; 	(time
-;; 	 ((unbox r) iters)
-;; 	 (current-output-port))))))

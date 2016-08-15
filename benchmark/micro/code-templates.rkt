@@ -20,19 +20,14 @@
          #:timed-action   timed-action)   ; (Symbol Symbol -> Schml-Expr)
   `(letrec ,letrec-bnds 
      (let ([iters : Int (read-int)]
-           [acc   : (GRef ,acc-type) (gbox ,acc-init)]
            ,@let-bnds)
        (letrec ([run-test
                  : (Int ,acc-type -> ,acc-type)
                  (lambda ([i : Int] [acc : ,acc-type])
                    ,(timed-action 'i 'acc))])
-         (begin
-           (timer-start)
-           (repeat (i 0 iters)
-                   (gbox-set! acc (run-test i (gunbox acc))))
-           (timer-stop)
-           (timer-report)
-           ,(use-acc-action '(gunbox acc)))))))
+         ,(use-acc-action
+           `(time (repeat (i 0 iters) (acc : ,acc-type ,acc-init)
+                    (run-test i acc))))))))
 
 
 

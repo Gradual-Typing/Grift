@@ -1,15 +1,12 @@
-#!/u/dalmahal/bin/bin/gsi-script -:d0
-
+#!gsi-script
 
 (define (main arg)
   (let ([iters (string->number arg)]
-	[acc (box 0)]
 	[ref (box 0)])
-    (letrec ([run-test (lambda (i acc) i)])
-      (begin
-	(time
-	 (let loop ([i iters])
+    (letrec ([run-test (lambda (i acc) acc)])
+      (time
+	 (let loop ([i iters] [acc 42])
 	   (cond
-	    [(zero? i) (unbox acc)]
-	    [else (set-box! acc (run-test i (unbox acc))) (loop (- i 1))]))
-	 (current-output-port))))))
+	    [(zero? i) acc]
+	    [else (loop (- i 1) (run-test i acc))]))
+	 (current-output-port)))))
