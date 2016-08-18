@@ -11,7 +11,7 @@ before_install:
 - export PATH=~/racket/bin:$PATH
 
 install:
-- echo 42
+raco make main.rkt
   
 script:
 - echo 42
