@@ -13,7 +13,7 @@ before_install:
 install:
 - # cat /proc/meminfo
 - # export PLTSTDERR="error debug@tr-timing"
-- time raco make -j 4 main.rkt
+- time raco make -v -j 4 main.rkt
   
 script:
 - echo 42
