@@ -14,5 +14,6 @@ install:
 - echo 42
   
 script:
+- echo 42
 
 after_script:
