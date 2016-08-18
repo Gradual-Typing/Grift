@@ -13,8 +13,8 @@ before_install:
 install:
 - # cat /proc/meminfo
 - # export PLTSTDERR="error debug@tr-timing"
-- time raco make -v -j 4 src/casts/impose-cast-semantics.rkt
-  
+- time raco make -v -j 4 src/casts/hoist-casts-and-coercions.rkt
+
 script:
 - echo 42
 
