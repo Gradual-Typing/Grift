@@ -42,3 +42,9 @@
 
 (define (new-command name output)
     (format "\\newcommand{~a}{~a}\n" name output))
+
+(define (string->exact-integer x)
+  (cond
+    [(string->number x) => 
+     (lambda (n) (and (exact-integer? n) n))]
+    [else (error 'string->exact-integer "failed ~v" x)]))

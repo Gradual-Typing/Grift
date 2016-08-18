@@ -1,7 +1,5 @@
 sudo: false
-
 language: c
-
 env:
 - PATH=~/racket/bin:$PATH
 
@@ -12,12 +10,9 @@ before_install:
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
 
-
 install:
-- raco make -v main.rkt
-- raco make -v tests/main.rkt
-
+- echo 42
+  
 script:
-- racket tests/main.rkt -s all
 
 after_script:

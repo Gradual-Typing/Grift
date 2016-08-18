@@ -29,8 +29,6 @@
            `(time (repeat (i 0 iters) (acc : ,acc-type ,acc-init)
                     (run-test i acc))))))))
 
-
-
 (define timing-loop-example
   (make-timing-loop
    #:letrec-bnds '(FUNC-BND ...)
@@ -80,6 +78,9 @@
     [(Ref r w)
      (+ 1 (sizeof-coercion r) (sizeof-coercion w))]
     [else (error 'sizeof-coercion "unmatched ~a" c)]))
+
+(define (sizeof-coercionof-types t1 t2)
+  (sizeof-coercion ((make-coercions "") t1 t2)))
 
 (define timing-loop-test
   (make-timing-loop
