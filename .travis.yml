@@ -14,6 +14,9 @@ install:
 - # cat /proc/meminfo
 - # export PLTSTDERR="error debug@tr-timing"
 - time raco make -v -j 4 src/casts/hoist-casts-and-coercions.rkt
+- time raco make -v -j 4 src/casts/specify-representation.rkt
+- time raco make -v -j 4 src/casts/purify-letrec.rkt
+
 
 script:
 - echo 42
