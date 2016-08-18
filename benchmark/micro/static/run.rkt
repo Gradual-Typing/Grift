@@ -230,14 +230,6 @@
   #;(pretty-print brs-no-stats)
   )
 
-
-
-(define (string->exact-integer x)
-  (cond
-    [(string->number x) => 
-     (lambda (n) (and (exact-integer? n) n))]
-    [else (error 'string->exact-integer "failed ~v" x)]))
-
 (define (build-benchmark test reps compiler hand-coded?)
   (define out-path (configuration->exe-path test reps compiler hand-coded?))
   (define src-path (configuration->src-path test reps compiler hand-coded?))

@@ -1,12 +1,88 @@
 #lang racket
 
 (require
- "helpers.rkt"
- "code-templates.rkt"
+ "../helpers.rkt"
+ "../../helpers.rkt"
+ "../code-templates.rkt"
+ "../../../src/compile.rkt"
  syntax/location
+ racket/runtime-path
  math)
 
-(initialize-dirs! (file-name-from-path (quote-source-file)))
+(define-runtime-path src-dir "./src")
+
+(define (configuration->test-name test casts tsize csize)
+  (format "~a_~a_~a_~a" test casts tsize csize))
+
+(define (name->configuration name)
+  (match (string-split name "_")
+    [(list test-str casts-str tsize-str csize-str)
+     (values (string->symbol test-str)
+             (string->number casts-str)
+             (string->number tsize-str)
+             (string->number csize-str))]
+    [other (error 'test-name->configuration "invalid ~v" name)]))
+
+(define (configuration->src test casts tsize csize)
+  (define name (configuration->test-name test casts tsize csize))
+  (build-path src-dir (string-append name ".schml")))
+
+(define (src->configuration path)
+  (define name (path->string (path-replace-suffix (file-name-from-path path) "")))
+  (name->configuration name))
+
+(define (generate-benchmarks)
+  ;; Casts can cast the same function over and over because the code
+  ;; that is running will be the cast code.
+  ;; Unfortunately this casts code is going to have unlikely cache performance.
+  ;; This could be seen as best case cast behavior.
+  (define (make-function-types/init/use depth)
+    (let loop ([depth depth])
+      (cond
+        [(<= depth 0)
+         (values
+          '(Int -> Int)
+          '(Dyn -> Dyn)
+          '(lambda ([x : Int]) x)
+          (lambda (f) `(,f 42)))]
+        [else
+         (let-values ([(t1 t2 init use) (loop (sub1 depth))])
+           (define t1^ `(,t1 -> ,t1))
+           (define t2^ `(,t2 -> ,t2))
+           (define use^ (lambda (f) (use `(,f ,init))))
+           (define init^ `(lambda ([x : ,t1]) x))
+           (values t1^ t2^ init^ use^))])))
+
+  (define (generate-cast-timing-loop-source depth n-casts)
+    (unless (and (exact-nonnegative-integer? n-casts)
+                 (even? n-casts))
+      (error 'cast-timing-loop "no way to loop with odd number of casts"))
+    (define-values (t1 t2 init use)
+      (make-function-types/init/use depth))
+    (define (cast-back-forth acc n)
+      (if (zero? n)
+          acc
+          `(: (: ,(cast-back-forth acc (- n 2)) ,t2) ,t1)))
+    (write-source (configuration->src 'fn-cast
+                                      n-casts
+                                      (sizeof-type* t1 t2)
+                                      (sizeof-coercionof-types t1 t2))
+                  (make-timing-loop
+                   #:timed-action
+                   (lambda (i acc)
+                     (cast-back-forth acc n-casts))
+                   #:letrec-bnds  `([f : ,t1 ,init])
+                   #:acc-type t1
+                   #:acc-init 'f
+                   #:use-acc-action use)))
+  
+  (for/list ([depth (in-range 0 5)])
+    (for/list ([n-casts (in-range 0 21 2)])
+      (generate-cast-timing-loop-source depth n-casts)))
+  
+  
+  )
+
 
 #|
 This script runs a series of tests that are respnsible for
@@ -42,100 +118,16 @@ the following portion of the ICFP outline.
 Configuaration variables
 |#
 
+#|
 ;; Runs = the number of times the test is repeated in order to understand
 ;; how much volitility is coming from the system it is being run o
 (define iters 1000)
 (define runs  100)
 (define decimals 2)
 (define prec `(= ,decimals))
+|#
 
-
-;; Casts can cast the same function over and over because the code
-;; that is running will be the cast code.
-;; Unfortunately this casts code is going to have unlikely cache performance.
-;; This could be seen as best case cast behavior.
-(define (make-function-types/init/use depth)
-  (let loop ([depth depth])
-    (cond
-      [(<= depth 0)
-       (values
-        '(Int -> Int)
-        '(Dyn -> Dyn)
-        '(lambda ([x : Int]) x)
-        (lambda (f) (,f 42)))]
-      [else
-       (let-values ([(t1 t2 init use) (loop (sub1 depth))])
-         (define t1^ `(,t1 -> ,t1))
-         (define t2^ `(,t2 -> ,t2))
-         (define use^ (lambda (f) (use `(,f ,init))))
-         (define init^ `(lambda ([x : ,t1]) x))
-         (values t1^ t2^ init^ use^))])))
-
-(define (make-cast-timing-loop-record depth n-casts)
-  (unless (and (exact-nonnegative-integer? n-casts)
-               (even? n-casts))
-    (error 'cast-timing-loop "no way to loop with odd number of casts"))
-  (define-values (t1 t2 init use)
-    (make-function-types/init/use depth))
-  (define (cast-back-forth acc n)
-    (if (zero? n)
-        acc
-        `(: (: ,(cast-back-forth acc (- n 2)) ,t2) ,t1)))
-  (list (format "fn-cast-~a-~a" depth n-casts)
-        depth n-casts
-        (sizeof-type* t1 t2)
-        (sizeof-coercion-of-types t1 t2)
-        t1 t2
-        (make-timing-loop
-         #:timed-action
-         (lambda (i acc)
-           (cast-back-forth acc number))
-         #:letrec-bnds  `([f : ,t1 ,init])
-         #:acc-type t1
-         #:acc-init 'f
-         #:use-acc-action use)))
-
-(define function-cast-results
-  ;; Generate the paramerter to the test itself
-  (for/list ([depth (in-range 0 5)])
-    (for/list ([n-casts (in-range 0 21 2)])
-      (match-define (list name d nc st sc t1 t2 prog)
-        (make-cast-timing-loop-record depth n-casts))
-      (define-values (src-file name-twosomes name-coercions)
-        (values (write-source name prog)
-                (string-append name "-twosomes-functional")
-                (string-append name "-coercions-hybrid")))
-      (match-define (list t-run-time* t-iter-time*)
-          (compile&run/iteration-time
-           #:base-name     name-twosomes-functional
-           #:src-file      src-file
-           #:runs          runs
-           #:iterations    iters
-           #:cast-repr     'Twosomes
-           #:function-repr 'Functional
-           #:output-regexp spec
-           #:memory-limit  (* 4096 30000)
-           #:mean-of-runs? #f))
-        (match-define (list c-run-time* c-iter-time*)
-          (compile&run/iteration-time
-           #:base-name     name-coercions-hybrid
-           #:src-file      src-file
-           #:runs          runs
-           #:iterations    iters
-           #:cast-repr     'Coercions
-           #:function-repr 'Hybrid
-           #:output-regexp spec
-           #:memory-limit  (* 4096 30000)
-           #:mean-of-runs?  #f))
-        (list
-         name depth args st sc t1 t2
-         (mean-of-runs t-run-time* t-iter-time*)
-         (list t-run-time* t-iter-time*)
-         (mean-of-runs c-run-time* c-iter-time*)
-         (list c-run-time* c-iter-time*)))
-    
-
-    ))
+#|
 
 (define function-cast-results
   (let ([spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : 42\n$"])
@@ -718,3 +710,43 @@ Configuaration variables
 
 (system "python partially-typed.py")
 (system "python fn-app-by-casts-for-abstract.py")
+;;|#
+
+(module+ main
+  (define program-main
+    (make-parameter generate-benchmarks #;
+     (lambda ()
+       (error 'run.rkt "please pass the \"generate\" or \"run\" flag"))))
+  (command-line
+   #:once-each
+   [("-i" "--iterations") number-of-iterations
+    "number of iterations in timing loop"
+    (iterations-parameter
+     (or (string->exact-integer number-of-iterations)
+         (error 'dynamic-write-read-benchmark "bad iterations argument")))]
+   [("-r" "--runs") number-of-runs
+    "number of trials of each benchmark"
+    (runs-parameter
+     (or (string->exact-integer number-of-runs)
+         (error 'dynamic-write-read-benchmark "bad runs argument")))]
+   [("-m" "--memory") memory-start-size
+    "size in kilobytes of schml starting memory"
+    (init-heap-kilobytes
+     (or (string->exact-integer memory-start-size)
+         (error 'dynamic-write-read-benchmark "bad memory argument")))]
+   [("-e" "--epsilon") epsilon
+    "smallest time in milliseconds that will be recorded without error"
+    (epsilon-parameter
+     (or (string->number epsilon)
+         (error 'dynamic-write-read-benchmark "bad epsilon argument")))]
+   #:once-any
+   ["--generate" "Run the code generation phase of benchmark"
+    (program-main generate-benchmarks)]
+   #;
+   ["--run" "Run the benchmark on generated code"
+    (program-main
+     (lambda ()
+       (let ([results (analyze-results (run-static-benchmarks))])
+         (generate-documentation results))))]
+   #:args a ((program-main))))
+

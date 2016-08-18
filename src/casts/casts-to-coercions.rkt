@@ -33,9 +33,13 @@ should be able to compile programs this the twosome casts for future comparison.
     (let ([exp (c2c-expr exp)])
       (Prog (list name next type) exp))))
 
-(: mk-coercion (Blame-Label Boolean ->
-                (Schml-Type Schml-Type -> Schml-Coercion)))
-(define ((mk-coercion lbl space-efficient-normal-form?) t1 t2)
+(: mk-coercion (->* (String)
+                    Boolean (Schml-Type Schml-Type -> Schml-Coercion)))
+(define ((mk-coercion lbl
+                      [space-efficient-normal-form?
+                       (and (space-efficient?)
+                            (not (optimize-first-order-coercions?)))])
+         t1 t2)
   (define recur (mk-coercion lbl (space-efficient?)))
   (logging mk-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
   (define result : Schml-Coercion
@@ -73,10 +77,7 @@ should be able to compile programs this the twosome casts for future comparison.
   (match exp
     ;; The only Interesting Case
     [(Cast (app c2c-expr exp) (Twosome t1 t2 lbl))
-     (define normal-form?
-       (and (space-efficient?)
-            (not (optimize-first-order-coercions?))))
-     (Cast exp (Coercion ((mk-coercion lbl normal-form?) t1 t2)))]
+     (Cast exp (Coercion ((mk-coercion lbl) t1 t2)))]
     ;; Everything else should be really boring
     [(Lambda f* (app c2c-expr exp))
      (Lambda f* exp)]
