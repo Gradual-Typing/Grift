@@ -11,8 +11,8 @@ before_install:
 - export PATH=~/racket/bin:$PATH
 
 install:
-- cat /proc/meminfo
-- export PLTSTDERR="error debug@tr-timing"
+- # cat /proc/meminfo
+- # export PLTSTDERR="error debug@tr-timing"
 - time raco make -j 4 main.rkt
   
 script:
