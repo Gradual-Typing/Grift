@@ -11,7 +11,8 @@ before_install:
 - export PATH=~/racket/bin:$PATH
 
 install:
-- raco make main.rkt
+- cat /proc/meminfo
+- time raco make -v main.rkt
   
 script:
 - echo 42
