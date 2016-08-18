@@ -33,8 +33,7 @@ should be able to compile programs this the twosome casts for future comparison.
     (let ([exp (c2c-expr exp)])
       (Prog (list name next type) exp))))
 
-(: mk-coercion (->* (String)
-                    Boolean (Schml-Type Schml-Type -> Schml-Coercion)))
+(: mk-coercion (->* (String) (Boolean) (Schml-Type Schml-Type -> Schml-Coercion)))
 (define ((mk-coercion lbl
                       [space-efficient-normal-form?
                        (and (space-efficient?)
