@@ -16,7 +16,7 @@ install:
 - time raco make -v -j 4 src/casts/hoist-casts-and-coercions.rkt
 - time raco make -v -j 4 src/casts/specify-representation.rkt
 - time raco make -v -j 4 src/casts/purify-letrec.rkt
-
+- time raco make -v -j 4 src/casts/impose-cast-semantics.rkt
 
 script:
 - echo 42
