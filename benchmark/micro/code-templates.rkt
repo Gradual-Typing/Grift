@@ -1,6 +1,7 @@
 #lang racket
 (require "../../src/language/forms.rkt"
          "../helpers.rkt"
+         "../../src/schml/syntax-to-schml0.rkt"
          "../../src/casts/casts-to-coercions.rkt")
 (provide (all-defined-out))
 
@@ -80,7 +81,10 @@
     [else (error 'sizeof-coercion "unmatched ~a" c)]))
 
 (define (sizeof-coercionof-types t1 t2)
-  (sizeof-coercion ((make-coercions "") t1 t2)))
+  (sizeof-coercion
+   ((make-coercion "")
+    (parse-type (datum->syntax #f t1))
+    (parse-type (datum->syntax #f t2)))))
 
 (define timing-loop-test
   (make-timing-loop

@@ -37,12 +37,13 @@
 (define (gvector-grow! gv min)
   (define-values (init data)
     (values (GVectorof-init gv) (GVectorof-data gv)))
+  (define old-len (vector-length data))
   (define new-len
-    (do : Natural ([l : Natural (vector-length data) (* l 2)])
+    (do : Natural ([l : Natural old-len (* l 2)])
         ((< min l) l)))
   (set-GVectorof-data! gv (make-vector new-len init))
   ;; Todo test this with vector-copy!
-  (for ([i : Natural (in-range 0 min)])
+  (for ([i : Natural (in-range 0 old-len)])
     (gvector-set-without-grow! gv i (vector-ref data i))))
 
 (: gvector-length (All (a) (GVectorof a) -> Index))
