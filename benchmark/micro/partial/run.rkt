@@ -170,7 +170,7 @@
                     (make-app-timing-loop casts t1 t2 init use overhead?)))
   
     (for* ([casts (in-range 0 15)]
-           [depth (in-range 0 4)] 
+           [depth (in-range 0 4)]
            [overhead? (list #f #t)])
       (generate-fn-app-timing-loop-source casts depth overhead?))
 
