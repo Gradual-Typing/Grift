@@ -122,7 +122,7 @@
       #:use-acc-action use))
     src-path)
 
-  (for* ([depth (in-range 0 5)]
+  (for* ([depth (in-range 0 4)]
          [n-casts (list 2)]
          [overhead? (list #f #t)])
     (generate-fn-cast-timing-loop-source depth n-casts overhead?))
@@ -195,7 +195,7 @@
         (configuration->src 'ref-cast casts type-size crcn-size overhead?))
       (write-source src-path (make-reference-cast-timing-loop t1 t2 depth overhead?)))
 
-    (for* ([depth (in-range 0 6)]
+    (for* ([depth (in-range 0 4)]
            [casts (list 2)]
            [overhead? '(#f #t)])
       (generate-reference-cast-timing-loop depth casts overhead?))
