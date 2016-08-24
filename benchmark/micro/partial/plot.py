@@ -106,8 +106,8 @@ def cast_plot(fignum, test, rx, ry, calc_plot_bounds=None):
         
     plt.savefig('out/{}-results.png'.format(test), bbox_inches='tight')
 
-cast_plot(1, "fn-cast", 40, 325,
-          lambda lx, hx, ly, hy: [lx - 5, hx + 5, -25, 700])
+cast_plot(1, "fn-cast", 80, 450,
+          lambda lx, hx, ly, hy: [lx - 10, hx + 10, -25, hy + 10])
 
 cast_plot(2, "ref-cast", 40, 200, 
           lambda lx, hx, ly, hy: [lx - 10, hx + 10, 0, hy + 10])
@@ -202,10 +202,10 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
     plt.savefig('out/{}-by-casts.png'.format(test), bbox_inches='tight')
 
 use_by_casts_plot(3, "fn-app", 10, 275, "function application",
-                  lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1750])
+                  lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])
 
 use_by_casts_plot(4, "ref-write-read", 3, 50, "guarded read and write",
-                  lambda lx, hx, ly, hy: [-.75, 5.75, -10, 500])               
+                  lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])               
 
                
 def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
@@ -247,8 +247,8 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
 
 use_by_crcns_plot(5, "fn-app", 40, 100, "function application", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy+10])
-use_by_crcns_plot(6, "ref-write-read", 75, 600, "guarded write and read", 20,
-                  lambda lx, hx, ly, hy: [lx-20, hx+20, ly-20, hy+20])
+use_by_crcns_plot(6, "ref-write-read", 75, 600, "guarded write and read", 5,
+                  lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy +10])
 
 
 plt.show()
