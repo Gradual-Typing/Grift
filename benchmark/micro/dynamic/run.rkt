@@ -20,6 +20,7 @@
 (define tests               '(Ref RefOverhead Call CallOverhead))
 (define compilers           '(Gambit Coercions Type-Based))
 (define dynamic-operations? '(#f #t))
+(define just-testing? (make-parameter #f))
 
 (define (benchmark-configuration->string t c d?)
   (case c
@@ -69,6 +70,8 @@
     (epsilon-parameter
      (or (string->number epsilon)
          (error 'dynamic-write-read-benchmark "bad epsilon argument")))]
+   [("--test") "Quickly test that all generated code compiles and runs"
+    (just-testing? #t)]
    #:args ()
    (dynamic-write-read-print-latex!
     (run-dynamic-write-reads-benchmark))))
@@ -99,7 +102,7 @@
    #:skip dynamic-function-app-skip?
    #:build build-benchmark
    #:extract-time (parse-output iterations epsilon)
-   #:num-trials number-of-runs
+   #:num-trials (if (just-testing?) 1 number-of-runs)
    #:results-file (build-path data-dir "funcall")))
 
 (define (dynamic-function-app-skip? name compiler dynamic-ops?)
@@ -144,16 +147,16 @@
     (define stat-name (benchmark-configuration->string name c d?))
     (string-append
      (new-command (format "dyn~aMeanNS" stat-name)
-                  (format "~a ns" (~r mean #:precision '(= 0))))
+                  (format "~a ns" (~r mean #:precision '(= 2))))
      (new-command (format "dyn~aSdevNS" stat-name)
-                  (format "~a ns" (~r sdev #:precision '(= 0))))))
+                  (format "~a ns" (~r sdev #:precision '(= 2))))))
 
   (define (stat->string s)
     (match-define (list name (list c d?) mean sdev) s)
     (format "dynamic ~a (ns) mean: ~a sdev: ~a\n"
             (benchmark-configuration->string name c d?)
-            (~r mean #:precision '(= 0))
-            (~r sdev #:precision '(= 0))))
+            (~r mean #:precision '(= 2))
+            (~r sdev #:precision '(= 2))))
   
   (call-with-output-file tex-file #:exists 'replace
     (lambda (tex)
