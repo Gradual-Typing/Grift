@@ -12,5 +12,9 @@ linux_save:
 	cat /proc/meminfo > out/meminfo.txt
 	tar -cf `date -I`-micro-partial.tar run.rkt plot.py src tmp out
 
+plot:
+	python plot.py
+
+
 clean:
 	rm -rf src tmp compiled out
