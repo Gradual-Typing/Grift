@@ -109,7 +109,7 @@ def cast_plot(fignum, test, rx, ry, calc_plot_bounds=None):
 cast_plot(1, "fn-cast", 40, 325,
           lambda lx, hx, ly, hy: [lx - 5, hx + 5, -25, 700])
 
-cast_plot(2, "ref-cast", 100, 300, 
+cast_plot(2, "ref-cast", 40, 200, 
           lambda lx, hx, ly, hy: [lx - 10, hx + 10, 0, hy + 10])
     
 # type_based_cast_data = np.genfromtxt('out/fn-cast_Type-Based.txt'
@@ -202,9 +202,9 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
     plt.savefig('out/{}-by-casts.png'.format(test), bbox_inches='tight')
 
 use_by_casts_plot(3, "fn-app", 10, 275, "function application",
-                  lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 2000])
+                  lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1750])
 
-use_by_casts_plot(4, "ref-write-read", 3, 75, "guarded read and write",
+use_by_casts_plot(4, "ref-write-read", 3, 50, "guarded read and write",
                   lambda lx, hx, ly, hy: [-.75, 5.75, -10, 500])               
 
                
@@ -247,7 +247,7 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
 
 use_by_crcns_plot(5, "fn-app", 40, 100, "function application", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy+10])
-use_by_crcns_plot(6, "ref-write-read", 150, 900, "guarded write and read", 20,
+use_by_crcns_plot(6, "ref-write-read", 75, 600, "guarded write and read", 20,
                   lambda lx, hx, ly, hy: [lx-20, hx+20, ly-20, hy+20])
 
 

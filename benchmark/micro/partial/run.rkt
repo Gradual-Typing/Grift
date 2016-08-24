@@ -122,7 +122,7 @@
       #:use-acc-action use))
     src-path)
 
-  (for* ([depth (in-range 0 4)]
+  (for* ([depth (in-range 2 6)]
          [n-casts (list 2)]
          [overhead? (list #f #t)])
     (generate-fn-cast-timing-loop-source depth n-casts overhead?))
@@ -169,8 +169,8 @@
       (write-source src-path
                     (make-app-timing-loop casts t1 t2 init use overhead?)))
   
-    (for* ([casts (in-range 0 20)]
-           [depth (in-range 0 4)]
+    (for* ([casts (in-range 0 15)]
+           [depth (in-range 0 4)] 
            [overhead? (list #f #t)])
       (generate-fn-app-timing-loop-source casts depth overhead?))
 
@@ -195,7 +195,7 @@
         (configuration->src 'ref-cast casts type-size crcn-size overhead?))
       (write-source src-path (make-reference-cast-timing-loop t1 t2 depth overhead?)))
 
-    (for* ([depth (in-range 0 4)]
+    (for* ([depth (in-range 0 5)]
            [casts (list 2)]
            [overhead? '(#f #t)])
       (generate-reference-cast-timing-loop depth casts overhead?))
@@ -242,8 +242,8 @@
         #:acc-init acc-init
         #:use-acc-action use)))
     
-    (for* ([depth (in-range 0 6)]
-           [casts (in-range 0 6)]
+    (for* ([depth (in-range 0 5)]
+           [casts (in-range 0 15)]
            [overhead? '(#f #t)])
       (generate-reference-write-read-timing-loop depth casts overhead?)))
 
@@ -994,9 +994,9 @@ Configuaration variables
 
 
 (define (clean-benchmarks)
-  (delete-file src-dir)
-  (delete-file out-dir)
-  (delete-file tmp-dir))
+  (delete-directory/files src-dir)
+  (delete-directory/files out-dir)
+  (delete-directory/files tmp-dir))
 
 (module+ main
   (define program-main
@@ -1035,7 +1035,7 @@ Configuaration variables
    ["--generate" "Generate schml programs for benchmark."
     (program-main generate-benchmarks)]
    ["--compile" "Run schml on all programs in the src dir."
-    (program-main (compile-benchmarks '(Type-Based Coercions)))]
+    (program-main compile-benchmarks)]
    ["--run" "Run programs in exe directory"
     (program-main run-benchmarks)]
    ["--analyze" "Run programs in exe directory"
