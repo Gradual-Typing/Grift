@@ -122,7 +122,7 @@
       #:use-acc-action use))
     src-path)
 
-  (for* ([depth (in-range 0 4)]
+  (for* ([depth (in-range 2 6)]
          [n-casts (list 2)]
          [overhead? (list #f #t)])
     (generate-fn-cast-timing-loop-source depth n-casts overhead?))
@@ -169,7 +169,7 @@
       (write-source src-path
                     (make-app-timing-loop casts t1 t2 init use overhead?)))
   
-    (for* ([casts (in-range 0 20)]
+    (for* ([casts (in-range 0 15)]
            [depth (in-range 0 4)]
            [overhead? (list #f #t)])
       (generate-fn-app-timing-loop-source casts depth overhead?))
@@ -242,8 +242,8 @@
         #:acc-init acc-init
         #:use-acc-action use)))
     
-    (for* ([depth (in-range 0 6)]
-           [casts (in-range 0 6)]
+    (for* ([depth (in-range 0 5)]
+           [casts (in-range 0 15)]
            [overhead? '(#f #t)])
       (generate-reference-write-read-timing-loop depth casts overhead?)))
 
