@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib as mpl
 
-latex_output = False
+latex_output = True
 
 if latex_output:
     mpl.use('PDF')
@@ -204,7 +204,7 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
 use_by_casts_plot(3, "fn-app", 10, 275, "function application",
                   lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])
 
-use_by_casts_plot(4, "ref-write-read", 3, 50, "guarded read and write",
+use_by_casts_plot(4, "ref-write-read", 1, 300, "guarded read and write",
                   lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])               
 
                
@@ -245,9 +245,9 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
         
     plt.savefig('out/{}-by-types.png'.format(test), bbox_inches='tight')
 
-use_by_crcns_plot(5, "fn-app", 40, 100, "function application", 5,
+use_by_crcns_plot(5, "fn-app", 40, 140, "function application", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy+10])
-use_by_crcns_plot(6, "ref-write-read", 75, 600, "guarded write and read", 5,
+use_by_crcns_plot(6, "ref-write-read", 40, 350, "guarded write and read", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy +10])
 
 
