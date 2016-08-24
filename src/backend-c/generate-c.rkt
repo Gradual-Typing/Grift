@@ -67,7 +67,7 @@
 (: init-mem (Natural -> Void))
 (define (init-mem n)
   (printf
-   "free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);\n" n)
+   "free_ptr = (int64_t)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);\n" n)
   (printf "limit = free_ptr + ~a;\n" n)
   (display "allocd_mem = 0;\n"))
 
@@ -133,14 +133,14 @@
 (: emit-alloc (Natural -> Void))
 (define (emit-alloc n)
   (let ([s (number->string n)])
-    (display "long alloc(int n){")
-    (display "    long result = free_ptr;")
-    (display "    long newFree = result + n;")
+    (display "int64_t alloc(int n){")
+    (display "    int64_t result = free_ptr;")
+    (display "    int64_t newFree = result + n;")
     (display "    allocd_mem += n;")
     (display "    if (newFree >= limit){")
     (display "        puts(\"Requesting more memory\\n\");")
-    (printf  "        free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);" s)
-    (display "        if (free_ptr == (long)NULL){\n")
+    (printf  "        free_ptr = (int64_t)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);" s)
+    (display "        if (free_ptr == (int64_t)NULL){\n")
     (display "           fputs(\"couldn't allocate any more memory\", stderr);\n")
     (printf  "           exit(~a);" ERROR-OUT-OF-MEMORY)
     (display "        }\n")
@@ -160,7 +160,7 @@
   (for ([d : String C-DECLARATIONS])
     (display d)
     (newline))
-  (display "void* alloc_ptr;\nlong free_ptr;\nlong limit;\nunsigned long allocd_mem;\n\n")
+  (display "void* alloc_ptr;\nint64_t free_ptr;\nint64_t limit;\nint64_t allocd_mem;\n\n")
   (emit-alloc n)
   (newline)
   (display timer-boiler-plate)
@@ -292,7 +292,7 @@
     [(Halt)           (display "exit(-1),-1")]
     [(Code-Label i)  (begin
                        (display "((")
-                       (display "long)")
+                       (display "int64_t)")
                        (display (uid->string i))
                        (display ")"))]
     [other   (error 'generate-c-emit-value-match)]))
@@ -340,14 +340,14 @@
   (match* (p exp*)
     ;;[('Exit '()) (display C-EXIT)]
     [('Array-set! (list a o v)) (begin
-                                  (emit-wrap (display "(long*)")
+                                  (emit-wrap (display "(int64_t*)")
                                              (emit-value a))
                                   (display "[")
                                   (emit-value o)
                                   (display "] = ")
                                   (emit-value v))]
     [('Array-ref (list a o)) (begin
-                               (emit-wrap (display "(long*)")
+                               (emit-wrap (display "(int64_t*)")
                                           (emit-value a))
                                (display "[")
                                (emit-value o)
