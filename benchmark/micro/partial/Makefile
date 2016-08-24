@@ -10,5 +10,9 @@ save:
 	git rev-parse --verify HEAD > out/commit-hash.txt
 	tar -cf archive/`date -I`-snapshot.tar run.rkt plot.py src tmp out
 
+plot:
+	python plot.py
+
+
 clean:
 	rm -rf src tmp compiled out

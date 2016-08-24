@@ -197,9 +197,9 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
                , shadow=True)
 
     if latex_output:
-        plt.savefig('out/{}-by-casts'.format(test), bbox_inches='tight')
+        plt.savefig('out/{}-by-casts-coercions=15'.format(test), bbox_inches='tight')
 
-    plt.savefig('out/{}-by-casts.png'.format(test), bbox_inches='tight')
+    plt.savefig('out/{}-by-casts-coercions=15.png'.format(test), bbox_inches='tight')
 
 use_by_casts_plot(3, "fn-app", 10, 275, "function application",
                   lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])
@@ -241,9 +241,9 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
                         , shadow=True)
 
     if latex_output:
-        plt.savefig('out/{}-by-types'.format(test), bbox_inches='tight')
+        plt.savefig('out/{}-by-coercions-casts=1'.format(test), bbox_inches='tight')
         
-    plt.savefig('out/{}-by-types.png'.format(test), bbox_inches='tight')
+    plt.savefig('out/{}-by-coercions-casts=1.png'.format(test), bbox_inches='tight')
 
 use_by_crcns_plot(5, "fn-app", 40, 140, "function application", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy+10])

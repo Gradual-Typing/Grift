@@ -307,80 +307,96 @@
 
       (debug (list t c hc) overhead-mean overhead-sdev unit-mean unit-sdev)
       (benchmark-result t (list c hc) (list (- unit-mean overhead-mean)))))
-
+  
   (pretty-print mean-no-overhead)
-  mean-no-overhead)
+  (define (results-ref test attributes)
+    (benchmark-results-ref  mean-no-overhead test attributes))
+  
+  (match-define (list mean-ref-rw-twosomes #;sdev-ref-rw-twosomes)
+    (results-ref 'ref-read-write '(Type-Based #f)))
+  
+  (match-define (list mean-ref-rw-twosomes-hc #;sdev-ref-rw-twosomes-hc)
+    (results-ref 'ref-read-write '(Type-Based #t)))
+  
+  (match-define (list mean-ref-rw-coercions #;sdev-ref-rw-coercions)
+    (results-ref 'ref-read-write '(Coercions #f)))
 
+  (match-define (list mean-ref-rw-coercions-hc #;sdev-ref-rw-coercions-hc)
+    (results-ref 'ref-read-write '(Coercions #t)))
 
+  (match-define (list mean-fn-app-twosomes #;sdev-fn-app-twosomes)
+    (results-ref 'fn-app '(Type-Based #f)))
 
-(define (generate-documentation results)
-  (match-define (list mean-ref-rw-twosomes #;sdev-ref-rw-twosomes
-                      )
-    (benchmark-results-ref results 'ref-read-write '(Type-Based #f)))
-  (match-define (list mean-ref-rw-twosomes-hc #;sdev-ref-rw-twosomes-hc
-                      )
-    (benchmark-results-ref results 'ref-read-write '(Type-Based #t)))
-  (match-define (list mean-ref-rw-coercions #;sdev-ref-rw-coercions
-                      )
-    (benchmark-results-ref results 'ref-read-write '(Coercions #f)))
-  (match-define (list mean-ref-rw-coercions-hc #;sdev-ref-rw-coercions-hc
-                      )
-    (benchmark-results-ref results 'ref-read-write '(Coercions #t)))
-  (match-define (list mean-fn-app-twosomes #;sdev-fn-app-twosomes
-                      )
-    (benchmark-results-ref results 'fn-app '(Type-Based #f)))
-  (match-define (list mean-fn-app-twosomes-hc #;sdev-fn-app-twosomes-hc
-                      )
-    (benchmark-results-ref results 'fn-app '(Type-Based #t)))
-  (match-define (list mean-fn-app-coercions #;sdev-fn-app-coercions
-                      )
-    (benchmark-results-ref results 'fn-app '(Coercions #f)))
-  (match-define (list mean-fn-app-coercions-hc #;sdev-fn-app-coercions-hc
-                      )
-    (benchmark-results-ref results 'fn-app '(Coercions #t)))
+  (match-define (list mean-fn-app-twosomes-hc #;sdev-fn-app-twosomes-hc)
+    (results-ref 'fn-app '(Type-Based #t)))
+
+  (match-define (list mean-fn-app-coercions #;sdev-fn-app-coercions)
+    (results-ref 'fn-app '(Coercions #f)))
+
+  (match-define (list mean-fn-app-coercions-hc #;sdev-fn-app-coercions-hc)
+    (results-ref 'fn-app '(Coercions #t)))
+
   (define (fmt x) (format "~a ns" (~r x #:precision '(= 2))))
-  (with-output-to-file (build-path data-dir "static-results.tex")  
+  (with-output-to-file (build-path data-dir "results.tex")  
     #:exists 'replace
     (lambda ()
       (display
        (string-append
-        (new-command "staticRefTypeBasedMeanNano" (fmt mean-ref-rw-twosomes))
-        #;(new-command "staticRefTypeBasedSDevNano" (fmt sdev-ref-rw-twosomes))
+        (new-command "staticRefTypeBasedMeanNano"
+                     (fmt mean-ref-rw-twosomes))
+        
         (new-command "staticRefTypeBasedHandCodedMeanNano"
                      (fmt mean-ref-rw-twosomes-hc))
-        #;
-        (new-command "staticRefTypeBasedHandCodedSDevNano"
-                     (fmt sdev-ref-rw-twosomes-hc))
+        
         (new-command "staticRefCoercionsMeanNano"
                      (fmt mean-ref-rw-coercions))
-        #;
-        (new-command "staticRefCoercionsSDevNano"
-                     (fmt sdev-ref-rw-coercions))
+
         (new-command "staticRefCoercionsHandCodedMeanNano"
                      (fmt mean-ref-rw-coercions-hc))
-        #;
-        (new-command "staticRefCoercionsHandCodedSDevNano"
-                     (fmt sdev-ref-rw-coercions-hc))
+
         (new-command "staticFnAppTypeBasedMeanNano"
                      (fmt mean-fn-app-twosomes))
-        #;
-        (new-command "staticFnAppTypeBasedSDevNano"
-                     (fmt sdev-fn-app-twosomes))
+
         (new-command "staticFnAppTypeBasedHandCodedMeanNano"
                      (fmt mean-fn-app-twosomes-hc))
-        #;
-        (new-command "staticFnAppTypeBasedHandCodedSDevNano"
-                     (fmt sdev-fn-app-twosomes-hc))
+
         (new-command "staticFnAppCoercionsMeanNano"
                      (fmt mean-fn-app-coercions))
-        #;
-        (new-command "staticFnAppCoercionsSDevNano"
-                     (fmt sdev-fn-app-coercions))
+
         (new-command "staticFnAppCoercionsHandCodedMeanNano"
-                     (fmt mean-fn-app-coercions-hc))
-        #;
-        (new-command "staticFnAppCoercionsHandCodedSDevNano"
-                     (fmt sdev-fn-app-coercions-hc)))))))
+                     (fmt mean-fn-app-coercions-hc))))))
+
+  (with-output-to-file
+    (build-path data-dir "table.tex")
+    #:exists 'replace
+    (lambda ()
+      (define (fmt-entry r s c)
+        (format "~a & ~a & ~a & ~a\\% \\\\\n\\hline\n"
+                r (fmt s) (fmt s) (exact-round (* 100 (/ (- s c) c)))))
+      (define (fmt-block t tbs tbc cs cc)
+        (string-append
+         (format "\\multicolumn{6}{|l|}{ ~a }\\\\\n\\hline\n" t)
+         (fmt-entry 'Type-Based tbs tbc)
+         (fmt-entry 'Coercions cs cc)))
+      (display
+       (string-append
+        "\\begin{tabular}{| l | r | r | r |}\n"
+        "\\hline\n"
+        "\\multicolumn{2}{c|}{Time in nanoseconds} & Overhead \\\\\n"
+        "\\cline{2-4}\n"
+        "\\ & Schml (S) & C & (S - C) / S \\\\\n\\hline\n" 
+        (fmt-block "Function Application"
+                      mean-fn-app-twosomes
+                      mean-fn-app-twosomes-hc
+                      mean-fn-app-coercions
+                      mean-fn-app-coercions-hc)
+        (fmt-block "Guarded Reference Read and Write"
+                   mean-ref-rw-twosomes
+                   mean-ref-rw-twosomes-hc
+                   mean-ref-rw-coercions
+                   mean-ref-rw-coercions-hc)
+        "\\end{tabular}\n")))))
+
 
 ;;  ;; (define ref-write-read-test
 ;;  ;;  (make-reference-wr-timing-loop '(GRef Int) '(GRef Dyn) 0 0))
@@ -521,7 +537,5 @@
        (display "make edits and run benchmark\n")))]
    ["--run" "Run the benchmark on generated code"
     (program-main
-     (lambda ()
-       (let ([results (analyze-results (run-static-benchmarks))])
-         (generate-documentation results))))]
+     (lambda () (analyze-results (run-static-benchmarks))))]
    #:args () ((program-main))))
