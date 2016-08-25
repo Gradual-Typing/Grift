@@ -6,9 +6,11 @@ test:
 	raco make -v run.rkt
 	racket run.rkt --test
 
-save:
+linux_save:
 	git rev-parse --verify HEAD > out/commit-hash.txt
-	tar -cf archive/`date -I`-snapshot.tar run.rkt plot.py src tmp out
+	cat /proc/cpuinfo > out/cpuinfo.txt
+	cat /proc/meminfo > out/meminfo.txt
+	tar -cf `date -I`-micro-partial.tar run.rkt plot.py src tmp out
 
 plot:
 	python plot.py

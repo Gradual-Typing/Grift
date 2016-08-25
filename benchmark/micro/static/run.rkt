@@ -372,7 +372,7 @@
     (lambda ()
       (define (fmt-entry r s c)
         (format "~a & ~a & ~a & ~a\\% \\\\\n\\hline\n"
-                r (fmt s) (fmt s) (exact-round (* 100 (/ (- s c) c)))))
+                r (fmt s) (fmt c) (exact-round (* 100 (/ (- s c) c)))))
       (define (fmt-block t tbs tbc cs cc)
         (string-append
          (format "\\multicolumn{6}{|l|}{ ~a }\\\\\n\\hline\n" t)

@@ -1,11 +1,21 @@
+// Note likely have to rename ids
 
 // Change for fn_app x 1
-int64_t u4_run_test(int64_t clos, int64_t i, int64_t acc) { 
+int64_t u3_run_test(int64_t clos, int64_t i, int64_t acc) { 
   int64_t id1_clos = ((int64_t*)clos)[2];
   int64_t (*id1)(int64_t, int64_t) = 
     (int64_t(*)(int64_t, int64_t)) ((int64_t*) id1_clos)[0];
   return id1(id1_clos, (1 + acc));
 }
+
+// change for ref x1
+int64_t u2_run_test(int64_t clos, int64_t i, int64_t acc) {
+  int64_t* b1 = ((int64_t**) clos)[2];
+  int64_t r1 = *b1;
+  *b1 = (1 + acc);
+  return r1;
+}
+
 
 int64_t u6_run_test(int64_t clos, int64_t i, int64_t acc) { 
   int64_t id1_clos = ((int64_t*)clos)[2];
@@ -52,12 +62,7 @@ int64_t u10_run_test(int64_t clos, int64_t i, int64_t acc) {
   return id4(id4_clos, tmp3);
 }
 
-int64_t u3_run_test(int64_t clos, int64_t i, int64_t acc) {
-  int64_t* b1 = ((int64_t**) clos)[2];
-  int64_t r1 = *b1;
-  *b1 = (1 + acc);
-  return r1;
-}
+
 
 int64_t u4_run_test(int64_t clos, int64_t i, int64_t acc) {
   int64_t* b1 = ((int64_t**) clos)[2];
