@@ -60,7 +60,7 @@ def violin_plot(data, x, y, widths, color, label, do_regression=None):
 
 # Function cast analysis
 # Reference cast analysis
-def cast_plot(fignum, test, rx, ry, calc_plot_bounds=None):
+def cast_plot(fignum, test, test_action, rx, ry, calc_plot_bounds=None):
     plt.figure(fignum)
     
     type_based_cast_data = np.genfromtxt('out/{}_Type-Based.txt'.format(test)
@@ -94,7 +94,7 @@ def cast_plot(fignum, test, rx, ry, calc_plot_bounds=None):
                                   , max(coercions_cast_data["time"])))
         
     plt.xlabel('Number of nodes in Coercion resulting from types ($N_c$)')
-    plt.ylabel('Time in nanoseconds per cast')
+    plt.ylabel('Time in $ns$ to perform {}'.format(test_action))
     plt.legend(handles=[ type_based_vplt
                          ,coercions_vplt
                          ,coercions_lplt]
@@ -106,10 +106,10 @@ def cast_plot(fignum, test, rx, ry, calc_plot_bounds=None):
         
     plt.savefig('out/{}-results.png'.format(test), bbox_inches='tight')
 
-cast_plot(1, "fn-cast", 80, 450,
+cast_plot(1, "fn-cast", "function cast", 80, 450,
           lambda lx, hx, ly, hy: [lx - 10, hx + 10, -25, hy + 10])
 
-cast_plot(2, "ref-cast", 40, 200, 
+cast_plot(2, "ref-cast", "reference cast", 40, 200, 
           lambda lx, hx, ly, hy: [lx - 10, hx + 10, 0, hy + 10])
     
 # type_based_cast_data = np.genfromtxt('out/fn-cast_Type-Based.txt'
@@ -145,7 +145,7 @@ cast_plot(2, "ref-cast", 40, 200,
 # plt.axis([0, max(coercions_cast_data["coercions"]) + 10
 #           , -100, max(coercions_cast_data["time"]) + 100])
 # plt.xlabel('Number of nodes in Coercion resulting from types ($N_c$)')
-# plt.ylabel('Time in nanoseconds per cast')
+# plt.ylabel('Time in $ns$ per cast')
 # legend = plt.legend(handles=[ type_based_vplt
 #                               ,coercions_vplt
 #                               ,coercions_lplt]
@@ -189,7 +189,7 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
                              min(t_data["titer"]),
                              max(t_data["titer"])))
     plt.xlabel('Number of casts before the {} ($N_i$)'.format(test_action))
-    plt.ylabel('Time in nanoseconds per {}'.format(test_action))
+    plt.ylabel('Time in $ns$ to {}'.format(test_action))
     plt.legend(handles=[ t_vplt
                          ,c_vplt
                          ,t_lplt]
@@ -201,10 +201,10 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
 
     plt.savefig('out/{}-by-casts-coercions=15.png'.format(test), bbox_inches='tight')
 
-use_by_casts_plot(3, "fn-app", 10, 275, "function application",
+use_by_casts_plot(3, "fn-app", 10, 275, "apply function",
                   lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])
 
-use_by_casts_plot(4, "ref-write-read", 1, 300, "guarded read and write",
+use_by_casts_plot(4, "ref-write-read", 1, 300, "write and read reference",
                   lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])               
 
                
@@ -232,7 +232,7 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
                          min(c_data["titer"]),
                          max(c_data["titer"])))
     plt.xlabel('Nodes in the Coercions needed to represent cast ($N_c$)')
-    plt.ylabel('Time in nanoseconds per {}'.format(test_action))
+    plt.ylabel('Time in $ns$ to {}'.format(test_action))
 
     legend = plt.legend(handles=[ t_vplt
                                   ,c_vplt
@@ -245,9 +245,9 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
         
     plt.savefig('out/{}-by-coercions-casts=1.png'.format(test), bbox_inches='tight')
 
-use_by_crcns_plot(5, "fn-app", 40, 140, "function application", 5,
+use_by_crcns_plot(5, "fn-app", 40, 140, "apply function", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy+10])
-use_by_crcns_plot(6, "ref-write-read", 40, 350, "guarded write and read", 5,
+use_by_crcns_plot(6, "ref-write-read", 40, 350, "write and read reference", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy +10])
 
 
