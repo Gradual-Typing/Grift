@@ -248,9 +248,9 @@ The type rules for core forms that have interesting type rules
 (define (gvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
-        [(Dyn) DYN-TYPE]
+        [(Dyn) UNIT-TYPE]
         [(GVect g) (if (consistent? g val-ty)
-                       val-ty
+                       UNIT-TYPE
                        (error 'type-check/todo))]
         [otherwise (error 'type-check/todo)])
       (error 'type-check/todo)))
