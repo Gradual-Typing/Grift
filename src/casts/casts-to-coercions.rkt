@@ -19,7 +19,7 @@ should be able to compile programs this the twosome casts for future comparison.
          "../language/coercion.rkt")
 
 (provide casts->coercions
-         mk-coercion
+         make-coercion
          (all-from-out "../language/cast0.rkt"
                        "../language/coercion.rkt"))
 
@@ -33,14 +33,14 @@ should be able to compile programs this the twosome casts for future comparison.
     (let ([exp (c2c-expr exp)])
       (Prog (list name next type) exp))))
 
-(: mk-coercion (->* (String) (Boolean) (Schml-Type Schml-Type -> Schml-Coercion)))
-(define ((mk-coercion lbl
+(: make-coercion (->* (String) (Boolean) (Schml-Type Schml-Type -> Schml-Coercion)))
+(define ((make-coercion lbl
                       [space-efficient-normal-form?
                        (and (space-efficient?)
                             (not (optimize-first-order-coercions?)))])
          t1 t2)
-  (define recur (mk-coercion lbl (space-efficient?)))
-  (logging mk-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
+  (define recur (make-coercion lbl (space-efficient?)))
+  (logging make-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
   (define result : Schml-Coercion
     (match* (t1 t2)
       [(t        t) IDENTITY]
@@ -66,7 +66,7 @@ should be able to compile programs this the twosome casts for future comparison.
       [((STuple n1 t1*) (STuple n2 t2*)) #:when (= n1 n2)
        (CTuple n1 (map recur t1* t2*))]
       [(_ _) (Failed lbl)]))
-  (logging mk-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
+  (logging make-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
 
 
@@ -76,7 +76,7 @@ should be able to compile programs this the twosome casts for future comparison.
   (match exp
     ;; The only Interesting Case
     [(Cast (app c2c-expr exp) (Twosome t1 t2 lbl))
-     (Cast exp (Coercion ((mk-coercion lbl) t1 t2)))]
+     (Cast exp (Coercion ((make-coercion lbl) t1 t2)))]
     ;; Everything else should be really boring
     [(Lambda f* (app c2c-expr exp))
      (Lambda f* exp)]
