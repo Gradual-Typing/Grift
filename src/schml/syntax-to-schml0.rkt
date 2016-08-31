@@ -68,7 +68,7 @@
     [(gbox gunbox gbox-set! gvector gvector-ref gvector-set!) #t]
     [(mbox munbox mbox-set! mvector mvector-ref mvector-set!) #t]
     [(tuple tuple-proj) #t]
-    [(+ - * binary-and binary-or < <= = >= > %/ %<< %>>) #t]
+    [(+ - * binary-and binary-or < <= = >= > %/ %% %<< %>>) #t]
     [(time timer-start timer-stop timer-report repeat) #t]
     [(read-int) #t]
     [else #f]))

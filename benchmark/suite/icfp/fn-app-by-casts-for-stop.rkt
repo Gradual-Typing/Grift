@@ -59,16 +59,16 @@ Configuaration variables
     (cond
       [(<= depth 0)
        (values
-        '(Int -> Int)
-        '(Dyn -> Dyn)
-        '(lambda ([x : Int]) x)
-        (lambda (f) `(,f 42)))]
+        'Int
+        'Dyn
+        42
+        (lambda (acc) acc))]
       [else
        (let-values ([(t1 t2 init use) (loop (sub1 depth))])
          (define t1^ `(,t1 -> ,t1))
          (define t2^ `(,t2 -> ,t2))
-         (define use^ (lambda (f) (use `(,f ,init))))
          (define init^ `(lambda ([x : ,t1]) x))
+         (define use^ (lambda (acc) (use `(,acc ,init))))
          (values t1^ t2^ init^ use^))])))
 
 

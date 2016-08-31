@@ -137,11 +137,15 @@
     (parameterize ([date-display-format 'iso-8601])
       (date->string (current-date))))
   
-  (define tex-file (build-path out-dir (string-append date-str "-dynamic" ".tex")))
+  (define def-tex-file
+    (build-path out-dir (string-append date-str "-times" ".tex")))
+  (define tab-tex-file
+    (build-path out-dir (string-append date-str "-table" ".tex")))
   (define log-file (build-path out-dir (string-append date-str "-dynamic" ".txt")))
 
   (define (new-command name output)
-    (format "newcommand{~a}{~a}\n" name output))
+    (string-replace (format "\\newcommand{\\~a}{~a}\n" name output)
+                    "-" ""))
   (define (stat->tex s)
     (match-define (list name (list c d?) mean sdev) s)
     (define stat-name (benchmark-configuration->string name c d?))
@@ -158,7 +162,7 @@
             (~r mean #:precision '(= 2))
             (~r sdev #:precision '(= 2))))
   
-  (call-with-output-file tex-file #:exists 'replace
+  (call-with-output-file def-tex-file #:exists 'replace
     (lambda (tex)
       (display (new-command "dynIterations" (number->string iterations)) tex)
       (display (new-command "dynRuns" (number->string number-of-runs)) tex)
@@ -171,6 +175,61 @@
           (for ([stat brs-no-stats])
             (display (stat->tex stat) tex)
             (display (stat->string stat) log))))))
+  
+  (with-output-to-file tab-tex-file #:exists 'replace
+    (lambda ()
+      (define (res-ref t c d)
+        (car (benchmark-results-stats-ref brs-no-stats t (list c d))))
+      (define mean-call-type-based
+        (res-ref 'Call 'Type-Based #f))
+      (define mean-call-type-based-with-dyn-ops
+        (res-ref 'Call 'Type-Based #t))
+      (define mean-call-coercions
+        (res-ref 'Call 'Coercions #f))
+      (define mean-call-coercions-with-dyn-ops
+        (res-ref 'Call 'Coercions #t))
+      (define mean-call-gambit
+        (res-ref 'Call 'Gambit #f))
+      (define mean-ref-type-based
+        (res-ref 'Ref 'Type-Based #f))
+      (define mean-ref-type-based-with-dyn-ops
+        (res-ref 'Ref 'Type-Based #t))
+      (define mean-ref-coercions
+        (res-ref 'Ref 'Coercions #f))
+      (define mean-ref-coercions-with-dyn-ops
+        (res-ref 'Ref 'Coercions #t))
+      (define mean-ref-gambit
+        (res-ref 'Ref 'Gambit #f))
+      (display
+       (string-append
+        "\\begin{tabular}{| l | r | r | r | r | r |}\n"
+        "\\hline\n"
+        " & "
+        "\\multicolumn{2}{c|}{Schml Type-Based} & "
+        "\\multicolumn{2}{c|}{Schml Coercions } & "
+        "\\multicolumn{1}{c|}{Gambit} \\\\\n"
+        "\\hline\n"
+        "Dynamic Operations & without & with & without & with & \\\\\n"
+        "\\hline\n"))
+      (printf
+       "Function Application & ~a & ~a & ~a & ~a & ~a \\\\\n"
+       (~r mean-call-type-based #:precision '(= 2))
+       (~r mean-call-type-based-with-dyn-ops #:precision '(= 2))
+       (~r mean-call-coercions  #:precision '(= 2))
+       (~r mean-call-coercions-with-dyn-ops  #:precision '(= 2))
+       (~r mean-call-gambit     #:precision '(= 2)))
+      (display "\\hline\n")
+      (printf
+       "Refercece Read \\& Write & ~a & ~a & ~a & ~a & ~a \\\\\n"
+       (~r mean-ref-type-based #:precision '(= 2))
+       (~r mean-ref-type-based-with-dyn-ops #:precision '(= 2))
+       (~r mean-ref-coercions  #:precision '(= 2))
+       (~r mean-ref-coercions-with-dyn-ops  #:precision '(= 2))
+       (~r mean-ref-gambit     #:precision '(= 2)))
+      (display
+       (string-append
+        "\\hline\n"
+        "\\end{tabular}\n"))))
   (pretty-print brs-no-stats))
 
 

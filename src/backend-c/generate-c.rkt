@@ -376,6 +376,7 @@
         [(%>>) (display " >> ")]
         [(%<<) (display " << ")]
         [(%/) (display " / ")]
+        [(%%) (display " % ")]
         [(binary-and) (display " & ")]
         [(binary-or)  (display " | ")]
         [(binary-xor) (display " ^ ")]

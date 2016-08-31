@@ -347,8 +347,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (or (timer-primitive? x)))
 
 (define-type IntxInt->Int-Primitive (U '* '+ '-
-                                        'binary-and 'binary-or 'binary-xor
-                                        '%/ '%>> '%<<))
+                                       'binary-and 'binary-or 'binary-xor
+                                       '%/ '%>> '%<< '%%))
 
 (define-type IxI->I-Prim IntxInt->Int-Primitive)
 

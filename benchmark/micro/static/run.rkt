@@ -19,10 +19,13 @@
 
 (define-runtime-path data-dir "out")
 (build-dir/check data-dir)
-(define-runtime-path tmp-dir "tmp")
+(define-runtime-path tmp-dir "tmp/logs")
 (build-dir/check tmp-dir)
-(define-runtime-path src-dir "src")
+(define-runtime-path src-dir "tmp/src")
 (build-dir/check src-dir)
+(define-runtime-path exe-dir "tmp/exe")
+(build-dir/check exe-dir)
+
 (define-runtime-path src-paths-file "src/schml.path-objects")
 
 ;; where is clang
@@ -76,7 +79,7 @@
 
 (define (configuration->exe-path test reps compiler hand-coded?)
   (define name (configuration->string test reps compiler hand-coded?))
-  (build-path tmp-dir name))
+  (build-path exe-dir name))
 
 (define (generate-fn-app-test-src n)
   (define-values (bnd* app)
@@ -119,6 +122,34 @@
    #:acc-init     0
    #:timed-action test
    #:use-acc-action use))
+
+(define (generate-vector-read-write-src num)
+  (define-values (bnd* test use)
+    (let loop ([n num]
+               [bnd* '()]
+               [test (lambda (i acc) `(+ 1 acc))]
+               [use (lambda (acc) acc)])
+      (if (= n 0)
+          (values bnd* test use)
+          (let ([boxn (string->symbol (format "b~a" n))]
+                [redn (string->symbol (format "r~a" n))]
+                [wrtn (string->symbol (format "w~a" n))])
+            (loop (sub1 n)
+                  `([,boxn : (GVect Int) (gvector 10000 iters)] . ,bnd*)
+                  (lambda (i acc)
+                    `(let ([j (%% ,i 10000)])
+                       (let ([,redn (gvector-ref ,boxn j)])
+                         (let ([,wrtn ,(test i acc)])
+                           (begin (gvector-set! ,boxn j ,wrtn) ,redn)))))
+                  (lambda (acc) `(+ (repeat [i 0 10000] [sum 0]
+                                      (+ (gvector-ref ,boxn i) sum))
+                                    ,acc)))))))
+    (make-timing-loop
+     #:let-bnds     bnd*
+     #:acc-type     'Int 
+     #:acc-init     0
+     #:timed-action test
+     #:use-acc-action use))
 
 
 (define (check-src-files-ready-to-run-benchmarks)
@@ -273,7 +304,7 @@
          [iterations (iterations-parameter)]
          [number-of-runs (runs-parameter)]
          [epsilon    (epsilon-parameter)])
-
+  
   (define (basic-stats xs ys)
     (values (mean xs) (stddev xs)
             (mean ys) (stddev ys)
@@ -350,7 +381,7 @@
         
         (new-command "staticRefCoercionsMeanNano"
                      (fmt mean-ref-rw-coercions))
-
+        
         (new-command "staticRefCoercionsHandCodedMeanNano"
                      (fmt mean-ref-rw-coercions-hc))
 
@@ -533,7 +564,7 @@
     (program-main
      (lambda ()
        (generate-benchmarks generate-fn-app-test-src 'fn-app)
-       (generate-benchmarks generate-ref-read-write-src 'ref-read-write)
+       (generate-benchmarks generate-vector-read-write-src 'ref-read-write)
        (display "make edits and run benchmark\n")))]
    ["--run" "Run the benchmark on generated code"
     (program-main

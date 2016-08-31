@@ -20,15 +20,18 @@
          #:use-acc-action use-acc-action ; (Symbol -> Schml-Expr)
          #:timed-action   timed-action)   ; (Symbol Symbol -> Schml-Expr)
   `(letrec ,letrec-bnds 
-     (let ([iters : Int (read-int)]
-           ,@let-bnds)
-       (letrec ([run-test
-                 : (Int ,acc-type -> ,acc-type)
-                 (lambda ([i : Int] [acc : ,acc-type])
-                   ,(timed-action 'i 'acc))])
-         ,(use-acc-action
-           `(time (repeat (i 0 iters) (acc : ,acc-type ,acc-init)
-                    (run-test i acc))))))))
+     (let ([iters : Int (read-int)])
+       ,(let make-let* ([b* let-bnds])
+          (if (null? b*)
+              `(letrec ([run-test
+                         : (Int ,acc-type -> ,acc-type)
+                         (lambda ([i : Int] [acc : ,acc-type])
+                           ,(timed-action 'i 'acc))])
+                 (let ([res (time (repeat (i 0 iters) (acc : ,acc-type ,acc-init)
+                                    (run-test i acc)))])
+                   ,(use-acc-action 'res)))
+              `(let (,(car b*))
+                 ,(make-let* (cdr b*))))))))
 
 (define timing-loop-example
   (make-timing-loop

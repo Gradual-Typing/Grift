@@ -28,6 +28,7 @@
    (test-file "core" "prim-bor.schml" (int 10))
    (test-file "core" "prim-shiftl.schml" (int 10))
    (test-file "core" "prim-shiftr.schml" (int 10))
+   (test-file "core" "mod1.schml" (int 42))
    ;; Primitive relational operators should test more corner cases
    (test-file "core" "prim-eq.schml" (bool #t))
    (test-file "core" "prim-lt.schml" (bool #t))

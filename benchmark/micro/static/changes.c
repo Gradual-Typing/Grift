@@ -8,6 +8,17 @@ int64_t u3_run_test(int64_t clos, int64_t i, int64_t acc) {
   return id1(id1_clos, (1 + acc));
 }
 
+int64_t u2_run_test(int64_t clos, int64_t i, int64_t acc) {
+  int64_t j = i % 10000;
+  int64_t* v1 = ((int64_t**) clos)[2];
+  if (j >= v1[0]) exit(EXIT_FAILURE);
+  int64_t r1 = v1[j + 1];
+  if (j >= v1[0]) exit(EXIT_FAILURE);
+  v1[j + 1] = (1 + acc);
+  return r1;
+            
+}
+
 // change for ref x1
 int64_t u2_run_test(int64_t clos, int64_t i, int64_t acc) {
   int64_t* b1 = ((int64_t**) clos)[2];
@@ -16,6 +27,16 @@ int64_t u2_run_test(int64_t clos, int64_t i, int64_t acc) {
   return r1;
 }
 
+
+
+int64_t u2_run_test(int64_t clos, int64_t i, int64_t acc) {
+  int64_t* v1 = ((int64_t**) clos)[2];
+  if (i >= v1[0]) exit(EXIT_FAILURE);
+  int64_t r1 = v1[i + 1];
+  if (i >= v1[0]) exit(EXIT_FAILURE);
+  v1[i + 1] = (1 + acc);
+  return r1;
+}
 
 int64_t u6_run_test(int64_t clos, int64_t i, int64_t acc) { 
   int64_t id1_clos = ((int64_t*)clos)[2];
