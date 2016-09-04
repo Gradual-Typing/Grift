@@ -133,11 +133,13 @@ avg()
 {
     local avg_sum=0
     local avg_i
+    # echo $1
     for avg_i in `seq $loops`; do
 	avg_t=$(eval $1)
 	avg_sum=$(echo "scale=$precision;$avg_sum+$avg_t" | bc)
     done
     RETURN=$(echo "scale=$precision;$avg_sum/$loops" | bc)
+    # echo $RETURN
 }
 
 
@@ -193,6 +195,7 @@ for f in $tmpdir/static/*.schml; do
     ct=$RETURN
     cr=$(echo "$ct/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n",p, $0}')
     
+    
     c="$command3 | sed -n '3,3s/ *\\([0-9]*\\).*/\\1/p' | awk -v c="$c1" -v p="$precision"  '{printf(\"%.*f\\n\",p, \$1*c)}'"
     avg "$c"
     gt=$RETURN
@@ -217,27 +220,28 @@ for f in $tmpdir/static/*.schml; do
     avg "$c22"
     t22=$RETURN
     typed_untyped_ratio_tb=$(echo "$t21/$t22" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
-    echo $t21 $t22
 
     cr_t=$(echo $cr | awk '{printf "%.2f\n",$0}');gr_t=$(echo $gr | awk '{printf "%.2f\n",$0}')
     lpc_t=$(echo "$less_precise_count/1000000000" | bc -l | awk '{printf "%.2f\n",$0}')
-    
-    usability_code="$usability_code;unset tics;unset border;set yrange [0:1];set xrange [0:1];\
+
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+      	   `"enhanced color font 'Verdana,10' ;"`
+    	   `"set output '$outdir/cumperflattice/${names[$in]}.png';"`
+	   `"unset key;set border 15 back;"`
+      	   `"set title \"\";"`
+    	   `"set xrange [0:10]; set yrange [0:${n}];"`
+    	   `"set xtics nomirror (\"1x\" 1,\"\" 2,\"\" 3,\"\" 4,\"\" 5, \"6x\" 6,\"\" 7, \"\" 8, \"\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
+    	   `"set ytics nomirror 0,200;"`
+	   `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
+    	   `"plot '$logfile2' using 1:2 with lines lw 2 lc rgb \"red\" title '' smooth cumulative,"`
+    	   `"'$logfile4' using 1:2 with lines lw 2 lc rgb \"blue\" title '' smooth cumulative"
+
+    "unset tics;unset border;set yrange [0:1];set xrange [0:1];\
      	   LABEL = \"{/Verdana:Bold ${names[$in]}}\nlattice size\n\nClang\nGambit-C\n\ntyped/untyped ratio\nmin. slowdown\nmax. slowdown\nmean slowdown\";\
-	   set label $((in+1)) at .8,1 LABEL front right font 'Verdana,13';plot sqrt(-1);unset label $((in+1));\
+	   set label 1 at .8,1 LABEL front right font 'Verdana,13';plot sqrt(-1);unset label 1;\
 	   unset tics;unset border;set yrange [0:1];set xrange [0:2.5];\
      	   LABEL = \"(${type_constructor_count} type nodes)\n${lpc_t} B\n\n${cr_t}x\n${gr_t}x\n\n${typed_untyped_ratio_tb}x\t${typed_untyped_ratio_c}x\n${min_tb}x\t${min_c}x\n${max_tb}x\t${max_c}x\n${mean_tb}x\t${mean_c}x\";\
-	   set label $((in+1)) at 0,1 LABEL front left font 'Verdana,13';plot sqrt(-1);unset label $((in+1));\
-	   set multiplot next;\
-    	   set border 15 back; \
-    	   set title \"\"; \
-    	   set xrange [0:10]; set yrange [0:${n}]; \
-    	   set xtics nomirror (\"1x\" 1,\"\" 2,\"\" 3,\"\" 4,\"\" 5, \"6x\" 6,\"\" 7, \"\" 8, \"\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20); \
-    	   set ytics nomirror 0,200; \
-	   set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2; \
-	   set rmargin 2;\
-    	   plot '$logfile2' using 1:2 with lines lw 2 title '' smooth cumulative, \
-    	   '$logfile4' using 1:2 with lines lw 2 title '' smooth cumulative; unset arrow; set multiplot next"
+	   set label 2 at 0,1 LABEL front left font 'Verdana,13';plot sqrt(-1);unset label 2;"
 
     scatter_code="$scatter_code;set yrange [0:100];\
     	   set title \"${names[$in]}\"; \
@@ -249,31 +253,11 @@ for f in $tmpdir/static/*.schml; do
     let in=in+1
 done
 
-legend="ofs_x = 0.5;\
-dx = 40;\
-set yrange [0:4];set xrange [0:20];unset tics; unset border;\
-set rmargin 0;set lmargin 0;\
-set label $((in+1)) at .5,4.5 \"x-axis: slowdown\" front left font 'Verdana,16';\
-set label $((in+2)) at 5,4.5 \"y-axis: # configs\" front left font 'Verdana,16';\
-set label $((in+3)) at 11.3,4.5 \"Coercions\" front left font 'Verdana,16';set arrow from 14,4.5 to 15,4.5 nohead lc rgb \"red\";\
-set label $((in+4)) at 15.5,4.5 \"Type-based\" front left font 'Verdana,16';set arrow from 18.5,4.5 to 19.5,4.5 nohead lc rgb \"blue\";\
-plot sqrt(-1);"
 
-gnuplot -e "w = 300 * ($in+1);set datafile separator \",\"; set terminal pngcairo size 880,w "`
-      	    `"enhanced color font 'Verdana,10' ;"`
-    	   `"set output '$outdir/usability.png'; "`
-	   `"x = $in + 1;set multiplot layout x,5 margins 0.15,.95,0.1,0.98 spacing 0,0.08; unset key $usability_code"`
-	   `";$legend"
-
-let h=($in+1)*300-270
-convert $outdir/usability.png -crop 880x$h new.png
-rm new-1.png;mv new-0.png $outdir/usability.png
-
-
-gnuplot -e "w = 400 * $in;set datafile separator \",\"; set terminal pngcairo size 500,w "`
-      	    `"enhanced color font 'Verdana,10' ;"`
-    	   `"set output '$outdir/scatter.png'; "`
-	   `"set multiplot layout $in,1 $scatter_code"
+# gnuplot -e "w = 400 * $in;set datafile separator \",\"; set terminal pngcairo size 500,w "`
+#       	    `"enhanced color font 'Verdana,10' ;"`
+#     	   `"set output '$outdir/scatter.png'; "`
+# 	   `"set multiplot layout $in,1 $scatter_code"
 
 #---------------------------------------------------------------------
 

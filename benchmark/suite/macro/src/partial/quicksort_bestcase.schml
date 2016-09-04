@@ -31,6 +31,7 @@
                                    (gvector-set! a i (gvector-ref a j))
                                    (gvector-set! a j t)))))])
       (begin
-        INITIALIZE-VECTOR
+        (repeat (i 0 size) (_ ())
+                (gvector-set! a i (read-int)))
         (time (sort a 0 (- iters 1)))
         (gvector-ref a (- iters 1))))))

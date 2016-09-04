@@ -8,9 +8,13 @@
 # imagemagick
 # gnuplot
 
+# It takes the following arguments:
+# number of samples
+# number of times each program will run
+
 set -euo pipefail
 
-loops=5
+loops=${2:-5}
 precision=5
 schml_mem_limit1=999999
 schml_mem_limit2=9999999999
@@ -22,15 +26,15 @@ usable=10
 #---------------------------------------------------------------------
 # quicksort worstcase parameters
 quicksort_worstcase_array_len=1000
-quicksort_worstcase_nsamples=1000
+quicksort_worstcase_nsamples=${1:-1000}
 
 # quicksort bestcase parameters
 quicksort_bestcase_array_len=1000
-quicksort_bestcase_nsamples=1000
+quicksort_bestcase_nsamples=${1:-1000}
 
 # matrix multiplication parameters
 matmult_mat_side_len=200
-matmult_nsamples=1000
+matmult_nsamples=${1:-1000}
 
 # --------------------------------------------------------------------
 date=`date +%Y_%m_%d_%H_%M_%S`
@@ -110,6 +114,19 @@ printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
 printf "Arg_array_len\t:%s\n" "$quicksort_bestcase_array_len" >> $paramfile
 printf "Arg_nsamples\t:%s\n" "$quicksort_bestcase_nsamples" >> $paramfile
 
+f=""
+s=""
+n=$(($quicksort_bestcase_array_len-1))
+for i in `seq 0 $n`; do
+    # x=$(perl -e 'print int rand $quicksort_bestcase_array_len, "\n"; ')
+    x=$(( ( RANDOM % $quicksort_bestcase_array_len )  + 1 ))
+    f="$f\n$x"
+    s="$s $x"
+done
+
+echo -e $f > $tmpdir/nums
+f="$quicksort_bestcase_array_len $s"
+
 benchmark_rkt="$tmpdir/rkt/$benchmark"
 raco make $benchmark_rkt.rkt
 quicksort_bestcase_rkt_command="racket $benchmark_rkt.rkt $quicksort_bestcase_array_len"
@@ -122,22 +139,7 @@ benchmark_gambit="$tmpdir/gambit/$benchmark"
 gsc -exe -cc-options -O3 $benchmark_gambit.scm
 quicksort_bestcase_gambit_command="$benchmark_gambit $quicksort_bestcase_array_len"
 
-quicksort_bestcase_schml_arg=$quicksort_bestcase_array_len
-
-s=""
-f=""
-n=$(($quicksort_bestcase_array_len-1))
-for i in `seq 0 $n`; do
-    # x=$(perl -e 'print int rand $quicksort_bestcase_array_len, "\n"; ')
-    x=$(( ( RANDOM % $quicksort_bestcase_array_len )  + 1 ))
-    f="$f\n$x"
-    s="$s\n(gvector-set! a $i $x)"
-done
-
-echo -e $f > $tmpdir/nums
-
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/static/$benchmark.schml
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/dyn/$benchmark.schml
+quicksort_bestcase_schml_arg=$f
 
 # ---------------------------------
 # preparing the matmult benchmark
