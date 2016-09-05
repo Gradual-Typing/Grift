@@ -64,23 +64,42 @@ done
 echo "iterations,time coercions, time twosomes" > $logfile
 paste -d"," log1 log2 log3 >> $logfile
 
-gnuplot -e "set datafile separator \",\"; set term tikz standalone color; "`
-	   `"set output '$outdir/${name}.tex'; "`
-	   `"set border back; "`
+gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 'Verdana,10'; "`
+	   `"set output '$outdir/${name}.png'; "`
 	   `"set key left top;"`
-	   `"set title \"\"; "`
-	   `"set xrange [0:10000]; set yrange [0:5100]; "`
+	   `"set title \"Coercions vs Type-based casts performance comparison for quicksort worst case\"; "`
 	   `"set xlabel \"length of the array\"; "`
 	   `"set ylabel \"time in seconds\"; "`
-	   `"set xtics nomirror (10,100,1000,5000,8000,10000); "`
+	   `"set xtics nomirror; "`
 	   `"set ytics nomirror; "`
-	   `"plot '$logfile' using 1:2 with lp lw 3 lc rgb \"blue\" title 'Coercions', "`
-	   `"'$logfile' using 1:3 with lp lw 3 lc rgb \"red\" title 'Type-based casts'"
+	   `"set logscale y;"`
+	   `"set format y \"%.4f\";"`
+	   `"plot '$logfile' using 1:2 with lp lw 3 title 'Coercions', "`
+	   `"'$logfile' using 1:3 with lp lw 3 title 'Type-based casts'"
 
-# compile tex code
+gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 'Verdana,10'; "`
+	   `"set output '$outdir/${name}_coercions_fitting.png'; "`
+	   `"set key left top;"`
+	   `"f(x) = a*x**2 + b*x + c;"`
+	   `"set title \"Coercions runtimes fitted by a 2nd degree polynomial\"; "`
+	   `"set xlabel \"length of the array\"; "`
+	   `"set ylabel \"time in seconds\"; "`
+	   `"set xtics nomirror; "`
+	   `"set ytics nomirror; "`
+	   `"fit f(x) '$logfile' using 1:2 via a, b, c;"`
+	   `"plot '$logfile' using 1:2 with lp lw 3 title 'Coercions', "`
+	   `"f(x) ls 4 title '2nd-degree polynomial'"
 
-cp $miscdir/* $tmpdir
-cp $outdir/${name}.tex $tmpdir
-cd $tmpdir
-lualatex --interaction=nonstopmode ${name}.tex
-mv ${name}.pdf $outdir
+gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 'Verdana,10'; "`
+	   `"set output '$outdir/${name}_typebased_fitting.png'; "`
+	   `"set key left top;"`
+	   `"f(x) = a*x**3 + b*x**2 + c*x + d;"`
+	   `"set title \"Type-based casts runtimes fitted by a 3nd degree polynomial\"; "`
+	   `"set xlabel \"length of the array\"; "`
+	   `"set ylabel \"time in seconds\"; "`
+	   `"set xtics nomirror; "`
+	   `"set ytics nomirror; "`
+	   `"fit f(x) '$logfile' using 1:3 via a, b, c, d;"`
+	   `"set style line 2 lw 3 lt 2;"`
+	   `"plot '$logfile' using 1:3 with lp ls 2 title 'Type-based casts', "`
+	   `"f(x) ls 4 title  '3rd-degree polynomial'"

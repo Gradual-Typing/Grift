@@ -227,28 +227,39 @@ for f in $tmpdir/static/*.schml; do
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
     	   `"set output '$outdir/cumperflattice/${names[$in]}.png';"`
-	   `"unset key;set border 15 back;"`
-      	   `"set title \"\";"`
+	   `"set border 15 back;"`
+      	   `"set title \"${names[$in]}\";"`
     	   `"set xrange [0:10]; set yrange [0:${n}];"`
-    	   `"set xtics nomirror (\"1x\" 1,\"\" 2,\"\" 3,\"\" 4,\"\" 5, \"6x\" 6,\"\" 7, \"\" 8, \"\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
+    	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
     	   `"set ytics nomirror 0,200;"`
 	   `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
-    	   `"plot '$logfile2' using 1:2 with lines lw 2 lc rgb \"red\" title '' smooth cumulative,"`
-    	   `"'$logfile4' using 1:2 with lines lw 2 lc rgb \"blue\" title '' smooth cumulative"
+    	   `"plot '$logfile2' using 1:2 with lines lw 2 title 'Coercions' smooth cumulative,"`
+    	   `"'$logfile4' using 1:2 with lines lw 2 title 'Type-based casts' smooth cumulative"
 
-    "unset tics;unset border;set yrange [0:1];set xrange [0:1];\
-     	   LABEL = \"{/Verdana:Bold ${names[$in]}}\nlattice size\n\nClang\nGambit-C\n\ntyped/untyped ratio\nmin. slowdown\nmax. slowdown\nmean slowdown\";\
-	   set label 1 at .8,1 LABEL front right font 'Verdana,13';plot sqrt(-1);unset label 1;\
-	   unset tics;unset border;set yrange [0:1];set xrange [0:2.5];\
-     	   LABEL = \"(${type_constructor_count} type nodes)\n${lpc_t} B\n\n${cr_t}x\n${gr_t}x\n\n${typed_untyped_ratio_tb}x\t${typed_untyped_ratio_c}x\n${min_tb}x\t${min_c}x\n${max_tb}x\t${max_c}x\n${mean_tb}x\t${mean_c}x\";\
-	   set label 2 at 0,1 LABEL front left font 'Verdana,13';plot sqrt(-1);unset label 2;"
+    echo "\begin{tabular}{|l|l|l|}
+\hline
+\textbf{${names[$in]}} & \multicolumn{2}{l|}{(${type_constructor_count} type nodes)} \\\ \hline
+lattice size                & \multicolumn{2}{l|}{${lpc_t} B}         \\\ \hline
+\multicolumn{3}{|l|}{}                                             \\\ \hline
+Clang                       & \multicolumn{2}{l|}{${cr_t}x}           \\\ \hline
+Gambit-C                    & \multicolumn{2}{l|}{${gr_t}x}           \\\ \hline
+\multicolumn{3}{|l|}{}                                             \\\ \hline
+typed/untyped ratio         & ${typed_untyped_ratio_tb}x             & ${typed_untyped_ratio_tb}x            \\\ \hline
+min. slowdown               & ${min_tb}x             & ${min_c}x            \\\ \hline
+max. slowdown               & ${max_tb}x             & ${max_c}x            \\\ \hline
+mean slowdown               & ${mean_tb}x             & ${mean_c}x            \\\ \hline
+\end{tabular}
+\end{table}" > $outdir/cumperflattice/${names[$in]}.tex
 
-    scatter_code="$scatter_code;set yrange [0:100];\
-    	   set title \"${names[$in]}\"; \
-	   set xlabel \"slowdown\";\
-	   set ylabel \"How much of the code is typed\";\
-    	   plot '$logfile1' using 4:(100-\$2) with points title 'Coercions', \
-    	   '$logfile3' using 4:(100-\$2) with points title 'Type-based casts'"
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+      	   `"enhanced color font 'Verdana,10' ;"`
+    	   `"set output '$outdir/perflattice/${names[$in]}.png';"`
+    	   `"set yrange [0:100];"`
+    	   `"set title \"${names[$in]}\";"`
+	   `"set xlabel \"slowdown\";"`
+	   `"set ylabel \"How much of the code is typed\";"`
+    	   `"plot '$logfile1' using 4:(100-\$2) with points title 'Coercions',"`
+    	   `"'$logfile3' using 4:(100-\$2) with points title 'Type-based casts'"
 
     let in=in+1
 done
