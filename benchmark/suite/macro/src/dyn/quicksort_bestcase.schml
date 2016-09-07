@@ -1,0 +1,36 @@
+(let ([size : Dyn (read-int)])
+  (let ([a : Dyn (gvector size 1)])
+    (letrec ([sort : Dyn
+                   (lambda ([a : Dyn] [p : Dyn] [r : Dyn])
+                     (if (< p r)
+                         (let ([q : Dyn (partition a p r)])
+                           (begin
+                             (sort a p (- q 1))
+                             (sort a (+ q 1) r)))
+                         ()))]
+             [partition : Dyn
+                        (lambda ([a : Dyn] [p : Dyn] [r : Dyn])
+                          (let ([i : Dyn (gbox (- p 1))]
+                                [x : Dyn (gvector-ref a r)])
+                            (begin
+                              (repeat (j p r) (_ ())
+                                      (if (<= (gvector-ref a j) x)
+                                          (begin
+                                            (gbox-set! i (+ (gunbox i) 1))
+                                            (swap a (gunbox i) j))
+                                          ()))
+                              (swap a (+ (gunbox i) 1) r)
+                              (+ (gunbox i) 1))))]
+             [swap : Dyn
+                   (lambda ([a : Dyn] [i : Dyn] [j : Dyn])
+                     (if (= i j)
+                         ()
+                         (let ([t : Dyn (gvector-ref a i)])
+                           (begin
+                             (gvector-set! a i (gvector-ref a j))
+                             (gvector-set! a j t)))))])
+      (begin
+        (repeat (i 0 size) (_ ())
+                (gvector-set! a i (read-int)))
+        (time (sort a 0 (- size 1)))
+        (gvector-ref a (- size 1))))))
