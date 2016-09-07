@@ -1,13 +1,14 @@
 import numpy as np
 import matplotlib as mpl
 
-latex_output = True
+latex_output = False
+show_regression = True
 
 if latex_output:
     mpl.use('PDF')
     mpl.rc('font',**{'family':'serif','serif':['Computer Modern Roman']})
     mpl.rc('text', usetex=True)
-
+    
 mpl.rcParams.update({'font.size': 15})
     
 import matplotlib.pyplot  as plt
@@ -38,7 +39,7 @@ def violin_plot(data, x, y, widths, color, label, do_regression=None):
     
     vplt_fake = set_violin_color_label(vplt, color, label)
     
-    if do_regression:
+    if do_regression and show_regression:
         color, x_name, l_label, eq_x, eq_y = do_regression
         lreg = np.polyfit(data[x] , data[y] , 1)
         lplt = plt.plot(data[x]
@@ -53,10 +54,9 @@ def violin_plot(data, x, y, widths, color, label, do_regression=None):
             
         lplt_fake = mlines.Line2D([],[],color=color, label=l_label)
         lplt_txt  = plt.text(eq_x, eq_y, lplt_eq, color=color)
-        
         return (vplt_fake, lplt_fake)
     else:
-        return vplt_fake
+        return (vplt_fake, None)
 
 # Function cast analysis
 # Reference cast analysis
@@ -66,13 +66,17 @@ def cast_plot(fignum, test, test_action, rx, ry, calc_plot_bounds=None):
     type_based_cast_data = np.genfromtxt('out/{}_Type-Based.txt'.format(test)
                                          , dtype=(int, int, float)
                                          , names="types, coercions, time"
-                                         , usecols=("coercions, time"))                     
-    type_based_vplt = violin_plot(type_based_cast_data
-                                  , "coercions"
-                                  , "time"
-                                  , 7
-                                  , "blue"
-                                  , "Type-Based Casts")
+                                         , usecols=("coercions, time"))
+
+    reg_params = ("purple" , "$N_c$" , "Linear Model of Type-Based"
+                  , rx ,  ry - 100)
+    type_based_vplt, type_based_lplt = violin_plot(type_based_cast_data
+                                                   , "coercions"
+                                                   , "time"
+                                                   , 7
+                                                   , "blue"
+                                                   , "Type-Based Casts"
+                                                   ,do_regression=reg_params)
 
     coercions_cast_data = np.genfromtxt('out/{}_Coercions.txt'.format(test)
                                         , dtype=(int, int, float)
@@ -87,17 +91,23 @@ def cast_plot(fignum, test, test_action, rx, ry, calc_plot_bounds=None):
                                                  , "green"
                                                  , "Coercions"
                                                  ,do_regression=reg_params)
+    
     if calc_plot_bounds:
         plt.axis(calc_plot_bounds(min(coercions_cast_data["coercions"])
                                   , max(coercions_cast_data["coercions"])
                                   , min(coercions_cast_data["time"])
                                   , max(coercions_cast_data["time"])))
         
-    plt.xlabel('Number of nodes in Coercion resulting from types ($N_c$)')
+    plt.xlabel('Number of nodes in Coercion resulting from types')
     plt.ylabel('Time in $ns$ to perform {}'.format(test_action))
-    plt.legend(handles=[ type_based_vplt
-                         ,coercions_vplt
-                         ,coercions_lplt]
+
+    hs = [ type_based_vplt
+           ,coercions_vplt]
+    
+    if show_regression:
+        hs.extend([coercions_lplt, type_based_lplt])
+
+    plt.legend(handles=hs
                , loc="upper left"
                , shadow=True)
 
@@ -105,6 +115,9 @@ def cast_plot(fignum, test, test_action, rx, ry, calc_plot_bounds=None):
         plt.savefig('out/{}-results'.format(test), bbox_inches='tight')
         
     plt.savefig('out/{}-results.png'.format(test), bbox_inches='tight')
+
+    print test, "type-based", np.mean(type_based_cast_data["time"])
+    print test, "coercions", np.mean(coercions_cast_data["time"])
 
 cast_plot(1, "fn-cast", "function cast", 80, 450,
           lambda lx, hx, ly, hy: [lx - 10, hx + 10, -25, hy + 10])
@@ -173,26 +186,31 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
     reg_params = ("red", "$N_i$", "Linear Model of Type-Based Casts", rx, ry)
     
     t_vplt, t_lplt = violin_plot(t_data
-                                 ,"casts"
-                                 ,"titer"
-                                 , 0.5
-                                 , "blue"
-                                 , "Type-Based Casts"
-                                 ,do_regression=reg_params)
+                         ,"casts"
+                         ,"titer"
+                         , 0.5
+                         , "blue"
+                         , "Type-Based Casts"
+                         ,do_regression=reg_params)
 
-    c_vplt = violin_plot(c_data ,"casts" ,"titer" , 0.5
-                         , "green" , "Coercions")
+    reg_params = ("purple", "$N_i$", "Linear Model of Coercions", rx, ry - 100)
+    c_vplt, c_lplt = violin_plot(c_data ,"casts" ,"titer" , 0.5
+                               , "green" , "Coercions", do_regression=reg_params)
 
     if calc_bounds:
         plt.axis(calc_bounds(min(c_data["casts"]),
                              max(c_data["casts"]),
                              min(t_data["titer"]),
                              max(t_data["titer"])))
-    plt.xlabel('Number of casts before the {} ($N_i$)'.format(test_action))
+    plt.xlabel('Number of casts before the {}'.format(test_action))
     plt.ylabel('Time in $ns$ to {}'.format(test_action))
-    plt.legend(handles=[ t_vplt
-                         ,c_vplt
-                         ,t_lplt]
+
+    hs = [ t_vplt ,c_vplt]
+
+    if show_regression:
+        hs.extend([t_lplt, c_lplt])
+    
+    plt.legend(handles=hs
                , loc="upper left"
                , shadow=True)
 
@@ -200,7 +218,13 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
         plt.savefig('out/{}-by-casts-coercions=15'.format(test), bbox_inches='tight')
 
     plt.savefig('out/{}-by-casts-coercions=15.png'.format(test), bbox_inches='tight')
-
+    c_data_odd = [t for c, t in c_data if not 0 == c % 2]
+    c_data_even = [t for c, t in c_data if 0 == c % 2]
+    
+    print test, "type-based", np.mean(t_data["titer"])
+    print test, "coercions odd", np.mean(c_data_odd)
+    print test, "coercions even", np.mean(c_data_even)
+    
 use_by_casts_plot(3, "fn-app", 10, 275, "apply function",
                   lambda lx, hx, ly, hy: [-.5, hx + .5, -10, 1250])
 
@@ -220,31 +244,41 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
                            , names="casts, types, coercions, trun, titer"
                            , usecols=("coercions, titer"))
 
-    t_vplt = violin_plot(t_data ,"coercions" ,"titer"
-                         ,w ,"blue" ,"Type-Based Casts")
+    reg_params = ("purple" , "$N_c$" , "Linear Model of Type-Based" , rx ,  ry - 100)
+    t_vplt, t_lplt = violin_plot(t_data ,"coercions" ,"titer"
+                               ,w ,"blue" ,"Type-Based Casts"
+                               , do_regression=reg_params)
 
     reg_params = ("red" , "$N_c$" , "Linear Model of Coercions" , rx ,  ry)
     c_vplt, c_lplt = violin_plot(c_data ,"coercions" ,"titer" ,w
-                                 ,"green" ,"Coercions" ,do_regression=reg_params)
+                                 ,"green" ,"Coercions", do_regression=reg_params)
 
     plt.axis(calc_bounds(min(c_data["coercions"]),
                          max(c_data["coercions"]),
                          min(c_data["titer"]),
                          max(c_data["titer"])))
-    plt.xlabel('Nodes in the Coercions needed to represent cast ($N_c$)')
+    plt.xlabel('Nodes in the Coercions needed to represent cast')
     plt.ylabel('Time in $ns$ to {}'.format(test_action))
 
-    legend = plt.legend(handles=[ t_vplt
-                                  ,c_vplt
-                                  ,c_lplt]
-                        , loc="upper left"
-                        , shadow=True)
+
+    hs = [t_vplt, c_vplt]
+
+    if show_regression :
+        hs.extend([t_lplt, c_lplt])
+    
+    legend = plt.legend(handles=hs , loc="upper left" , shadow=True)
 
     if latex_output:
         plt.savefig('out/{}-by-coercions-casts=1'.format(test), bbox_inches='tight')
         
     plt.savefig('out/{}-by-coercions-casts=1.png'.format(test), bbox_inches='tight')
 
+    t_data_gt10 = [t for (c, t) in t_data if c > 10]
+    print test, "type-based", np.mean(t_data["titer"])
+    print test, "type-based > 10", np.mean(t_data_gt10)
+    print test, "coercions", np.mean(c_data["titer"])
+    
+    
 use_by_crcns_plot(5, "fn-app", 40, 140, "apply function", 5,
                   lambda lx, hx, ly, hy: [lx-10, hx+10, ly-10, hy+10])
 use_by_crcns_plot(6, "ref-write-read", 40, 350, "write and read reference", 5,

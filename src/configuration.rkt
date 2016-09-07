@@ -16,6 +16,9 @@
 (: dynamic-operations? (Parameterof (U Boolean 'inline)))
 (define dynamic-operations? (make-parameter #t))
 
+(: specialize-cast-code-generation? (Parameterof Boolean))
+(define specialize-cast-code-generation? (make-parameter #f))
+
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof (Option Path))
   (make-parameter #f))
@@ -28,23 +31,9 @@
 
 ;; Interaction with the c compiler
 (define c-flags : (Parameterof (Listof String))
-  (make-parameter '()))
+  (make-parameter '("-Wno-int-conversion" "-Wno-format" "-Wno-unused-value")))
 ;; where is the runtime to be used located
 (define runtime-path : (Parameterof (Option Path)) (make-parameter #f))
 
-
-#;
-(struct Config
-  ([source-path : Path]
-   [blame-semantics : Blame-Semantics]
-   [exec-path : Path]
-   [c-path : Path]
-   [keep-c : Boolean]
-   [c-flags : (Listof String)]
-   [asm-path : (Option Path)]
-   [cast-rep : Cast-Representation]
-   [mem-limit : Natural]
-   [runtime-path : (Option Path)])
-  #:transparent)
 
 

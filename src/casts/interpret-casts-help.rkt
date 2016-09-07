@@ -51,13 +51,25 @@
       (if (Quote-literal t) c a)
       (If t c a)))
 
+;; Warning and$ doesn't evaluate the first expression
+;; if the second is the literal false
 (: and$ (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (and$ fst snd)
-  (if$_ fst snd (Quote #f)))
+  (match* (fst snd)
+    [((Quote #f) _) fst]
+    [(_ (Quote #f)) snd]
+    [((Quote #t) _) snd]
+    [(_ (Quote #t)) fst]
+    [(_ _) (If fst snd (Quote #f))]))
 
 (: or$ (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (or$ fst snd)
-  (if$_ fst (Quote #t) snd))
+  (match* (fst snd)
+    [((Quote #f) _) snd]
+    [(_ (Quote #f)) fst]
+    [((Quote #t) _) fst]
+    [(_ (Quote #t)) snd]
+    [(_ _) (If fst snd (Quote #f))]))
 
 (define-syntax cond$
   (syntax-rules (else)
@@ -315,14 +327,14 @@
 (define-syntax-rule
   (define-smart-type? (name compile-time? run-time?) ...)
   (begin
-    (: name (CoC3-Expr -> CoC3-Expr)) ...
-    (define (name x)
-      (if (not (Type? x))
-          (run-time? x)
-          (let ([x (Type-type x)])
-            (if (compile-time? x)
-                (Quote #t)
-                (Quote #f))))) ...))
+    (begin
+      (: name (CoC3-Expr -> CoC3-Expr))
+      (define (name x)
+        (if (not (Type? x))
+            (run-time? x)
+            (let ([x (Type-type x)])
+              (Quote (compile-time? x))))))
+    ...))
 
 (define-smart-type?
   (dyn?$    Dyn?    Type-Dyn-Huh)
@@ -338,7 +350,7 @@
       (let ([x (Type-type x)])
         (if (Fn? x)
             (Quote (Fn-arity x))
-            (error 'fnT-arity$ "given ~a" x)))))
+            (error 'tupleT-num$ "given ~a" x)))))
 
 (: tupleT-num$ (CoC3-Expr -> CoC3-Expr))
 (define (tupleT-num$ x)

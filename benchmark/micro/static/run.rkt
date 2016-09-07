@@ -406,7 +406,7 @@
                 r (fmt s) (fmt c) (exact-round (* 100 (/ (- s c) c)))))
       (define (fmt-block t tbs tbc cs cc)
         (string-append
-         (format "\\multicolumn{6}{|l|}{ ~a }\\\\\n\\hline\n" t)
+         (format "\\multicolumn{4}{|l|}{ ~a }\\\\\n\\hline\n" t)
          (fmt-entry 'Type-Based tbs tbc)
          (fmt-entry 'Coercions cs cc)))
       (display
@@ -415,7 +415,10 @@
         "\\hline\n"
         "\\multicolumn{2}{c|}{Time in nanoseconds} & Overhead \\\\\n"
         "\\cline{2-4}\n"
-        "\\ & Schml (S) & C & (S - C) / S \\\\\n\\hline\n" 
+        "& \\multicolumn{1}{c|}{Schml (S)} "
+        "& \\multicolumn{1}{c|}{C} "
+        "& \\multicolumn{1}{c|}{(S - C) / S} "
+        "\\\\\n\\hline\n"
         (fmt-block "Function Application"
                       mean-fn-app-twosomes
                       mean-fn-app-twosomes-hc

@@ -63,6 +63,8 @@
  (for ([cast-rep : Cast-Representation (test-cast-representation)])
    (parameterize ([cast-representation cast-rep]
                   [output-path (build-path test-tmp-path "t.out")]
-                  [c-path (build-path test-tmp-path "t.c")])
+                  [c-path (build-path test-tmp-path "t.c")]
+                  [c-flags (cons "-O3" (c-flags))]
+                  [specialize-cast-code-generation? #t])
      (printf "~a tests running:\n" cast-rep)
      (run-tests (suite)))))

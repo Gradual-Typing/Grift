@@ -39,14 +39,6 @@ form, to the shortest branch of the cast tree that is relevant.
   "../language/cast-or-coerce1.rkt"
   "../language/cast-or-coerce3.rkt"))
 
-;; Configuration options that determine how code is generated
-(define-type inlinable-casts
-  (U 'cast 'inject 'project 'higher-order
-     'cast-ground 'cast-undyned 'cast-fn 'cast-gbox 'cast-gvec))
-(: inlined-casts (Parameterof (Setof inlinable-casts)))
-(define inlined-casts
-  (make-parameter (ann (set) (Setof inlinable-casts))))
-
 (: use-simple-cast-interp? (Parameterof Boolean))
 (define use-simple-cast-interp? (make-parameter #f))
 
@@ -57,11 +49,24 @@ form, to the shortest branch of the cast tree that is relevant.
     prgm)
   (define unique-counter (make-unique-counter prgm-next))
   (define next-uid! (make-next-uid! unique-counter))
-
+  
   ;; First we generate names for everything in the runtime
   ;; and procedure that will either generate code to perform
   ;; and action or call off to one of the runtime functions
   ;; we are generating.
+
+  ;; Configuration options that determine how code is generated
+  (define-type inlinable-casts
+    (U 'cast 'inject 'project 'higher-order
+       'cast-ground 'cast-undyned 'cast-dyn
+       'cast-fn 'cast-gbox 'cast-gvec))
+
+  (define inlined-casts : (Setof inlinable-casts)
+    (if (specialize-cast-code-generation?) 
+        (set 'cast 'inject 'project 'higher-order
+             'cast-ground 'cast-undyned 'cast-dyn
+             'cast-fn 'cast-gbox 'cast-gvec)
+        (set)))
   
   ;; The runtime label for the runtime coercion interpreter
   (define-syntax (inline-or-bnd-cast stx)
@@ -71,17 +76,18 @@ form, to the shortest branch of the cast tree that is relevant.
                      [((ta _) ...) #'([ty-arg arg] ...)])
          #'(let ([gen cg-exp])
              (cond
-               [(set-member? (inlined-casts) f-sym) (values bnd* gen)]
+               [(set-member? inlined-casts f-sym)
+                (values bnd* gen)]
                [else
                 (define f : Uid (if (Uid? f-name) f-name (next-uid! f-name)))
                 (define p : Uid (next-uid! arg)) ...
                 (define bnd : CoC3-Bnd-Code
                   (cons f (Code (list p ...) (gen (Var p) ...))))
-                (define (cast [p : ta] ...) : CoC3-Expr
+                (define (call [p : ta] ...) : CoC3-Expr
                   (App-Code (Code-Label f) (list p ...)))
-                (values (cons bnd bnd*) cast)])))]))
+                (values (cons bnd bnd*) call)])))]))
 
-
+  
   (: bindings-needed-for-casts CoC3-Bnd-Code*)
   (: cast : Cast-Type)
   (: cast-u : Uid)
@@ -90,6 +96,9 @@ form, to the shortest branch of the cast tree that is relevant.
       [(use-simple-cast-interp?)
        (let*-values
            ([(cast-uid) (next-uid! "interp_cast")]
+            ;; This line prevents the code generation
+            ;; from infinitely looping calls to cast in
+            ;; code for casting makes a recursive call. 
             [(cast) (ann (apply-code cast-uid) Cast-Type)]
             [(b* ho-cast)
              (inline-or-bnd-cast
@@ -152,10 +161,20 @@ form, to the shortest branch of the cast tree that is relevant.
               (make-cast-dyn-code next-uid! cast-undyned)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
             [(b* cast)
-             (inline-or-bnd-cast
-              b* 'cast cast-uid
-              (make-cast-any-code next-uid! cast-dyn cast-ground)
-              CoC3-Expr "value" "type1" "type2" "blame_info")])
+             (let ([gen (make-cast-any-code next-uid! cast-dyn cast-ground)])
+               (define v  : Uid (next-uid! "value")) 
+               (define t1 : Uid (next-uid! "type1"))
+               (define t2 : Uid (next-uid! "type2"))
+               (define l  : Uid (next-uid! "blame_info"))
+               (define bnd : CoC3-Bnd-Code
+                 (cons cast-uid (Code (list v t1 t2 l) (gen (Var v) (Var t1) (Var t2) (Var l)))))
+               (define (call [v : CoC3-Expr] [t1 : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr])
+                 : CoC3-Expr
+                 (App-Code (Code-Label cast-uid) (list v t1 t2 l)))
+               (values (cons bnd b*)
+                      (if (set-member? inlined-casts 'cast)
+                          gen
+                          call)))])
          (values b* cast cast-uid))]))
   
   ;; ;; Initialize all the state for guarded operations
@@ -296,6 +315,8 @@ form, to the shortest branch of the cast tree that is relevant.
             bindings-needed-for-casts
             bindings-needed-for-guarded))
 
+
+  
   (define exp-with-lowered-gradual-operations
     (interpret-casts-in-expr
      next-uid!

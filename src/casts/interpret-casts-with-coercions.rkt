@@ -23,7 +23,9 @@ form, to the shortest branch of the cast tree that is relevant.
  racket/match
  racket/format
  racket/list
- "../helpers.rkt"
+ racket/set
+ (except-in  "../helpers.rkt" logging)
+ "../logging.rkt"
   "../unique-identifiers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
@@ -40,7 +42,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (: space-efficient? (Parameterof Boolean))
 (define space-efficient? (make-parameter #t))
 
-
 (: interpret-casts/coercions : Cast-or-Coerce1-Lang ->  Cast-or-Coerce3-Lang)
 (define (interpret-casts/coercions prgm)
   ;; Desugaring the input program into its constituents 
@@ -50,6 +51,13 @@ form, to the shortest branch of the cast tree that is relevant.
   (define unique-counter (make-unique-counter prgm-next))
   (define next-uid! (make-next-uid! unique-counter))
 
+  (define open-coded? : (Symbol -> Boolean)
+    (if (specialize-cast-code-generation?)
+        (let ([open-coded-set  (set 'make-coercion 'interp-cast)])
+          (lambda ([x : Symbol])
+            (set-member? open-coded-set x)))
+        (lambda (x) #f)))
+  
   ;; First we generate names for everything in the runtime
   ;; and procedure that will either generate code to perform
   ;; and action or call off to one of the runtime functions
@@ -57,32 +65,51 @@ form, to the shortest branch of the cast tree that is relevant.
   
   ;; The runtime label for the runtime coercion interpreter
   (define interp-cast-uid (next-uid! "interp_coercion"))
-  (: interp-cast : CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define interp-cast (apply-code interp-cast-uid))
+
+  (: interp-cast-call : CoC3-Expr CoC3-Expr -> CoC3-Expr)
+  (define interp-cast-call (apply-code interp-cast-uid))
 
   ;; The runtime label for the compose interpreter
   (define compose-coercions-uid (next-uid! "compose_coercions"))
-  (: compose-coercions : CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define compose-coercions
+
+  (define compose-coercions-call : Compose-Coercions-Type
     (cond
       [(space-efficient?) (apply-code compose-coercions-uid)]
       [else (lambda (c1 c2) (Sequence-Coercion c1 c2))]))
   
   ;; The runtime label for the make coercion operation
   (define make-coercion-uid (next-uid! "make_coercion"))
-  (: make-coercion : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define make-coercion (apply-code make-coercion-uid))
+  
+  (: make-coercion-call : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
+  (define make-coercion-call (apply-code make-coercion-uid))
+  
+  (define gen-make-coercion-code : Make-Coercion-Type
+    (make-make-coercion-code next-uid! make-coercion-call make-coercion-uid))
+  
+  (define make-coercion : Make-Coercion-Type
+    (cond
+      [(open-coded? 'make-coercion) gen-make-coercion-code]
+      [else make-coercion-call]))
 
+
+  (define gen-compose-coercions-code : Compose-Coercions-Type
+    (make-compose-coercions-code next-uid! compose-coercions-call
+                                 compose-coercions-uid make-coercion))
+
+  (define compose-coercions : Compose-Coercions-Type
+    (cond
+      [(open-coded? 'compose-coercions) gen-compose-coercions-code]
+      [else compose-coercions-call]))
+  
   ;; Code generators for the coercion casting runtime
   (define gen-interp-cast-code
-    (make-cast-code next-uid! interp-cast interp-cast-uid make-coercion compose-coercions))
-  (define gen-compose-coercions-code
-    (make-compose-coercions-code next-uid! compose-coercions
-                                 compose-coercions-uid make-coercion))
-  (define gen-make-coercion-code
-    (make-make-coercion-code next-uid! make-coercion make-coercion-uid))
+    (make-cast-code next-uid! interp-cast-call interp-cast-uid make-coercion compose-coercions))
 
-
+  (define interp-cast
+    (cond
+      [(open-coded? 'interp-cast) gen-interp-cast-code]
+      [else interp-cast-call]))
+  
   (define bindings-needed-for-interp-cast
     (let ([interp-v (next-uid! "value")]
           [interp-c (next-uid! "coercion")]
@@ -117,10 +144,10 @@ form, to the shortest branch of the cast tree that is relevant.
   (define-values (gbox-ref gbox-set! gvec-ref gvec-set!
                   bindings-needed-for-guarded)
     ;; First we create initialize the code generators
-    (let ([gen-gbox-ref-code (make-gbox-ref-code interp-cast)]
-          [gen-gbox-set!-code (make-gbox-set!-code interp-cast)]
-          [gen-gvec-ref-code (make-gvect-ref-code interp-cast)]
-          [gen-gvec-set!-code (make-gvect-set!-code interp-cast)])
+    (let ([gen-gbox-ref-code (make-gbox-ref-code interp-cast-call)]
+          [gen-gbox-set!-code (make-gbox-set!-code interp-cast-call)]
+          [gen-gvec-ref-code (make-gvect-ref-code interp-cast-call)]
+          [gen-gvec-set!-code (make-gvect-set!-code interp-cast-call)])
       (cond
         [(inline-guarded-branch?)
          ;; we just hand back the code generators to build
@@ -172,7 +199,7 @@ form, to the shortest branch of the cast tree that is relevant.
                   dyn-gvec-ref dyn-gvec-set!
                   bindings-needed-for-dynamic-operations)
     (let* ([smart-cast
-            (make-smart-cast interp-cast make-coercion)]
+            (make-smart-cast next-uid! interp-cast-call make-coercion)]
            [gen-dyn-fn-app
             (make-dyn-fn-app-code next-uid! smart-cast)]
            [gen-dyn-gvec-set!
@@ -261,138 +288,101 @@ form, to the shortest branch of the cast tree that is relevant.
   
   (Prog (list prgm-name (unique-counter-next! unique-counter) prgm-type)
     (Labels gradual-runtime-bindings
-      (Observe  exp-with-lowered-gradual-operations prgm-type)))
+      (Observe  exp-with-lowered-gradual-operations prgm-type))))
   
-  #;
-  (let* ([exp (ic-expr interp-uid interp compose prgm-exp)]
-         [next (unbox next-unique-number)]
-         [bnd* (list mk-coercion-binding interp-binding)]
-         ;; compose-binding? is correlates space-efficient?
-         ;; but typed-racket wants to know the binding
-         ;; isn't false.
-         [bnd* (if compose-binding?
-                   (cons compose-binding? bnd*)
-                   bnd*)])
-    (Prog (list prgm-name next prgm-type)
-      (Labels bnd* (Observe exp prgm-type))))
-  
-  ;; (define dyn-operations-bnd* : CoC3-Bnd-Code*
-  ;;   (cond
-  ;;     [(inline-dynamic-operations?) '()]
-  ;;     [else
-  ;;      (parameterize ([inline-dynamic-operations? #t])
-  ;;        (define-values (gunbox-b gunbox-l)
-  ;;          (values (next-uid! "box") (next-uid! "blame")))
-  ;;        (define gunbox-bnd : CoC3-Bnd-Code
-  ;;          (cons dyn-gunbox-uid
-  ;;                (Code (list gunbox-b gunbox-l)
-  ;;                  (dyn-gunbox (Var gunbox-b) (Var gunbox-l)))))
-  ;;        (define-values (setbox-b setbox-v setbox-t setbox-l)
-  ;;          (values (next-uid! "box") (next-uid! "value")
-  ;;                  (next-uid! "type") (next-uid! "blame")))
-  ;;        (define setbox-bnd : CoC3-Bnd-Code
-  ;;          (cons dyn-setbox-uid
-  ;;                (Code (list setbox-b setbox-v setbox-t setbox-l)
-  ;;                  (dyn-setbox (Var setbox-b) (Var setbox-v)
-  ;;                              (Var setbox-t) (Var setbox-l)))))
-  ;;        (list gunbox-bnd setbox-bnd))]))
+;; These templates are used to build the code that performs
+;; casting at runtime. The templates are a little over
+;; parameterized currently in hopes that it make specialization
+;; and customization easier in the future.
+(define-type Cast-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
-  
-  ;; body of interpret-casts
-
-
-  #;(error 'todo))
-
-  ;; These templates are used to build the code that performs
-  ;; casting at runtime. The templates are a little over
-  ;; parameterized currently in hopes that it make specialization
-  ;; and customization easier in the future.
-  (define-type Cast-Type (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
-
-  (: make-cast-code :
-     (String -> Uid) Cast-Type Uid Make-Coercion-Type Compose-Coercions-Type
-     ->
-     Cast-Type)
-  (define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn) v c)
-    (define-syntax-let$* let$* next-uid!)
-    ;; apply-cast is normally specified in terms of inspecting the
-    ;; value. But in a world were value reflection on values is limited
-    ;; the coercions can drive the casting process.
+(: make-cast-code :
+   (String -> Uid) Cast-Type Uid Make-Coercion-Type Compose-Coercions-Type
+   ->
+   Cast-Type)
+(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn) v c)
+  (define who 'make-cast-code)
+  (debug who v c)
+  (define-syntax-let$* let$* next-uid!)
+  ;; apply-cast is normally specified in terms of inspecting the
+  ;; value. But in a world were value reflection on values is limited
+  ;; the coercions can drive the casting process.
+  (let$* ([val v] [crcn c])
     (cond$
-     [(id?$ c) v]
-     [(seq?$ c)
-      ;; I think that something better could be done here
+     [(id?$ crcn) val]
+     [(seq?$ crcn)
+      ;; I think that something better crcnould be done here
       ;; why recur there are only so many things that the underlying
       ;; sequence could be?
-
+      
       ;; This may be getting in the way of simple specializations
       ;; May want come up with smaller versions of the cast/function
       ;; For the specialized sub grammers.
-      (let$* ([seq_fst (seq-fst$ c)]
-              [seq_snd (seq-snd$ c)]
-              [fst_cast_value (cast v seq_fst)])
-             (cast fst_cast_value seq_snd))]
+      (let$* ([seq_fst (seq-fst$ crcn)]
+              [seq_snd (seq-snd$ crcn)]
+              [fst_cast_value (cast val seq_fst)])
+        (cast fst_cast_value seq_snd))]
      ;; By the typing rules of coercions we know v must be a dyn value
-     [(prj?$ c)
-      (let$* ([prj_type  (prj-type$ c)]
-              [prj_label (prj-label$ c)]
+     [(prj?$ crcn)
+      (let$* ([prj_type  (prj-type$ crcn)]
+              [prj_label (prj-label$ crcn)]
               ;; The current implementation of the dyn interface is not a good one
               ;; this line is going to have to recover the type from dyn twice
-              [dyn_value (Dyn-value v)]
-              [dyn_type  (Dyn-type v)])
-             ;; Maybe this line should be a call to compose?
-             ;; which would do the same thing but wouldn't duplicate
-             ;; this line across two functions
-             ;; I did it this way because I know this code won't build
-             ;; the injection coercion
-             (let$* ([projected_type (mk-crcn dyn_type prj_type prj_label)])
-                    (cast dyn_value projected_type)))]
-     [(inj?$ c) (Dyn-make v (inj-type$ c))]
-     [(mediating-crcn?$ c)
+              [dyn_value (Dyn-value val)]
+              [dyn_type  (Dyn-type val)])
+        ;; Maybe this line should be a call to compose?
+        ;; which would do the same thing but wouldn't duplicate
+        ;; this line across two functions
+        ;; I did it this way because I know this code won't build
+        ;; the injection coercion
+        (let$* ([projected_type (mk-crcn dyn_type prj_type prj_label)])
+          (cast dyn_value projected_type)))]
+     [(inj?$ crcn) (Dyn-make val (inj-type$ crcn))]
+     [(mediating-crcn?$ crcn)
       (cond$
-       [(fnC?$ c)
-        (If (Fn-Proxy-Huh v)
-            (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
-            (App-Code (Fn-Caster v) (list v c)))]
-       [(ref?$ c)
-        (if$ (Guarded-Proxy-Huh v)
-             (let$* ([old_val  (Guarded-Proxy-Ref v)]
-                     [old_crcn (Guarded-Proxy-Coercion v)])
-                    (let$* ([composed_crcn (comp-crcn old_crcn c)])
-                           (if$ (id?$ composed_crcn)
-                                old_val
-                                (Guarded-Proxy
-                                 old_val 
-                                 (Coercion composed_crcn)))))
-             (Guarded-Proxy v (Coercion c)))]
-       [(tuple?$ c)
-        (if (Quote-Coercion? c)
-            (let ([ctuple (Quote-Coercion-const c)])
-              (if (CTuple? ctuple)
-                  (let-values ([(bnd* arg*)
-                                (for/fold ([b* : CoC3-Bnd* '()]
-                                           [arg* : Uid* '()])
-                                          ([i (in-range (CTuple-num ctuple))])
-                                  (unless (index? i)
-                                    (error 'interpret-casts-with-coercions "bad index"))
-                                  (let ([a (next-uid! "item_coercion")])
-                                    (values (cons (cons a (let$* ([item (Tuple-proj v i)]
-                                                                  [crcn (tuple-crcn-arg$ c i)])
-                                                                 (cast item crcn))) b*)
-                                            (cons a arg*))))])
-                    (Let bnd* (Create-tuple (map (inst Var Uid) arg*))))
-                  (error 'cast/coercion)))
-            (Coerce-Tuple cast-u v c))]
+       [(fnC?$ crcn)
+        (If (Fn-Proxy-Huh val)
+            (App-Code (Fn-Caster (Fn-Proxy-Closure val)) (list val crcn))
+            (App-Code (Fn-Caster val) (list val crcn)))]
+       [(ref?$ crcn)
+        (if$ (Guarded-Proxy-Huh val)
+             (let$* ([old_val  (Guarded-Proxy-Ref val)]
+                     [old_crcn (Guarded-Proxy-Coercion val)])
+               (let$* ([composed_crcn (comp-crcn old_crcn crcn)])
+                 (if$ (id?$ composed_crcn)
+                      old_val
+                      (Guarded-Proxy
+                       old_val 
+                       (Coercion composed_crcn)))))
+             (Guarded-Proxy val (Coercion crcn)))]
+       [(tuple?$ crcn)
+        (match crcn
+          [(not (Quote-Coercion _)) (Coerce-Tuple cast-u val crcn)]
+          [(Quote-Coercion (CTuple n c*))
+           (define-values (bnd* var*)
+             (for/lists ([bnd* : CoC3-Bnd*] [var* : CoC3-Expr*])
+                        ([i (in-range n)] [c (in-list c*)])
+               (cond
+                 [(index? i)
+                  (define tmp (next-uid! "element"))
+                  (values
+                   (cons tmp (cast (Tuple-proj val i) (Quote-Coercion c)))
+                   (Var tmp))]
+                 [else (error 'interpret-casts-with-coercions "bad index")])))
+           (Let bnd* (Create-tuple var*))]
+          [other (error 'cast/coercion "thats impossible! ... I think")])]
        [else (Blame (Quote "bad implemention of mediating coercions"))])]
      ;; the coercion must be failure
-     [else (Blame (fail-label$ c))]))
+     [else (Blame (fail-label$ crcn))])))
 
 (define-type Make-Coercion-Type
-  (CoC3-Trivial CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
 (: make-make-coercion-code :
    (String -> Uid) Make-Coercion-Type Uid -> Make-Coercion-Type)
 (define ((make-make-coercion-code next-uid! mk-crcn mk-crcn-uid) t1 t2 lbl)
+  (define who 'make-make-coercion-code)
+  (debug who t1 t2 lbl)
   (define-syntax-let$* let$* next-uid!)
   (: help-comp :
      CoC3-Trivial -> (Schml-Type Schml-Type -> Schml-Coercion))
@@ -429,32 +419,33 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; specify representation were the language is a little
       ;; more flexible.
       [else (Make-Fn-Coercion mk-crcn-uid t1 t2 lbl)]))
-  (cond$
-   [(op=? t1 t2) (Quote-Coercion (Identity))]
-   [(and$ (fnT?$ t1) (fnT?$ t2))
-    ;; This line is a little tricky because
-    ;; unless we have actual types for this at
-    ;; compile time we have to generate code
-    ;; that can handle arbitry fn-arity.
-    ;; We delegate this task to specify representation because
-    ;; it involves safely allocating an object whos size cannot
-    ;; be determined until run-time.
-    (if$ (op=? (fnT-arity$ t1) (fnT-arity$ t2))
-         (make-make-fn-crcn-code t1 t2 lbl)
-         (Blame lbl))]
-   [(and$ (gvect?$ t1) (gvect?$ t2))
-    (let$* ([gv1_of (gvect-of$ t1)]
-            [gv2_of (gvect-of$ t2)]
-            [read_crcn  (mk-crcn gv1_of gv2_of lbl)]
-            [write_crcn (mk-crcn gv2_of gv1_of lbl)])
-      (ref$ read_crcn write_crcn))]
-   [(and$ (gref?$ t1) (gref?$ t2))
-    (let$* ([gr1_of (gref-of$ t1)]
-            [gr2_of (gref-of$ t2)]
-            [read_crcn  (mk-crcn gr1_of gr2_of lbl)]
-            [write_crcn (mk-crcn gr2_of gr1_of lbl)])
-           (ref$ read_crcn write_crcn))]
-   [(and$ (tupleT?$ t1) (tupleT?$ t2))
+  (let$* ([t1 t1] [t2 t2] [lbl lbl])
+    (cond$
+     [(op=? t1 t2) (Quote-Coercion (Identity))]
+     [(and$ (fnT?$ t1) (fnT?$ t2))
+      ;; This line is a little tricky because
+      ;; unless we have actual types for this at
+      ;; compile time we have to generate code
+      ;; that can handle arbitry fn-arity.
+      ;; We delegate this task to specify representation because
+      ;; it involves safely allocating an object whos size cannot
+      ;; be determined until run-time.
+      (if$ (op=? (fnT-arity$ t1) (fnT-arity$ t2))
+           (make-make-fn-crcn-code t1 t2 lbl)
+           (Blame lbl))]
+     [(and$ (gvect?$ t1) (gvect?$ t2))
+      (let$* ([gv1_of (gvect-of$ t1)]
+              [gv2_of (gvect-of$ t2)]
+              [read_crcn  (mk-crcn gv1_of gv2_of lbl)]
+              [write_crcn (mk-crcn gv2_of gv1_of lbl)])
+        (ref$ read_crcn write_crcn))]
+     [(and$ (gref?$ t1) (gref?$ t2))
+      (let$* ([gr1_of (gref-of$ t1)]
+              [gr2_of (gref-of$ t2)]
+              [read_crcn  (mk-crcn gr1_of gr2_of lbl)]
+              [write_crcn (mk-crcn gr2_of gr1_of lbl)])
+        (ref$ read_crcn write_crcn))]
+     [(and$ (tupleT?$ t1) (tupleT?$ t2))
       (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
            (if (and (Type? t1) (Type? t2))
                (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
@@ -466,16 +457,16 @@ form, to the shortest branch of the cast tree that is relevant.
                      (error 'make-coercion)))
                (Make-Tuple-Coercion mk-crcn-uid t1 t2 lbl))
            (Blame lbl))]
-   ;; This is absolutly necisarry
-   ;; While Injections and Projections are never made by
-   ;; source code coercions composition can create new
-   ;; projections and injections.
-   [(dyn?$ t1) (seq$ (prj$ t2 lbl) (Quote-Coercion (Identity)))]
-   [(dyn?$ t2) (seq$ (Quote-Coercion (Identity)) (inj$ t1))]
-   [else (fail$ lbl)]))
+     ;; This is absolutly necisarry
+     ;; While Injections and Projections are never made by
+     ;; source code coercions composition can create new
+     ;; projections and injections.
+     [(dyn?$ t1) (seq$ (prj$ t2 lbl) (Quote-Coercion (Identity)))]
+     [(dyn?$ t2) (seq$ (Quote-Coercion (Identity)) (inj$ t1))]
+     [else (fail$ lbl)])))
 
 (define-type Compose-Coercions-Type
-  (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
+  (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
 (: make-compose-coercions-code :
    (String -> Uid)
@@ -610,7 +601,8 @@ form, to the shortest branch of the cast tree that is relevant.
   
   (: recur : CoC1-Expr -> CoC3-Expr)
   (define (recur exp)
-    ;;(printf "ic: ~a\n" exp) (flush-output (current-output-port))
+    (define who 'recur)
+    (debug who exp)
     (match exp
       ;; Interesting Cases -----------------------------------------------
       ;; Transformations for Casting runtime
@@ -810,18 +802,24 @@ form, to the shortest branch of the cast tree that is relevant.
        (#:t1-not-dyn Boolean #:t2-not-dyn Boolean)
        CoC3-Expr))
 (: make-smart-cast :
+   (String -> Uid)
    (CoC3-Expr CoC3-Expr  -> CoC3-Expr)
    (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
    -> Smart-Cast-Type)
-(define ((make-smart-cast cast mk-coercion)
+(define ((make-smart-cast next-uid! cast mk-coercion)
          val t1 t2 lbl
          #:t1-not-dyn [t1-not-dyn #f]
          #:t2-not-dyn [t2-not-dyn #f])
   (match* (val t1 t2)
     [(val (Type t) (Type t)) val]
     [(val (Type (Dyn)) t2) #:when t2-not-dyn
-     (cast val (Project-Coercion t2 lbl))]
-    [((Var _) (Type (Dyn)) t2)
+     (match val
+       [(or (Var _) (Quote _)) (cast val (Project-Coercion t2 lbl))]
+       [other
+        (define u (next-uid! "tmp"))
+        (Let (list (cons u val))
+          (cast (Var u) (Project-Coercion t2 lbl)))])]
+    [((or (Var _) (Quote _)) (Type (Dyn)) t2)
      (If (Type-Dyn-Huh t2) val (cast val (Project-Coercion t2 lbl)))]
     [(val t1 (Type (Dyn))) #:when t1-not-dyn
      (cast val (Inject-Coercion t1))]

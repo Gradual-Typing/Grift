@@ -25,8 +25,9 @@
                                  expected
                                  (blame #t (exn-message e))
                                  "static type error")))])
-       (define f (compile path))
-       (parameterize ([current-input-port (open-test-input path)])
+      (define f
+        (compile path))
+      (parameterize ([current-input-port (open-test-input path)])
          (check value=?
                 (observe (system (path->string f)))
                 expected
