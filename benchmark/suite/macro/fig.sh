@@ -50,10 +50,6 @@ schml_regex="sed -n 's/.*): \\([0-9]\\+\\)/\\1/p'"
 # preparing the quicksort worstcase benchmark
 benchmark=quicksort_worstcase
 
-printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
-printf "Arg_array_len\t:%s\n" "$quicksort_worstcase_array_len" >> $paramfile
-printf "Arg_nsamples\t:%s\n" "$quicksort_worstcase_nsamples" >> $paramfile
-
 benchmark_rkt="$tmpdir/rkt/$benchmark"
 raco make $benchmark_rkt.rkt
 quicksort_worstcase_rkt_command="racket $benchmark_rkt.rkt $quicksort_worstcase_array_len"
@@ -72,9 +68,18 @@ quicksort_worstcase_schml_arg=$quicksort_worstcase_array_len
 # preparing the quicksort bestcase benchmark
 benchmark=quicksort_bestcase
 
-printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
-printf "Arg_array_len\t:%s\n" "$quicksort_bestcase_array_len" >> $paramfile
-printf "Arg_nsamples\t:%s\n" "$quicksort_bestcase_nsamples" >> $paramfile
+f=""
+s=""
+n=$(($quicksort_bestcase_array_len-1))
+for i in `seq 0 $n`; do
+    # x=$(perl -e 'print int rand $quicksort_bestcase_array_len, "\n"; ')
+    x=$(( ( RANDOM % $quicksort_bestcase_array_len )  + 1 ))
+    f="$f\n$x"
+    s="$s $x"
+done
+
+echo -e $f > $tmpdir/nums
+f="$quicksort_bestcase_array_len $s"
 
 benchmark_rkt="$tmpdir/rkt/$benchmark"
 raco make $benchmark_rkt.rkt
@@ -88,31 +93,12 @@ benchmark_gambit="$tmpdir/gambit/$benchmark"
 gsc -exe -cc-options -O3 $benchmark_gambit.scm
 quicksort_bestcase_gambit_command="$benchmark_gambit $quicksort_bestcase_array_len"
 
-quicksort_bestcase_schml_arg=$quicksort_bestcase_array_len
-
-s=""
-f=""
-n=$(($quicksort_bestcase_array_len-1))
-for i in `seq 0 $n`; do
-    # x=$(perl -e 'print int rand $quicksort_bestcase_array_len, "\n"; ')
-    x=$(( ( RANDOM % $quicksort_bestcase_array_len )  + 1 ))
-    f="$f\n$x"
-    s="$s\n(gvector-set! a $i $x)"
-done
-
-echo -e $f > $tmpdir/nums
-
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/static/$benchmark.schml
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/dyn/$benchmark.schml
+quicksort_bestcase_schml_arg=$f
 
 # ---------------------------------
 # preparing the matmult benchmark
 
 benchmark=matmult
-
-printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
-printf "Mat_side_len\t:%s\n" "$matmult_mat_side_len" >> $paramfile
-printf "Arg_nsamples\t:%s\n" "$matmult_nsamples" >> $paramfile
 
 benchmark_rkt="$tmpdir/rkt/$benchmark"
 raco make $benchmark_rkt.rkt

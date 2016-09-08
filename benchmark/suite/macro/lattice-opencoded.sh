@@ -41,7 +41,7 @@ date=`date +%Y_%m_%d_%H_%M_%S`
 
 schmldir=$SCHML_DIR
 testdir=$schmldir/benchmark/suite/macro
-latticedir=$testdir/lattice-dev/$date
+latticedir=$testdir/lattice-opencoded-dev/$date
 datadir=$latticedir/data
 outdir=$latticedir/output
 tmpdir=$latticedir/tmp
@@ -204,10 +204,14 @@ for f in $tmpdir/static/*.schml; do
 	working_nsamples=$matmult_nsamples
     fi
 
-    logfile1=$datadir/${name}1.log
-    logfile2=$datadir/${name}1.csv
-    logfile3=$datadir/${name}2.log
-    logfile4=$datadir/${name}2.csv
+    logfile11=$datadir/${name}1.log
+    logfile12=$datadir/${name}1.csv
+    logfile21=$datadir/${name}2.log
+    logfile22=$datadir/${name}2.csv
+    logfile31=$datadir/${name}3.log
+    logfile32=$datadir/${name}3.csv
+    logfile41=$datadir/${name}4.log
+    logfile42=$datadir/${name}4.csv
 
     names[$in]=$(echo $name | tr _ " " | sed -e "s/\b\(.\)/\u\1/g" | tr " " "-")
 
@@ -232,7 +236,7 @@ for f in $tmpdir/static/*.schml; do
     cd $schmldir
     racket $schmldir/benchmark/benchmark.rkt $path/ $schml_mem_limit2
     
-    echo "name,precision,time,slowdown" > $logfile1
+    echo "name,precision,time,slowdown" > $logfile11
     n=0
     for b in $(find $path -name '*.o1'); do
 	let n=n+1
@@ -245,11 +249,11 @@ for f in $tmpdir/static/*.schml; do
 	# echo $t
 	f=$(echo "$t/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n", p,$0}')
 	echo $f
-	printf "%d,%.2f,%.${precision}f,%.2f\n" $bname $p $t $f >> $logfile1
+	printf "%d,%.2f,%.${precision}f,%.2f\n" $bname $p $t $f >> $logfile11
     done
 
     n=0
-    echo "name,precision,time,slowdown" > $logfile3
+    echo "name,precision,time,slowdown" > $logfile21
     for b in $(find $path -name '*.o2'); do
 	let n=n+1
 	binpath="${b%.*}";bname=$(basename "$binpath")
@@ -261,36 +265,92 @@ for f in $tmpdir/static/*.schml; do
 	# echo $t
 	f=$(echo "$t/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n", p,$0}')
 	echo $f
-	printf "%d,%.2f,%.${precision}f,%.2f\n" $bname $p $t $f >> $logfile3
+	printf "%d,%.2f,%.${precision}f,%.2f\n" $bname $p $t $f >> $logfile21
     done
 
-    cut -d, -f4 $logfile1 | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > $logfile2
-    cut -d, -f4 $logfile3 | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > $logfile4
+    n=0
+    echo "name,precision,time,slowdown" > $logfile31
+    for b in $(find $path -name '*.o3'); do
+	let n=n+1
+	binpath="${b%.*}";bname=$(basename "$binpath")
+	echo $b $n
+	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
+	c="echo $schml_arg | $b | $schml_regex"
+	avg "$c"
+	t=$RETURN
+	# echo $t
+	f=$(echo "$t/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n", p,$0}')
+	echo $f
+	printf "%d,%.2f,%.${precision}f,%.2f\n" $bname $p $t $f >> $logfile31
+    done
+
+    n=0
+    echo "name,precision,time,slowdown" > $logfile41
+    for b in $(find $path -name '*.o4'); do
+	let n=n+1
+	binpath="${b%.*}";bname=$(basename "$binpath")
+	echo $b $n
+	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
+	c="echo $schml_arg | $b | $schml_regex"
+	avg "$c"
+	t=$RETURN
+	# echo $t
+	f=$(echo "$t/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n", p,$0}')
+	echo $f
+	printf "%d,%.2f,%.${precision}f,%.2f\n" $bname $p $t $f >> $logfile41
+    done
+
+    cut -d, -f4 $logfile11 | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > $logfile12
+    cut -d, -f4 $logfile21 | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > $logfile22
+    cut -d, -f4 $logfile31 | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > $logfile32
+    cut -d, -f4 $logfile41 | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > $logfile42
     
-    min_c=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' $logfile2)
-    min_tb=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' $logfile4)
+    min_c_closecoded=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' $logfile12)
+    min_tb_closecoded=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' $logfile22)
+    min_c_opencoded=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' $logfile32)
+    min_tb_opencoded=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' $logfile42)
 
-    max_c=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' $logfile2)
-    max_tb=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' $logfile4)
+    max_c_closecoded=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' $logfile12)
+    max_tb_closecoded=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' $logfile22)
+    max_c_opencoded=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' $logfile32)
+    max_tb_opencoded=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' $logfile42)
 
-    read std_c mean_c <<< $( cat $logfile2 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
-    read std_tb mean_tb <<< $( cat $logfile4 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    read std_c_closecoded mean_c_closecoded <<< $( cat $logfile12 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    read std_tb_closecoded mean_tb_closecoded <<< $( cat $logfile22 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    read std_c_opencoded mean_c_opencoded <<< $( cat $logfile32 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    read std_tb_opencoded mean_tb_opencoded <<< $( cat $logfile42 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 
-    c11="echo $schml_arg | $tmpdir/static/$name.o1 | $schml_regex"
-    avg "$c11"
+    c="echo $schml_arg | $tmpdir/static/$name.o1 | $schml_regex"
+    avg "$c"
     t11=$RETURN
-    c12="echo $schml_arg | $tmpdir/dyn/$name.o1 | $schml_regex"
-    avg "$c12"
+    c="echo $schml_arg | $tmpdir/dyn/$name.o1 | $schml_regex"
+    avg "$c"
     t12=$RETURN
-    typed_untyped_ratio_c=$(echo "$t11/$t12" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
+    typed_untyped_ratio_c_closecoded=$(echo "$t11/$t12" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
 
-    c21="echo $schml_arg | $tmpdir/static/$name.o2 | $schml_regex"
-    avg "$c21"
+    c="echo $schml_arg | $tmpdir/static/$name.o2 | $schml_regex"
+    avg "$c"
     t21=$RETURN
-    c22="echo $schml_arg | $tmpdir/dyn/$name.o2 | $schml_regex"
-    avg "$c22"
+    c="echo $schml_arg | $tmpdir/dyn/$name.o2 | $schml_regex"
+    avg "$c"
     t22=$RETURN
-    typed_untyped_ratio_tb=$(echo "$t21/$t22" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
+    typed_untyped_ratio_tb_closecoded=$(echo "$t21/$t22" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
+
+    c="echo $schml_arg | $tmpdir/static/$name.o3 | $schml_regex"
+    avg "$c"
+    t31=$RETURN
+    c="echo $schml_arg | $tmpdir/dyn/$name.o3 | $schml_regex"
+    avg "$c"
+    t32=$RETURN
+    typed_untyped_ratio_c_opencoded=$(echo "$t31/$t32" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
+
+    c="echo $schml_arg | $tmpdir/static/$name.o4 | $schml_regex"
+    avg "$c"
+    t41=$RETURN
+    c="echo $schml_arg | $tmpdir/dyn/$name.o4 | $schml_regex"
+    avg "$c"
+    t42=$RETURN
+    typed_untyped_ratio_tb_opencoded=$(echo "$t41/$t42" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
 
     cr_t=$(echo $cr | awk '{printf "%.2f\n",$0}');gr_t=$(echo $gr | awk '{printf "%.2f\n",$0}')
     lpc_t=$(echo "$less_precise_count/1000000000" | bc -l | awk '{printf "%.2f\n",$0}')
@@ -304,8 +364,10 @@ for f in $tmpdir/static/*.schml; do
     	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
     	   `"set ytics nomirror 0,200;"`
 	   `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
-    	   `"plot '$logfile2' using 1:2 with lines lw 2 title 'Coercions' smooth cumulative,"`
-    	   `"'$logfile4' using 1:2 with lines lw 2 title 'Type-based casts' smooth cumulative"
+    	   `"plot '$logfile12' using 1:2 with lines lw 2 title 'Coercions - Closecoded' smooth cumulative,"`
+    	   `"'$logfile22' using 1:2 with lines lw 2 title 'Type-based casts - Closecoded' smooth cumulative,"`
+	   `"'$logfile32' using 1:2 with lines lw 2 title 'Coercions - Opencoded' smooth cumulative,"`
+	   `"'$logfile42' using 1:2 with lines lw 2 title 'Type-based casts - Opencoded' smooth cumulative"
 
     echo "\begin{tabular}{|l|l|l|}
 \hline
@@ -315,10 +377,14 @@ lattice size                & \multicolumn{2}{l|}{${lpc_t} B}         \\\ \hline
 Clang                       & \multicolumn{2}{l|}{${cr_t}x}           \\\ \hline
 Gambit-C                    & \multicolumn{2}{l|}{${gr_t}x}           \\\ \hline
 \multicolumn{3}{|l|}{}                                             \\\ \hline
-typed/untyped ratio         & ${typed_untyped_ratio_tb}x             & ${typed_untyped_ratio_c}x            \\\ \hline
-min. slowdown               & ${min_tb}x             & ${min_c}x            \\\ \hline
-max. slowdown               & ${max_tb}x             & ${max_c}x            \\\ \hline
-mean slowdown               & ${mean_tb}x             & ${mean_c}x            \\\ \hline
+typed/untyped ratio - closecoded         & ${typed_untyped_ratio_tb_closecoded}x             & ${typed_untyped_ratio_c_closecoded}x            \\\ \hline
+min. slowdown - closecoded               & ${min_tb_closecoded}x             & ${min_c_closecoded}x            \\\ \hline
+max. slowdown - closecoded               & ${max_tb_closecoded}x             & ${max_c_closecoded}x            \\\ \hline
+mean slowdown - closecoded               & ${mean_tb_closecoded}x             & ${mean_c_closecoded}x            \\\ \hline
+typed/untyped ratio - opencoded         & ${typed_untyped_ratio_tb_opencoded}x             & ${typed_untyped_ratio_c_opencoded}x            \\\ \hline
+min. slowdown - opencoded               & ${min_tb_opencoded}x             & ${min_c_opencoded}x            \\\ \hline
+max. slowdown - opencoded               & ${max_tb_opencoded}x             & ${max_c_opencoded}x            \\\ \hline
+mean slowdown - opencoded               & ${mean_tb_opencoded}x             & ${mean_c_opencoded}x            \\\ \hline
 \end{tabular}
 \end{table}" > $outdir/cumperflattice/${names[$in]}.tex
 
@@ -329,8 +395,10 @@ mean slowdown               & ${mean_tb}x             & ${mean_c}x            \\
     	   `"set title \"${names[$in]}\";"`
 	   `"set xlabel \"slowdown\";"`
 	   `"set ylabel \"How much of the code is typed\";"`
-    	   `"plot '$logfile1' using 4:(100-\$2) with points title 'Coercions',"`
-    	   `"'$logfile3' using 4:(100-\$2) with points title 'Type-based casts'"
+    	   `"plot '$logfile11' using 4:(100-\$2) with points title 'Coercions - Closecoded',"`
+    	   `"'$logfile21' using 4:(100-\$2) with points title 'Type-based casts - Closecoded',"`
+	   `"'$logfile31' using 4:(100-\$2) with points title 'Coercions - Opencoded',"`
+    	   `"'$logfile41' using 4:(100-\$2) with points title 'Type-based casts - Opencoded'"
 
     let in=in+1
 done
