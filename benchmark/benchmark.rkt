@@ -46,17 +46,32 @@
       (define out-file (path-replace-suffix file-name suffix))
       (define c-file (path-add-suffix out-file #".c"))
       (values (build-path compile-dir out-file) (build-path c-dir c-file)))
-        
-    (define-values (coercion-f-o coercion-f-c) (renaming-output-files #".o1"))
-    (define-values (twosome-f-o twosome-f-c)   (renaming-output-files #".o2"))
+
+    ;; config 1: coercions and close coded
+    ;; config 2: type-based and close coded
+    ;; config 3: coercions and open coded
+    ;; config 4: type-based and open coded
+    (define-values (coercion-closecoded-f-o coercion-closecoded-f-c) (renaming-output-files #".o1"))
+    (define-values (twosome-closecoded-f-o twosome-closecoded-f-c)   (renaming-output-files #".o2"))
+    (define-values (coercion-opencoded-f-o coercion-opencoded-f-c) (renaming-output-files #".o3"))
+    (define-values (twosome-opencoded-f-o twosome-opencoded-f-c)   (renaming-output-files #".o4"))
     (compile fl
-             #:output coercion-f-o
-             #:keep-c coercion-f-c
+             #:output coercion-closecoded-f-o
+             #:keep-c coercion-closecoded-f-c
              #:cast 'Coercions)
     (compile fl
-             #:output twosome-f-o
-             #:keep-c twosome-f-c
-             #:cast 'Type-Based)))
+             #:output twosome-closecoded-f-o
+             #:keep-c twosome-closecoded-f-c
+             #:cast 'Type-Based)
+    (parameterize ([specialize-cast-code-generation? #t])
+      (compile fl
+               #:output coercion-opencoded-f-o
+               #:keep-c coercion-opencoded-f-c
+               #:cast 'Coercions)
+      (compile fl
+               #:output twosome-opencoded-f-o
+               #:keep-c twosome-opencoded-f-c
+               #:cast 'Type-Based))))
 
 (module+ main
   (command-line
@@ -96,19 +111,19 @@
       (let-values ([(dirname filename _) (split-path (path-replace-suffix fl ""))])
         (let* ([f-o (string-append (path->string dirname) (path->string filename) ".o")]
                [f-c (string-append (path->string dirname) "c/" (path->string filename))]
-               [coercion-f-o (string-append f-o "1")]
-               [coercion-f-c (string-append f-c "_1.c")]
-               [twosome-f-o (string-append f-o "2")]
-               [twosome-f-c (string-append f-c "_2.c")])
+               [coercion-closecoded-f-o (string-append f-o "1")]
+               [coercion-closecoded-f-c (string-append f-c "_1.c")]
+               [twosome-closecoded-f-o (string-append f-o "2")]
+               [twosome-closecoded-f-c (string-append f-c "_2.c")])
           (compile fl
-                   #:output (build-path coercion-f-o)
-                   #:keep-c (build-path coercion-f-c)
+                   #:output (build-path coercion-closecoded-f-o)
+                   #:keep-c (build-path coercion-closecoded-f-c)
                    #:cast-rep 'Coercions
                    ;; #:log (build-path "tests" "tmp" "p1.log")
                    #:mem m)
           (compile fl
-                   #:output (build-path twosome-f-o)
-                   #:keep-c (build-path twosome-f-c)
+                   #:output (build-path twosome-closecoded-f-o)
+                   #:keep-c (build-path twosome-closecoded-f-c)
                    #:cast-rep 'Twosomes
                    ;; #:log (build-path "tests" "tmp" "p2.log")
                    #:mem m))))
