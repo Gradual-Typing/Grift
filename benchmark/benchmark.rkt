@@ -59,6 +59,7 @@
              #:cast 'Type-Based)))
 
 (module+ main
+  (c-flags (cons "-O3" (c-flags)))
   (command-line
    #:once-each
    ["--no-dyn-operations"
