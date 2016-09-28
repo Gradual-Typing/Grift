@@ -86,6 +86,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Var Uid)
           ;; Controll Flow
           (If E E E)
+          (Switch E (Switch-Case* E) E)
           (Begin CoC3.1-Expr* E)
           (Repeat Uid E E Uid E E)
           ;;Primitives

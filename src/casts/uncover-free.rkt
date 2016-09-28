@@ -20,11 +20,11 @@
 (: uncover-free (Cast-or-Coerce4-Lang . -> . Cast-or-Coerce5-Lang))
 (define (uncover-free prgm)
   (logging uncover-free (All) prgm)
-  (match-let ([(Prog (list name count type) (Let-Static* tbnd* cbnd* exp)) prgm])
-    (let-values ([(exp free*) (uf-expr exp)])
-      (if (set-empty? free*)
-	  (Prog (list name count type) (Let-Static* tbnd* cbnd* exp))
-	  (raise-pass-exn 'uncover-free "Free variables detect ~a" free*)))))
+  (match-define (Prog m (Let-Static* tb* cb* e)) prgm)
+  (define-values (new-exp free*) (uf-expr e))
+  (unless (set-empty? free*)
+    (raise-pass-exn 'uncover-free "Free variables detect ~a" free*))
+  (Prog m (Let-Static* tb* cb* new-exp)))
 
 (: uf-expr (CoC4-Expr -> (values CoC5-Expr (Setof Uid))))
 (define (uf-expr e)
@@ -47,6 +47,17 @@
      (values (Repeat i e1 e2 a e3 e4) (set-subtract (set-union f1 f2 f3 f4) (set i a)))]
     [(If (app uf-expr t t-fv) (app uf-expr c c-fv) (app uf-expr a a-fv))
      (values (If t c a) (set-union t-fv c-fv a-fv))]
+    [(Switch (app uf-expr e e-fv) c* (app uf-expr d d-fv))
+     (: uf-case/pair :
+        (Switch-Case CoC4-Expr)
+        (Pair (Switch-Case* CoC5-Expr) (Setof Uid))
+        -> (Pair (Switch-Case* CoC5-Expr) (Setof Uid)))
+     (define/match (uf-case/pair c p)
+       [((cons l (app uf-expr r f)) (cons c* v))
+        (cons (cons (cons l r) c*) (set-union f v))])
+     (define acc (cons '() ((inst set Uid))))
+     (match-define (cons c*^ c*-fv) (foldr uf-case/pair acc c*))
+     (values (Switch e c*^ d) (set-union e-fv c*-fv d-fv))]
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
     [(Quote k) (values (Quote k) (set))]
     [(Tag t) (values (Tag t) (set))]

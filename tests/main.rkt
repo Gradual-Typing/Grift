@@ -1,11 +1,19 @@
-#lang typed/racket/base
+#lang racket/base
 
-(require "./rackunit.rkt"
-         "../src/helpers.rkt"
-         "../src/configuration.rkt"
-         "./test-compile.rkt"
+(require rackunit
+         rackunit/text-ui
+         racket/sequence
+         racket/function
+         racket/file
+         racket/format
+         ;;"../src/helpers.rkt"
+         (except-in "./test-compile.rkt" debug)
          "./paths.rkt"
-         racket/cmdline)
+         "./test-compile-file.rkt"
+         "../src/compile.rkt"
+         "../src/logging.rkt"
+         racket/cmdline
+         racket/path)
 
 
 (provide (all-defined-out))
@@ -22,15 +30,13 @@
   (open-output-file (build-path test-tmp-path "t.log.txt")
                     #:mode 'text #:exists 'replace))
 
-(current-log-port log)
-
 ;; Allow choice of test suites
-(define suite : (Parameterof Test)
-  (make-parameter most-tests))
+(define suite (make-parameter most-tests))
 
-(define suite-choices : (Listof (Pair Symbol Test))
+(define suite-choices 
   `((all     . ,all-tests)
     (most    . ,most-tests)
+    (tiny    . ,tiny-tests)
     (core    . ,core-tests)
     (box     . ,box-tests)
     (vector  . ,vector-tests)
@@ -39,32 +45,122 @@
     (program . ,program-tests)
     (large   . ,large-tests)))
 
-(define test-cast-representation : (Parameterof (Listof Cast-Representation))
-  (make-parameter (list 'Type-Based 'Coercions)))
+
+(define test-cast-representation
+  (make-parameter '(Type-Based Coercions)))
+(define test-blame-semantics
+  (make-parameter '(Lazy-D)))
+(define test-dynamic-operations
+  (make-parameter '(#f #t inline)))
+(define test-specialize-cast-code-generation
+  (make-parameter '(#f #t)))
+(define test-init-heap-kilobytes
+  (make-parameter (list (expt 1024 2))))
+(define test-c-flags
+  (make-parameter
+   '(("-Wno-int-conversion" "-Wno-format" "-Wno-unused-value")
+     ("-O3" "-Wno-int-conversion" "-Wno-format" "-Wno-unused-value"))))
+
+(define test-suite-dir (make-parameter test-suite-path))
+
+(define (run-test-suite)
+  (define dir  (build-path (test-suite-dir)))
+  (debug off dir)
+  (run-tests
+   (make-test-suite
+    "/"
+    (for*/list ([p (in-directory dir)]
+                [e (in-value (debug off (path-get-extension p)))] 
+                #:when (and e (equal? e #".schml")))
+      
+      (test-path dir p)))))
+
+(define (run-single-path p)
+  (run-tests (test-path (current-directory) p)))
+
+
+(define (test-path suite-dir p)
+  (define-values (base src-name _) (split-path p))
+  (define print-path
+    (let ([cop (current-output-port)])
+      (thunk (fprintf cop "\t~a\n" (find-relative-path suite-dir p)))))
+  (define tmp-dir (build-path base "tmp"))
+  (unless (directory-exists? tmp-dir)
+    (make-directory tmp-dir))
+  (define tmp-exe (build-path tmp-dir (path-replace-suffix src-name ""))) 
+  (define input (file?->string (path-replace-extension p #".in") ""))
+  (define out-rx
+    (pregexp (file?->string (path-replace-extension p #".out.rx") "")))
+  (define err-rx
+    (pregexp (file?->string (path-replace-extension p #".err.rx") "^$")))
+  (make-test-suite
+   (path->string (find-relative-path suite-dir p))
+   (for*/list ([cast (in-list (test-cast-representation))])
+     (test-suite
+      (~a (list cast))
+      #:before print-path
+      (check-io
+       (thunk*
+        (compile
+         p
+         #:output  tmp-exe
+         #:keep-c  (path-replace-suffix tmp-exe ".c")
+         #:keep-s  (path-replace-suffix tmp-exe ".s")
+         #:cast   cast))
+       input out-rx err-rx)))))
+
+
+(define (file?->string p d)
+  (cond
+    [(file-exists? p) (file->string p)]
+    [else d]))
+
+
+(define (old-run-tests) 
+  (for ([cast-rep (test-cast-representation)])
+    (parameterize ([cast-representation cast-rep]
+                   [output-path (build-path test-tmp-path "t.out")]
+                   [c-path (build-path test-tmp-path "t.c")]
+                   [c-flags (cons "-O3" (c-flags))]
+                   [specialize-cast-code-generation? #t])
+      (printf "~a tests running:\n" cast-rep)
+      (run-tests (suite)))))
+
 
 ;; Parse the command line arguments
+(define main-function (make-parameter old-run-tests))
+
 (command-line
  #:program "schml-test-runner"
- #:once-each
+ #:once-any
+ [("-t" "--test") path-to-test
+  "run a single test"
+  (define p (build-path path-to-test))
+  (unless (file-exists? p)
+    (error 'schml-test-runner "invalid path to test: ~v" path-to-test))
+  (main-function (thunk (run-single-path p)))]
+ [("-d" "--dir") dir
+  "run all files in a directiory"
+  (unless (directory-exists? dir)
+    (error 'schml-test-runner "invalid directory ~v" dir))
+  (main-function run-test-suite)
+  (test-suite-dir (build-path dir))]
  [("-s" "--suite") choice
   "specify suite: all most core box vector tool program large"
-  (let* ([s? (assq (to-symbol choice) suite-choices)])
+  (let* ([s? (assq (string->symbol choice) suite-choices)])
     (if s?
         (suite (cdr s?))
         (error 'tests "--suite given invalid argument ~a" choice)))]
+ #:once-each
  [("-r" "--cast-representation") crep
-  "specify which cast representation to use (Twosomes or Coercions)"
-  (let ((crep (to-symbol crep)))
+  "specify which cast representation to use (Type-Based or Coercions)"
+  (let ((crep (string->symbol crep)))
     (if (or (eq? 'Type-Based crep)
             (eq? 'Coercions crep))
         (test-cast-representation (list crep))
         (error 'tests "--cast-representation given invalid argument ~a" crep)))]
  #:args ()
- (for ([cast-rep : Cast-Representation (test-cast-representation)])
-   (parameterize ([cast-representation cast-rep]
-                  [output-path (build-path test-tmp-path "t.out")]
-                  [c-path (build-path test-tmp-path "t.c")]
-                  [c-flags (cons "-O3" (c-flags))]
-                  [specialize-cast-code-generation? #t])
-     (printf "~a tests running:\n" cast-rep)
-     (run-tests (suite)))))
+ (debug off (test-suite-dir) (test-cast-representation))
+ ((main-function)))
+
+

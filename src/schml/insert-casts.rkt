@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang racket/base
 #|------------------------------------------------------------------------------+
 |Pass: src/insert-casts                                                         |
 +-------------------------------------------------------------------------------+
@@ -12,67 +12,84 @@
 |Input Grammar                                                                  |
 +------------------------------------------------------------------------------|#
 (require racket/match
-         "../helpers.rkt"
          "../errors.rkt"
+         "../logging.rkt"
          "../configuration.rkt"
-         "../language/schml1.rkt"
-         "../language/cast0.rkt")
+         "../language/forms.rkt")
 
 ;; Only the pass is provided by this module
-(provide insert-casts
-         (all-from-out
-          "../language/schml1.rkt"
-          "../language/cast0.rkt"))
+(provide insert-casts)
 
+(module* typed typed/racket/base
+  (require "../language/schml1.rkt"
+           "../language/cast0.rkt")
+  (provide (all-from-out
+            "../language/schml1.rkt"
+            "../language/cast0.rkt"))
+  (require/typed/provide (submod "..")
+    [insert-casts (Schml1-Lang -> Cast0-Lang)]))
 
+(define-syntax-rule (: stx ...) (void))
+(define-syntax-rule (ann e t ...) e)
+(define-syntax-rule (inst e t ...) e)
 
-(: insert-casts (Schml1-Lang . -> . Cast0-Lang))
+(: insert-casts (Schml1-Lang -> Cast0-Lang))
 (define (insert-casts prgm)
-  (match-let ([(Prog (list name next-uid type) exp) prgm])
-    (Prog (list name next-uid type) (iic-expr exp))))
+  (match-define (Prog ann exp) prgm)
+  (debug (Prog ann (ic-expr exp))))
 
 (: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type . -> . C0-Expr))
 (define (mk-cast l-th e t1 t2)
   (if (equal? t1 t2) e (Cast e (Twosome t1 t2 (l-th)))))
 
-(: iic-expr (S1-Expr . -> . C0-Expr))
-(define (iic-expr exp^)
+(: ic-expr (S1-Expr . -> . C0-Expr))
+(define (ic-expr exp^)
   (match-let ([(Ann exp (cons src type)) exp^])
     (match exp
       [(Lambda fml* (and (Ann _ (cons body-src body-type))
-                         (app iic-expr body)))
+                         (app ic-expr body)))
        (unless (Fn? type)
          (error 'insert-casts "function type recieve non-function type"))
        (let* ([lbl-th (mk-label "lambda" body-src)]
               [body (mk-cast lbl-th body body-type (ann (Fn-ret type) Schml-Type))]
-              [fml* : Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)])
+              [fml* #;#;: Uid* (map (inst Fml-identifier Uid Schml-Type) fml*)
+                    ])
          (Lambda fml* body))]
       [(Let bnd* (and (Ann _ (cons src type^)) body))
-       (Let (map iic-bnd bnd*) (mk-cast (mk-label "let" src) (iic-expr body) type^ type))]
+       (Let (map ic-bnd bnd*) (mk-cast (mk-label "let" src) (ic-expr body) type^ type))]
       [(Letrec bnd* (and (Ann _ (cons src type^)) body))
-       (Letrec (map iic-bnd bnd*)
-               (mk-cast (mk-label "letrec" src) (iic-expr body) type^ type))]
-      [(App rator rand*) (iic-application rator rand* src type)]
+       (Letrec (map ic-bnd bnd*)
+               (mk-cast (mk-label "letrec" src) (ic-expr body) type^ type))]
+      [(App rator rand*) (ic-application rator rand* src type)]
       [(Op (Ann prim rand-ty*) rand*)
-       (Op prim (map (iic-operand/cast src) rand* rand-ty*))]
+       (Op prim (map (ic-operand/cast src) rand* rand-ty*))]
       [(Ascribe exp t1 lbl?)
        (let ([lbl (if lbl? (th lbl?) (mk-label "ascription" src))])
-         (mk-cast lbl (iic-expr exp) t1 type))]
-      [(If (and (Ann _ (cons tst-src tst-ty)) (app iic-expr tst))
-           (and (Ann _ (cons csq-src csq-ty)) (app iic-expr csq))
-           (and (Ann _ (cons alt-src alt-ty)) (app iic-expr alt)))
+         (mk-cast lbl (ic-expr exp) t1 type))]
+      [(If (and (Ann _ (cons tst-src tst-ty)) (app ic-expr tst))
+           (and (Ann _ (cons csq-src csq-ty)) (app ic-expr csq))
+           (and (Ann _ (cons alt-src alt-ty)) (app ic-expr alt)))
        (If (mk-cast (mk-label "if" tst-src) tst tst-ty BOOL-TYPE)
            (mk-cast (mk-label "if" csq-src) csq csq-ty type)
            (mk-cast (mk-label "if" alt-src) alt alt-ty type))]
+      [(Switch (and (Ann _ (cons es et)) (app ic-expr e))
+               c*
+               (and (Ann _ (cons ds dt)) (app ic-expr d)))
+       (Switch (mk-cast (mk-label "switch" es) e et INT-TYPE)
+               (for/list #;#;: (Switch-Case* C0-Expr) ([c c*])
+                 (match-let ([(cons cl (and (Ann _ (cons cs ct))
+                                            (app ic-expr cr))) c])
+                   (cons cl (mk-cast (mk-label "switch" cs) cr ct type))))
+               (mk-cast (mk-label "switch" ds) d dt type))]
       [(Var id) (Var id)]
       [(Quote lit) (Quote lit)]
-      [(Begin e* e) (Begin (map iic-expr e*) (iic-expr e))]
+      [(Begin e* e) (Begin (map ic-expr e*) (ic-expr e))]
       [(Repeat index
-           (and (Ann _ (cons s1 t1)) (app iic-expr e1))
-           (and (Ann _ (cons s2 t2)) (app iic-expr e2))
+           (and (Ann _ (cons s1 t1)) (app ic-expr e1))
+           (and (Ann _ (cons s2 t2)) (app ic-expr e2))
          acc
-         (and (Ann _ (cons s3 t3)) (app iic-expr e3))
-         (and (Ann _ (cons s4 t4)) (app iic-expr e4)))
+         (and (Ann _ (cons s3 t3)) (app ic-expr e3))
+         (and (Ann _ (cons s4 t4)) (app ic-expr e4)))
        (Repeat
            index
            (mk-cast (mk-label "Repeat" s1) e1 t1 INT-TYPE)
@@ -83,8 +100,8 @@
       ;; These rules are a rough translation of the coercion semantics that
       ;; are presented in space-efficient gradual typing figure 4
       ;; Their system was using lazy-ud and this system is lazy-d
-      [(Gbox e) (Gbox (iic-expr e))]
-      [(Gunbox (and (Ann _ (cons e-src e-ty)) (app iic-expr e)))
+      [(Gbox e) (Gbox (ic-expr e))]
+      [(Gunbox (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
        (cond
          [(GRef? e-ty) (Gunbox e)]
          [(Dyn? e-ty)
@@ -96,8 +113,8 @@
              (Gunbox (mk-cast lbl e e-ty (GRef DYN-TYPE)))])]
          [else
           (error 'insert-casts/gunbox "unexexpected value for e-ty: ~a" e-ty)])]
-      [(Gbox-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
-                  (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
+      [(Gbox-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
+                  (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
        (define lbl1 (mk-label "guarded box-set!" e1-src))
        (define lbl2 (mk-label "guarded box-set!" e2-src))
        (cond
@@ -115,15 +132,15 @@
                  "unexpected value for e1-ty: ~a"
                  e1-ty)])]
       [(Gvector (and (Ann _ (cons size-src size-ty))
-                     (app iic-expr size))
-                (app iic-expr e))
+                     (app ic-expr size))
+                (app ic-expr e))
        (cond
          [(Dyn? size-ty)
           (define lbl (mk-label "gvector index" size-src))
           (Gvector (mk-cast lbl size size-ty INT-TYPE) e)]
          [else (Gvector size e)])]
-      [(Gvector-ref (and (Ann _ (cons e-src e-ty)) (app iic-expr e))
-                    (and (Ann _ (cons i-src i-ty)) (app iic-expr i)))
+      [(Gvector-ref (and (Ann _ (cons e-src e-ty)) (app ic-expr e))
+                    (and (Ann _ (cons i-src i-ty)) (app ic-expr i)))
        (define i-exp
          (cond
            [(Dyn? i-ty)
@@ -137,9 +154,9 @@
             [(dynamic-operations?)
              (Dyn-GVector-Ref e i-exp (lbl))]
             [else (Gvector-ref (mk-cast lbl e e-ty (GVect DYN-TYPE)) i-exp)])])]
-      [(Gvector-set! (and (Ann _ (cons e1-src e1-ty)) (app iic-expr e1))
-                     (and (Ann _ (cons i-src i-ty)) (app iic-expr i))
-                     (and (Ann _ (cons e2-src e2-ty)) (app iic-expr e2)))
+      [(Gvector-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
+                     (and (Ann _ (cons i-src i-ty)) (app ic-expr i))
+                     (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
        (define lbl1 (mk-label "gvector-set!" e1-src))
        (define lbl2 (mk-label "gvector-set!" e2-src))
        (define i-exp
@@ -162,17 +179,17 @@
          [else (error 'insert-casts/gvector-set!
                       "unexpected value for e1 type: ~a"
                       e1-ty)])]
-      [(Create-tuple e*) (Create-tuple (map iic-expr e*))]
-      [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app iic-expr e)) i)
+      [(Create-tuple e*) (Create-tuple (map ic-expr e*))]
+      [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) i)
        (cond
          [(Dyn? e-ty)
           (let ([n (+ i 1)])
-            (unless (index? n) (error 'iic-expr "bad index"))
+            #;(unless (index? n) (error 'ic-expr "bad index"))
             (Tuple-proj (mk-cast (mk-label "tuple-proj" e-src)
                                  e DYN-TYPE
                                  (STuple n (make-list n DYN-TYPE))) i))]
          [(STuple? e-ty) (Tuple-proj e i)]
-         [else (error 'schml/insert-casts/iic-expr/Tuple-proj "unmatched: ~a" e-ty)])]
+         [else (error 'schml/insert-casts/ic-expr/Tuple-proj "unmatched: ~a" e-ty)])]
       ;; TODO add these cases when monotonic is finished
       ;;[(Mvector e1 e2)         (TODO define vector insert implicit casts)]
       ;;[(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
@@ -185,57 +202,60 @@
       '()
       (cons t (make-list (- n 1) t))))
 
-(: iic-bnd (S1-Bnd . -> . C0-Bnd))
-(define (iic-bnd b)
+(: ic-bnd (S1-Bnd . -> . C0-Bnd))
+(define (ic-bnd b)
   (match-let ([(Bnd i t (and rhs (Ann _ (cons rhs-src rhs-type)))) b])
-    (cons i (mk-cast (mk-label "binding" rhs-src) (iic-expr rhs) rhs-type t))))
+    (cons i (mk-cast (mk-label "binding" rhs-src) (ic-expr rhs) rhs-type t))))
 
 
 ;; An Application of dynamic casts the arguments to dyn and the operand to
 ;; a function that takes dynamic values and returns a dynamic value
-(: iic-application (S1-Expr (Listof S1-Expr) Src Schml-Type . -> . C0-Expr))
-(define (iic-application rator rand* src type)
+(: ic-application (S1-Expr (Listof S1-Expr) Src Schml-Type . -> . C0-Expr))
+(define (ic-application rator rand* src type)
   (match-let ([(Ann _ (cons rator-src rator-type)) rator])
     (cond
       [(Dyn? rator-type)
        (cond
          [(dynamic-operations?)
-          (define-values (expr* type*) (iic-operands rand*))
-          (define expr (iic-expr rator))
+          (define-values (expr* type*) (ic-operands rand*))
+          (define expr (ic-expr rator))
           (Dyn-Fn-App expr expr* type* ((mk-label "Application" src)))]
          [else
-          (let*-values ([(exp* ty*) (iic-operands rand*)]
+          (let*-values ([(exp* ty*) (ic-operands rand*)]
                         [(needed-rator-type) (Fn (length ty*) ty* DYN-TYPE)]
-                        [(exp)          (iic-expr rator)]
+                        [(exp)          (ic-expr rator)]
                         [(lbl) (mk-label "Application" src rator-src)])
             (App (mk-cast lbl exp DYN-TYPE needed-rator-type) exp*))])]
       [(Fn? rator-type)
        ;(Ann type)
-       (App (iic-expr rator)
-            (map (iic-operand/cast src) rand* (Fn-fmls rator-type)))]
-      [else (raise-pass-exn "insert-casts"
-                            "error in iic-application's implimentation")])))
+       (App (ic-expr rator)
+            (map (ic-operand/cast src) rand* (Fn-fmls rator-type)))]
+      [else (error 'unmatched "~a" rator-type)#;
+       (raise-pass-exn "insert-casts"
+                            "error in ic-application's implimentation")])))
 
 (: make-dyn-fn-type (-> Index (Fn Index (Listof Schml-Type) Schml-Type)))
 (define (make-dyn-fn-type n)
-  (Fn n (build-list n (lambda (_) : Schml-Type DYN-TYPE)) DYN-TYPE))
+  (Fn n (build-list n (lambda (_) #;#;: Schml-Type DYN-TYPE)) DYN-TYPE))
 
-(: iic-operands
+(: ic-operands
    (-> (Listof S1-Expr)
        (values (Listof C0-Expr) (Listof Schml-Type))))
-(define (iic-operands rand*)
-  (for/lists ([cf* : (Listof C0-Expr)]
-	      [ty* : Schml-Type*])
-             ([rand : S1-Expr rand*])
+(define (ic-operands rand*)
+  (for/lists (cf* ty*)
+      #;
+      ([cf* : (Listof C0-Expr)]
+       [ty* : Schml-Type*])
+      ([rand #;#;: S1-Expr rand*])
     (match-let ([(Ann _ (cons _ type)) rand])
-      (values (iic-expr rand) type))))
+      (values (ic-expr rand) type))))
 
-(: iic-operand/cast (-> Src (-> S1-Expr Schml-Type C0-Expr)))
-(define (iic-operand/cast app-src)
+(: ic-operand/cast (-> Src (-> S1-Expr Schml-Type C0-Expr)))
+(define (ic-operand/cast app-src)
   (lambda (rand arg-type)
     (match-let ([(Ann _ (cons rand-src rand-type)) rand])
       (mk-cast (mk-label "application" app-src rand-src)
-	       (iic-expr rand)
+	       (ic-expr rand)
 	       rand-type arg-type))))
 
 (define-syntax-rule (th o ...)

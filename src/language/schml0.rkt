@@ -7,12 +7,8 @@
 #|-----------------------------------------------------------------------------+
 | Language/Schml-Syntax this is a program returned from schml/read
 +-----------------------------------------------------------------------------|#
-;; The language created by schml/read
-(define-type Syntax-Lang (Prog String (Listof Stx)))
+(define-type Syntax-Lang (Prog String (Listof Any)))
 
-;; This might not be what I want considier Just Syntax
-(define-type Stx (Syntaxof Any))
-(define-type Stx* (Listof Stx))
 
 
 #|-----------------------------------------------------------------------------+
@@ -27,6 +23,7 @@
      (App E (Listof E))
      (Op Schml-Primitive (Listof E))
      (If E E E)
+     (Switch E (Listof (Pair (Listof Integer) E)) E)
      (Ascribe E Schml-Type (Option Blame-Label))
      (Var Uid)
      (Quote Schml-Literal)

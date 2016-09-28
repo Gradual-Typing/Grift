@@ -261,6 +261,11 @@
         ;; The rest of the cases are just recuring into sub expressions
         [(Let (app (cc-bnd-data* recur) b*) (app recur e)) (Let b* e)]
         [(If (app recur t) (app recur c) (app recur a)) (If t c a)]
+        [(Switch e c* d)
+         (: recur-case : (Switch-Case CoC5-Expr) -> (Switch-Case CoC6-Expr))
+         (define/match (recur-case c)
+           [((cons l r)) (cons l (recur r))])
+         (Switch (recur e) (map recur-case c*) (recur d))]
         [(Op p (app recur* e*)) (Op p e*)]
         [(Quote k) (Quote k)]
         [(Tag t)   (Tag t)]

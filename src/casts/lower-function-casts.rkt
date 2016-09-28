@@ -290,6 +290,13 @@ T?l $ (_  ; )  = what here
        (Op p exp*)]
       [(If (app recur t) (app recur c) (app recur a))
        (If t c a)]
+      [(Switch e c* d)
+       (: map-case :
+          (CoC0-Expr -> CoC1-Expr)
+          -> ((Switch-Case CoC0-Expr) -> (Switch-Case CoC1-Expr))) 
+       (define ((map-case f) c)
+         (cons (car c) (f (cdr c))))
+       (Switch (recur e) (map (map-case recur) c*) (recur d))]
       [(Begin (app recur* e*) (app recur e))
        (Begin e* e)]
       [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))

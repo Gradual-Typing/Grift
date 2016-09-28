@@ -53,6 +53,14 @@
 (define (ul-body gdecs tail)
   (Locals (set->list (set-subtract (ul-tail tail (set)) gdecs)) tail))
 
+(: fold-switch-case (All (A B) (A B -> B) -> ((Switch-Case A) B -> B)))
+(define ((fold-switch-case f) c a)
+  (match-let ([(cons l r) c])
+    (f r a)))
+(: foldr-switch-case* (All (A B) (A B -> B) B (Switch-Case* A) -> B))
+(define (foldr-switch-case* f b c*)
+  (foldr (fold-switch-case f) b c*))
+
 (: ul-tail (D1-Tail (Setof Uid) -> (Setof Uid)))
 (define (ul-tail tail lv*)
   (logging ul-tail (Vomit) "~v" tail)
@@ -62,6 +70,8 @@
                    [(lv*) (ul-tail c lv*)]
                    [(lv*) (ul-tail a lv*)])
        lv*)]
+    [(Switch e c* d)
+     (ul-value e (ul-tail d (foldr-switch-case* ul-tail lv* c*)))]
     [(Begin stm* tail)
      (let*-values ([(lv*) (ul-effect* stm* lv*)]
                    [(lv*)  (ul-tail tail lv*)])
@@ -82,6 +92,8 @@
                    [(lv*) (ul-value c lv*)]
                    [(lv*) (ul-value a lv*)])
        lv*)]
+    [(Switch e c* d)
+     (ul-value e (ul-value d (foldr-switch-case* ul-value lv* c*)))]
     [(Begin stm* exp)
      (let*-values ([(lv*) (ul-value exp lv*)]
                    [(lv*) (ul-effect* stm* lv*)])
@@ -104,6 +116,8 @@
                    [(lv*) (ul-pred c lv*)]
                    [(lv*) (ul-pred a lv*)])
        lv*)]
+    [(Switch e c* d)
+     (ul-value e (ul-pred d (foldr-switch-case* ul-pred lv* c*)))]
     [(Begin stm* pred)
      (let*-values ([(lv*) (ul-pred pred lv*)]
                    [(lv*) (ul-effect* stm* lv*)])
@@ -148,6 +162,8 @@
                    [(lv*) (ul-effect c lv*)]
                    [(lv*) (ul-effect a lv*)])
        lv*)]
+    [(Switch e c* d)
+     (ul-value e (ul-effect d (foldr-switch-case* ul-effect lv* c*)))]
     [(Begin stm* _) (ul-effect* stm* lv*)]
     [(Repeat i e1 e2 #f #f e3)
      (let*-values ([(lv*) (ul-value e1 lv*)]

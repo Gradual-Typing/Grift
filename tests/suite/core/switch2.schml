@@ -1,0 +1,4 @@
+(let ([y 10])
+ (switch y
+  [(1 2) #f]
+  [else  #t]))

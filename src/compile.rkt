@@ -2,7 +2,7 @@
 
 (require "./configuration.rkt"
          "./helpers.rkt"
-         "./schml/reduce-to-cast-calculus.rkt"
+         (submod "./schml/reduce-to-cast-calculus.rkt" typed)
          "./casts/impose-cast-semantics.rkt"
          "./data/convert-representation.rkt"
          "./backend-c/code-generator.rkt"
@@ -100,9 +100,6 @@
 
 (define output-suffix : (Parameterof String) (make-parameter ""))
 
-(define-syntax-rule (debug v ...)
-    (begin (printf "~a=~v\n" 'v v) ... (newline)))
-
 ;; Compile all .schml files in a directory and sub-directories
 (: compile-directory : Path -> (Listof Path))
 (define (compile-directory compile-dir)
@@ -129,14 +126,9 @@
     (define c-path (and c-dir (build-path c-dir (path-add-suffix out-name #".c"))))
     (define s-path (and s-dir (build-path s-dir (path-add-suffix out-name #".s"))))
     (values (build-path compile-dir out-name) c-path s-path))
-
- 
-  
-  (debug compile-dir c-dir s-dir)
   
   ;; Iterate over all schml files in directory and subdirectories
   (for/list ((fl (find-files schml-path? compile-dir)))
-    (debug fl)
 
     ;; generate actual file paths instead of directory paths
     (define-values (out-path c-path? s-path?)

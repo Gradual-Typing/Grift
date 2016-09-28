@@ -121,3 +121,7 @@ get around this problem.
         (raise-syntax-error
          'Unfinished-TODO
          (format "~a: ~a" loc-string (syntax->datum x))))))
+
+
+(define-syntax-rule (debug v ...)
+  (begin (printf "~a=~v\n" 'v v) ... (newline)))

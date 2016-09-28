@@ -35,9 +35,6 @@
   ;; terms that may be of use in testing other languages
   (provide  good good1 good2 good3 odd5))
 
-
-(check-redudancy #t)
-
 (define-extended-language GTLC STLC
   ;; Expressions now allow ascription
   (e   ::= .... (: e τ))

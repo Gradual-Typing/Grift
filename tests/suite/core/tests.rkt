@@ -5,10 +5,10 @@
 
 (provide (all-defined-out))
 
-(define core-tests : Test
+(define tiny-tests : Test
   (test-suite
-   "core tests"
-   #:before (lambda () (display "core test running ... "))
+   "tiny tests"
+   #:before (lambda () (display "tiny tests running ... "))
    #:after (lambda () (display "done\n"))
    (test-file "core" "const-unit.schml" (unit))
    ;; Bools
@@ -79,6 +79,13 @@
    (test-file "core" "read-int1.schml" (bool #t))
    (test-file "core" "read-int2.schml" (int 42))
    (test-file "core" "read-int3.schml" (blame #f #f))
+   ))
+
+(define core-tests : Test
+  (test-suite
+   "core tests"
+   #:before (lambda () (display "core test running ... "))
+   #:after (lambda () (display "done\n"))
    ;; Letrec
    (test-file "core" "letrec1.schml" (dyn))
    (test-file "core" "letrec2.schml" (function))
@@ -110,6 +117,9 @@
    (test-file "core" "blame12.schml" (blame #f "Pass"))
    (test-file "core" "blame13.schml" (blame #f "Pass"))
    (test-file "core" "blame14.schml" (blame #f "Pass"))
-   
-
+   ;; Switches
+   (test-file "core" "switch0.schml"   (bool #t))
+   (test-file "core" "switch1.schml"   (bool #t))
+   (test-file "core" "switch2.schml"   (bool #t))
+   (test-file "core" "switch3.schml"   (bool #t))
    ))

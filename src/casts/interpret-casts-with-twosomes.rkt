@@ -776,6 +776,11 @@ form, to the shortest branch of the cast tree that is relevant.
        (Blame (recur e))]
       [(If tst csq alt)
        (If (recur tst) (recur csq) (recur alt))]
+      [(Switch e c* d)
+       (: recur-case : (Switch-Case CoC1-Expr) -> (Switch-Case CoC3-Expr))
+       (define/match (recur-case c)
+         [((cons l r)) (cons l (recur r))])
+       (Switch (recur e) (map recur-case c*) (recur d))]
       [(Var i) (Var i)]
       [(Type t) (Type t)]
       [(Quote k) (Quote k)]

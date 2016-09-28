@@ -8,7 +8,7 @@
          ;;"../src/language.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
-         
+         racket/exn
          (only-in "../src/compile.rkt" compile)
          "./values.rkt"
          "./paths.rkt")
@@ -18,8 +18,8 @@
 
 (define-syntax-rule (test-compile name path expected)
   (test-case name 
-    (with-handlers ([exn:schml:type:static?
-                      (lambda ([e : exn:schml:type:static])
+    (with-handlers ([exn?
+                      (lambda ([e : exn])
                         (begin
                           (check value=?
                                  expected
@@ -50,3 +50,5 @@
 (define-syntax-rule (make-test-file p ...)
   (syntax-rules ()
     [(n e) (test-compile n (simplify-path (build-path test-suite-path p ... n)) e)]))
+
+
