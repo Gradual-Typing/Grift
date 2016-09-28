@@ -4,10 +4,10 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
- Discription:
+ Description:
  This pass adds the castable form which extends all lambdas that
  are castable with a free variable which represents the function that is
- necissary in order to cast the closure created by this lambda. It can now be
+ necessary in order to cast the closure created by this lambda. It can now be
  extracted from a closure value using the fn-cast form. Note that lambdas
  created in the process of creating these casting functions are not castable.
  Though their return values are.
@@ -16,7 +16,7 @@
  used in each of the higher order casting functions because the values needed
  to perform the cast are not available until runtime.
 
- This pass also substitutes all casts of the for (cast v Fn1 Fn2 l) with the
+ This pass also substitutes all casts of the form (cast v Fn1 Fn2 l) with the
  equivalent form (fn-cast v Fn1 Fn2 l), in order to show that the cast specific
  to the closure value is being used.
 
@@ -200,7 +200,6 @@ T?l $ (_  ; )  = what here
 (provide lower-function-casts
          (all-from-out
           "../language/cast-or-coerce0.rkt"
-          #;"../language/casts-or-coercions.rkt"
           "../language/cast-or-coerce1.rkt"))
 
 
@@ -222,7 +221,7 @@ T?l $ (_  ; )  = what here
 
 
 ;; The entry point for this pass it is called by impose-casting semantics
-(: lower-function-casts (Cast-or-Coerce0-Lang Config . -> . Cast-or-Coerce1-Lang))
+(: lower-function-casts (Cast-or-Coerce0-Lang Config -> Cast-or-Coerce1-Lang))
 (define (lower-function-casts prgm config)
   (match-define (Prog (list name next type) exp) prgm)
   (match (Config-cast-rep config)
@@ -355,16 +354,51 @@ T?l $ (_  ; )  = what here
          (i : CoC1-Expr <- (lfc-expr index))
          (e2 : CoC1-Expr <- (lfc-expr e2))
          (return-state (Gvector-set! e1 i e2))]
+        [(Mbox e t)
+         (e  : CoC1-Expr  <- (lfc-expr e))
+         (return-state (Mbox e t))]
+        [(Munbox e)
+         (e  : CoC1-Expr  <- (lfc-expr e))
+         (return-state (Munbox e))]
+        [(Mbox-set! e1 e2)
+         (e1 : CoC1-Expr <- (lfc-expr e1))
+         (e2 : CoC1-Expr <- (lfc-expr e2))
+         (return-state (Mbox-set! e1 e2))]
+        [(MBoxCastedRef u t)
+         (return-state (MBoxCastedRef u t))]
+        [(MBoxCastedSet! u e t)
+         (e : CoC1-Expr <- (lfc-expr e))
+         (return-state (MBoxCastedSet! u e t))]
+        [(Mvector e1 e2 t)
+         (e1  : CoC1-Expr  <- (lfc-expr e1))
+         (e2  : CoC1-Expr  <- (lfc-expr e2))
+         (return-state (Mvector e1 e2 t))]
+        [(Mvector-ref e1 e2)
+         (e1  : CoC1-Expr  <- (lfc-expr e1))
+         (e2  : CoC1-Expr  <- (lfc-expr e2))
+         (return-state (Mvector-ref e1 e2))]
+        [(Mvector-set! e1 e2 e3)
+         (e1 : CoC1-Expr <- (lfc-expr e1))
+         (e2 : CoC1-Expr <- (lfc-expr e2))
+         (e3 : CoC1-Expr <- (lfc-expr e3))
+         (return-state (Mvector-set! e1 e2 e3))]
+        [(MVectCastedRef u i t)
+         (i : CoC1-Expr <- (lfc-expr i))
+         (return-state (MVectCastedRef u i t))]
+        [(MVectCastedSet! u i e t)
+         (e : CoC1-Expr <- (lfc-expr e))
+         (i : CoC1-Expr <- (lfc-expr i))
+         (return-state (MVectCastedSet! u i e t))]
         [(Var id)    (return-state (Var id))]
         [(Quote lit) (return-state (Quote lit))])))
 
-(: lfc-expr* (-> CoC0-Expr* (State LFC-State CoC1-Expr*)))
+(: lfc-expr* (CoC0-Expr* -> (State LFC-State CoC1-Expr*)))
 (define (lfc-expr* e*) (map-state lfc-expr e*))
 
 ;; Recur through binding with the casting state
-(: lfc-bnd* (-> CoC0-Bnd* (State LFC-State CoC1-Bnd*)))
+(: lfc-bnd* (CoC0-Bnd* -> (State LFC-State CoC1-Bnd*)))
 (define (lfc-bnd* b*)
-  (: lfc-bnd (-> CoC0-Bnd (State LFC-State CoC1-Bnd)))
+  (: lfc-bnd (CoC0-Bnd -> (State LFC-State CoC1-Bnd)))
   (define (lfc-bnd b)
     (match-let ([(cons i e) b])
       (do (bind-state : (State LFC-State CoC1-Bnd))
@@ -452,7 +486,7 @@ T?l $ (_  ; )  = what here
 ;;[check : CoC1-Expr (If arity-test then-cast else-blame)])
 ;; The entire casting function is now all constructed
 
-(: mk-casted-args (-> CoC1-Expr CoC1-Expr CoC1-Expr Uid* CoC1-Expr*))
+(: mk-casted-args (CoC1-Expr CoC1-Expr CoC1-Expr Uid* -> CoC1-Expr*))
 (define (mk-casted-args t1 t2 lbl uid*)
   (error 'foo)
   ;(: loop (-> Uid* Index CoC1-Expr*))
@@ -733,7 +767,7 @@ fun
 (Function-Coercions (List arg-n ...) ret))))
 |#
 
-(: mk-caster-ids (-> Index Uid* (State LFC-State Uid*)))
+(: mk-caster-ids (Index Uid* -> (State LFC-State Uid*)))
 (define (mk-caster-ids ary vars)
   (if (zero? ary)
       (return-state vars)

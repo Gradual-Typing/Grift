@@ -50,7 +50,7 @@
                                  (current-error-port))])
       (let ([asm? (Config-asm-path config)])
         (when asm?
-          (system (format "cc ~a -S -o ~a ~a" in (path->string asm?) flags))))
+          (system (format "clang ~a -S -o ~a ~a" in (path->string asm?) flags))))
       (unless (system cmd)
         (error 'schml/backend-c/invoke-c-compiler
                "failed to compile with: ~a"

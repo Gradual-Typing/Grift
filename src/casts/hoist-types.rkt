@@ -146,15 +146,18 @@
        (Fn i a* r)]
       [(Ref (app ht-coercion r) (app ht-coercion w))
        (Ref r w)]
+      [(MonoRef (app identify-type t)) (MonoRef t)]
       [other (error 'hoist-types/coercion "unmatched ~a" other)]))
   
   ;; Recur through expression replacing types with their primitive counterparts
   (: recur (CoC3-Expr -> CoC3.1-Expr))
   (define (recur exp)
     (match exp
-      ;; The only expression of any inportance in the pass
+      ;; interesting cases
       [(Type (app identify-type t))
        (Type t)]
+      [(Mbox (app recur e) (app identify-type t)) (Mbox e t)]
+      [(Mvector (app recur e1) (app recur e2) (app identify-type t)) (Mvector e1 e2 t)]
       ;; Every other case is just a boring flow agnostic tree traversal
       [(Code-Label u)
        (Code-Label u)]
@@ -315,6 +318,42 @@
        (Guarded-Proxy-Blames exp)]
       [(Guarded-Proxy-Coercion (app recur exp))
        (Guarded-Proxy-Coercion exp)]
+      [(CastedValue-Huh (app recur exp))
+       (CastedValue-Huh exp)]
+      [(CastedValue (app recur e1) r)
+       (match r
+         [(Twosome (app recur e2) (app recur e3) (app recur e4))
+          (CastedValue e1 (Twosome e2 e3 e4))]
+         [(Coercion (app recur e2))
+          (CastedValue e1 (Coercion e2))])]
+      [(CastedValue-Value (app recur exp))
+       (CastedValue-Value exp)]
+      [(CastedValue-Source (app recur exp))
+       (CastedValue-Source exp)]
+      [(CastedValue-Target (app recur exp))
+       (CastedValue-Target exp)]
+      [(CastedValue-Blames (app recur exp))
+       (CastedValue-Blames exp)]
+      [(CastedValue-Coercion (app recur exp))
+       (CastedValue-Coercion exp)]
+      [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
+      [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
+      [(Mbox-rtti-set! u (app recur e)) (Mbox-rtti-set! u e)]
+      [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+      [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
+      [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+      [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
+      [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+      [(Make-Fn-Type e1 (app recur e2) (app recur e3)) (Make-Fn-Type e1 e2 e3)]
+      [(MRef-Coercion-Huh (app recur e)) (MRef-Coercion-Huh e)]
+      [(MRef-Coercion-Type (app recur e)) (MRef-Coercion-Type e)]
+      [(MRef-Coercion (app recur e)) (MRef-Coercion e)]
+      [(Type-GRef (app recur e)) (Type-GRef e)]
+      [(Type-GVect (app recur e)) (Type-GVect e)]
+      [(Type-MRef (app recur e)) (Type-MRef e)]
+      [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
+      [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
+      [(Error (app recur e)) (Error e)]
       [other (error 'hoist-types/expr "unmatched ~a" other)]))
   ;; Recur through other type containing ast forms
   (: recur* (CoC3-Expr* -> CoC3.1-Expr*))

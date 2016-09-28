@@ -59,7 +59,18 @@
           (Gbox-set! E E)
           (Gvector E E)
           (Gvector-set! E E E)
-          (Gvector-ref E E))))
+          (Gvector-ref E E)
+          ;; Monotonic
+          (Mbox E Schml-Type)
+          (Munbox E) ;; fast read
+          (Mbox-set! E E) ;; fast write
+          (MBoxCastedRef Uid Schml-Type)
+          (MBoxCastedSet! Uid E Schml-Type)
+          (Mvector E E Schml-Type)
+          (Mvector-ref E E) ;; fast read
+          (Mvector-set! E E E) ;; fast write
+          (MVectCastedRef Uid E Schml-Type)
+          (MVectCastedSet! Uid E E Schml-Type))))
 
 (define-type CoC1-Expr* (Listof CoC1-Expr))
 (define-type CoC1-Bnd   (Pairof Uid CoC1-Expr))

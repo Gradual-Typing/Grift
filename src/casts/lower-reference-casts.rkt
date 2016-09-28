@@ -57,14 +57,14 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
 (define inline-guarded-branch?
   (make-parameter #t))
 
-;; The entry point for this pass it is called by impose-casting semantics
+;; The entry point for this pass is called by impose-casting semantics
 (: lower-reference-casts (Cast-or-Coerce1-Lang Config -> Cast-or-Coerce2-Lang))
 (trace-define (lower-reference-casts prgm config)
               (match-let (((Prog (list name next type) body) prgm))
                 (let ([next : (Boxof Nat) (box next)])
-                  (match-let ([(list gunbox gbox-set! gvect-ref gvect-set! build-runtime)
+                  (match-let ([(list gunbox gbox-set! gvect-ref gvect-set! munbox mbox-set! build-runtime)
                                (get-ref-helpers next (Config-cast-rep config))])
-                    (let* ([e : CoC2-Expr ((lrc-expr next gunbox gbox-set! gvect-ref gvect-set!) body)]
+                    (let* ([e : CoC2-Expr ((lrc-expr next gunbox gbox-set! gvect-ref gvect-set! munbox mbox-set!) body)]
                            [next : Nat (unbox next)])
                       (Prog (list name next type) (build-runtime e)))))))
 
@@ -77,6 +77,9 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
                          (U (Quote Integer) (Var Uid))
                          (U (Quote Cast-Literal) (Var Uid))
                          -> CoC2-Expr))
+(define-type MunboxTy (Uid (Var Uid) -> CoC2-Expr))
+(define-type Mbox-setTy (Uid (U (Quote Cast-Literal) (Var Uid)) (Var Uid) ->
+                             CoC2-Expr))
 
 (: gunbox/coercion GunboxT)
 (define (gunbox/coercion gref)
@@ -139,6 +142,17 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
           (Unguarded-Box-Ref gref))
       (App-Code lbl (list gref))))
 
+(: munbox/twosome MunboxTy)
+(define (munbox/twosome addr type)
+  (Interpreted-Cast
+   (Mbox-val-ref (Var addr)) (Twosome (Mbox-rtti-ref addr) type (Quote ""))))
+
+(: mbox-set!/twosome Mbox-setTy)
+(define (mbox-set!/twosome addr val type)
+  (Mbox-val-set!
+   (Var addr)
+   (CastedValue val (Twosome type (Mbox-rtti-ref addr) (Quote "")))))
+
 (: gbox-set!/twosome ((Code-Label Uid) -> Gbox-setT))
 (define ((gbox-set!/twosome lbl) gref val)
   (if (inline-guarded-branch?)
@@ -182,9 +196,13 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
           (Unguarded-Vect-Set! gref index val))
       (App-Code lbl (list gref index val))))
 
+(define-type GreatestLowerBoundType ((Var Uid) (Var Uid) -> CoC2-Expr))
+
 (: get-ref-helpers ((Boxof Nat) Cast-Representation
                     -> (List GunboxT Gbox-setT
                              Gvect-refT Gvect-setT
+                             MunboxTy Mbox-setTy
+                             ;;GreatestLowerBoundType
                              (CoC2-Expr -> CoC2-Expr))))
 (define (get-ref-helpers next rep)
   ;; create a new unique identifier
@@ -193,6 +211,23 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
     (let ([n (unbox next)])
       (set-box! next (+ n 1))
       (Uid s n)))
+
+  (: munbox/coercion MunboxTy)
+  (define (munbox/coercion addr t2)
+    (let ([t1 (next-uid! "t1")]
+          [c  (next-uid! "crcn")])
+      (Let (list (cons t1 (Mbox-rtti-ref addr)))
+           (Let (list (cons c (Make-Coercion (Var t1) t2)))
+                (Interpreted-Cast (Mbox-val-ref (Var addr)) (Coercion (Var c)))))))
+
+  (: mbox-set!/coercion Mbox-setTy)
+  (define (mbox-set!/coercion addr val t1)
+    (let ([t2 (next-uid! "t2")]
+          [c  (next-uid! "crcn")])
+      (Let (list (cons t2 (Mbox-rtti-ref addr)))
+           (Let (list (cons c (Make-Coercion t1 (Var t2))))
+                (Mbox-val-set! (Var addr) (CastedValue val (Coercion (Var c))))))))
+  
   ;; Template to Build the GRef Read Runtime Code
   ;; The current implementation recursively removes proxies until
   ;; it finds an unguarded box, reads the value from the box, and
@@ -209,6 +244,7 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
          gunbox
          (Code (list gref)
                ((gunbox/twosome (Code-Label gunbox)) (Var gref)))))))
+
   ;; A template to build the GRef Write Runtime Code
   ;; The current implementation recursively removes proxies
   ;; casting the value to be written as specified by each traversed
@@ -261,6 +297,9 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
         (gbox-set!/twosome (Code-Label gbox-set-u))
         (gvect-ref/twosome (Code-Label gvec-ref-u))
         (gvect-set!/twosome (Code-Label gvec-set-u))
+        munbox/twosome
+        mbox-set!/twosome
+        ;; build-runtime
         (lambda ([e : CoC2-Expr])
           (Labels (list (cons gunbox-u gunbox-c)
                         (cons gbox-set-u gbox-set-c)
@@ -270,6 +309,7 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
     ['Coercions
      (list gunbox/coercion gbox-set!/coercion
            gvect-ref/coercion gvect-set!/coercion
+           munbox/coercion mbox-set!/coercion
            (lambda ([e : CoC2-Expr]) e))]
     [other (error 'lrc/get-ref-help "unmatched ~a" other)]))
 
@@ -277,9 +317,9 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
 ;; Map over the expression tree lowering reference operations into
 ;; more explicit operations on the GRef interface described at the
 ;; top of the file.
-(: lrc-expr ((Boxof Nat) GunboxT Gbox-setT Gvect-refT Gvect-setT ->
-                     (CoC1-Expr -> CoC2-Expr)))
-(define (lrc-expr next gunbox gbox-set! gvect-ref gvect-set!)
+(: lrc-expr ((Boxof Nat) GunboxT Gbox-setT Gvect-refT Gvect-setT MunboxTy Mbox-setTy ->
+             (CoC1-Expr -> CoC2-Expr)))
+(define (lrc-expr next gunbox gbox-set! gvect-ref gvect-set! munbox mbox-set!)
   ;; create a new unique identifier
   (: next-uid! (String -> Uid))
   (define (next-uid! s)
@@ -407,6 +447,28 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
          (if (null? b*)
              (gvect-set! v i w)
              (Let b* (gvect-set! v i w))))]
+      [(Mbox (app recur e) t) (Mbox e t)]
+      [(Munbox (app recur e)) (Mbox-val-ref e)]
+      [(Mbox-set! (app recur e1) (app recur e2))
+       (Mbox-val-set! e1 e2)]
+      [(MBoxCastedRef addr t)
+       (let ([t2 (next-uid! "t2")])
+         (Let (list (cons t2 (Type t)))
+              (munbox addr (Var t2))))]
+      [(MBoxCastedSet! addr (app recur e) t)
+       (let ([t1 (next-uid! "t1")])
+         (Let (list (cons t1 (Type t)))
+              (if (or (Var? e) (Quote? e))
+                  (mbox-set! addr e (Var t1))
+                  (let ([val (next-uid! "write_cv")])
+                    (Let (list (cons val e))
+                         (mbox-set! addr (Var val) (Var t1)))))))]
+      [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
+      [(Mvector-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+      [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
+       (Mvector-val-set! e1 e2 e3)]
+      [(MVectCastedRef u i t) (TODO)]
+      [(MVectCastedSet! u i e t) (TODO)]
       ;; Boring Recursion Cases --------------------------------
       [(Lambda f* (Castable fn (app recur e)))
        (Lambda f* (Castable fn e))]
@@ -463,5 +525,5 @@ Guarded-Proxy-Blames  : (x : GRep A) -> {Guarded-Proxy-Huh x} -> Blame-Label
     (match-let ([(cons i e) b])
       (cons i (recur e))))
   
-  ;; recur is a recursive closure that results from lower-reference-ops
+  ;; body of lrc-expr
   recur)

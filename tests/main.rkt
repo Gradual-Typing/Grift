@@ -32,6 +32,7 @@
     (most    . ,most-tests)
     (core    . ,core-tests)
     (box     . ,box-tests)
+    (monobox . ,monobox-tests)
     (vector  . ,vector-tests)
     (tool    . ,tool-tests)
     (program . ,program-tests)

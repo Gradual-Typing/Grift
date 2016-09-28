@@ -4,12 +4,15 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-|Discription: This is a first attempt at typechecking for the GTLC core         |
+|Description: This is a first attempt at typechecking for the GTLC core         |
 |language.  It is currently limited to just the grammar noted below but with the|
-|with the addition of a unification algorithm is could be generalize to mutually|
+|addition of a unification algorithm is could be generalize to mutually         |
 |recursive functions. There is a major way in which this algorithm is different |
 |from that of the STLC. The difference is that instead of checking for type     |
 |equality the algorithm is checking for type consitency.                        |
+|                                                                               |
+|splits each elimination form of monotonic references to one that is annotated  |
+|and the one that is not, refer to the paper for the rules                      |
 |                                                                               |
 |Essence of the consistency relationship:                                       |
 |Two type are consistent any of the following relationships are true.           |
@@ -55,7 +58,7 @@ Provide comments about where to find definitions of types and data
   (lambda () (raise-variable-not-found src id)))
 
 #|
-  The type rules for core forms that have interesting type rules
+The type rules for core forms that have interesting type rules
 |#
 
 ;; The type of a lambda that is annotated is the type of the annotation
@@ -65,18 +68,18 @@ Provide comments about where to find definitions of types and data
 			(Fn Index Schml-Type* Schml-Type)))
 (define (lambda-type-rule src ty-param* t-body return-ann)
   (cond
-   [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
-   [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
-   [else (raise-lambda-inconsistent src t-body return-ann)]))
+    [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
+    [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
+    [else (raise-lambda-inconsistent src t-body return-ann)]))
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
 (: let-binding-type-rule (-> Schml-Type? Schml-Type Uid Src Schml-Type))
 (define (let-binding-type-rule t-bnd t-exp id src)
   (cond
-   [(not t-bnd) t-exp]
-   [(consistent? t-bnd t-exp) t-bnd]
-   [else (raise-binding-inconsistent src id t-bnd t-exp)]))
+    [(not t-bnd) t-exp]
+    [(consistent? t-bnd t-exp) t-bnd]
+    [else (raise-binding-inconsistent src id t-bnd t-exp)]))
 
 ;; The type of a cast is the cast-type if the expression type and
 ;; the cast type are consistent.
@@ -96,11 +99,11 @@ Provide comments about where to find definitions of types and data
 		    Schml-Type))
 (define (if-type-rule t-tst t-csq t-alt src)
   (cond
-   [(not (consistent? t-tst BOOL-TYPE))
-    (raise-if-inconsistent-test src t-tst)]
-   [(not (consistent? t-csq t-alt))
-    (raise-if-inconsistent-branches src t-csq t-alt)]
-   [else (join t-csq t-alt)]))
+    [(not (consistent? t-tst BOOL-TYPE))
+     (raise-if-inconsistent-test src t-tst)]
+    [(not (consistent? t-csq t-alt))
+     (raise-if-inconsistent-branches src t-csq t-alt)]
+    [else (join t-csq t-alt)]))
 
 ;; The type of literal constants are staticly known
 (: const-type-rule (Schml-Literal . -> . (U Bool Int Unit)))
@@ -174,18 +177,25 @@ Provide comments about where to find definitions of types and data
 (define (munbox-type-rule ty)
   (match ty
     [(Dyn) DYN-TYPE]
-    [(MRef m) m]
+    [(MRef t) t]
     [otherwise (TODO raise an error about there a type error here)]))
 
 ;; The type of setting a dyn value is dyn
-;; The type of setting a MRef value is the type of the armurment
+;; The type of setting a MRef value is the type of the argument
 (: mbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
 (define (mbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) DYN-TYPE]
-    [(MRef m) (if (consistent? m val-ty)
-                  val-ty
+    [(MRef t) (if (consistent? t val-ty)
+                  UNIT-TYPE
                   (TODO raise an error about type inconsistency between m and val-ty))]
+    [otherwise (TODO raise an error about box-type beinm type-incorrect)]))
+
+(: mbox-val-type (-> Schml-Type Schml-Type))
+(define (mbox-val-type box-ty)
+  (match box-ty
+    [(Dyn) DYN-TYPE]
+    [(MRef t) t]
     [otherwise (TODO raise an error about box-type beinm type-incorrect)]))
 
 ;; The type of creating an array is Vect of the type of the initializing argument
@@ -220,7 +230,7 @@ Provide comments about where to find definitions of types and data
       (match vect-ty
         [(Dyn) DYN-TYPE]
         [(GVect g) (if (consistent? g val-ty)
-                       val-ty
+                       UNIT-TYPE
                        (TODO raise a error about consistency between g and val-ty))]
         [otherwise (TODO raise an error about consistency between (Gvect val-ty))])
       (TODO raise an error about consistency between index-ty and int)))
@@ -242,7 +252,7 @@ Provide comments about where to find definitions of types and data
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
         [(Dyn) DYN-TYPE]
-        [(MVect g) g]
+        [(MVect t) t]
         [otherwise (TODO raise inconsistent with MVECT 'a here)])
       (TODO raise inconsistent with INT here)))
 
@@ -256,18 +266,24 @@ Provide comments about where to find definitions of types and data
       (match vect-ty
         [(Dyn) DYN-TYPE]
         [(MVect g) (if (consistent? g val-ty)
-                       val-ty
+                       UNIT-TYPE
                        (TODO raise a error about consistency between g and val-ty))]
         [otherwise (TODO raise an error about consistency between (Mvect val-ty))])
       (TODO raise an error about consistency between index-ty and int)))
 
+(: mvector-val-type (-> Schml-Type Schml-Type))
+(define (mvector-val-type vect-ty)
+  (match vect-ty
+    [(Dyn) DYN-TYPE]
+    [(MVect t) t]
+    [otherwise (TODO raise an error about vect-type being type-incorrect)]))
 
 ;;; Procedures that destructure and restructure the ast
 (: tc-expr (-> S0-Expr Env (values S1-Expr Schml-Type)))
 (define (tc-expr exp env)
   (define-syntax-rule (map-recur exp*)
     (for/lists ([e* : (Listof S1-Expr)] [t* : (Listof Schml-Type)])
-      ([e exp*]) (recur e)))
+               ([e exp*]) (recur e)))
   (: recur (-> S0-Expr (values S1-Expr Schml-Type)))
   (define (recur e)
     (let ((src (Ann-data e)))
@@ -326,19 +342,20 @@ Provide comments about where to find definitions of types and data
                        [(e2 t2) (recur e2)]
                        [(ty)    (gbox-set!-type-rule t1 t2)])
            (values (Ann (Gbox-set! e1 e2) (cons src ty)) ty))]
-        [(Mbox e)
-         (let*-values ([(e ty) (recur e)]
-                       [(ty)   (mbox-type-rule ty)])
-           (values (Ann (Mbox e) (cons src ty)) ty))]
+        [(MboxS e)
+         (let*-values ([(e val-type) (recur e)]
+                       [(ref-type)   (mbox-type-rule val-type)])
+           (values (Ann (Mbox e val-type) (cons src ref-type)) ref-type))]
         [(Munbox e)
          (let*-values ([(e ty) (recur e)]
                        [(ty)   (munbox-type-rule ty)])
-           (values (Ann (Munbox e) (cons src ty)) ty))]
+           (values (Ann (if (completely-static-type? ty) (Munbox e) (MunboxT e ty)) (cons src ty)) ty))]
         [(Mbox-set! e1 e2)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
-                       [(ty)    (mbox-set!-type-rule t1 t2)])
-           (values (Ann (Mbox-set! e1 e2) (cons src ty)) ty))]
+                       [(ty)    (mbox-set!-type-rule t1 t2)]
+                       [(T)     (mbox-val-type t1)])
+           (values (Ann (if (completely-static-type? T) (Mbox-set! e1 e2) (Mbox-set!T e1 e2 T)) (cons src ty)) ty))]
         [(Gvector e1 e2)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
@@ -355,22 +372,23 @@ Provide comments about where to find definitions of types and data
                        [(e3 t3) (recur e3)]
                        [(ty)    (gvector-set!-type-rule t1 t2 t3)])
            (values (Ann (Gvector-set! e1 e2 e3) (cons src ty)) ty))]
-        [(Mvector e1 e2)
+        [(MvectorS e1 e2)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(ty)    (mvector-type-rule t1 t2)])
-           (values (Ann (Mvector e1 e2) (cons src ty)) ty))]
+           (values (Ann (Mvector e1 e2 t2) (cons src ty)) ty))]
         [(Mvector-ref e1 e2)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(ty)    (mvector-ref-type-rule t1 t2)])
-           (values (Ann (Mvector-ref e1 e2) (cons src ty)) ty))]
+           (values (Ann (if (completely-static-type? ty) (Mvector-ref e1 e2) (Mvector-refT e1 e2 ty)) (cons src ty)) ty))]
         [(Mvector-set! e1 e2 e3)
          (let*-values ([(e1 t1) (recur e1)]
                        [(e2 t2) (recur e2)]
                        [(e3 t3) (recur e3)]
-                       [(ty)    (mvector-set!-type-rule t1 t2 t3)])
-           (values (Ann (Mvector-set! e1 e2 e3) (cons src ty)) ty))])))
+                       [(ty)    (mvector-set!-type-rule t1 t2 t3)]
+                       [(T)     (mvector-val-type t1)])
+           (values (Ann (if (completely-static-type? T) (Mvector-set! e1 e2 e3) (Mvector-set!T e1 e2 e3 T)) (cons src ty)) ty))])))
   (recur exp))
 
 (: tc-lambda (-> Schml-Fml* Schml-Type? S0-Expr Src Env
@@ -385,39 +403,39 @@ Provide comments about where to find definitions of types and data
 (: unzip-formals (-> Schml-Fml* (values (Listof Uid) Schml-Type*)))
 (define (unzip-formals f*)
   (for/lists ([i* : (Listof Uid)] [t* : Schml-Type*])
-      ([f f*])
+             ([f f*])
     (values (Fml-identifier f) (Fml-type f))))
 
 
 (: tc-letrec (S0-Bnd* S0-Expr Src Env -> (values S1-Expr Schml-Type)))
 (define (tc-letrec bnd* body src env)
-    (: fold-env-extend/bnd (S0-Bnd* Env -> (values S0-Bnd* Env)))
+  (: fold-env-extend/bnd (S0-Bnd* Env -> (values S0-Bnd* Env)))
   (define (fold-env-extend/bnd b* env)
     (for/fold : (values S0-Bnd* Env) ([bnd* : S0-Bnd* '()] [env : Env env]) ([bnd : S0-Bnd b*])
-              (match bnd
-                [(Bnd id type (Ann exp src))
-                 (match exp
-                   [(Lambda f* (Ann b t^))
-                    (cond
-                      [type (values (cons bnd bnd*) (hash-set env id type))]
-                      [else
-                       (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
-                              [arity  (length arg-t*)])
-                         (cond
-                           [t^
-                            (values (cons bnd bnd*)
-                                    (hash-set env id (Fn arity arg-t* t^)))]
-                           [else
-                            ;; Function without return-type annotatin gets dyn return
-                            (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
-                                   [rhs : S0-Expr
-                                        (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
-                              (values (cons (Bnd id type rhs) bnd*)
-                                      (hash-set env id type)))]))])]
-                   [e (let* ([recur/env (lambda ([e : S0-Expr]) (tc-expr e env))]
-                            [e2 ((mk-tc-binding src recur/env) bnd)])
-                        (match-let ([(Bnd id type rhs) e2])
-                          (values (cons bnd bnd*) (hash-set env id type))))])])))
+      (match bnd
+        [(Bnd id type (Ann exp src))
+         (match exp
+           [(Lambda f* (Ann b t^))
+            (cond
+              [type (values (cons bnd bnd*) (hash-set env id type))]
+              [else
+               (let* ([arg-t* (map (inst Fml-type Uid Schml-Type) f*)]
+                      [arity  (length arg-t*)])
+                 (cond
+                   [t^
+                    (values (cons bnd bnd*)
+                            (hash-set env id (Fn arity arg-t* t^)))]
+                   [else
+                    ;; Function without return-type annotatin gets dyn return
+                    (let* ([type : Schml-Type (Fn arity arg-t* DYN-TYPE)]
+                           [rhs : S0-Expr
+                                (Ann (Lambda f* (Ann b DYN-TYPE)) src)])
+                      (values (cons (Bnd id type rhs) bnd*)
+                              (hash-set env id type)))]))])]
+           [e (let* ([recur/env (lambda ([e : S0-Expr]) (tc-expr e env))]
+                     [e2 ((mk-tc-binding src recur/env) bnd)])
+                (match-let ([(Bnd id type rhs) e2])
+                  (values (cons bnd bnd*) (hash-set env id type))))])])))
   (let*-values
       ([(bnd* env) (fold-env-extend/bnd bnd* env)]
        [(recur/env) (lambda ([e : S0-Expr]) (tc-expr e env))]
@@ -443,8 +461,8 @@ Provide comments about where to find definitions of types and data
 		     (-> S0-Bnd S1-Bnd)))
 (define (mk-tc-binding src tc-expr)
   (lambda ([bnd : S0-Bnd]) : S1-Bnd
-    (match-let ([(Bnd id type rhs) bnd])
-      (let-values ([(rhs type-rhs) (tc-expr rhs)])
-	(Bnd id
-	     (let-binding-type-rule type type-rhs id src)
-	     rhs)))))
+          (match-let ([(Bnd id type rhs) bnd])
+            (let-values ([(rhs type-rhs) (tc-expr rhs)])
+              (Bnd id
+                   (let-binding-type-rule type type-rhs id src)
+                   rhs)))))

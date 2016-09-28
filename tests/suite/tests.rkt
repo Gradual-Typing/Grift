@@ -5,6 +5,7 @@
 
 (require "core/tests.rkt"
          "boxes/tests.rkt"
+         "monoboxes/tests.rkt"
          "vectors/tests.rkt"
          "tools/tests.rkt"
          "program/tests.rkt"
@@ -14,6 +15,7 @@
          (all-from-out
           "core/tests.rkt"
           "boxes/tests.rkt"
+          "monoboxes/tests.rkt"
           "vectors/tests.rkt"
           "tools/tests.rkt"
           "program/tests.rkt"
@@ -21,7 +23,7 @@
 
 (define most-tests : Test
   (test-suite "most tests"
-    core-tests box-tests vector-tests tool-tests program-tests))
+    core-tests box-tests monobox-tests vector-tests tool-tests program-tests))
 
 (define all-tests : Test
   (test-suite "all tests"

@@ -191,7 +191,7 @@
   (if (and (pair? stx*) (null? (cdr stx*)))
       (do (bind-state : (State Natural S0-Expr))
         (e : S0-Expr <- (parse-expr (car stx*) env #f))
-        (return-state (Ann (Mbox e) src)))
+        (return-state (Ann (MboxS e) src)))
       (TODO come up with better error message)))
 
 (: parse-munbox (-> Stx* Src Env (State Natural S0-Expr)))
@@ -252,7 +252,7 @@
      (do (bind-state : (State Natural S0-Expr))
        (e1 : S0-Expr <- (parse-expr s1 env #f))
        (e2 : S0-Expr <- (parse-expr s2 env #f))
-       (return-state (Ann (Mvector e1 e2) src)))]
+       (return-state (Ann (MvectorS e1 e2) src)))]
     [else (TODO come up with an error message)]))
 
 (: parse-mvector-ref (-> Stx* Src Env (State Natural S0-Expr)))

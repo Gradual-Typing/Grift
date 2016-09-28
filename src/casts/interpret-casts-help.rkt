@@ -52,37 +52,6 @@
                               (Tag Tag-Symbol)
                               (Type Schml-Type)
                               (Var Uid)))
-#|
-;(: trivial? (CoC3-Expr -> Boolean : Trivial))
-(define (trivial? x)
-  (or (Quote? x)
-      (Tag? x)
-      (Type? x)
-      (Var? x)))
-
-(: trivialize ((Box Nat) String CoC3-Expr CoC3-Bnd* ->
-               (Pair CoC3-Bnd* let$-Trivial)))
-(define (trivialize next s e b*)
-  (if (or (Quote? e) (Tag? e) (Type? e) (Var? e))
-      `(,b* . ,e)
-      (let ([u (unbox next)])
-        (set-box! next (add1 u))
-        ())
-      (bind-state
-       (uid-state s)
-       (lambda ([u : Uid])
-         : (State Nat (Pair CoC3-Bnd* (Var Uid)))
-         (return-state `(((,u . ,e) . ,b*) . ,(Var u)))))))
-
-;; This is meant to help let$* which accumulates the list of
-;; bindings backwards. This gives proper let* behavior
-(: let$*-help (CoC3-Bnd* CoC3-Expr -> CoC3-Expr))
-(define (let$*-help b* b)
-  (if (null? b*)
-      b
-      (let$*-help (cdr b*) (Let (list (car b*)) b))))
-|#
-
 
 ;; createsCoC3-Expr let bindings for non-trivial CoC3-Expr expressions,
 ;; since non-trivial expressions must be evaluated only once.
@@ -119,17 +88,6 @@
                  body
                  (let$*-help b* body)))))])))))
 
-#|
-       (do (bind-state : (State Nat CoC3-Expr))
-           ((cons b* t*) : (Pair CoC3-Bnd* CoC3-Trivial)
-            <- (trivialize (~a 't*) v* b*)) ...
-           (b^ : CoC3-Expr <- b)
-           (if (null? b*)
-               (return-state b^)
-               (return-state (let$*-help b* b^))))|#
-
-
-
 ;; performs compile time folding of prim = on literals
 ;; todo convert this to using eq-huh
 ;; TODO this should be op=?$
@@ -154,6 +112,7 @@
           [(GRef? v) (Tag 'GRef)]
           [(GVect? v) (Tag 'GVect)]
           [(Fn? v) (Tag 'Fn)]
+          [(MRef? v) (Tag 'MRef)]
           [else (error 'interpret-casts/type-tag
                        "Unexpected ~a" v)]))
         (Type-Tag o)))
@@ -178,13 +137,14 @@
               (Quote #f))))) ...))
 
 (define-smart-coercion?
-  (id?$   Identity? Id-Coercion-Huh)
-  (seq?$  Sequence? Sequence-Coercion-Huh)
-  (prj?$  Project?  Project-Coercion-Huh)
-  (inj?$  Inject?   Inject-Coercion-Huh)
-  (fail?$ Failed?   Failed-Coercion-Huh)
-  (fnC?$  Fn?       Fn-Coercion-Huh)
-  (ref?$  Ref?      Ref-Coercion-Huh))
+  (id?$    Identity?         Id-Coercion-Huh)
+  (seq?$   Sequence?         Sequence-Coercion-Huh)
+  (prj?$   Project?          Project-Coercion-Huh)
+  (inj?$   Inject?           Inject-Coercion-Huh)
+  (fail?$  Failed?           Failed-Coercion-Huh)
+  (fnC?$   Fn?               Fn-Coercion-Huh)
+  (ref?$   Ref?              Ref-Coercion-Huh)
+  (mrefC?$ MonoRef?          MRef-Coercion-Huh))
 
 (define-syntax-rule
   (define-smart-access (name check kuote compile-time run-time) ...)
@@ -200,14 +160,15 @@
     ...))
 
 (define-smart-access
-  (seq-fst$    Sequence?  Quote-Coercion Sequence-fst  Sequence-Coercion-Fst)
-  (seq-snd$    Sequence?  Quote-Coercion Sequence-snd  Sequence-Coercion-Snd)
-  (prj-type$   Project?   Type           Project-type  Project-Coercion-Type)
-  (prj-label$  Project?   Quote          Project-label Project-Coercion-Label)
-  (inj-type$   Inject?    Type           Inject-type   Inject-Coercion-Type)
-  (ref-read$   Ref?       Quote-Coercion Ref-read      Ref-Coercion-Read)
-  (ref-write$  Ref?       Quote-Coercion Ref-write     Ref-Coercion-Write)  
-  (fail-label$ Failed?    Quote          Failed-label  Failed-Coercion-Label))
+  (seq-fst$    Sequence?         Quote-Coercion Sequence-fst           Sequence-Coercion-Fst)
+  (seq-snd$    Sequence?         Quote-Coercion Sequence-snd           Sequence-Coercion-Snd)
+  (prj-type$   Project?          Type           Project-type           Project-Coercion-Type)
+  (prj-label$  Project?          Quote          Project-label          Project-Coercion-Label)
+  (inj-type$   Inject?           Type           Inject-type            Inject-Coercion-Type)
+  (ref-read$   Ref?              Quote-Coercion Ref-read               Ref-Coercion-Read)
+  (ref-write$  Ref?              Quote-Coercion Ref-write              Ref-Coercion-Write)  
+  (fail-label$ Failed?           Quote          Failed-label           Failed-Coercion-Label)
+  (mrefC-type$ MonoRef?          Type           MonoRef-type           MRef-Coercion-Type))
 
 (define-syntax-rule
   (define-smart-coercion (name compile-time run-time field ...) ...)
@@ -221,6 +182,13 @@
 (define-smart-coercion
   (seq$  Sequence Sequence-Coercion fst snd)
   (ref$  Ref      Ref-Coercion      read write))
+
+(: mrefC$ (CoC3-Expr -> CoC3-Expr))
+(define (mrefC$ type)
+  (if (Type? type)
+      (let ([t (Type-type type)])
+        (Quote-Coercion (MonoRef t)))
+      (MRef-Coercion type)))
 
 (: inj$ (CoC3-Expr -> CoC3-Expr))
 (define (inj$ type)
@@ -262,10 +230,11 @@
               (Quote #f))))) ...))
 
 (define-smart-type?
-  (dyn?$   Dyn?   Type-Dyn-Huh)
-  (fnT?$   Fn?    Type-Fn-Huh)
-  (gvect?$ GVect? Type-GVect-Huh)
-  (gref?$  GRef?  Type-GRef-Huh))
+  (dyn?$   Dyn?      Type-Dyn-Huh)
+  (fnT?$   Fn?       Type-Fn-Huh)
+  (gvect?$ GVect?    Type-GVect-Huh)
+  (gref?$  GRef?     Type-GRef-Huh)
+  (mref?$  MRef?     Type-MRef-Huh))
 
 (: fnT-arity$ (CoC3-Expr -> CoC3-Expr))
 (define (fnT-arity$ x)
@@ -292,4 +261,31 @@
       (let ([x (Type-type x)])
         (if (GRef? x)
             (Type (GRef-arg x))
-            (error 'gvect-of$ "given ~a" x)))))
+            (error 'gref-of$ "given ~a" x)))))
+
+(: mref-of$ (CoC3-Expr -> CoC3-Expr))
+(define (mref-of$ x)
+  (if (not (Type? x))
+      (Type-MRef-Of x)
+      (let ([x (Type-type x)])
+        (if (MRef? x)
+            (Type (MRef-arg x))
+            (error 'mref-of$ "given ~a" x)))))
+
+;; building types, I do not think we will ever need to build them in
+;; compile time, but monotonic references need to build them in runtime
+(define-syntax-rule
+  (define-smart-type (name compile-time run-time field ...) ...)
+  (begin
+    (define (name (field : CoC3-Expr) ...) : CoC3-Expr
+      (if (and (Type? field) ...)
+          (Type (compile-time (Type-type field) ...))
+          (run-time field ...)))
+    ...))
+
+(define-smart-type
+  (gref$  GRef  Type-GRef  type)
+  (gvect$ GVect Type-GVect type)
+  (mref$  MRef  Type-MRef  type))
+
+(define-type GreatestLowerBound-Type (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))

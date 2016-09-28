@@ -47,7 +47,7 @@ exposed as the effects that they truelly are.
 (define FN-ARITY-INDEX        (Quote l:FN-ARITY-INDEX))
 (define FN-RETURN-INDEX       (Quote l:FN-RETURN-INDEX))
 (define FN-FMLS-OFFSET        (Quote l:FN-FMLS-OFFSET))
-                          
+
 (define TYPE-TAG-MASK         (Quote l:TYPE-TAG-MASK))
 (define TYPE-FN-TAG           (Quote l:TYPE-FN-TAG))
 (define TYPE-ATOMIC-TAG       (Quote l:TYPE-ATOMIC-TAG))
@@ -59,6 +59,10 @@ exposed as the effects that they truelly are.
 (define TYPE-GREF-TAG         (Quote l:TYPE-GREF-TAG))
 (define TYPE-GVECT-SIZE       (Quote l:TYPE-GVECT-SIZE))
 (define TYPE-GVECT-TAG        (Quote l:TYPE-GVECT-TAG))
+(define TYPE-MREF-SIZE        (Quote l:TYPE-MREF-SIZE))
+(define TYPE-MREF-TAG         (Quote l:TYPE-MREF-TAG))
+(define TYPE-MVECT-SIZE        (Quote l:TYPE-MVECT-SIZE))
+(define TYPE-MVECT-TAG        (Quote l:TYPE-MVECT-TAG))
 (define DYN-TAG-MASK          (Quote l:DYN-TAG-MASK))
 (define DYN-BOXED-TAG         (Quote l:DYN-BOXED-TAG))
 (define DYN-INT-TAG           (Quote l:DYN-INT-TAG))
@@ -73,7 +77,7 @@ exposed as the effects that they truelly are.
 (define UNDEF-IMDT            (Quote l:UNDEF-IMDT))
 (define UNIT-IMDT             (Quote l:UNIT-IMDT))
 (define GREP-TAG-MASK         (Quote l:GREP-TAG-MASK))
-(define UGBOX-TAG  (Quote l:UGBOX-TAG))
+(define UGBOX-TAG             (Quote l:UGBOX-TAG))
 (define UGBOX-SIZE            (Quote l:UGBOX-SIZE))
 (define UGBOX-VALUE-INDEX     (Quote l:UGBOX-VALUE-INDEX))
 (define UGVECT-SIZE-INDEX     (Quote l:UGVECT-SIZE-INDEX))
@@ -86,12 +90,32 @@ exposed as the effects that they truelly are.
 (define GPROXY-FROM-INDEX     (Quote l:GPROXY-FROM-INDEX))
 (define GPROXY-TO-INDEX       (Quote l:GPROXY-TO-INDEX))
 (define GPROXY-BLAMES-INDEX   (Quote l:GPROXY-BLAMES-INDEX))
+(define CV-TAG-MASK           (Quote l:CV-TAG-MASK))
+(define CASTEDVALUE-TAG            (Quote l:CASTEDVALUE-TAG))
+(define CASTEDVALUE/TWOSOME-SIZE   (Quote l:CASTEDVALUE/TWOSOME-SIZE))
+(define CASTEDVALUE/COERCION-SIZE  (Quote l:CASTEDVALUE/COERCION-SIZE))
+(define CASTEDVALUE-COERCION-INDEX (Quote l:CASTEDVALUE-COERCION-INDEX))
+(define CASTEDVALUE-FOR-INDEX      (Quote l:CASTEDVALUE-FOR-INDEX))
+(define CASTEDVALUE-FROM-INDEX     (Quote l:CASTEDVALUE-FROM-INDEX))
+(define CASTEDVALUE-TO-INDEX       (Quote l:CASTEDVALUE-TO-INDEX))
+(define CASTEDVALUE-BLAMES-INDEX   (Quote l:CASTEDVALUE-BLAMES-INDEX))
 (define CLOS-CODE-INDEX       (Quote l:CLOS-CODE-INDEX))
 (define CLOS-CSTR-INDEX       (Quote l:CLOS-CSTR-INDEX))
 (define CLOS-FVAR-OFFSET      (Quote l:CLOS-FVAR-OFFSET))
 (define GREF-TO-INDEX         (Quote l:GREF-TO-INDEX))
 (define GVECT-TO-INDEX        (Quote l:GVECT-TO-INDEX))
-
+(define MREF-TO-INDEX         (Quote l:MREF-TO-INDEX))
+(define MBOX-SIZE             (Quote l:MBOX-SIZE))
+(define MBOX-VALUE-INDEX      (Quote l:MBOX-VALUE-INDEX))
+(define MBOX-RTTI-INDEX       (Quote l:MBOX-RTTI-INDEX))
+(define MBOX-TAG              (Quote l:MBOX-TAG))
+(define MVECT-TO-INDEX        (Quote l:MVECT-TO-INDEX))
+(define MVECT-SIZE-INDEX      (Quote l:MVECT-SIZE-INDEX))
+(define MVECT-SIZE            (Quote l:MVECT-SIZE))
+(define MVECT-OFFSET          (Quote l:MVECT-OFFSET))
+(define MVECT-RTTI-INDEX      (Quote l:MVECT-RTTI-INDEX))
+(define MVECT-TAG             (Quote l:MVECT-TAG))
+(define COERCION-TAG-MASK (Quote #b111))
 (define l:PROJECT-COERCION-TAG #b000)
 (define PROJECT-COERCION-TAG (Quote l:PROJECT-COERCION-TAG))
 (define PROJECT-COERCION-TYPE-INDEX (Quote 0))
@@ -103,11 +127,20 @@ exposed as the effects that they truelly are.
 (define SEQUENCE-COERCION-TAG (Quote l:SEQUENCE-COERCION-TAG))
 (define SEQUENCE-COERCION-FST-INDEX (Quote 0))
 (define SEQUENCE-COERCION-SND-INDEX (Quote 1))
-(define COERCION-TAG-MASK (Quote #b111))
 (define IDENTITY-COERCION-TAG (Quote #b011))
 (define IDENTITY-COERCION-IMDT IDENTITY-COERCION-TAG)
 (define l:FN-COERCION-TAG #b100)
 (define FN-COERCION-TAG (Quote l:FN-COERCION-TAG))
+(define l:REF-COERCION-TAG #b101)
+(define REF-COERCION-TAG (Quote l:REF-COERCION-TAG))
+(define REF-COERCION-READ-INDEX (Quote 0))
+(define REF-COERCION-WRITE-INDEX (Quote 1))
+(define l:MREF-COERCION-TAG #b111)
+(define MREF-COERCION-TAG (Quote l:MREF-COERCION-TAG))
+(define MREF-COERCION-TYPE-INDEX (Quote 0))
+(define l:FAILED-COERCION-TAG #b110)
+(define FAILED-COERCION-TAG (Quote l:FAILED-COERCION-TAG))
+(define FAILED-COERCION-LABEL-INDEX (Quote 0))
 
 (define l:FN-TAG-MASK #b111)
 (define FN-TAG-MASK (Quote l:FN-TAG-MASK))
@@ -123,30 +156,23 @@ exposed as the effects that they truelly are.
 (define HYBRID-PROXY-TAG (Quote l:HYBRID-PROXY-TAG))
 (define HYBRID-PROXY-CRCN-INDEX (Quote l:HYBRID-PROXY-CRCN-INDEX))
 (define HYBRID-PROXY-CLOS-INDEX (Quote l:HYBRID-PROXY-CLOS-INDEX))
-(define l:REF-COERCION-TAG #b101)
-(define REF-COERCION-TAG (Quote l:REF-COERCION-TAG))
-(define REF-COERCION-READ-INDEX (Quote 0))
-(define REF-COERCION-WRITE-INDEX (Quote 1))
-(define l:FAILED-COERCION-TAG #b110)
-(define FAILED-COERCION-TAG (Quote l:FAILED-COERCION-TAG))
-(define FAILED-COERCION-LABEL-INDEX (Quote 0))
 
 
 
 (: specify-representation (Cast-or-Coerce6-Lang Config -> Data0-Lang))
 (trace-define (specify-representation prgm comp-config)
-  (match-let ([(Prog (list name next type) (LetT* bndt* exp)) prgm])
-    (let* ([next  : (Boxof Nat) (box next)]
-           [bndc* : (Boxof D0-Bnd-Code*) (box '())]
-           [exp   : D0-Expr (sr-expr next bndc* (hash) empty-index-map exp)]
-           [init* : D0-Expr* (map (sr-bndt next) bndt*)]
-           [tid*  : Uid*     (map (inst car Uid Any) bndt*)]
-           [next  : Nat (unbox next)]
-           [bndc* : D0-Bnd-Code* (unbox bndc*)])
-      (Prog (list name next type)
-       (GlobDecs tid*
-        (Labels bndc*
-         (Begin init* exp)))))))
+              (match-let ([(Prog (list name next type) (LetT* bndt* exp)) prgm])
+                (let* ([next  : (Boxof Nat) (box next)]
+                       [bndc* : (Boxof D0-Bnd-Code*) (box '())]
+                       [exp   : D0-Expr (sr-expr next bndc* (hash) empty-index-map exp)]
+                       [init* : D0-Expr* (map (sr-bndt next) bndt*)]
+                       [tid*  : Uid*     (map (inst car Uid Any) bndt*)]
+                       [next  : Nat (unbox next)]
+                       [bndc* : D0-Bnd-Code* (unbox bndc*)])
+                  (Prog (list name next type)
+                        (GlobDecs tid*
+                                  (Labels bndc*
+                                          (Begin init* exp)))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
@@ -166,6 +192,9 @@ exposed as the effects that they truelly are.
   (: add-new-code! (D0-Bnd-Code -> Void))
   (define (add-new-code! b)
     (set-box! new-code (cons b (unbox new-code))))
+
+  (: mk-fn-type-code-label? (Boxof (Option (Code-Label Uid))))
+  (define mk-fn-type-code-label? (box #f))
 
   (: mk-fn-coercion-code-label? (Boxof (Option (Code-Label Uid))))
   (define mk-fn-coercion-code-label? (box #f))
@@ -207,19 +236,71 @@ exposed as the effects that they truelly are.
               [type-var (Var type)]
               [tag-var (Var tag)]
               [imm-var (Var imm)])
-       (Let `((,val . ,e1)
-              (,type . ,(sr-expr e2)))
-        (Let `((,tag . ,(Op 'binary-and `(,type-var ,TYPE-TAG-MASK))))
-         (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG))
-             (Let `((,imm . ,(Op '%<< (list val-var DYN-IMDT-SHIFT))))
-              (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
-                  (Op 'binary-or `(,imm-var ,DYN-INT-TAG))
-                  (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
-                      (Op 'binary-or `(,imm-var ,DYN-BOOL-TAG))
-                      (Op 'binary-or `(,imm-var ,DYN-UNIT-TAG)))))
-             (sr-alloc "dynamic_boxed" #b000
-                       `(("" . ,val-var)
-                         ("" . ,type-var)))))))]))
+         (Let `((,val . ,e1)
+                (,type . ,(sr-expr e2)))
+              (Let `((,tag . ,(Op 'binary-and `(,type-var ,TYPE-TAG-MASK))))
+                   (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG))
+                       (Let `((,imm . ,(Op '%<< (list val-var DYN-IMDT-SHIFT))))
+                            (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
+                                (Op 'binary-or `(,imm-var ,DYN-INT-TAG))
+                                (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
+                                    (Op 'binary-or `(,imm-var ,DYN-BOOL-TAG))
+                                    (Op 'binary-or `(,imm-var ,DYN-UNIT-TAG)))))
+                       (sr-alloc "dynamic_boxed" #b000
+                                 `(("" . ,val-var)
+                                   ("" . ,type-var)))))))]))
+
+  (: get-mk-fn-type! (Uid -> (Code-Label Uid)))
+  (define (get-mk-fn-type! mk-glb)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! mk-glb)
+      (define mk-fn-u (next-uid! "make-fn-type"))
+      (define t1-u    (next-uid! "fn-type1"))
+      (define t2-u    (next-uid! "fn-type2"))
+      (define i-u     (next-uid! "index"))
+      (define a-u     (next-uid! "fn-type-arity"))
+      (define t1r-u   (next-uid! "fn-type1-return"))
+      (define t2r-u   (next-uid! "fn-type2-return"))
+      (define t1a-u   (next-uid! "fn-type1-argument"))
+      (define t2a-u   (next-uid! "fn-type2-argument"))
+      (define c1-u    (next-uid! "resulting_type"))
+      (define c2-u    (next-uid! "resulting_type"))
+      (define cr-u    (next-uid! "return-type"))
+      (define ca-u    (next-uid! "argument-type"))
+      (define t1      (Var t1-u))
+      (define t2      (Var t2-u))
+      (define c1      (Var c1-u))
+      (define c2      (Var c2-u))
+      (define i       (Var i-u))
+      (define a       (Var a-u))
+      (define mk-fn   (Code-Label mk-fn-u))
+      (define mk-g    (Code-Label mk-glb))
+      ;; This code is carfully crafted so that the allocation occurs after
+      ;; all of the coercion have been made this ensures that there isn't the
+      ;; possibility of collecting while there is unitialized data in the heap.
+      (define mk-fn-t : D0-Code
+        (Code `(,t1-u ,t2-u ,i-u ,a-u)
+              (If (Op '= `(,i ,a))
+                  (Let `((,t1r-u . ,(sr-tagged-array-ref t1 TYPE-FN-TAG FN-RETURN-INDEX))
+                         (,t2r-u . ,(sr-tagged-array-ref t2 TYPE-FN-TAG FN-RETURN-INDEX)))
+                       (Let `((,cr-u . ,(App-Code mk-g `(,(Var t1r-u) ,(Var t2r-u)))))
+                            (Let `((,c1-u . ,(Op 'Alloc (list (sr-plus a (Quote 2))))))
+                                 (Begin
+                                   `(,(sr-array-set! c1 FN-ARITY-INDEX a)
+                                     ,(sr-array-set! c1 FN-RETURN-INDEX (Var cr-u)))
+                                   (sr-tag-value c1 TYPE-FN-TAG)))))
+                  (Let `((,t1a-u . ,(sr-tagged-array-ref t1 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i)))
+                         (,t2a-u . ,(sr-tagged-array-ref t2 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i))))
+                       (Let `((,ca-u . ,(App-Code mk-g `(,(Var t2a-u) ,(Var t1a-u)))))
+                            (Let `((,c2-u . ,(App-Code mk-fn `(,t1 ,t2 ,(sr-plus (Quote 1) i) ,a))))
+                                 (Begin
+                                   `(,(sr-tagged-array-set! c2 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i) (Var ca-u)))
+                                   c2)))))))
+      (add-new-code! (cons mk-fn-u mk-fn-t))
+      (set-box! mk-fn-type-code-label? mk-fn)
+      mk-fn)
+    (let ([cl? (unbox mk-fn-type-code-label?)])
+      (or cl? (make-code! mk-glb))))
 
   (: get-mk-fn-crcn! (Uid -> (Code-Label Uid)))
   (define (get-mk-fn-crcn! mk-crcn)
@@ -261,7 +342,7 @@ exposed as the effects that they truelly are.
                                  (Begin
                                    `(,(sr-array-set! c1 FN-ARITY-INDEX a)
                                      ,(sr-array-set! c1 FN-RETURN-INDEX (Var cr-u)))
-                                    (sr-tag-value c1 FN-COERCION-TAG)))))
+                                   (sr-tag-value c1 FN-COERCION-TAG)))))
                   (Let `((,t1a-u . ,(sr-tagged-array-ref t1 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i)))
                          (,t2a-u . ,(sr-tagged-array-ref t2 TYPE-FN-TAG (sr-plus FN-FMLS-OFFSET i))))
                        (Let `((,ca-u . ,(App-Code mk-c `(,(Var t2a-u) ,(Var t1a-u) ,l))))
@@ -320,83 +401,26 @@ exposed as the effects that they truelly are.
                                     FALSE-IMDT)
                                 IDENTITY-COERCION-IMDT
                                 (Let `((,c3-u . ,(Op 'Alloc (list (sr-plus a (Quote 2))))))
-                                 (Begin
-                                   `(,(sr-array-set! c3 FN-RETURN-INDEX cr))
-                                    (sr-tag-value c3 FN-COERCION-TAG))))))
+                                     (Begin
+                                       `(,(sr-array-set! c3 FN-RETURN-INDEX cr))
+                                       (sr-tag-value c3 FN-COERCION-TAG))))))
                   (Let `((,c1a-u . ,(sr-tagged-array-ref c1 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i)))
                          (,c2a-u . ,(sr-tagged-array-ref c2 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i))))
                        (Let `((,ca-u . ,(App-Code comp-c `(,(Var c2a-u) ,(Var c1a-u)))))
-                        (Let `((,id?2-u . ,(If id?1
-                                               (sr-check-tag=? ca COERCION-TAG-MASK IDENTITY-COERCION-TAG)
-                                               FALSE-IMDT)))
-                         (Let `((,c4-u . ,(App-Code comp-fn `(,c1 ,c2 ,(sr-plus (Quote 1) i) ,a ,id?2))))
-                          (If (sr-check-tag=? c4 COERCION-TAG-MASK IDENTITY-COERCION-TAG)
-                              IDENTITY-COERCION-IMDT
-                              (Begin
-                                `(,(sr-tagged-array-set! c4 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i) ca))
-                                c4)))))))))
+                            (Let `((,id?2-u . ,(If id?1
+                                                   (sr-check-tag=? ca COERCION-TAG-MASK IDENTITY-COERCION-TAG)
+                                                   FALSE-IMDT)))
+                                 (Let `((,c4-u . ,(App-Code comp-fn `(,c1 ,c2 ,(sr-plus (Quote 1) i) ,a ,id?2))))
+                                      (If (sr-check-tag=? c4 COERCION-TAG-MASK IDENTITY-COERCION-TAG)
+                                          IDENTITY-COERCION-IMDT
+                                          (Begin
+                                            `(,(sr-tagged-array-set! c4 FN-COERCION-TAG (sr-plus FN-FMLS-OFFSET i) ca))
+                                            c4)))))))))
       (add-new-code! (cons comp-fn-u comp-fn-c))
       (set-box! comp-fn-coercion-code-label? comp-fn)
       comp-fn)
     (let ([cl? (unbox comp-fn-coercion-code-label?)])
       (or cl? (make-code! comp-crcn))))
-
-  
-
-      #|(: sr-type (-> CoC6-Bnd-Type (State Nat D0-Expr)))
-      (define (sr-type b)
-        ;; lays down the data in the third list in continuous sequence
-        ;; of memory
-        (: array-set* (-> D0-Expr Integer (Listof D0-Expr) (Listof D0-Expr)))
-        (define (array-set* a i f*)
-          (if (null? f*)
-              '()
-              (cons
-               (Op 'Array-set! (list a (Quote i) (car f*)))
-               (array-set* a (add1 i) (cdr f*)))))
-        (match-let ([(cons i t) b])
-          (match t
-            ;; abstract over allocating so that all allocations
-            ;; are shorter than this.
-            [(GRef t)
-             (do (bind-state : (State Nat D0-Expr))
-                 (ty : D0-Expr <- (sr-prim-type t))
-               (let* ([alloc  : D0-Expr
-                              (Op 'Alloc (list TYPE-GREF-SIZE-VALUE))]
-                      [gref-init : D0-Expr (Assign i alloc)]
-                      [stmt : D0-Expr
-                            (Op 'Array-set! (list (Var i) GREF-TO-INDEX-VALUE ty))])
-                 (return-state
-                  (Begin (list gref-init stmt)
-                         (Assign i (Op 'binary-or (list (Var i) TYPE-GREF-TAG-VALUE)))))))]
-            ;; TODO: parametrize over the logic of GRef and GVect
-            [(GVect t)
-             (do (bind-state : (State Nat D0-Expr))
-                 (ty : D0-Expr <- (sr-prim-type t))
-               (let* ([alloc  : D0-Expr
-                              (Op 'Alloc (list TYPE-GVECT-SIZE-VALUE))]
-                      [gvect-init : D0-Expr (Assign i alloc)]
-                      [stmt   : D0-Expr
-                              (Op 'Array-set! (list (Var i) GVECT-TO-INDEX-VALUE ty))])
-                 (return-state
-                  (Begin (list gvect-init stmt)
-                         (Assign i (Op 'binary-or (list (Var i) TYPE-GVECT-TAG-VALUE)))))))]
-            [(Fn a f* r)
-             (do (bind-state : (State Nat D0-Expr))
-                 (f*  : D0-Expr* <- (map-state sr-prim-type f*))
-               (r   : D0-Expr  <- (sr-prim-type r))
-               (let* ([v (Var i)]
-                      [alloc (Op 'Alloc (list (Quote (+ a FN-FMLS-OFFSET))))]
-                      [fun-init (Assign i alloc)]
-                      [stmt1
-                       (Op 'Array-set! (list v (Quote FN-ARITY-INDEX) (Quote a)))]
-                      [stmt2
-                       (Op 'Array-set! (list v (Quote FN-RETURN-INDEX) r))]
-                      [stmt* (array-set* v FN-FMLS-OFFSET f*)])
-                 (return-state
-                  (Begin (append (list fun-init stmt1 stmt2) stmt*) v))))]
-            [else (TODO)])))
-      |#
 
   (: sr-coercion (Coercion/Prim-Type -> D0-Expr))
   (define (sr-coercion c)
@@ -425,6 +449,9 @@ exposed as the effects that they truelly are.
       [(Failed l)
        (sr-alloc "failed-coercion" l:FAILED-COERCION-TAG
                  `(("label" . ,(Quote l))))]
+      [(MonoRef (app sr-prim-type t))
+       (sr-alloc "mref-coercion" l:MREF-COERCION-TAG
+                 `(("type" . ,t)))]
       [other (error 'specify-representation/coercion "unmatched ~a" other)]))
 
   (: recur-curry-env (Env IndexMap -> (CoC6-Expr -> D0-Expr)))
@@ -514,7 +541,7 @@ exposed as the effects that they truelly are.
          (Op 'Array-ref (list arg GVECT-TO-INDEX))]
         [(Type-Dyn-Huh (app recur e))
          (Op '= (list TYPE-DYN-RT-VALUE e))]
-       
+        
         [(Type-Tag (app recur e))
          (Op 'binary-and (list e TYPE-TAG-MASK))]
         ;; Coercions
@@ -725,10 +752,10 @@ exposed as the effects that they truelly are.
                   (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
                       (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET))))
                       (Begin
-                        (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                        (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                         (Op 'Exit (list (Quote -1)))))
                   (Begin
-                    (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                    (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                     (Op 'Exit (list (Quote -1))))))]
         [(Unguarded-Vect-Set! (app recur e1) (app recur e2) (app recur e3))
          (define ind  (next-uid! "index"))
@@ -742,10 +769,10 @@ exposed as the effects that they truelly are.
                        (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
                            (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET)) e3))
                            (Begin
-                             (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                             (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                              (Op 'Exit (list (Quote -1))))))
                   (Begin
-                    `(,(Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                    `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                     (Op 'Exit (list (Quote -1))))))]
         [(Guarded-Proxy-Huh (app recur e))
          (Op '= `(,(Op 'binary-and (list e GREP-TAG-MASK))
@@ -767,6 +794,137 @@ exposed as the effects that they truelly are.
          ((untag-deref-gproxy GPROXY-BLAMES-INDEX) e)]
         [(Guarded-Proxy-Coercion (app recur e))
          ((untag-deref-gproxy GPROXY-COERCION-INDEX) e)]
+        [(CastedValue-Huh (app recur e))
+         (Op '= `(,(Op 'binary-and (list e CV-TAG-MASK))
+                  ,CASTEDVALUE-TAG))]
+        [(CastedValue (app recur e) r)
+         (match r
+           [(Twosome (app recur t1) (app recur t2) (app recur l))
+            (alloc-tag-set-cv/twosome next-uid! e t1 t2 l)]
+           [(Coercion (app recur c))
+            (alloc-tag-set-cv/coercion next-uid! e c)])]
+        [(CastedValue-Value (app recur e))
+         ((untag-deref-castedvalue CASTEDVALUE-FOR-INDEX) e)]
+        [(CastedValue-Coercion (app recur e))
+         ((untag-deref-castedvalue CASTEDVALUE-COERCION-INDEX) e)]
+        [(CastedValue-Source (app recur e))
+         ((untag-deref-castedvalue CASTEDVALUE-FROM-INDEX) e)]
+        [(CastedValue-Target (app recur e))
+         ((untag-deref-castedvalue CASTEDVALUE-TO-INDEX) e)]
+        [(CastedValue-Blames (app recur e))
+         ((untag-deref-castedvalue CASTEDVALUE-BLAMES-INDEX) e)]
+        [(Mbox (app recur e) (app sr-prim-type t))
+         (sr-alloc "mbox" l:MBOX-TAG (list (cons "init_value" e) (cons "init_type" t)))]
+        [(Mbox-val-set! (app recur e1) (app recur e2))
+         (Op 'Array-set! (list e1 MBOX-VALUE-INDEX e2))]
+        [(Mbox-val-ref (app recur e))
+         (Op 'Array-ref (list e MBOX-VALUE-INDEX))]
+        [(Mbox-rtti-set! u (app recur e))
+         (Op 'Array-set! (list (Var u) MBOX-RTTI-INDEX e))]
+        [(Mbox-rtti-ref u)
+         (Op 'Array-ref (list (Var u) MBOX-RTTI-INDEX))]
+
+        [(Mvector (app recur e1) (app recur e2) (app sr-prim-type t))
+         (define tmp1     (next-uid! "mvect1"))
+         (define tmp2     (next-uid! "mvect2"))
+         (define tmp3     (next-uid! "mvect3"))
+         (define tmp4     (next-uid! "mvect4"))
+         (define i        (next-uid! "index"))
+         (define rtti     (next-uid! "rtti"))
+         (define tmp1-var (Var tmp1))
+         (define tmp2-var (Var tmp2))
+         (define tmp3-var (var tmp3))
+         (define tmp4-var (var tmp4))
+         (define rtti-var (Var rtti))
+         (define tl       (Op '+ (list tmp1-var MVECT-OFFSET))) ;; the size of the memory layout
+         (define alloc    (Op 'Alloc (list tmp4-var)))
+         (define set      (Repeat i MVECT-OFFSET tmp4-var
+                                  (Op 'Array-set! (list tmp3-var (Var i) tmp2-var))))
+         (define set-n    (Op 'Array-set! (list tmp3-var MVECT-SIZE-INDEX tmp1-var)))
+         (define set-t    (Op 'Array-set! (list tmp3-var MVECT-RTTI-INDEX rtti-var)))
+         (Let `((,tmp1 . ,e1)
+                (,tmp2 . ,e2)
+                (,rtti . ,t))
+              (Let `((,tmp4 . ,tl))
+                   (Let `((,tmp3 . ,alloc))
+                        (Begin `(,set-n ,set-t ,set) tmp3-var))))]
+        
+        [(Mvector-rtti-set! u (app recur e))
+         (Op 'Array-set! (list (Var u) MVECT-RTTI-INDEX e))]
+        [(Mvector-rtti-ref u)
+         (Op 'Array-ref (list (Var u) MVECT-RTTI-INDEX))]
+
+        [(Mvector-val-ref (app recur e1) (app recur e2))
+         (define ind  (next-uid! "index"))
+         (define tmp1 (next-uid! "mvect"))
+         (define zro (Quote 0))
+         (define tmp1-var (Var tmp1))
+         (define ind-var (Var ind))
+         (Let (list (cons ind e2) (cons tmp1 e1))
+              (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+                  (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                      (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))
+                      (Begin
+                        (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                        (Op 'Exit (list (Quote -1)))))
+                  (Begin
+                    (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                    (Op 'Exit (list (Quote -1))))))]
+        [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3))
+         (define ind  (next-uid! "index"))
+         (define tmp1 (next-uid! "mvect"))
+         (define zro (Quote 0))
+         (define tmp1-var (Var tmp1))
+         (define ind-var (Var ind))
+         (Let (list (cons ind e2))
+              (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+                  (Let (list (cons tmp1 e1))
+                       (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                           (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET)) e3))
+                           (Begin
+                             (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                             (Op 'Exit (list (Quote -1))))))
+                  (Begin
+                    `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                    (Op 'Exit (list (Quote -1))))))]
+        
+        [(MRef-Coercion-Huh (app recur e))
+         (sr-check-tag=?
+          e COERCION-TAG-MASK MREF-COERCION-TAG)]
+        [(MRef-Coercion-Type (app recur e))
+         (sr-tagged-array-ref e MREF-COERCION-TAG MREF-COERCION-TYPE-INDEX)]
+        [(MRef-Coercion (app recur e))
+         (sr-alloc "mref_coecion" l:MREF-COERCION-TAG `(("type" . ,e)))]
+        [(Make-Fn-Type mk-glb (app recur t1) (app recur t2))
+         (: invoke-mk-fn-type ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
+         (define (invoke-mk-fn-type mk-fn t1 t2)
+           (App-Code
+            mk-fn
+            (list t1 t2 (Quote 0)
+                  (sr-tagged-array-ref t1 TYPE-FN-TAG FN-ARITY-INDEX))))
+         (let ([mk-fn-type (get-mk-fn-type! mk-glb)])
+           (if (Var? t1)
+               (invoke-mk-fn-type mk-fn-type t1 t2)
+               (let ([u (next-uid! "fn_type1")])
+                 (Let `((,u . ,t1))
+                      (invoke-mk-fn-type mk-fn-type (Var u) t2)))))]
+        [(Type-GRef (app recur e))
+         (sr-alloc "GRefT" l:TYPE-GREF-TAG `(("type" . ,e)))]
+        [(Type-GVect (app recur e))
+         (sr-alloc "GVectT" l:TYPE-GVECT-TAG `(("type" . ,e)))]
+        [(Type-MRef (app recur e))
+         (sr-alloc "MRefT" l:TYPE-MREF-TAG `(("type" . ,e)))]
+        [(Type-MRef-Huh (app recur e))
+         (sr-check-tag=? e TYPE-TAG-MASK TYPE-MREF-TAG)]
+        [(Type-MRef-Of (app recur e))
+         (define arg : D0-Expr
+           (Op 'binary-xor (list e TYPE-MREF-TAG)))
+         (Op 'Array-ref (list arg MREF-TO-INDEX))]
+        [(Error (app recur e))
+         (Begin
+           (list (Op 'Print (list e))
+                 (Op 'Exit  (list (Quote -1))))
+           UNDEF-IMDT)]
         [other (error 'specify-representation "unmatched ~a" other)]))
 
 
@@ -786,7 +944,7 @@ exposed as the effects that they truelly are.
 ;; though it does eliminate any form that it can based on it's input
 (: sr-alloc/next ((Boxof Nat) ->
                   (String Fixnum (Listof (Pair String D0-Expr)) ->
-                   D0-Expr)))
+                          D0-Expr)))
 (define ((sr-alloc/next next) name tag slots)
   (: next-uid! (String -> Uid))
   (define (next-uid! x)
@@ -834,42 +992,51 @@ exposed as the effects that they truelly are.
 (: sr-prim-type (Prim-Type -> D0-Expr))
 (define (sr-prim-type t)
   (match t
-    ;; TODO Var is a little wastful perhaps this should be
-    ;; A Label node of some sort?
     [(Int)  TYPE-INT-RT-VALUE]
     [(Bool) TYPE-BOOL-RT-VALUE]
     [(Dyn)  TYPE-DYN-RT-VALUE]
     [(Unit) TYPE-UNIT-RT-VALUE]
+    ;; TODO Var is a little wastful perhaps this should be
+    ;; A Label node of some sort?
     [(TypeId u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
-  (: sr-bndt ((Boxof Nat) -> (CoC6-Bnd-Type -> D0-Expr)))
-  (define ((sr-bndt next) bnd)
-    (define sr-alloc (sr-alloc/next next))
-    (: sr-type (Compact-Type -> D0-Expr))
-    (define (sr-type t)
-      (match t
-        [(GRef t)
-         (sr-alloc "GRefT" l:TYPE-GREF-TAG
-                   `(("type" . ,(sr-prim-type t))))]
-        [(GVect t)
-         (sr-alloc "GVect_Type" l:TYPE-GVECT-TAG
-                   `(("type" . ,(sr-prim-type t))))]      
-        [(Fn a f* r)
-         (sr-alloc "Fun_Type" l:TYPE-FN-TAG
-                   `(("arity" . ,(Quote a))
-                     ("return" . ,(sr-prim-type r)) .
-                     ,(map (lambda ([t : Prim-Type])
-                             (cons "argument" (sr-prim-type t)))
-                           f*)))]
-        [other (error 'specify-representation/type "unmatched ~a" other)]))
-    (match-let ([(cons u t) bnd])
-      (Assign u (sr-type t))))
+(: sr-bndt ((Boxof Nat) -> (CoC6-Bnd-Type -> D0-Expr)))
+(define ((sr-bndt next) bnd)
+  (define sr-alloc (sr-alloc/next next))
+  (: sr-type (Compact-Type -> D0-Expr))
+  (define (sr-type t)
+    (match t
+      [(GRef t)
+       (sr-alloc "GRefT" l:TYPE-GREF-TAG
+                 `(("type" . ,(sr-prim-type t))))]
+      [(GVect t)
+       (sr-alloc "GVect_Type" l:TYPE-GVECT-TAG
+                 `(("type" . ,(sr-prim-type t))))]
+      [(MRef t)
+       (sr-alloc "MRefT" l:TYPE-MREF-TAG
+                 `(("type" . ,(sr-prim-type t))))]
+      [(Fn a f* r)
+       (sr-alloc "Fun_Type" l:TYPE-FN-TAG
+                 `(("arity" . ,(Quote a))
+                   ("return" . ,(sr-prim-type r)) .
+                   ,(map (lambda ([t : Prim-Type])
+                           (cons "argument" (sr-prim-type t)))
+                         f*)))]
+      [other (error 'specify-representation/type "unmatched ~a" other)]))
+  (match-let ([(cons u t) bnd])
+    (Assign u (sr-type t))))
 
 (: untag-deref-gproxy (-> D0-Expr (-> D0-Expr D0-Expr)))
 (define ((untag-deref-gproxy index) proxy)
   (Op 'Array-ref
       (list (Op 'binary-xor (list proxy GPROXY-TAG))
+            index)))
+
+(: untag-deref-castedvalue (-> D0-Expr (-> D0-Expr D0-Expr)))
+(define ((untag-deref-castedvalue index) cv)
+  (Op 'Array-ref
+      (list (Op 'binary-xor (list cv CASTEDVALUE-TAG))
             index)))
 
 (: alloc-tag-set-gproxy/twosome
@@ -884,14 +1051,36 @@ exposed as the effects that they truelly are.
   (define var   (Var proxy))
   (Let `((,ref . ,ref-e) (,src . ,src-e)
          (,tar . ,tar-e) (,lbl . ,lbl-e))
-   (Let `((,proxy . ,(Op 'Alloc (list GPROXY/TWOSOME-SIZE))))
-    (Begin
-      (list
-       (Op 'Array-set! (list var GPROXY-FOR-INDEX    (Var ref)))
-       (Op 'Array-set! (list var GPROXY-FROM-INDEX   (Var src)))
-       (Op 'Array-set! (list var GPROXY-TO-INDEX     (Var tar)))
-       (Op 'Array-set! (list var GPROXY-BLAMES-INDEX (Var lbl))))
-      (Op 'binary-or (list var GPROXY-TAG))))))
+       (Let `((,proxy . ,(Op 'Alloc (list GPROXY/TWOSOME-SIZE))))
+            (Begin
+              (list
+               (Op 'Array-set! (list var GPROXY-FOR-INDEX    (Var ref)))
+               (Op 'Array-set! (list var GPROXY-FROM-INDEX   (Var src)))
+               (Op 'Array-set! (list var GPROXY-TO-INDEX     (Var tar)))
+               (Op 'Array-set! (list var GPROXY-BLAMES-INDEX (Var lbl))))
+              (Op 'binary-or (list var GPROXY-TAG))))))
+
+;; TODO: parameterize over the body of this function
+(: alloc-tag-set-cv/twosome
+   ((String -> Uid) D0-Expr D0-Expr D0-Expr D0-Expr -> D0-Expr))
+(define (alloc-tag-set-cv/twosome uid! e src-e tar-e lbl-e)
+  ;; TODO Consider using sr-alloc here
+  (define cv (uid! "casted_value"))
+  (define val   (uid! "value"))
+  (define src   (uid! "source_t"))
+  (define tar   (uid! "target_t"))
+  (define lbl   (uid! "blame"))
+  (define var   (Var cv))
+  (Let `((,cv . ,e) (,src . ,src-e)
+         (,tar . ,tar-e) (,lbl . ,lbl-e))
+       (Let `((,cv . ,(Op 'Alloc (list CASTEDVALUE/TWOSOME-SIZE))))
+            (Begin
+              (list
+               (Op 'Array-set! (list var CASTEDVALUE-FOR-INDEX    (Var val)))
+               (Op 'Array-set! (list var CASTEDVALUE-FROM-INDEX   (Var src)))
+               (Op 'Array-set! (list var CASTEDVALUE-TO-INDEX     (Var tar)))
+               (Op 'Array-set! (list var CASTEDVALUE-BLAMES-INDEX (Var lbl))))
+              (Op 'binary-or (list var CASTEDVALUE-TAG))))))
 
 (: alloc-tag-set-gproxy/coercion
    ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
@@ -901,12 +1090,27 @@ exposed as the effects that they truelly are.
   (define crcn  (uid! "coercion"))
   (define var   (Var proxy))
   (Let `((,ref . ,ref-e) (,crcn . ,crcn-e))
-   (Let `((,proxy . ,(Op 'Alloc (list GPROXY/COERCION-SIZE))))
-    (Begin
-      (list
-       (Op 'Array-set! (list var GPROXY-FOR-INDEX      (Var ref)))
-       (Op 'Array-set! (list var GPROXY-COERCION-INDEX (Var crcn))))
-      (Op 'binary-or (list var GPROXY-TAG))))))
+       (Let `((,proxy . ,(Op 'Alloc (list GPROXY/COERCION-SIZE))))
+            (Begin
+              (list
+               (Op 'Array-set! (list var GPROXY-FOR-INDEX      (Var ref)))
+               (Op 'Array-set! (list var GPROXY-COERCION-INDEX (Var crcn))))
+              (Op 'binary-or (list var GPROXY-TAG))))))
+
+(: alloc-tag-set-cv/coercion
+   ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
+(define (alloc-tag-set-cv/coercion uid! e crcn-e)
+  (define cv (uid! "casted_value"))
+  (define val   (uid! "value"))
+  (define crcn  (uid! "coercion"))
+  (define var   (Var cv))
+  (Let `((,val . ,e) (,crcn . ,crcn-e))
+       (Let `((,cv . ,(Op 'Alloc (list CASTEDVALUE/COERCION-SIZE))))
+            (Begin
+              (list
+               (Op 'Array-set! (list var CASTEDVALUE-FOR-INDEX      (Var val)))
+               (Op 'Array-set! (list var CASTEDVALUE-COERCION-INDEX (Var crcn))))
+              (Op 'binary-or (list var CASTEDVALUE-TAG))))))
 
 
 ;; fold map through bindings
@@ -943,11 +1147,12 @@ exposed as the effects that they truelly are.
       [(Fn? t) (Op 'Print (list (Quote "Function : ?\n")))]
       [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
       [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
+      [(MRef? t) (Op 'Print (list (Quote "MReference : ?\n")))]
       [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
       [else (TODO implement thing for reference types)]))
   (let* ([res (uid! "result")])
     (Let (list (cons res e))
-      (Begin (list (generate-print res t)) (Success)))))
+         (Begin (list (generate-print res t)) (Success)))))
 
 #;(TODO GET RID OF TAGS IN THE COMPILER)
 (: sr-tag (Tag-Symbol -> (Quote Integer)))
@@ -960,7 +1165,8 @@ exposed as the effects that they truelly are.
     [(Fn)     TYPE-FN-TAG]
     [(GRef)   TYPE-GREF-TAG]
     [(GVect)  TYPE-GVECT-TAG]
-    [(Boxed)  DYN-BOXED-TAG]))
+    [(Boxed)  DYN-BOXED-TAG]
+    [(MRef)   TYPE-MREF-TAG]))
 
 
 
@@ -974,7 +1180,7 @@ exposed as the effects that they truelly are.
              [closv  (Var cp)]
              [env (for/hash : Env ([fvar fvar*]
                                    [i (in-naturals offset)])
-                  (values fvar (Op 'Array-ref (list closv (Quote i)))))]
+                    (values fvar (Op 'Array-ref (list closv (Quote i)))))]
              [env (extend* env param* (map var param*))]
              [cenv (index-closure offset cp fvar*)])
         (cons u (Code (cons cp param*) (sr-expr exp env cenv))))))

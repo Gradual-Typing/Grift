@@ -4,7 +4,7 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
- Discription: This pass translates casts in the AST to their corresponding
+Description: This pass translates casts in the AST to their corresponding
 coercions. The output type doesn't allow casts in the AST but is a subset of
 future languages that do. This is because this pass is optional and the compiler
 should be able to compile programs this the twosome casts for future comparison.
@@ -22,7 +22,7 @@ should be able to compile programs this the twosome casts for future comparison.
          (all-from-out "../language/cast-with-pure-letrec.rkt"
                        "../language/coercion.rkt"))
 
-;; The entry point for this pass it is called by impose-casting semantics
+;; The entry point for this pass it is called by impose-casting-semantics
 (: casts->coercions (Cast/Pure-Letrec Config . -> . Coercion-Lang))
 (define (casts->coercions prgm config)
   (match-let ([(Prog (list name next type) exp) prgm])
@@ -30,31 +30,31 @@ should be able to compile programs this the twosome casts for future comparison.
       (Prog (list name next type) exp))))
 
 (: mk-coercion (Blame-Label ->
-                (Schml-Type Schml-Type -> Schml-Coercion)))
+                            (Schml-Type Schml-Type -> Schml-Coercion)))
 (define ((mk-coercion lbl) t1 t2)
   (define recur (mk-coercion lbl))
   (logging mk-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
   (define result : Schml-Coercion
-    (if (equal? t1 t2)
-        (Identity)
-        (match* (t1 t2)
-          [((Dyn)    t)  (Sequence (Project t lbl) (Identity))]
-          [(t    (Dyn))  (Sequence (Identity) (Inject t))]
-          [((Fn n1 a1* r1) (Fn n2 a2* r2)) #:when (= n1 n2)
-           ;; The arity check here means that all coercions have
-           ;; the correct arrity under the static type system.
-           ;; Notice that the argument types are reversed
-           ;; because of contravarience of functions.
-           (Fn n1 (map recur a2* a1*) (recur r1 r2))]
-          ;; It seems like we could get by without other coercions
-          [((GRef t1) (GRef t2))
-           (Ref (recur t1 t2) (recur t2 t1))]
-          [((GVect t1) (GVect t2))
-           (Ref (recur t1 t2) (recur t2 t1))]
-          [(_ _) (Failed lbl)])))
+    (cond
+      [(equal? t1 t2) (Identity)]
+      [(Dyn? t1) (Sequence (Project t2 lbl) (Identity))]
+      [(Dyn? t2) (Sequence (Identity) (Inject t1))]
+      [else (match* (t1 t2)
+              [((Fn n1 a1* r1) (Fn n2 a2* r2)) #:when (= n1 n2)
+               ;; The arity check here means that all coercions have
+               ;; the correct arity under the static type system.
+               ;; Notice that the argument types are reversed
+               ;; because of contravarience of functions.
+               (Fn n1 (map recur a2* a1*) (recur r1 r2))]
+              ;; It seems like we could get by without other coercions
+              [((GRef t1) (GRef t2))
+               (Ref (recur t1 t2) (recur t2 t1))]
+              [((GVect t1) (GVect t2))
+               (Ref (recur t1 t2) (recur t2 t1))]
+              [((MRef _) (MRef t2)) (MonoRef t2)]
+              [(_ _) (Failed lbl)])]))
   (logging mk-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
-
 
 ;; Fold through the expression converting casts to coercions
 (: c2c-expr (C/PL-Expr -> Crcn-Expr))
@@ -92,7 +92,22 @@ should be able to compile programs this the twosome casts for future comparison.
      (Gvector-ref (c2c-expr e) (c2c-expr i))]
     [(Gvector-set! e1 e2 e3)
      (Gvector-set! (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
-    [(Var id)    (Var id)]
+    [(Mbox e t) (Mbox (c2c-expr e) t)]
+    [(Munbox e) (Munbox (c2c-expr e))]
+    [(Mbox-set! e1 e2) (Mbox-set! (c2c-expr e1) (c2c-expr e2))]
+    [(MBoxCastedRef u t)
+     (MBoxCastedRef u t)]
+    [(MBoxCastedSet! u (app c2c-expr e) t)
+     (MBoxCastedSet! u e t)]
+    [(Mvector e1 e2 t) (Mvector (c2c-expr e1) (c2c-expr e2) t)]
+    [(Mvector-ref e1 e2) (Mvector-ref (c2c-expr e1) (c2c-expr e2))]
+    [(Mvector-set! e1 e2 e3)
+     (Mvector-set! (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
+    [(MVectCastedRef u i t)
+     (MVectCastedRef u (c2c-expr i) t)]
+    [(MVectCastedSet! u (app c2c-expr i) (app c2c-expr e) t)
+     (MVectCastedSet! u i e t)]
+    [(Var id) (Var id)]
     [(Quote lit) (Quote lit)]))
 
 (: c2c-expr* (C/PL-Expr* -> Crcn-Expr*))
@@ -113,7 +128,3 @@ should be able to compile programs this the twosome casts for future comparison.
      (match-let ([(cons u (Lambda f* e)) b])
        (cons u (Lambda f* (c2c-expr e)))))
    b*))
-
-
-
-

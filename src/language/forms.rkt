@@ -57,12 +57,39 @@ And a type constructor "name" expecting the types of field1 and field2
   (No-Op)
   ;; Effect operations
   ;; Monotonic effects
-  (Mbox value)
+  (MboxS value) ;; source level mbox has no type annotation
+  (Mbox value type)
   (Munbox box)
+  (MunboxT box type)
   (Mbox-set! box value)
-  (Mvector value constructor)
-  (Mvector-set! vector offset value)
-  (Mvector-ref vector offset)
+  (Mbox-set!T box value type)
+  (Mbox-val-ref expression)
+  (Mbox-val-set! expression1 expression2)
+  (Mbox-rtti-ref address)
+  (Mbox-rtti-set! address expression)
+  (Make-Fn-Type expression1 expression2 expression3) ;; create meeted function type in runtime
+  ;; the underlying value can be accessed by the location encoded in the type
+  (MBoxCastedRef addr type)
+  (MBoxCastedSet! addr v type)
+  (CastedValue-Huh expression)
+  (CastedValue expression1 expression2)
+  (CastedValue-Value expression)
+  (CastedValue-Source expression)
+  (CastedValue-Target expression)
+  (CastedValue-Blames expression)
+  (CastedValue-Coercion expression)
+  (MvectorS value constructor)
+  (Mvector value constructor type)
+  (Mvector-set! vector index value)
+  (Mvector-set!T vector index value type)
+  (Mvector-ref vector index)
+  (Mvector-refT vector index type)
+  (Mvector-val-ref vector index)
+  (Mvector-val-set! vector index value)
+  (Mvector-rtti-ref vector)
+  (Mvector-rtti-set! address expression)
+  (MVectCastedRef addr index type)
+  (MVectCastedSet! addr index value type)
   ;; Guarded effects
   (Gbox value)
   (Gunbox box)
@@ -88,6 +115,11 @@ And a type constructor "name" expecting the types of field1 and field2
   ;;Type Operations
   (Type-Dyn-Huh exp)
   (Type-Tag expression)
+  (Type-Fn index return-type argument-types)
+  (Type-GRef type)
+  (Type-GVect type)
+  (Type-MRef type)
+  (Type-MVect type)
   (Type-Fn-arity expression)
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
@@ -96,6 +128,10 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-GRef-Huh type)
   (Type-GRef-Of expression)
   (Type-GVect-Of expression)
+  (Type-MRef-Huh expression)
+  (Type-MRef-Of expression)
+  (Type-MVect-Huh expression)
+  (Type-MVect-Of expression)
   ;; closure Representation
   (App-Closure code data exprs)
   (Closure-Data code caster variables)
@@ -118,6 +154,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Observational Operations
   (Blame expression)
   (Observe expression type)
+  (Error expression)
   ;; Lambda subforms
   (Castable caster body)
   (Bound closure variables body)
@@ -174,7 +211,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Gproxy-to expression)
   (Gproxy-blames expression)
   |#
-)
+  )
 
 (define NO-OP (No-Op))
 
@@ -277,7 +314,7 @@ And a type constructor "name" expecting the types of field1 and field2
 
 
 #|
-   Unique Identifier
+Unique Identifier
 |#
 
 (struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
@@ -371,8 +408,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (or (timer-primitive? x)))
 
 (define-type IntxInt->Int-Primitive (U '* '+ '-
-                                        'binary-and 'binary-or 'binary-xor
-                                        '%/ '%>> '%<<))
+                                       'binary-and 'binary-or 'binary-xor
+                                       '%/ '%>> '%<<))
 
 (define-type IxI->I-Prim IntxInt->Int-Primitive)
 
@@ -419,8 +456,8 @@ And a type constructor "name" expecting the types of field1 and field2
       (eq? 'timer-report x)))
 
 #| Literals of the schml languages
-   Only Integers and Booleans in the schml language are first
-   class literal constants
+Only Integers and Booleans in the schml language are first
+class literal constants
 |#
 
 (define-type Schml-Literal
@@ -461,6 +498,10 @@ And a type constructor "name" expecting the types of field1 and field2
      Schml-Fn-Type
      Schml-Ref-Type))
 
+;; type known at runtime only for monotonic references, the uid is for
+;; the entire reference cell, you have to access the second component
+;; of the cell to get the type.
+
 (define-type Schml-Fn-Type
   (Fn Index Schml-Type* Schml-Type))
 
@@ -478,7 +519,7 @@ And a type constructor "name" expecting the types of field1 and field2
       (base-type? x)
       (schml-fn? x)
       (schml-ref? x)))
-      
+
 
 (define-predicate schml-type*? Schml-Type*)
 #;(: schml-type*? (Any -> Boolean : Schml-Type*))
@@ -490,12 +531,13 @@ And a type constructor "name" expecting the types of field1 and field2
            (schml-type*? (cdr x)))))
 
 (define-predicate schml-fn? Schml-Fn-Type)
+
 #;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
 #;(define (schml-fn? x)
-   (and (Fn? x)
-    (index? (Fn-arity x))
-    (schml-type*? (Fn-fmls x))
-    (schml-type? (Fn-ret x))))
+    (and (Fn? x)
+         (index? (Fn-arity x))
+         (schml-type*? (Fn-fmls x))
+         (schml-type? (Fn-ret x))))
 
 
 (define-predicate schml-ref? Schml-Ref-Type)
@@ -532,10 +574,18 @@ And a type constructor "name" expecting the types of field1 and field2
   (define (gref? t g)
     (and (GRef? t) (GRef? g)
          (consistent? (GRef-arg t) (GRef-arg g))))
+  (: mref? ConsistentT)
+  (define (mref? t g)
+    (and (MRef? t) (MRef? g)
+         (consistent? (MRef-arg t) (MRef-arg g))))
   (: gvect? ConsistentT)
   (define (gvect? t g)
     (and (GVect? t) (GVect? g)
          (consistent? (GVect-arg t) (GVect-arg g))))
+  (: mvect? ConsistentT)
+  (define (mvect? t g)
+    (and (MVect? t) (MVect? g)
+         (consistent? (MVect-arg t) (MVect-arg g))))
   (or (Dyn? t) (Dyn? g)
       (unit? t g)
       (bool? t g)
@@ -543,36 +593,32 @@ And a type constructor "name" expecting the types of field1 and field2
       (fn? t g)
       (gref? t g)
       (gvect? t g)
+      (mref? t g)
+      (mvect? t g)
       
 
 
       ;; These will need to be added back but were adding
       ;; considerable type checking time.
       #;
-      (and (GVect? t) (GVect? g)
-           (consistent? (GVect-arg t) (GVect-arg g)))
-      #;
-      (and (MRef? t) (MRef? g)
-           (consistent? (MRef-arg t) (MRef-arg g)))
-      #;
       (and (MVect? t) (MVect? g)
            (consistent? (MVect-arg t) (MVect-arg g)))))
 
 #|
- Join :: type X type -> type
- This is the join of the least precise latice
-     ⊑ latice example:
-      Int --> Int
-         /   \
-        /     \
-       /       \        Joins ↑
+Join :: type X type -> type
+This is the join of the least precise latice
+⊑ latice example:
+Int --> Int
+/   \
+/     \
+/       \        Joins ↑
 Dyn --> Int Int --> Dyn
-       \       /        Meets ↓
-        \     /
-         \   /
-      Dyn --> Dyn
-           |
-          Dyn
+\       /        Meets ↓
+\     /
+\   /
+Dyn --> Dyn
+|
+Dyn
 |#
 
 (: join (Schml-Type Schml-Type . -> . Schml-Type))
@@ -590,12 +636,11 @@ Dyn --> Int Int --> Dyn
      (GRef (join (GRef-arg t) (GRef-arg g)))]
     [(and (GVect? t) (GVect? g))
      (join (GVect-arg t) (GVect-arg g))]
-    #;
     [(and (MRef? t) (MRef? g))
      (join (MRef-arg t) (MRef-arg g))]
     #;
     [(and (MVect? t) (MVect? g))
-    (join (MVect-arg t) (MVect-arg g))]
+     (join (MVect-arg t) (MVect-arg g))]
     [else (error 'join "Types are not consistent")]))
 
 
@@ -605,6 +650,7 @@ Dyn --> Int Int --> Dyn
   ;; TODO Come up with a better name for this
   (Quote-Coercion const)
   (Compose-Coercions fst snd)
+  (Make-Coercion t1 t2)
   ;; I am swithing to using the Cast and Interpreted Cast for the following
   ;; Forms
   ;(Coerce coercion expression) 
@@ -612,7 +658,7 @@ Dyn --> Int Int --> Dyn
   ;; Identity Cast
   ;; "Calculated No Op Cast"
   (Identity)
-  (Id-Coercion-Huh E)
+  (Id-Coercion-Huh expression)
   (Id-Coercion)
   ;; Projection Coercion
   ;; "Project from dynamic at type blaming label if it fails"
@@ -642,6 +688,11 @@ Dyn --> Int Int --> Dyn
   (Ref-Coercion read write)
   (Ref-Coercion-Read expression)
   (Ref-Coercion-Write ref)
+  (MonoRef type) ;; Monotonic Reference Coercion
+  (MRef-Coercion type)
+  (MRef-Coercion-Type expression)
+  (MVect-Coercion expression)
+  (MVect-Coercion-Type expression)
   (Fn-Proxy arity coercion closure)
   (Fn-Proxy-Coercion expression)
   (Fn-Proxy-Closure expression)
@@ -666,6 +717,8 @@ Dyn --> Int Int --> Dyn
   (Failed-Coercion-Huh crcn)
   (Failed-Coercion-Label fld)
   (Ref-Coercion-Huh crcn)
+  (MRef-Coercion-Huh crcn)
+  (MVect-Coercion-Huh crcn)
   (Fn-Coercion-Huh crcn)
   (Make-Fn-Coercion make-uid t1 t2 lbl)
   (Compose-Fn-Coercion comp-uid c1 c2))
@@ -677,7 +730,7 @@ Dyn --> Int Int --> Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef)) ;; 'MVect
 
 (define-type Schml-Coercion
   (Rec C (U Identity
@@ -686,15 +739,16 @@ Dyn --> Int Int --> Dyn
             (Sequence C C)
             (Failed Blame-Label)
             (Fn Index (Listof C) C)
-            (Ref C C))))
+            (Ref C C)
+            (MonoRef Schml-Type))))
 
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 
 (define-type Data-Literal (U Integer String))
 
 #|------------------------------------------------------------------------------
-  Compact Types are a sort of compile time hash-consing of types
-  They are introduced by hoist types in Language Cast-or-Coerce3.1
+Compact Types are a sort of compile time hash-consing of types
+They are introduced by hoist types in Language Cast-or-Coerce3.1
 ------------------------------------------------------------------------------|#
 
 (define-type Compact-Type
@@ -711,6 +765,7 @@ Dyn --> Int Int --> Dyn
             (Inject Prim-Type)
             (Sequence C C)
             (Fn Index (Listof C) C)
-            (Ref C C))))
+            (Ref C C)
+            (MonoRef Prim-Type))))
 
 (define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))

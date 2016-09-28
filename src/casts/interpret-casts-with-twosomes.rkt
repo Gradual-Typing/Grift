@@ -1,3 +1,4 @@
+
 #lang typed/racket/base
 #|-----------------------------------------------------------------------------+
 |Pass: src/casts/interpret-casts                                          |
@@ -51,329 +52,427 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (: interpret-casts/twosomes
    (Cast-or-Coerce2-Lang Config  ->  Cast-or-Coerce3-Lang))
-(define (interpret-casts/twosomes prgm config)
-  ;; Configuration options that determine how code is generated
-  (: cast-rep Cast-Representation)
-  (define cast-rep (Config-cast-rep config))
-  (: specialize-casts? (Parameterof Boolean))
-  (define specialize-casts? (make-parameter #f))
-  (: recursive-dyn-cast? (Parameterof Boolean))
-  (define recursive-dyn-cast? (make-parameter #t))
+(trace-define (interpret-casts/twosomes prgm config)
+              ;; Configuration options that determine how code is generated
+              (: cast-rep Cast-Representation)
+              (define cast-rep (Config-cast-rep config))
+              (: specialize-casts? (Parameterof Boolean))
+              (define specialize-casts? (make-parameter #f))
+              (: recursive-dyn-cast? (Parameterof Boolean))
+              (define recursive-dyn-cast? (make-parameter #t))
 
-  ;; Desugaring the input program into its constituents 
-  (match-define (Prog (list prgm-name prgm-next prgm-type) prgm-exp)
-    prgm)
+              ;; Desugaring the input program into its constituents 
+              (match-define (Prog (list prgm-name prgm-next prgm-type) prgm-exp)
+                prgm)
 
-  ;; Just a tad of mutable state to generate unique identifiers
-  (define next-unique-number : (Boxof Nat) (box prgm-next))
-  ;; And syntax for introducing bindings when needed
-  (define-syntax-let$* let$* next-unique-number)
-  ;; And unconditional binding introduction
-  (: next-uid! (String -> Uid))
-  (define (next-uid! x)
-    (let ([n (unbox next-unique-number)])
-      (set-box! next-unique-number (add1 n))
-      (Uid x n)))
-  
-  ;; These templates are used to build the code that performs
-  ;; casting at runtime.
-  ;; In my opinion they currently do too much manual specialization
-  ;; and we should make them simpler but implement a specialization
-  ;; pass that derives code with similar efficiency. AMK 2015-12-17
-  (define-type Cast-Rule/Cast-Rule
-    ((CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-     CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr
-     -> CoC3-Expr))
-  
-  ;; How to cast any type to some other type
-  (: cast-any/twosome Cast-Rule/Cast-Rule)
-  (define (cast-any/twosome cast-undyned v t1 t2 lbl)
-    (let$* ([type1 t1] [type2 t2])
-     (cond$
-      [(op=? type1 type2) v]
-      [(op=? type1 (Type DYN-TYPE))
-       (cast-dyn/twosome cast-undyned v type1 type2 lbl)]
-      [else (cast-ground/twosome v type1 type2 lbl)])))
+              ;; Just a tad of mutable state to generate unique identifiers
+              (define next-unique-number : (Boxof Nat) (box prgm-next))
+              ;; And syntax for introducing bindings when needed
+              (define-syntax-let$* let$* next-unique-number)
+              ;; And unconditional binding introduction
+              (: next-uid! (String -> Uid))
+              (define (next-uid! x)
+                (let ([n (unbox next-unique-number)])
+                  (set-box! next-unique-number (add1 n))
+                  (Uid x n)))
 
-  ;; How to cast any Injectable type to any other type
-  (: cast-ground/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (cast-ground/twosome v t1 t2 lbl)
-    (let$* ([value v] [type1 t1] [type2 t2])
-     (cond$
-      [(op=? type1 (Type INT-TYPE))
-       (if$ (op=? (Type DYN-TYPE) type2)
-            (Dyn-make value (Type INT-TYPE))
-            (Blame lbl))]
-      [(op=? type1 (Type BOOL-TYPE))
-       (if$ (op=? (Type DYN-TYPE) type2)
-            (Dyn-make value (Type BOOL-TYPE))
-            (Blame lbl))]
-      [(op=? type1 (Type UNIT-TYPE))
-       (if$ (op=? (Type DYN-TYPE) type2)
-            (Dyn-make value (Type UNIT-TYPE))
-            (Blame lbl))]
-      [else
-       (let$* ([tag1 (type-tag type1)])
-        (cond$
-         [(op=? (Tag 'Fn) tag1)
-          (cast-fn/twosome value type1 type2 lbl)]
-         [(op=? (Tag 'GRef) tag1)
-          (cast-gref/twosome value type1 type2 lbl)]
-         [(op=? (Tag 'GVect) tag1)
-          (cast-gvect/twosome value type1 type2 lbl)]
-         [else (Blame (Quote "Unexpected Type1 in cast tree"))]))])))
+              ;; The runtime label for the greatest lower bound
+              (define glb-uid (next-uid! "greatest_lower_bound"))
+              ;; Make a call to the runtime greatest lower bound
+              (: mk-glb-call (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (mk-glb-call t1 t2)
+                (App-Code (Code-Label glb-uid) (list t1 t2)))
 
-  ;; How to cast a Guarded Reference to some other type
-  (: cast-gref/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (cast-gref/twosome v t1 t2 lbl)
-    (: gref-arg (CoC3-Expr -> CoC3-Expr))
-    (define (gref-arg t)
-      (if (Type? t)
-          (let ([t (Type-type t)])
-            (if (GRef? t)
-                (Type (GRef-arg t))
-                (error 'interpret-casts "unexpected type in gref-arg")))
-          (Type-GRef-Of t)))
-    (: proxy-gref (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-    (define (proxy-gref val type1 type2 lbl)
-      (let$* ([tag_gref (type-tag type2)])
-       (if$ (op=? tag_gref (Tag 'GRef))
-            (let$* ([g1 (gref-arg type1)]
-                    [g2 (gref-arg type2)])
-              (Guarded-Proxy val (Twosome g1 g2 lbl)))
-            (Blame lbl))))
-    (let$* ([val v] [type1 t1] [type2 t2] [label lbl])
-           (if$ (op=? (Type DYN-TYPE) type2)
-                (Dyn-make val type1)
-                (proxy-gref val type1 type2 label))))
+              (: greatest-lower-bound$ (GreatestLowerBound-Type Uid -> GreatestLowerBound-Type))
+              (define ((greatest-lower-bound$ mk-glb mk-glb-uid) t1 t2)
+                (cond$
+                 [(op=? t1 t2) t1]
+                 [(dyn?$ t1) t2]
+                 [(dyn?$ t2) t1]
+                 [(and$ (fnT?$ t1) (fnT?$ t2))
+                  (if$ (op=? (fnT-arity$ t1) (fnT-arity$ t2))
+                       ((mk-fn-type$ mk-glb mk-glb-uid) t1 t2)
+                       (Error (Quote "can not compute the greatest lower bound for function types with mismatch arities")))]
+                 [(and$ (gref?$ t1) (gref?$ t2))
+                  (let$* ([gr1_of (gref-of$ t1)]
+                          [gr2_of (gref-of$ t2)]
+                          [t  (mk-glb gr1_of gr2_of)])
+                         (gref$ t))]
+                 [(and$ (gvect?$ t1) (gvect?$ t2))
+                  (let$* ([gr1_of (gvect-of$ t1)]
+                          [gr2_of (gvect-of$ t2)]
+                          [t  (mk-glb gr1_of gr2_of)])
+                         (gvect$ t))]
+                 [else (Error (Quote "inconsistent types"))]))
 
-  ;; How to Cast a Guarded Vector to some other type
-  (: cast-gvect/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (cast-gvect/twosome v t1 t2 lbl)
-    ;; Get the vector type argument either by compile time reflection
-    ;; or generating runtime code.
-    (: gvect-arg (CoC3-Expr -> CoC3-Expr))
-    (define (gvect-arg t)
-      (if (Type? t)
-          (let ([t (Type-type t)])
-            (if (GVect? t)
-                (Type (GVect-arg t))
-                (error 'interpret-casts "unexpected type in gvect-arg")))
-          (Type-GVect-Of t)))
-    ;; Generate the code to create a proxy if the target type is
-    ;; actually a Gvector
-    (: proxy-gvect (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-    (define (proxy-gvect val type1 type2 lbl)
-      (let$* ([tag_gvect (type-tag type2)])
-             (if$ (op=? tag_gvect (Tag 'GVect))
-                  (let$* ([g1 (gvect-arg type1)]
-                          [g2 (gvect-arg type2)])
-                         (Guarded-Proxy val (Twosome g1 g2 lbl)))
-                  (Blame lbl))))
-    ;; Check to see if we are casting to dyn, if so box the value.
-    ;; Otherwise either cast to a gvector type or blame the label.
-    (let$* ([val v] [type1 t1] [type2 t2] [label lbl])
-           (if$ (op=? (Type DYN-TYPE) type2)
-                (Dyn-make val type1)
-                (proxy-gvect val type1 type2 label))))
+              (: mk-fn-type$ (GreatestLowerBound-Type Uid -> GreatestLowerBound-Type))
+              (define ((mk-fn-type$  mk-glb uid) t1 t2)
+                (: help-glb (GreatestLowerBound-Type ->
+                                                      (Schml-Type Schml-Type -> Schml-Type)))
+                (define ((help-glb mk-glb) t1 t2)
+                  (let ([t : CoC3-Expr (mk-glb (Type t1) (Type t2))])
+                    (if (Type? t)
+                        (Type-type t)
+                        ;; This should always be possible if all the code is correct
+                        (error 'mk-fn-type$/help-glb))))
+                ;; This is suppose to be outside of the specializing code
+                ;; because we are defining the meta make function coercion
+                (cond
+                  [(and (Type? t1) (Type? t2))
+                   (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
+                     (unless (and (Fn? t1) (Fn? t2))
+                       (error 'mk-fn-type$))
+                     (let* ([t1-args (Fn-fmls t1)]
+                            [t2-args (Fn-fmls t2)]
+                            [t1-ret  (Fn-ret  t1)]
+                            [t2-ret  (Fn-ret  t2)]
+                            [arg* (map (help-glb mk-glb) t2-args t1-args)]
+                            [ret  ((help-glb mk-glb) t1-ret t2-ret)])
+                       (Type (Fn (Fn-arity t1) arg* ret))))]
+                  [else (Make-Fn-Type uid t1 t2)]))
+              
+              ;; These templates are used to build the code that performs
+              ;; casting at runtime.
+              ;; In my opinion they currently do too much manual specialization
+              ;; and we should make them simpler but implement a specialization
+              ;; pass that derives code with similar efficiency. AMK 2015-12-17
+              (define-type Cast-Rule/Cast-Rule
+                ((CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
+                 CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr
+                 -> CoC3-Expr))
+              
+              ;; How to cast any type to some other type
+              (: cast-any/twosome Cast-Rule/Cast-Rule)
+              (define (cast-any/twosome cast-undyned v t1 t2 lbl)
+                (let$* ([type1 t1] [type2 t2])
+                       (cond$
+                        [(op=? type1 type2) v]
+                        [(op=? type1 (Type DYN-TYPE))
+                         (cast-dyn/twosome cast-undyned v type1 type2 lbl)]
+                        [else (cast-ground/twosome v type1 type2 lbl)])))
 
-  ;; How to Cast a Function to some other type
-  (: cast-fn/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (cast-fn/twosome v t1 t2 lbl)
-    (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
-     (if$ (op=? (Type DYN-TYPE) type2)
-          (Dyn-make value type1)
-          (let$* ([tag2 (type-tag type2)])
-           (if$ (op=? tag2 (Tag 'Fn))
-                (let$* ([type1_arity (type-fn-arity type1)]
-                        [type2_arity (type-fn-arity type2)])
-                 (if$ (op=? type1_arity type2_arity)
-                      (App-Code (Fn-Caster value)
-                                (list value t1 type2 lbl))
-                      (Blame lbl)))
-                (Blame lbl))))))
+              ;; How to cast any Injectable type to any other type
+              (: cast-ground/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (cast-ground/twosome v t1 t2 lbl)
+                (let$* ([value v] [type1 t1] [type2 t2])
+                       (cond$
+                        [(op=? type1 (Type INT-TYPE))
+                         (if$ (op=? (Type DYN-TYPE) type2)
+                              (Dyn-make value (Type INT-TYPE))
+                              (Blame lbl))]
+                        [(op=? type1 (Type BOOL-TYPE))
+                         (if$ (op=? (Type DYN-TYPE) type2)
+                              (Dyn-make value (Type BOOL-TYPE))
+                              (Blame lbl))]
+                        [(op=? type1 (Type UNIT-TYPE))
+                         (if$ (op=? (Type DYN-TYPE) type2)
+                              (Dyn-make value (Type UNIT-TYPE))
+                              (Blame lbl))]
+                        [else
+                         (let$* ([tag1 (type-tag type1)])
+                                (cond$
+                                 [(op=? (Tag 'Fn) tag1)
+                                  (cast-fn/twosome value type1 type2 lbl)]
+                                 [(op=? (Tag 'GRef) tag1)
+                                  (cast-gref/twosome value type1 type2 lbl)]
+                                 [(op=? (Tag 'GVect) tag1)
+                                  (cast-gvect/twosome value type1 type2 lbl)]
+                                 [(op=? (Tag 'MRef) tag1)
+                                  (cast-mref/twosome value type1 type2 lbl)]
+                                 [else (Blame (Quote "Unexpected Type1 in cast tree"))]))])))
 
-  ;; How to extract a dynamic value
-  (: cast-dyn/twosome Cast-Rule/Cast-Rule)
-  (define (cast-dyn/twosome cast-undyned v t1 t2 lbl)
-    (let$* ([val v] [tag (Dyn-tag val)])
-     (cond$
-      [(op=? (Tag 'Int) tag)
-       (cast-undyned (Dyn-immediate val) (Type INT-TYPE) t2 lbl)]
-      [(op=? (Tag 'Bool) tag)
-       (cast-undyned (Dyn-immediate val) (Type BOOL-TYPE) t2 lbl)]
-      [(op=? (Tag 'Unit) tag)
-       (cast-undyned (Quote '()) (Type UNIT-TYPE) t2 lbl)]
-      [(op=? (Tag 'Boxed) tag)
-       (cast-undyned (Dyn-value val) (Dyn-type val) t2 lbl)]
-      [else (Blame (Quote "Unexpected value in cast tree"))])))
+              ;; How to cast a Monotonic Reference to some other type
+              (: cast-mref/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (cast-mref/twosome v t1 t2 lbl)
+                (let$* ([val v] [type1 t1] [type2 t2] [tag_mref (type-tag type2)] [label lbl])
+                       (if$ (op=? (Type DYN-TYPE) type2)
+                            (Dyn-make val type1)
+                            (if$ (op=? tag_mref (Tag 'MRef))
+                                 (match-let ([(Var a) val])
+                                   (let$* ([t2 (mref-of$ type2)])
+                                          (if (dyn?$ t2)
+                                              v
+                                              (let$* ([t1 (Mbox-rtti-ref a)]
+                                                      [t3 (mk-glb-call t1 t2)])
+                                                     (if$ (op=? t1 t3)
+                                                          v
+                                                          (let$* ([cv (Mbox-val-ref v)]
+                                                                  [cv_ (CastedValue cv (Twosome t1 t3 (Quote "")))])
+                                                                 (Begin
+                                                                   (list
+                                                                    (Mbox-val-set! v cv_)
+                                                                    (Mbox-rtti-set! a t3))
+                                                                   v)))))))
+                                 (Blame lbl)))))
 
-  ;; How to cast a non dynamic value to another type
-  ;; Notice this is used in conjuction with interpret cast based
-  ;; on the setting of the parameter recursive-dyn-cast
-  ;; when set to #t the cast used is a call to the interpret
-  ;; cast runtime routine instead of unfolding the cast tree even
-  ;; I am pretty sure this is the desired behavior
-  ;; There is an invarient that there will only ever be one level of dyn
-  (: spec-cast-undyned (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (spec-cast-undyned v t1 t2 l)
-    (let$* ([value v] [type1 t1] [type2 t2] [label l])
-      ;; If unboxed at the exact type then just return the value
-      (if (op=? type1 type2)
-          value
-          ;; Otherwise it was either unboxed at the wrong type
-          ;; or it is an inter structured type cast.
-          ;; Either way we build a cast tree specific to this type.
-          (cast-ground/twosome value type1 type2 label))))
+              ;; How to cast a Guarded Reference to some other type
+              (: cast-gref/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (cast-gref/twosome v t1 t2 lbl)
+                (: proxy-gref (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+                (define (proxy-gref val type1 type2 lbl)
+                  (let$* ([tag_gref (type-tag type2)])
+                         (if$ (op=? tag_gref (Tag 'GRef))
+                              (let$* ([g1 (gref-of$ type1)]
+                                      [g2 (gref-of$ type2)])
+                                     (Guarded-Proxy val (Twosome g1 g2 lbl)))
+                              (Blame lbl))))
+                (let$* ([val v] [type1 t1] [type2 t2] [label lbl])
+                       (if$ (op=? (Type DYN-TYPE) type2)
+                            (Dyn-make val type1)
+                            (proxy-gref val type1 type2 label))))
 
-  ;; The uid for the runtime interpreted cast
-  (define interp-cast-uid : Uid (next-uid! "interp_cast"))
+              ;; How to Cast a Guarded Vector to some other type
+              (: cast-gvect/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (cast-gvect/twosome v t1 t2 lbl)
+                ;; Generate the code to create a proxy if the target type is
+                ;; actually a Gvector
+                (: proxy-gvect (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+                (define (proxy-gvect val type1 type2 lbl)
+                  (let$* ([tag_gvect (type-tag type2)])
+                         (if$ (op=? tag_gvect (Tag 'GVect))
+                              (let$* ([g1 (gvect-of$ type1)]
+                                      [g2 (gvect-of$ type2)])
+                                     (Guarded-Proxy val (Twosome g1 g2 lbl)))
+                              (Blame lbl))))
+                ;; Check to see if we are casting to dyn, if so box the value.
+                ;; Otherwise either cast to a gvector type or blame the label.
+                (let$* ([val v] [type1 t1] [type2 t2] [label lbl])
+                       (if$ (op=? (Type DYN-TYPE) type2)
+                            (Dyn-make val type1)
+                            (proxy-gvect val type1 type2 label))))
 
-  ;; Build a call to the runtime interpreted cast code
-  (: interpret-cast (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (interpret-cast v t1 t2 l)
-    (App-Code (Code-Label interp-cast-uid) (list v t1 t2 l)))
+              ;; How to Cast a Function to some other type
+              (: cast-fn/twosome (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (cast-fn/twosome v t1 t2 lbl)
+                (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
+                       (if$ (op=? (Type DYN-TYPE) type2)
+                            (Dyn-make value type1)
+                            (let$* ([tag2 (type-tag type2)])
+                                   (if$ (op=? tag2 (Tag 'Fn))
+                                        (let$* ([type1_arity (type-fn-arity type1)]
+                                                [type2_arity (type-fn-arity type2)])
+                                               (if$ (op=? type1_arity type2_arity)
+                                                    (App-Code (Fn-Caster value)
+                                                              (list value t1 type2 lbl))
+                                                    (Blame lbl)))
+                                        (Blame lbl))))))
 
-  ;; Build a specialized cast for the given code
-  (: specialize-cast (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-  (define (specialize-cast v t1 t2 l)
-    (if (recursive-dyn-cast?)
-        (cast-any/twosome interpret-cast v t1 t2 l)
-        (cast-any/twosome spec-cast-undyned v t1 t2 l)))
-  
-  (define interp-cast-binding : CoC3-Bnd-Code
-    (let* ([v  (next-uid! "value")]
-           [t1 (next-uid! "type1")]
-           [t2 (next-uid! "type2")]
-           [l  (next-uid! "label")])
-      `(,interp-cast-uid
-        .
-        ,(Code (list v t1 t2 l)
-               (specialize-cast (Var v) (Var t1) (Var t2) (Var l))))))
-  
-  ;; ic-expr maps over the expressions lowering function cast
-  ;; into calls to the runtime cast interpreter and direct manipulation
-  ;; of the representation for each type and value.
-  (: ic-expr (CoC2-Expr -> CoC3-Expr))
-  (define (ic-expr exp)
-    (match exp
-      ;; Interesting Transformations
-      [(Interpreted-Cast
-        (app ic-expr v)
-        (Twosome (app ic-expr t1) (app ic-expr t2) (app ic-expr l)))
-       (if (and (specialize-casts?)
-                (or (Type? t1) (Type? t2)))
-           (specialize-cast v t1 t2 l)
-           (interpret-cast v t1 t2 l))]
-      [(Cast (app ic-expr v) (Twosome t1 t2 l))
-       (if (specialize-casts?)
-           (specialize-cast v (Type t1) (Type t2) (Quote l))
-           (interpret-cast v (Type t1) (Type t2) (Quote l)))]
-      [(Fn-Proxy i e1 e2)
-       (error 'ic "function proxies not yet implemented")]
-      [(App/Fn-Proxy-Huh e e*)
-       (error 'ic "function proxy apply not yet implemented")]
-      [(Fn-Proxy-Huh e)
-       (error 'ic "function proxies not yet implemented")]
-      [(Fn-Proxy-Closure e)
-       (error 'ic "function proxies not yet implemented")]
-      ;; Uniteresting Recursion till the end
-      [(Code-Label u)
-       (Code-Label u)]
-      [(Labels c* e)
-       (Labels (map ic-bndc c*) (ic-expr e))]
-      [(App-Code e e*)
-       (App-Code (ic-expr e) (map ic-expr e*)) ]
-      [(Lambda f* (Castable ctr e))
-       (Lambda f* (Castable ctr (ic-expr e)))]
-      [(App-Fn e e*)
-       (App-Fn (ic-expr e) (map ic-expr e*))]
-      [(Letrec b* e)
-       (Letrec (map ic-bnd b*) (ic-expr e))]
-      [(Let b* e)
-       (Let (map ic-bnd b*) (ic-expr e))]
-      [(Op p e*)
-       (Op p (map ic-expr e*))]
-      [(Fn-Caster e)
-       (Fn-Caster (ic-expr e))]
-      ;; Type manipulation
-      [(Type-Fn-arg e i)
-       (Type-Fn-arg (ic-expr e) (ic-expr i))]
-      [(Type-Fn-return e)
-       (Type-Fn-return (ic-expr e))]
-      [(Type-Fn-arity e)
-       (Type-Fn-arity (ic-expr e))]
-      [(Blame e)
-       (Blame (ic-expr e))]
-      [(If tst csq alt)
-       (If (ic-expr tst) (ic-expr csq) (ic-expr alt))]
-      [(Var i) (Var i)]
-      [(Type t) (Type t)]
-      [(Quote k) (Quote k)]
-      [(Begin e* e)
-       (Begin (map ic-expr e*) (ic-expr e))]
-      [(Repeat i e1 e2 e3)
-       (Repeat i (ic-expr e1) (ic-expr e2) (ic-expr e3))]
-      [(Unguarded-Box e)
-       (Unguarded-Box (ic-expr e))]
-      [(Unguarded-Box-Ref e)
-       (Unguarded-Box-Ref (ic-expr e))]
-      [(Unguarded-Box-Set! e1 e2)
-       (Unguarded-Box-Set! (ic-expr e1) (ic-expr e2))]
-      [(Unguarded-Vect e1 e2)
-       (Unguarded-Vect (ic-expr e1) (ic-expr e2))]
-      [(Unguarded-Vect-Ref e1 e2)
-       (Unguarded-Vect-Ref (ic-expr e1) (ic-expr e2))]
-      [(Unguarded-Vect-Set! e1 e2 e3)
-       (Unguarded-Vect-Set! (ic-expr e1) (ic-expr e2) (ic-expr e3))]
-      [(Guarded-Proxy-Huh e)
-       (Guarded-Proxy-Huh (ic-expr e))]
-      [(Guarded-Proxy e (Twosome t1 t2 l))
-       (Guarded-Proxy
-        (ic-expr e)
-        (Twosome (ic-expr t1) (ic-expr t2) (ic-expr l)))]
-      [(Guarded-Proxy-Ref e)
-       (Guarded-Proxy-Ref (ic-expr e))]
-      [(Guarded-Proxy-Source e)
-       (Guarded-Proxy-Source (ic-expr e))]
-      [(Guarded-Proxy-Target e)
-       (Guarded-Proxy-Target (ic-expr e))]
-      [(Guarded-Proxy-Blames e)
-       (Guarded-Proxy-Blames (ic-expr e))]
-      ;; Coercions manipulation
-      [other
-       (if (or (Compose-Coercions? other)
-               (Id-Coercion-Huh? other)
-               (Fn-Coercion? other)
-               (Fn-Coercion-Arg? other)
-               (Fn-Coercion-Return? other)
-               (Ref-Coercion? other)
-               (Ref-Coercion-Read? other)
-               (Ref-Coercion-Write? other)
-               (Quote-Coercion? other)
-               (Guarded-Proxy? other)
-               (Fn-Proxy-Coercion? other)
-               (Guarded-Proxy-Coercion? other))
-           (error 'ic-expr "coercion code in twosome pass: ~a" other)
-           (error 'ic-expr "umatched ~a" other))]))
+              ;; How to extract a dynamic value
+              (: cast-dyn/twosome Cast-Rule/Cast-Rule)
+              (define (cast-dyn/twosome cast-undyned v t1 t2 lbl)
+                (let$* ([val v] [tag (Dyn-tag val)])
+                       (cond$
+                        [(op=? (Tag 'Int) tag)
+                         (cast-undyned (Dyn-immediate val) (Type INT-TYPE) t2 lbl)]
+                        [(op=? (Tag 'Bool) tag)
+                         (cast-undyned (Dyn-immediate val) (Type BOOL-TYPE) t2 lbl)]
+                        [(op=? (Tag 'Unit) tag)
+                         (cast-undyned (Quote '()) (Type UNIT-TYPE) t2 lbl)]
+                        [(op=? (Tag 'Boxed) tag)
+                         (cast-undyned (Dyn-value val) (Dyn-type val) t2 lbl)]
+                        [else (Blame (Quote "Unexpected value in cast tree"))])))
 
-  ;; map through a code binding 
-  (: ic-bndc (CoC2-Bnd-Code -> CoC3-Bnd-Code))
-  (define (ic-bndc b)
-    (match-let ([(cons u (Code u* e)) b])
-      (cons u (Code u* (ic-expr e)))))
+              ;; How to cast a non dynamic value to another type
+              ;; Notice this is used in conjuction with interpret cast based
+              ;; on the setting of the parameter recursive-dyn-cast
+              ;; when set to #t the cast used is a call to the interpret
+              ;; cast runtime routine instead of unfolding the cast tree even
+              ;; I am pretty sure this is the desired behavior
+              ;; There is an invarient that there will only ever be one level of dyn
+              (: spec-cast-undyned (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (spec-cast-undyned v t1 t2 l)
+                (let$* ([value v] [type1 t1] [type2 t2] [label l])
+                       ;; If unboxed at the exact type then just return the value
+                       (if (op=? type1 type2)
+                           value
+                           ;; Otherwise it was either unboxed at the wrong type
+                           ;; or it is an inter structured type cast.
+                           ;; Either way we build a cast tree specific to this type.
+                           (cast-ground/twosome value type1 type2 label))))
 
-  ;; map through a data binding 
-  (: ic-bnd (CoC2-Bnd -> CoC3-Bnd))
-  (define (ic-bnd b)
-    (cons (car b) (ic-expr (cdr b))))
+              ;; The uid for the runtime interpreted cast
+              (define interp-cast-uid : Uid (next-uid! "interp_cast"))
 
-  ;; body of interpret-casts
-  (let* ([exp (ic-expr prgm-exp)]
-         [next (unbox next-unique-number)])
-    (Prog (list prgm-name next prgm-type)
-          (Labels (list interp-cast-binding)
-                  (Observe exp prgm-type)))))
+              ;; Build a call to the runtime interpreted cast code
+              (: interpret-cast (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (interpret-cast v t1 t2 l)
+                (App-Code (Code-Label interp-cast-uid) (list v t1 t2 l)))
+
+              ;; Build a specialized cast for the given code
+              (: specialize-cast (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+              (define (specialize-cast v t1 t2 l)
+                (if (recursive-dyn-cast?)
+                    (cast-any/twosome interpret-cast v t1 t2 l)
+                    (cast-any/twosome spec-cast-undyned v t1 t2 l)))
+              
+              (define interp-cast-binding : CoC3-Bnd-Code
+                (let* ([v  (next-uid! "value")]
+                       [t1 (next-uid! "type1")]
+                       [t2 (next-uid! "type2")]
+                       [l  (next-uid! "label")])
+                  `(,interp-cast-uid
+                    .
+                    ,(Code (list v t1 t2 l)
+                           (specialize-cast (Var v) (Var t1) (Var t2) (Var l))))))
+
+              (define glb-binding
+                (let ([t1 (next-uid! "type1")]
+                      [t2 (next-uid! "type2")])
+                  `(,glb-uid
+                    .
+                    ,(Code (list t1 t2)
+                           ((greatest-lower-bound$ mk-glb-call glb-uid) (Var t1) (Var t2))))))
+              
+              ;; ic-expr maps over the expressions lowering function cast
+              ;; into calls to the runtime cast interpreter and direct manipulation
+              ;; of the representation for each type and value.
+              (: ic-expr (CoC2-Expr -> CoC3-Expr))
+              (define (ic-expr exp)
+                (match exp
+                  ;; Interesting Transformations
+                  [(Interpreted-Cast
+                    (app ic-expr v)
+                    (Twosome (app ic-expr t1) (app ic-expr t2) (app ic-expr l)))
+                   (if (and (specialize-casts?)
+                            (or (Type? t1) (Type? t2)))
+                       (specialize-cast v t1 t2 l)
+                       (interpret-cast v t1 t2 l))]
+                  [(Cast (app ic-expr v) (Twosome t1 t2 l))
+                   (if (specialize-casts?)
+                       (specialize-cast v (Type t1) (Type t2) (Quote l))
+                       (interpret-cast v (Type t1) (Type t2) (Quote l)))]
+                  [(Fn-Proxy i e1 e2)
+                   (error 'ic "function proxies not yet implemented")]
+                  [(App/Fn-Proxy-Huh e e*)
+                   (error 'ic "function proxy apply not yet implemented")]
+                  [(Fn-Proxy-Huh e)
+                   (error 'ic "function proxies not yet implemented")]
+                  [(Fn-Proxy-Closure e)
+                   (error 'ic "function proxies not yet implemented")]
+                  ;; Uniteresting Recursion till the end
+                  [(Code-Label u)
+                   (Code-Label u)]
+                  [(Labels c* e)
+                   (Labels (map ic-bndc c*) (ic-expr e))]
+                  [(App-Code e e*)
+                   (App-Code (ic-expr e) (map ic-expr e*)) ]
+                  [(Lambda f* (Castable ctr e))
+                   (Lambda f* (Castable ctr (ic-expr e)))]
+                  [(App-Fn e e*)
+                   (App-Fn (ic-expr e) (map ic-expr e*))]
+                  [(Letrec b* e)
+                   (Letrec (map ic-bnd b*) (ic-expr e))]
+                  [(Let b* e)
+                   (Let (map ic-bnd b*) (ic-expr e))]
+                  [(Op p e*)
+                   (Op p (map ic-expr e*))]
+                  [(Fn-Caster e)
+                   (Fn-Caster (ic-expr e))]
+                  ;; Type manipulation
+                  [(Type-Fn-arg e i)
+                   (Type-Fn-arg (ic-expr e) (ic-expr i))]
+                  [(Type-Fn-return e)
+                   (Type-Fn-return (ic-expr e))]
+                  [(Type-Fn-arity e)
+                   (Type-Fn-arity (ic-expr e))]
+                  [(Blame e)
+                   (Blame (ic-expr e))]
+                  [(If tst csq alt)
+                   (If (ic-expr tst) (ic-expr csq) (ic-expr alt))]
+                  [(Var i) (Var i)]
+                  [(Type t) (Type t)]
+                  [(Quote k) (Quote k)]
+                  [(Begin e* e)
+                   (Begin (map ic-expr e*) (ic-expr e))]
+                  [(Repeat i e1 e2 e3)
+                   (Repeat i (ic-expr e1) (ic-expr e2) (ic-expr e3))]
+                  [(Unguarded-Box e)
+                   (Unguarded-Box (ic-expr e))]
+                  [(Unguarded-Box-Ref e)
+                   (Unguarded-Box-Ref (ic-expr e))]
+                  [(Unguarded-Box-Set! e1 e2)
+                   (Unguarded-Box-Set! (ic-expr e1) (ic-expr e2))]
+                  [(Unguarded-Vect e1 e2)
+                   (Unguarded-Vect (ic-expr e1) (ic-expr e2))]
+                  [(Unguarded-Vect-Ref e1 e2)
+                   (Unguarded-Vect-Ref (ic-expr e1) (ic-expr e2))]
+                  [(Unguarded-Vect-Set! e1 e2 e3)
+                   (Unguarded-Vect-Set! (ic-expr e1) (ic-expr e2) (ic-expr e3))]
+                  [(Guarded-Proxy-Huh e)
+                   (Guarded-Proxy-Huh (ic-expr e))]
+                  [(Guarded-Proxy e (Twosome t1 t2 l))
+                   (Guarded-Proxy
+                    (ic-expr e)
+                    (Twosome (ic-expr t1) (ic-expr t2) (ic-expr l)))]
+                  [(Guarded-Proxy-Ref e)
+                   (Guarded-Proxy-Ref (ic-expr e))]
+                  [(Guarded-Proxy-Source e)
+                   (Guarded-Proxy-Source (ic-expr e))]
+                  [(Guarded-Proxy-Target e)
+                   (Guarded-Proxy-Target (ic-expr e))]
+                  [(Guarded-Proxy-Blames e)
+                   (Guarded-Proxy-Blames (ic-expr e))]
+                  [(CastedValue-Huh e)
+                   (CastedValue-Huh (ic-expr e))]
+                  [(CastedValue e (Twosome t1 t2 l))
+                   (CastedValue
+                    (ic-expr e)
+                    (Twosome (ic-expr t1) (ic-expr t2) (ic-expr l)))]
+                  [(CastedValue-Value e)
+                   (CastedValue-Value (ic-expr e))]
+                  [(CastedValue-Source e)
+                   (CastedValue-Source (ic-expr e))]
+                  [(CastedValue-Target e)
+                   (CastedValue-Target (ic-expr e))]
+                  [(CastedValue-Blames e)
+                   (CastedValue-Blames (ic-expr e))]
+                  [(Mbox e t) (Mbox (ic-expr e) t)]
+                  [(Mbox-val-set! e1 e2) (Mbox-val-set! (ic-expr e1) (ic-expr e2))]
+                  [(Mbox-val-ref e) (Mbox-val-ref (ic-expr e))]
+                  [(Mbox-rtti-set! u e) (Mbox-rtti-set! u (ic-expr e))]
+                  [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+                  [(Mvector e1 e2 t) (Mvector (ic-expr e1) (ic-expr e2) t)]
+                  [(Mvector-val-set! e1 e2 e3)
+                   (Mvector-val-set! (ic-expr e1) (ic-expr e2) (ic-expr e3))]
+                  [(Mvector-val-ref e1 e2)
+                   (Mvector-val-ref (ic-expr e1) (ic-expr e2))]
+                  [(Mvector-rtti-set! u e) (Mvector-rtti-set! u (ic-expr e))]
+                  [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+                  ;; Coercions manipulation
+                  [other
+                   (if (or (Compose-Coercions? other)
+                           (Id-Coercion-Huh? other)
+                           (Fn-Coercion? other)
+                           (Fn-Coercion-Arg? other)
+                           (Fn-Coercion-Return? other)
+                           (Ref-Coercion? other)
+                           (Ref-Coercion-Read? other)
+                           (Ref-Coercion-Write? other)
+                           (Quote-Coercion? other)
+                           (Guarded-Proxy? other)
+                           (Fn-Proxy-Coercion? other)
+                           (Guarded-Proxy-Coercion? other)
+                           (CastedValue-Coercion? other))
+                       (error 'ic-expr "coercion code in twosome pass: ~a" other)
+                       (error 'ic-expr "umatched ~a" other))]))
+
+              ;; map through a code binding 
+              (: ic-bndc (CoC2-Bnd-Code -> CoC3-Bnd-Code))
+              (define (ic-bndc b)
+                (match-let ([(cons u (Code u* e)) b])
+                  (cons u (Code u* (ic-expr e)))))
+
+              ;; map through a data binding 
+              (: ic-bnd (CoC2-Bnd -> CoC3-Bnd))
+              (define (ic-bnd b)
+                (cons (car b) (ic-expr (cdr b))))
+
+              ;; body of interpret-casts
+              (let* ([exp (ic-expr prgm-exp)]
+                     [next (unbox next-unique-number)])
+                (Prog (list prgm-name next prgm-type)
+                      (Labels (list glb-binding interp-cast-binding)
+                              (Observe exp prgm-type)))))
 
 
 

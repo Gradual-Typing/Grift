@@ -28,7 +28,6 @@
 	    (Code-Label Uid)
 	    (Quote D0-Literal)
             (Assign Uid E)
-            Halt
             Success)))
 
 (define-type D0-Expr* (Listof D0-Expr))

@@ -92,9 +92,9 @@
          (cons
           cp
           (Procedure hc a* cp #f (list clos-clos crcn-clos)
-           (Let `((,clos . ,(Closure-ref hc clos-clos))
-                  (,crcn . ,(Closure-ref hc crcn-clos)))
-            (cast-apply-cast cast (Var clos) v* (Var crcn))))))
+                     (Let `((,clos . ,(Closure-ref hc clos-clos))
+                            (,crcn . ,(Closure-ref hc crcn-clos)))
+                          (cast-apply-cast cast (Var clos) v* (Var crcn))))))
        (hash-set! new-bnd-procs i bnd)
        cp]))
 
@@ -382,6 +382,47 @@
          (Guarded-Proxy-Blames e)]
         [(Guarded-Proxy-Coercion (app recur e))
          (Guarded-Proxy-Coercion e)]
+        [(CastedValue-Huh (app recur e))
+         (CastedValue-Huh e)]
+        [(CastedValue (app recur e) r)
+         (match r
+           [(Twosome (app recur t1) (app recur t2) (app recur l))
+            (CastedValue e (Twosome t1 t2 l))]
+           [(Coercion (app recur c))
+            (CastedValue e (Coercion c))])]
+        [(CastedValue-Value (app recur e))
+         (CastedValue-Value e)]
+        [(CastedValue-Source (app recur e))
+         (CastedValue-Source e)]
+        [(CastedValue-Target (app recur e))
+         (CastedValue-Target e)]
+        [(CastedValue-Blames (app recur e))
+         (CastedValue-Blames e)]
+        [(CastedValue-Coercion (app recur e))
+         (CastedValue-Coercion e)]
+        [(Mbox (app recur e) t) (Mbox e t)]
+        [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
+        [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
+        [(Mbox-rtti-set! u (app recur e)) (Mbox-rtti-set! u e)]
+        [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+        [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
+        [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3))
+         (Mvector-val-set! e1 e2 e3)]
+        [(Mvector-val-ref (app recur e1) (app recur e2))
+         (Mvector-val-ref e1 e2)]
+        [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
+        [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+        [(Make-Fn-Type e1 (app recur e2) (app recur e3))
+         (Make-Fn-Type e1 e2 e3)]
+        [(MRef-Coercion-Huh (app recur e)) (MRef-Coercion-Huh e)]
+        [(MRef-Coercion-Type (app recur e)) (MRef-Coercion-Type e)]
+        [(MRef-Coercion (app recur e)) (MRef-Coercion e)]
+        [(Type-GRef (app recur e)) (Type-GRef e)]
+        [(Type-GVect (app recur e)) (Type-GVect e)]
+        [(Type-MRef (app recur e)) (Type-MRef e)]
+        [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
+        [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
+        [(Error (app recur e)) (Error e)]
         [other (error 'Convert-Closures "unmatched ~a" other)]))
 
     ;; recur through a list of expressions
@@ -400,7 +441,7 @@
 (: mk-clos-ref : Uid -> (Uid -> CoC6-Expr))
 (define (mk-clos-ref clos)
   (lambda ([fvar : Uid]) : CoC6-Expr
-   (Closure-ref clos fvar)))
+          (Closure-ref clos fvar)))
 
 ;; Recur through bound data
 (: cc-bnd-data*

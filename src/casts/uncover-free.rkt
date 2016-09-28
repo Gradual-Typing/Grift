@@ -196,6 +196,51 @@
      (values (Guarded-Proxy-Blames e) fv)]
     [(Guarded-Proxy-Coercion (app uf-expr e fv))
      (values (Guarded-Proxy-Coercion e) fv)]
+    [(CastedValue-Huh (app uf-expr e fv))
+     (values (CastedValue-Huh e) fv)]
+    [(CastedValue (app uf-expr e fv0) r)
+     (match r
+       [(Twosome (app uf-expr t1 fv1) (app uf-expr t2 fv2) (app uf-expr l fv3))
+        (values (CastedValue e (Twosome t1 t2 l))
+                (set-union fv0 fv1 fv2 fv3))]
+       [(Coercion (app uf-expr c fv1))
+        (values (CastedValue e (Coercion c)) (set-union fv0 fv1))])]
+    [(CastedValue-Value (app uf-expr e fv))
+     (values (CastedValue-Value e) fv)]
+    [(CastedValue-Source (app uf-expr e fv))
+     (values (CastedValue-Source e) fv)]
+    [(CastedValue-Target (app uf-expr e fv))
+     (values (CastedValue-Target e) fv)]
+    [(CastedValue-Blames (app uf-expr e fv))
+     (values (CastedValue-Blames e) fv)]
+    [(CastedValue-Coercion (app uf-expr e fv))
+     (values (CastedValue-Coercion e) fv)]
+    [(Mbox (app uf-expr e fv) t) (values (Mbox e t) fv)]
+    [(Mbox-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Mbox-val-set! e1 e2) (set-union fv1 fv2))]
+    [(Mbox-val-ref (app uf-expr e fv)) (values (Mbox-val-ref e) fv)]
+    [(Mbox-rtti-set! u (app uf-expr e fv)) (values (Mbox-rtti-set! u e) fv)]
+    [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) (set))]
+    [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
+     (values (Mvector e1 e2 t) (set-union fv1 fv2))]
+    [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
+     (values (Mvector-val-set! e1 e2 e3) (set-union fv1 fv2 fv3))]
+    [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Mvector-val-ref e1 e2) (set-union fv1 fv2))]
+    [(Mvector-rtti-set! u (app uf-expr e fv))
+     (values (Mvector-rtti-set! u e) fv)]
+    [(Mvector-rtti-ref u) (values (Mvector-rtti-ref u) (set))]
+    [(Make-Fn-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
+     (values (Make-Fn-Type e1 e2 e3) (set-union fv1 fv2))]
+    [(MRef-Coercion-Huh (app uf-expr e fv)) (values (MRef-Coercion-Huh e) fv)]
+    [(MRef-Coercion-Type (app uf-expr e fv)) (values (MRef-Coercion-Type e) fv)]
+    [(MRef-Coercion (app uf-expr e fv)) (values (MRef-Coercion e) fv)]
+    [(Type-GRef (app uf-expr e fv)) (values (Type-GRef e) fv)]
+    [(Type-GVect (app uf-expr e fv)) (values (Type-GVect e) fv)]
+    [(Type-MRef (app uf-expr e fv)) (values (Type-MRef e) fv)]
+    [(Type-MRef-Huh (app uf-expr e fv)) (values (Type-MRef-Huh e) fv)]
+    [(Type-MRef-Of (app uf-expr e fv)) (values (Type-MRef-Of e) fv)]
+    [(Error (app uf-expr e fv)) (values (Error e) fv)]
     [other (error 'uncover-free "unmatched ~a" other)]))
 
 
@@ -241,14 +286,14 @@
 
 #|
 
-  (if (null? b*)
-      (values (set) '() (set))
-      (let ([a (car b*)] [d (cdr b*)]) ;; free the list
-        (let-values ([(u* b* f*) (uf-bnd-lambda* d)])
-          (match-let ([(cons u (app uf-lambda rhs rhs-f*)) a])
-            (values (set-add u* u)
-                    (cons (cons u rhs) b*)
-                    (set-union f* rhs-f*))))))|#
+(if (null? b*)
+    (values (set) '() (set))
+    (let ([a (car b*)] [d (cdr b*)]) ;; free the list
+      (let-values ([(u* b* f*) (uf-bnd-lambda* d)])
+        (match-let ([(cons u (app uf-lambda rhs rhs-f*)) a])
+          (values (set-add u* u)
+                  (cons (cons u rhs) b*)
+                  (set-union f* rhs-f*))))))|#
 
 (: uf-bnd-data*
    (-> CoC4-Bnd-Data*
