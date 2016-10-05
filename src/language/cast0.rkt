@@ -29,7 +29,7 @@
 	  (If E E E)
 	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
           (Begin C0-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;; Guarded effects
           (Gbox E)
           (Gunbox E)
@@ -48,6 +48,14 @@
           (Mvector-set! E E E) ;; fast write
           (MVectCastedRef Uid E Schml-Type)
           (MVectCastedSet! Uid E E Schml-Type)
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E C0-Expr* Schml-Type* Blame-Label)
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
 	  ;; Terminals
 	  (Var Uid)
 	  (Quote Cast-Literal))))

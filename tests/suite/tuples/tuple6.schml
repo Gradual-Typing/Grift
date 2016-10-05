@@ -1,0 +1,1 @@
+(: ((tuple-proj (: (tuple (lambda (x) x) (if #t #f #t) 3) Dyn) 0) 42) Int)

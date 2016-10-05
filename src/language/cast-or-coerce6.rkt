@@ -11,7 +11,7 @@
 
 (define-type Cast-or-Coerce6-Lang
   (Prog (List String Natural Schml-Type)
-        (LetT* CoC6-Bnd-Type* CoC6-Expr)))
+        (Let-Static* CoC6-Bnd-Type* CoC6-Bnd-Crcn* CoC6-Expr)))
 
 (define-type CoC6-Expr
   (Rec E (U
@@ -41,7 +41,7 @@
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
-          (Quote-Coercion Coercion/Prim-Type)
+          (Quote-Coercion Immediate-Coercion)
           ;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
@@ -98,7 +98,7 @@
           ;; Controll Flow
           (If E E E)
           (Begin CoC6-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
           (Quote Cast-Literal)
@@ -132,6 +132,7 @@
           (Mbox-rtti-set! Uid E)
           (Mbox-rtti-ref Uid)
           (Make-Fn-Type Uid E E)
+          (Make-Tuple-Type Uid E E)
           (MRef-Coercion-Huh E)
           (MRef-Coercion-Type E)
           (MRef-Coercion E)
@@ -159,7 +160,21 @@
           (Type-MVect-Of E)
           (MVect-Coercion-Huh E)
           (MVect-Coercion-Type E)
-          (MVect-Coercion E))))
+          (MVect-Coercion E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
+          (Tuple-Coercion-Huh E)
+          (Tuple-Coercion-Num E)
+          (Tuple-Coercion-Item E Index)
+          (Coerce-Tuple Uid E E)
+          (Cast-Tuple Uid E E E E)
+          (Type-Tuple-Huh E)
+          (Type-Tuple-num E)
+          (Type-Tuple-item E Index)
+          (Make-Tuple-Coercion Uid E E E)
+          (Compose-Tuple-Coercion Uid E E)
+          (Mediating-Coercion-Huh? E))))
 
 
 
@@ -180,3 +195,9 @@
 (define-type CoC6-Bnd-Closure* (Listof CoC6-Bnd-Closure))
 (define-type CoC6-Bnd-Type  (Pairof Uid Compact-Type))
 (define-type CoC6-Bnd-Type* (Listof CoC6-Bnd-Type))
+(define-type CoC6-Bnd-Crcn  (Pairof Uid Compact-Coercion))
+(define-type CoC6-Bnd-Crcn* (Listof CoC6-Bnd-Crcn))
+
+;; TODO Many of these forms static forms are identical accrose passes
+;; should we lift them into a seperate file so they can be used
+;; over and over.

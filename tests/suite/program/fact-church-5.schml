@@ -1,0 +1,41 @@
+(letrec ([add1 : (Int -> Int)
+               (lambda ([x : Int]) (+ 1 x))]
+         [one : ((Dyn -> Dyn) -> (Dyn -> Dyn))
+               (lambda (f) (lambda (x) (f x)))]
+         [five : ((Dyn -> Dyn) -> (Dyn -> Dyn))
+               (lambda (f) (lambda (x) (f (f (f (f (f x)))))))]
+         [pred : (((Dyn -> Dyn) -> (Dyn -> Dyn)) ->
+                  ((Dyn -> Dyn) -> (Dyn -> Dyn)))
+               (lambda (n)
+                 (lambda (f)
+                   (lambda (x)
+                     (((n (lambda (g) (lambda (h) (h (g f))))) 
+                       (lambda (u) x))
+                      (lambda (u) u)))))]
+         [mult : (((Dyn -> Dyn) -> (Dyn -> Dyn)) ->
+                  (((Dyn -> Dyn) -> (Dyn -> Dyn)) ->
+                   ((Dyn -> Dyn) -> (Dyn -> Dyn))))
+               (lambda (m)
+                 (lambda (n)
+                   (lambda (f) (m (n f)))))]
+         [true  : ((-> Dyn) -> ((-> Dyn) -> Dyn))
+                (lambda (a) (lambda (b) (a)))]
+         [false : ((-> Dyn) -> ((-> Dyn) -> Dyn))
+                (lambda (a) (lambda (b) (b)))]
+         [is0  : (((Dyn -> Dyn) -> (Dyn -> Dyn)) ->
+                  ((-> ((Dyn -> Dyn) -> (Dyn -> Dyn))) ->
+                   ((-> ((Dyn -> Dyn) -> (Dyn -> Dyn))) ->
+                    ((Dyn -> Dyn) -> (Dyn -> Dyn)))))
+               (lambda (n) ((n (lambda (x) false)) true))]
+         [fact : (((Dyn -> Dyn) -> (Dyn -> Dyn)) ->
+                  ((Dyn -> Dyn) -> (Dyn -> Dyn)))
+               (lambda (n)
+                 ((#;if (is0 n)
+                        (lambda () one))
+                        (lambda () ((mult n) (fact (pred n))))))]
+         [realize (lambda ([n : ((Int -> Int) -> (Int -> Int))]) ((n add1) 0))])
+  (begin
+    (timer-start)
+    (let ([n (fact five)])
+      (begin (timer-stop) (timer-report)
+             (: (realize n) Int)))))

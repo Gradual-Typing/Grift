@@ -66,7 +66,6 @@ between the calls (timer-start) and (timer-stop). If no such calls have occured
 there will be a runtime error.
 
 ### Tinkering with the compiler
-
 - Customizing the editor to indent well
    - Emacs users
       - Try racket-mode by Greg Hindershot

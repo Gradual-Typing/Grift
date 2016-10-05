@@ -16,6 +16,7 @@
    (test-file "program" "fact10.schml" (int 3628800))
    (test-file "program" "fact-dyn-6.schml" (int 720))
    (test-file "program" "fact-static-6.schml" (int 720))
+   (test-file "program" "fact-church-5.schml" (int 120))
    ;; even and odd
    (test-file "program" "odd-20-static.schml" (bool #f))
    (test-file "program" "odd-20-hybrid1.schml" (bool #f))

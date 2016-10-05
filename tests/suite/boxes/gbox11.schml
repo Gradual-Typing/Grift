@@ -1,0 +1,6 @@
+(letrec ([f : ((GRef Int) -> Int)
+          (lambda ([b : (GRef Int)])
+            (gunbox b))])
+ (let ([b : (GRef Int) (gbox 42)]
+       [f : ((GRef Dyn) -> Int) f])
+  (f b)))

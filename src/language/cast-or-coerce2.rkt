@@ -41,7 +41,7 @@
           ;; Controll Flow
           (If E E E)
           (Begin CoC2-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
           (Quote Cast-Literal)
@@ -63,6 +63,11 @@
           (Dyn-type E)
           (Dyn-value E)
           (Dyn-make E E)
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E CoC2-Expr* Schml-Type* Blame-Label)
           ;; Observations
           (Blame E)
           ;; Unguarded-Representation
@@ -99,7 +104,10 @@
           (Mvector-val-ref E E)
           (Mvector-val-set! E E E)
           (Mvector-rtti-ref Uid)
-          (Mvector-rtti-set! Uid E))))
+          (Mvector-rtti-set! Uid E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index))))
 
 (define-type CoC2-Code (Code Uid* CoC2-Expr))
 

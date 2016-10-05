@@ -19,20 +19,21 @@
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
-         "../language/cast-or-coerce3.rkt"
+         "../language/cast-or-coerce3.1.rkt"
          "../language/cast-or-coerce4.rkt")
 (provide label-lambdas
          (all-from-out
-          "../language/cast-or-coerce3.rkt"
+          "../language/cast-or-coerce3.1.rkt"
           "../language/cast-or-coerce4.rkt"))
 
-(: label-lambdas (Cast-or-Coerce3.1-Lang Config  -> Cast-or-Coerce4-Lang))
-(define (label-lambdas prgm comp-config)
-  (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
+(: label-lambdas (Cast-or-Coerce3.1-Lang  -> Cast-or-Coerce4-Lang))
+(define (label-lambdas prgm)
+  (match-let ([(Prog (list name count type)
+                     (Let-Static* tbnd* cbnd* exp)) prgm])
     (let* ([next : (Boxof Nat) (box count)]
            [exp  : CoC4-Expr (ll-expr! next exp)]
            [next : Nat (unbox next)])
-      (Prog (list name next type) (LetT* tbnd* exp)))))
+      (Prog (list name next type) (Let-Static* tbnd* cbnd* exp)))))
 
 (: ll-expr! ((Boxof Nat) CoC3.1-Expr -> CoC4-Expr))
 (define (ll-expr! next exp)
@@ -103,7 +104,7 @@
       [(Type t) (Type t)]
       [(Quote k) (Quote k)]
       [(Begin exp* exp) (Begin (map recur exp*) (recur exp))]
-      [(Repeat i e1 e2 e3) (Repeat i (recur e1) (recur e2) (recur e3))]
+      [(Repeat i e1 e2 a e3 e4) (Repeat i (recur e1) (recur e2) a (recur e3) (recur e4))]
       [(Tag s) (Tag s)]
       [(Dyn-tag e) (Dyn-tag (recur e))]
       [(Dyn-immediate e) (Dyn-immediate (recur e))]
@@ -230,13 +231,10 @@
       [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
       [(Mbox-rtti-set! u (app recur e)) (Mbox-rtti-set! u e)]
       [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
-      [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
-      [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
-      [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
-      [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
-      [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
       [(Make-Fn-Type e1 (app recur e2) (app recur e3))
        (Make-Fn-Type e1 e2 e3)]
+      [(Make-Tuple-Type e1 (app recur e2) (app recur e3))
+       (Make-Tuple-Type e1 e2 e3)]
       [(MRef-Coercion-Huh (app recur e)) (MRef-Coercion-Huh e)]
       [(MRef-Coercion-Type (app recur e)) (MRef-Coercion-Type e)]
       [(MRef-Coercion (app recur e)) (MRef-Coercion e)]
@@ -245,7 +243,48 @@
       [(Type-MRef (app recur e)) (Type-MRef e)]
       [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
       [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
+      [(CastedValue-Huh exp)
+       (CastedValue-Huh (recur exp))]
+      [(CastedValue (app recur e) r)
+       (match r
+         [(Twosome t1 t2 l)
+          (CastedValue e (Twosome (recur t1) (recur t2) (recur l)))]
+         [(Coercion c)
+          (CastedValue e (Coercion (recur c)))])]
+      [(CastedValue-Value exp)
+       (CastedValue-Value (recur exp))]
+      [(CastedValue-Source exp)
+       (CastedValue-Source (recur exp))]
+      [(CastedValue-Target exp)
+       (CastedValue-Target (recur exp))]
+      [(CastedValue-Blames exp)
+       (CastedValue-Blames (recur exp))]
+      [(CastedValue-Coercion exp)
+       (CastedValue-Coercion (recur exp))]
+      [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
+      [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
+      [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+      [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
+      [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+      [(Type-MVect e) (Type-MVect (recur e))]
+      [(Type-MVect-Huh e) (Type-MVect-Huh (recur e))]
+      [(Type-MVect-Of e) (Type-MVect-Of (recur e))]
+      [(MVect-Coercion-Huh e) (MVect-Coercion-Huh (recur e))]
+      [(MVect-Coercion-Type e) (MVect-Coercion-Type (recur e))]
+      [(MVect-Coercion e) (MVect-Coercion (recur e))]
       [(Error (app recur e)) (Error e)]
+      [(Create-tuple e*) (Create-tuple (map recur e*))]
+      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
+      [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+      [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+      [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
+      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
       [other (error 'll-expr "~a" other)]))
   ;; recur through a code binding
   (: ll-bndc  (CoC3.1-Bnd-Code -> CoC4-Bnd-Code))

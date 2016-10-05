@@ -31,7 +31,7 @@
      (Var Uid)
      (Quote Schml-Literal)
      (Begin (Listof E) E)
-     (Repeat Uid E E E)
+     (Repeat Uid E E (Ann Uid (Option Schml-Type)) E E)
      ;; Monotonic effects
      (MboxS E)
      (Munbox E)
@@ -45,7 +45,10 @@
      (Gbox-set! E E)
      (Gvector E E)
      (Gvector-set! E E E)
-     (Gvector-ref E E)))
+     (Gvector-ref E E)
+     ;;
+     (Create-tuple (Listof E))
+     (Tuple-proj E Index)))
 
 (define-type S0-Expr
   (Rec E (Ann (S0-Form E) Src)))

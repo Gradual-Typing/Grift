@@ -1,0 +1,7 @@
+(let ([iters : Int (read-int)])
+  (begin
+    (timer-start)
+    (repeat (i 0 iters) ())
+    (timer-stop)
+    (timer-report)
+    iters))

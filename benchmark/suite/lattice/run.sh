@@ -3,10 +3,10 @@
 # nAnnotizer ranges between 0 and 1 (not 100)
 
 nbins=10
-nsamples=10
+nsamples=100
 deliverable=3
 usable=10
-nAnnotizerbin=/u/dalmahal/nAnnotizer/.stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/./nAnnotizer
+nAnnotizerbin=/u/dalmahal/nAnnotizer/.stack-work/install/x86_64-linux/lts-5.8/7.10.3/bin/./nAnnotizer
 schmldir=/u/dalmahal/Schml
 # --------------------------------------------------------------------
 
@@ -53,8 +53,8 @@ for f in $tmpdir/*.schml; do
     statict2="$(time ( $path.o2 ) 2>&1 1>/dev/null )"
     $nAnnotizerbin $path 1 1 1
     racket benchmark.rkt $path
-    dynt1="$(time ( $path/0.o1 ) 2>&1 1>/dev/null )"
-    dynt2="$(time ( $path/0.o2 ) 2>&1 1>/dev/null )"
+    dynt1="$(time ( $path/100/0.o1 ) 2>&1 1>/dev/null )"
+    dynt2="$(time ( $path/100/0.o2 ) 2>&1 1>/dev/null )"
     rm -rf $path
     r1=$(echo "$statict1/$dynt1" | bc -l)
     r2=$(echo "$statict2/$dynt2" | bc -l)
@@ -67,7 +67,7 @@ for f in $tmpdir/*.schml; do
 	x2[$i]=0
     done
     echo "precision,time,slowdown" > $logfile1
-    for b in $path/*.o1; do
+    for b in $(find $path -name '*.o1'); do
 	binpath="${b%.*}"
 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
 	t="$(time ( $b ) 2>&1 1>/dev/null )"
@@ -81,7 +81,7 @@ for f in $tmpdir/*.schml; do
     sort -g $logfile2 -o $logfile2
 
     echo "precision,time,slowdown" > $logfile3
-    for b in $path/*.o2; do
+    for b in $(find $path -name '*.o2'); do
 	binpath="${b%.*}"
 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
 	t="$(time ( $b ) 2>&1 1>/dev/null )"

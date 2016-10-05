@@ -1,7 +1,12 @@
-#lang typed/racket
+#lang typed/racket/base
 
-(require "../helpers.rkt")
-(provide (all-defined-out))
+(require "../helpers.rkt"
+         "../unique-identifiers.rkt"
+         (for-syntax racket/base)
+         racket/match)
+
+(provide (all-defined-out)
+         (all-from-out "../unique-identifiers.rkt"))
 
 #|
 All language "Forms" are just polymorphic racket structs.
@@ -68,6 +73,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Mbox-rtti-ref address)
   (Mbox-rtti-set! address expression)
   (Make-Fn-Type expression1 expression2 expression3) ;; create meeted function type in runtime
+  (Make-Tuple-Type expression1 expression2 expression3)
   ;; the underlying value can be accessed by the location encoded in the type
   (MBoxCastedRef addr type)
   (MBoxCastedSet! addr v type)
@@ -97,6 +103,11 @@ And a type constructor "name" expecting the types of field1 and field2
   (Gvector len init-val)
   (Gvector-set! vector offset value)
   (Gvector-ref vector offset)
+  ;;
+  (Create-tuple values)
+  (Tuple-proj tuple index)
+  (Coerce-Tuple cast value coercion)
+  (Cast-Tuple cast value t1 t2 lbl)
   ;; various imediates markers
   (Quote literal)    ;; immediate data in general
   ;; Node that references a piece of code identified by the UID value
@@ -132,14 +143,17 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-MRef-Of expression)
   (Type-MVect-Huh expression)
   (Type-MVect-Of expression)
+  (Type-Tuple-Huh type)
+  (Type-Tuple-num type)
+  (Type-Tuple-item type index)
   ;; closure Representation
   (App-Closure code data exprs)
   (Closure-Data code caster variables)
   (Closure-code var)
   (Closure-ref this var)
   (Closure-caster this)
-  (TypeId id)
-  (LetT* bindings body)
+  (Let-Static* type-bindings crcn-bindings body)
+  (Static-Id id)
   (LetP bindings body)
   (LetC bindings body);; Can create cyclic immutable data
   (Procedure this params code caster bound-vars body)
@@ -151,6 +165,11 @@ And a type constructor "name" expecting the types of field1 and field2
   (Dyn-type expression)
   (Dyn-value expression)
   (Dyn-make expression type)
+  (Dyn-Fn-App expr expr* type* label)
+  (Dyn-GRef-Ref expr label)
+  (Dyn-GRef-Set! expr1 expr2 type label)
+  (Dyn-GVector-Ref expr index label)
+  (Dyn-GVector-Set! expr1 index expr2 type label)
   ;; Observational Operations
   (Blame expression)
   (Observe expression type)
@@ -168,7 +187,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (App-Fn-or-Proxy cast rand rators)
   ;; Benchmarking tools language forms
   ;; low cost repetition
-  (Repeat var start end body)
+  (Repeat var start end acc init body)
   ;; TODO figue out an appropriate comment about all forms here
   (Halt)
   (Success)
@@ -232,7 +251,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (MRef  arg)
   (MVect arg)
   (GRef  arg)
-  (GVect arg))
+  (GVect arg)
+  (STuple num items))
 
 ;; TODO I am unsure of if these are being used
 ;; find out and act appropriately
@@ -267,6 +287,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
 (define ->UNIT-TYPE (Fn 0 '() UNIT-TYPE))
+(define ->INT-TYPE (Fn 0 '() INT-TYPE))
 
 ;; Are two types consistent at the top of the types?
 (: shallow-consistent? (Any Any -> Boolean))
@@ -280,6 +301,11 @@ And a type constructor "name" expecting the types of field1 and field2
          (Fn? g)
          (equal? (Fn-arity t)
                  (Fn-arity g))))
+  (define (both-tuple? t g)  : Boolean
+    (and (STuple? t)
+         (STuple? g)
+         (equal? (STuple-num t)
+                 (STuple-num g))))
   (define (ref-shallow-consistent? t g) : Boolean
     (or (and (GRef? t) (GRef? g))
         (and (GVect? t) (GVect? g))
@@ -290,6 +316,7 @@ And a type constructor "name" expecting the types of field1 and field2
       (both-int? t g)
       (both-bool? t g)
       (both-fn? t g)
+      (both-tuple? t g)
       (ref-shallow-consistent? t g)))
 
 
@@ -302,6 +329,9 @@ And a type constructor "name" expecting the types of field1 and field2
     (and (Fn? t)
          (andmap completely-static-type? (Fn-fmls t))
          (completely-static-type? (Fn-ret t))))
+  (define (tuple-completely-static? [t : Schml-Type]): Boolean
+    (and (STuple? t)
+         (andmap completely-static-type? (STuple-items t))))
   (define (ref-completely-static? [t : Schml-Type])
     (or (and (GRef? t) (completely-static-type? (GRef-arg t)))
         (and (MRef? t) (completely-static-type? (MRef-arg t)))
@@ -310,66 +340,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (or (Int? t)
       (Bool? t)
       (fn-completely-static? t)
+      (tuple-completely-static? t)
       (ref-completely-static? t)))
-
-
-#|
-Unique Identifier
-|#
-
-(struct Uid ([prefix : String] [suffix : Natural]) #:transparent)
-
-(define-type Uid* (Listof Uid))
-
-(define FIRST-UID-SUFFIX 0)
-
-(: uid->string (-> Uid String))
-(define (uid->string u)
-  ;; Rubout all non c identifier characters
-  (: help (Char -> Char))
-  (define (help c)
-    (let ([n (char->integer c)])
-      ;;        A-Z          a-z          0-9
-      (if (or (<= 65 n 90) (<= 97 n 122) (<= 48 n 57))
-          c
-          #\_)))
-  (string-append
-   "u"
-   (number->string (Uid-suffix u))
-   "_"
-   (list->string (map help (string->list (Uid-prefix u))))))
-
-;; Are two uid equal?
-(: uid=? (-> Uid Uid Boolean))
-(define (uid=? [u : Uid] [v : Uid])
-  ;; a little bit of a hack that shouldn't be noticable
-  (or #;(eq? u v)
-      (= (Uid-suffix u) (Uid-suffix v))))
-
-;; If you are in the state monad you can purely allocate and increment
-(define-type Nat Natural)
-(: uid-state (String -> (State Nat Uid)))
-(define (uid-state (name : String))
-  (lambda ((s : Natural))
-    (values (Uid name s) (add1 s))))
-
-;; If you are in state passing style you
-;; could use this to allocate and increment
-(: next-uid (-> String Natural (values Uid Natural)))
-(define (next-uid prefix suffix) next-uid
-  (values (Uid prefix suffix) (add1 suffix)))
-
-;; A simple macro for helpign with state passing style
-;; I am trying to move away from this so that code can
-;; be less verbose
-(define-syntax let-uid*
-  (syntax-rules ()
-    [(_ (wrong ...) others ...) (raise-syntax-error 'let-uid "next must always be an identifier")]
-    [(_ next () body ...)(let () body ...)]
-    [(_ next ([name0 prefix0] [name* prefix*] ...) body ...)
-     (let-values ([(name0 next) (next-uid prefix0 next)])
-       (let-uid* next ([name* prefix*] ...)
-		 body ...))]))
 
 
 
@@ -388,7 +360,9 @@ Unique Identifier
 (define-predicate schml-primitive? Schml-Primitive)
 
 (define-type Schml-Prim
-  (U IntxInt->Int-Primitive IntxInt->Bool-Primitive))
+  (U IntxInt->Int-Primitive
+     IntxInt->Bool-Primitive
+     ->Int-Primitive))
 
 (define-predicate schml-prim? Schml-Prim)
 
@@ -409,11 +383,18 @@ Unique Identifier
 
 (define-type IntxInt->Int-Primitive (U '* '+ '-
                                        'binary-and 'binary-or 'binary-xor
-                                       '%/ '%>> '%<<))
+                                       '%/ '%>> '%<< '%%))
 
 (define-type IxI->I-Prim IntxInt->Int-Primitive)
 
 (define-predicate IntxInt->Int-primitive? IntxInt->Int-Primitive)
+
+(define-type ->Int-Primitive (U 'read-int))
+(define-type ->I-Prim ->Int-Primitive)
+
+(define-predicate ->Int-primitive? ->Int-Primitive)
+
+
 #;(: IntxInt->Int-primitive? (-> Any Boolean : IntxInt->Int-Primitive))
 #;
 (define (IntxInt->Int-primitive? x)
@@ -496,7 +477,8 @@ class literal constants
   (U Dyn
      Base-Type
      Schml-Fn-Type
-     Schml-Ref-Type))
+     Schml-Ref-Type
+     Schml-Tuple-Type))
 
 ;; type known at runtime only for monotonic references, the uid is for
 ;; the entire reference cell, you have to access the second component
@@ -504,6 +486,9 @@ class literal constants
 
 (define-type Schml-Fn-Type
   (Fn Index Schml-Type* Schml-Type))
+
+(define-type Schml-Tuple-Type
+  (STuple Index Schml-Type*))
 
 (define-type Schml-Ref-Type
   (U (GRef  Schml-Type)
@@ -518,8 +503,8 @@ class literal constants
   (or (Dyn? x)
       (base-type? x)
       (schml-fn? x)
-      (schml-ref? x)))
-
+      (schml-ref? x)
+      (schml-tuple? x)))
 
 (define-predicate schml-type*? Schml-Type*)
 #;(: schml-type*? (Any -> Boolean : Schml-Type*))
@@ -531,7 +516,7 @@ class literal constants
            (schml-type*? (cdr x)))))
 
 (define-predicate schml-fn? Schml-Fn-Type)
-
+(define-predicate schml-tuple? Schml-Tuple-Type)
 #;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
 #;(define (schml-fn? x)
     (and (Fn? x)
@@ -553,56 +538,54 @@ class literal constants
 (define-type+ Schml-Fml ([Schml-Fml* Listof])
   (Fml Uid Schml-Type))
 
-(define-type ConsistentT (Schml-Type Schml-Type . -> . Boolean))
+(define-type ConsistentT (Schml-Type Schml-Type -> Boolean))
 (: consistent? ConsistentT)
 (define (consistent? t g)
   ;; Typed racket made me structure the code this way.
-  ;; TODO change the names to be both-unit? ...
-  (: unit? ConsistentT)
-  (define (unit? t g) (and (Unit? t) (Unit? g)))
-  (: bool? ConsistentT)
-  (define (bool? t g) (and (Bool? t) (Bool? g)))
-  (: int? ConsistentT)
-  (define (int? t g) (and (Int? t) (Int? g)))
-  (: fn? ConsistentT)
-  (define (fn? t g)
+  (: both-unit? ConsistentT)
+  (define (both-unit? t g) (and (Unit? t) (Unit? g)))
+  (: both-bool? ConsistentT)
+  (define (both-bool? t g) (and (Bool? t) (Bool? g)))
+  (: both-int? ConsistentT)
+  (define (both-int? t g) (and (Int? t) (Int? g)))
+  (: consistent-fns? ConsistentT)
+  (define (consistent-fns? t g)
     (and (Fn? t) (Fn? g)
          (= (Fn-arity t) (Fn-arity g))
          (andmap consistent? (Fn-fmls t) (Fn-fmls g))
          (consistent? (Fn-ret t) (Fn-ret g))))
-  (: gref? ConsistentT)
-  (define (gref? t g)
+  (: consistent-tuples? ConsistentT)
+  (define (consistent-tuples? t g)
+    (and (STuple? t) (STuple? g)
+         (= (STuple-num t) (STuple-num g))
+         (andmap consistent? (STuple-items t) (STuple-items g))))
+  (: consistent-grefs? ConsistentT)
+  (define (consistent-grefs? t g)
     (and (GRef? t) (GRef? g)
          (consistent? (GRef-arg t) (GRef-arg g))))
-  (: mref? ConsistentT)
-  (define (mref? t g)
-    (and (MRef? t) (MRef? g)
-         (consistent? (MRef-arg t) (MRef-arg g))))
-  (: gvect? ConsistentT)
-  (define (gvect? t g)
+  (: consistent-gvects? ConsistentT)
+  (define (consistent-gvects? t g)
     (and (GVect? t) (GVect? g)
          (consistent? (GVect-arg t) (GVect-arg g))))
-  (: mvect? ConsistentT)
-  (define (mvect? t g)
+  (: consistent-mrefs? ConsistentT)
+  (define (consistent-mrefs? t g)
+    (and (MRef? t) (MRef? g)
+         (consistent? (MRef-arg t) (MRef-arg g))))
+  (: consistent-mvects? ConsistentT)
+  (define (consistent-mvects? t g)
     (and (MVect? t) (MVect? g)
          (consistent? (MVect-arg t) (MVect-arg g))))
-  (or (Dyn? t) (Dyn? g)
-      (unit? t g)
-      (bool? t g)
-      (int? t g)
-      (fn? t g)
-      (gref? t g)
-      (gvect? t g)
-      (mref? t g)
-      (mvect? t g)
-      
-
-
-      ;; These will need to be added back but were adding
-      ;; considerable type checking time.
-      #;
-      (and (MVect? t) (MVect? g)
-           (consistent? (MVect-arg t) (MVect-arg g)))))
+  (or (Dyn? t)
+      (Dyn? g)
+      (both-unit? t g)
+      (both-bool? t g)
+      (both-int? t g)
+      (consistent-fns? t g)
+      (consistent-tuples? t g)
+      (consistent-grefs? t g)
+      (consistent-gvects? t g)
+      (consistent-mrefs? t g)
+      (consistent-mvects? t g)))
 
 #|
 Join :: type X type -> type
@@ -632,15 +615,15 @@ Dyn
      (Fn (Fn-arity t)
          (map join (Fn-fmls t) (Fn-fmls g))
          (join (Fn-ret t) (Fn-ret g)))]
+    [(and (STuple? t) (STuple? g) (= (STuple-num t) (STuple-num g)))
+     (STuple (STuple-num t)
+         (map join (STuple-items t) (STuple-items g)))]
     [(and (GRef? t) (GRef? g))
      (GRef (join (GRef-arg t) (GRef-arg g)))]
     [(and (GVect? t) (GVect? g))
      (join (GVect-arg t) (GVect-arg g))]
     [(and (MRef? t) (MRef? g))
      (join (MRef-arg t) (MRef-arg g))]
-    #;
-    [(and (MVect? t) (MVect? g))
-     (join (MVect-arg t) (MVect-arg g))]
     [else (error 'join "Types are not consistent")]))
 
 
@@ -682,6 +665,15 @@ Dyn
   (Fn-Coercion args return)
   (Fn-Coercion-Arg coercion index)
   (Fn-Coercion-Return coercion)
+  ;;
+  (CTuple num items)
+  (Tuple-Coercion items)
+  (Tuple-Coercion-Huh c)
+  (Tuple-Coercion-Num c)
+  (Tuple-Coercion-Item c indx)
+  (Make-Tuple-Coercion make-uid t1 t2 lbl)
+  (Compose-Tuple-Coercion Uid c1 c2)
+  (Mediating-Coercion-Huh? c)
   ;; Guarded Reference Coercion
   ;; "Proxy a Guarded Reference's Reads and writes"
   (Ref read write)
@@ -720,6 +712,7 @@ Dyn
   (MRef-Coercion-Huh crcn)
   (MVect-Coercion-Huh crcn)
   (Fn-Coercion-Huh crcn)
+  ;; (Make-Coercion t1 t2 lbl)
   (Make-Fn-Coercion make-uid t1 t2 lbl)
   (Compose-Fn-Coercion comp-uid c1 c2))
 
@@ -730,7 +723,7 @@ Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef)) ;; 'MVect
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef 'STuple))
 
 (define-type Schml-Coercion
   (Rec C (U Identity
@@ -740,24 +733,58 @@ Dyn
             (Failed Blame-Label)
             (Fn Index (Listof C) C)
             (Ref C C)
-            (MonoRef Schml-Type))))
+            (MonoRef Schml-Type)
+            (CTuple Index (Listof C)))))
+
+(define IDENTITY : Identity (Identity))
 
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 
 (define-type Data-Literal (U Integer String))
 
 #|------------------------------------------------------------------------------
-Compact Types are a sort of compile time hash-consing of types
-They are introduced by hoist types in Language Cast-or-Coerce3.1
+  Compact Types and Coercions are a compile time hash-consing of types
+  They are introduced by hoist types in Language Cast-or-Coerce3.1
 ------------------------------------------------------------------------------|#
 
+;; Represents the shallow tree structure of types where all subtrees
+;; of the type are either and atomic type or a identifier for a type.
 (define-type Compact-Type
   (U (Fn Index (Listof Prim-Type) Prim-Type)
+     (STuple Index (Listof Prim-Type))
      (GRef Prim-Type) (MRef Prim-Type)
      (GVect Prim-Type) (MVect Prim-Type)))
 
-(define-type Prim-Type (U Atomic-Schml-Type (TypeId Uid)))
+;; Represent the shallow tree structure of coercions where all
+;; subtrees of the type are either atomic types, the identity coercion
+;; or coercion identifiers.
+(define-type Compact-Coercion
+  (U (Project Prim-Type Blame-Label)
+     (Inject Prim-Type)
+     (Sequence Immediate-Coercion Immediate-Coercion)
+     (Failed Blame-Label)
+     (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
+     (MonoRef Prim-Type)
+     (CTuple Index (Listof Immediate-Coercion))
+     (Ref Immediate-Coercion Immediate-Coercion)))
 
+;; TODO (andre) a more descriptive name for this would be
+;; Immediate-Type
+(define-type Prim-Type (U Atomic-Schml-Type (Static-Id Uid)))
+
+;; A type representing coercions that have already been
+;; allocated at runntime or are small enought to fit into
+;; a register at runtime. 
+;; TODO (andre) since types are completely static consider changing
+;; the type representation so that types are allocated as
+;; untagged values. Doing so would simplify type case and
+;; allow cheaper allocation of fails and injects at runtime.
+;; (NOTE) This should be done after implementation of the non
+;; N^2 implementation of guarded reference coercions because
+;; that may require injects to carry blame labels thus reducing
+;; the impact of this optimization.
+(define-type Immediate-Coercion (U Identity (Static-Id Uid)))
+ 
 (define-type Coercion/Prim-Type
   (Rec C (U Identity
             (Failed Blame-Label)
@@ -766,6 +793,196 @@ They are introduced by hoist types in Language Cast-or-Coerce3.1
             (Sequence C C)
             (Fn Index (Listof C) C)
             (Ref C C)
-            (MonoRef Prim-Type))))
+            (MonoRef Prim-Type)
+            (CTuple Index (Listof C)))))
 
 (define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))
+
+#;(define-type (Map-Expr E1 E2)
+  (case->
+   [(Type Schml-Type) -> (Type Schml-Type)]
+   [(Quote Schml-Literal) -> (Quote Schml-Literal)]
+   [(Quote Cast-Literal) -> (Quote Cast-Literal)]
+   [(Quote-Coercion Schml-Coercion) -> (Quote-Coercion Schml-Coercion)]
+   [(Quote-Coercion Immediate-Coercion) -> (Quote-Coercion Immediate-Coercion)]
+   [(Code-Label Uid) -> (Code-Label Uid)]
+   [(Var Uid) -> (Var Uid)]
+   [(Static-Id Uid) -> (Static-Id Uid)]
+   [No-Op -> No-Op]
+   [Halt -> Halt]
+   [Success -> Success] 
+   [(Lambda (Listof Uid) E1) -> (Lambda (Listof Uid) E2)]
+   [(Lambda (Listof (Fml Uid Schml-Type)) E1) ->
+    (Lambda (Listof (Fml Uid Schml-Type)) E2)]
+   [(App E1 (Listof E1)) -> (App E2 (Listof E2))]
+   [(App-Code E1 (Listof E1)) -> (App-Code E2 (Listof E2))]
+   [(App-Fn E1 (Listof E1)) -> (App-Fn E2 (Listof E2))]
+   [(App-Fn-or-Proxy Uid E1 (Listof E1)) -> (App-Fn-or-Proxy Uid E2 (Listof E2))]
+   [(App-Closure E1 E1 (Listof E1)) -> (App-Closure E2 E2 (Listof E2))]
+   [(If E1 E1 E1) -> (If E2 E2 E2)]
+   [(Observe E1 Schml-Type) -> (Observe E2 Schml-Type)]
+   [(Blame E1) -> (Blame E2)]
+   [(Repeat Uid E1 E1 E1) -> (Repeat Uid E2 E2 E2)]
+   [(Op Schml-Prim (Listof E1)) -> (Op Schml-Prim (Listof E2))]
+   [(Letrec (Listof (Pair Uid E1)) E1) -> (Letrec (Listof (Pair Uid E2)) E2)]
+   [(Letrec (Listof (Bnd Uid Schml-Type E1)) E1) -> (Letrec (Listof (Bnd Uid Schml-Type E2)) E2)]
+   [(Let (Listof (Pair Uid E1)) E1) -> (Let (Listof (Pair Uid E2)) E2)]
+   [(Let (Listof (Bnd Uid Schml-Type E1)) E1) -> (Let (Listof (Bnd Uid Schml-Type E2)) E2)]
+   [(Labels (Listof (Pair Uid (Code Uid* E1))) E1) ->
+    (Labels (Listof (Pair Uid (Code Uid* E2))) E2)]
+   [(Begin (Listof E1) E1) -> (Begin (Listof E2) E2)]
+   [(Gbox E1) -> (Gbox E2)]
+   [(Gunbox E1) -> (Gunbox E2)]
+   [(Gbox-set! E1 E1) -> (Gbox-set! E2 E2)]
+   [(Gvector E1 E1) -> (Gvector E2 E2)]
+   [(Gvector-set! E1 E1 E1) -> (Gvector-set! E2 E2 E2)]
+   [(Gvector-ref E1 E1) -> (Gvector-ref E2 E2)]
+   [(Cast E1 (Twosome Schml-Type Schml-Type Blame-Label)) ->
+    (Cast E2 (Twosome Schml-Type Schml-Type Blame-Label))]
+   [(Cast E1 (Coercion Schml-Coercion)) ->
+    (Cast E2 (Coercion Schml-Coercion))]
+   [(Interpreted-Cast E1 (Twosome E1 E1 E1)) -> (Interpreted-Cast E2 (Twosome E2 E2 E2))]
+   [(Interpreted-Cast E1 (Coercion E1)) -> (Interpreted-Cast E2 (Coercion E2))]
+   [(Fn-Caster E1) -> (Fn-Caster E2)]
+   [(Type-Dyn-Huh E1) -> (Type-Dyn-Huh E2)]
+   [(Type-Tag E1) -> (Type-Tag E2)] 
+   [(Type-Fn-arity E1) -> (Type-Fn-arity E2)]
+   [(Type-Fn-arg E1 E1) -> (Type-Fn-arg E2 E2)]
+   [(Type-Fn-return E1) -> (Type-Fn-return E2)]
+   [(Type-Fn-Huh E1) -> (Type-Fn-Huh E2)]
+   [(Type-GVect-Huh E1) -> (Type-GVect-Huh E2)]
+   [(Type-GRef-Huh E1) -> (Type-GRef-Huh E2)]
+   [(Type-GRef-Of E1) -> (Type-GRef-Of E2)]
+   [(Type-GVect-Of E1) -> (Type-GRef-Of E2)]
+   #;[(Let-Static* (Listof (Pair Uid Compact-Type))
+        (Listof (Pair Uid Compact-Coercion)) E1)
+      -> (Let-Static* (Listof (Pair Uid Compact-Type))
+           (Listof (Pair Uid Compact-Coercion)) E2)]
+   [(Dyn-tag E1) -> (Dyn-tag E2)]
+   [(Dyn-immediate E1) -> (Dyn-immediate E2)]
+   [(Dyn-type E1) -> (Dyn-type E2)]
+   [(Dyn-value E1) -> (Dyn-value E2)]
+   [(Fn-Proxy (List Index Uid) E1 E1) ->
+    (Fn-Proxy (List Index Uid) E2 E2)]
+   [(Fn-Proxy-Huh E1) ->
+    (Fn-Proxy-Huh E2)]
+   [(Fn-Proxy-Closure E1) ->
+    (Fn-Proxy-Closure E2)]
+   [(Fn-Proxy-Coercion E1) ->
+    (Fn-Proxy-Coercion E2)]
+   [(Compose-Coercions E1 E1) -> (Compose-Coercions E2 E2)]
+   [(Compose-Fn-Coercion Uid E1 E1) ->
+    (Compose-Fn-Coercion Uid E2 E2)]
+   [(Fn-Coercion-Arity E1) -> (Fn-Coercion-Arity E2)]
+   [(Fn-Coercion (Listof E1) E1) -> (Fn-Coercion (Listof E2) E2)]
+   [(Fn-Coercion-Arg E1 E1) -> (Fn-Coercion-Arg E2 E2)]
+   [(Fn-Coercion-Return E1) -> (Fn-Coercion-Return E2)]
+   [(Ref-Coercion E1 E1) -> (Ref-Coercion E2 E2)]
+   [(Ref-Coercion-Read E1) -> (Ref-Coercion-Read E2)]
+   [(Ref-Coercion-Write E1) -> (Ref-Coercion-Write E2)]
+   [(Hybrid-Proxy Uid E1 E1) -> (Hybrid-Proxy Uid E1 E2)]
+   [(Hybrid-Proxy-Huh E1) ->(Hybrid-Proxy-Huh E2)] 
+   [(Hybrid-Proxy-Closure E1) -> (Hybrid-Proxy-Closure E2)] 
+   [(Hybrid-Proxy-Coercion E1) -> (Hybrid-Proxy-Coercion E2)]
+   [(Sequence-Coercion E1 E1) -> (Sequence-Coercion E2 E2)]
+   [(Sequence-Coercion-Huh E1) -> (Sequence-Coercion-Huh E2)]
+   [(Sequence-Coercion-Fst E1) -> (Sequence-Coercion-Fst E2)]
+   [(Sequence-Coercion-Snd E1) -> (Sequence-Coercion-Snd E2)]
+   [(Project-Coercion E1 E1) -> (Project-Coercion E2 E2)]
+   [(Project-Coercion-Huh E1) ->   (Project-Coercion-Huh E2)]
+   [(Project-Coercion-Type E1) -> (Project-Coercion-Type E2)]
+   [(Project-Coercion-Label E1) -> (Project-Coercion-Label E2)]
+   [(Inject-Coercion E1) -> (Inject-Coercion E2)]
+   [(Inject-Coercion-Huh E1) -> (Inject-Coercion-Huh E2)]
+   [(Inject-Coercion-Type E1) -> (Inject-Coercion-Type E2)]
+   [(Failed-Coercion E1) ->   (Failed-Coercion E2)]
+   [(Failed-Coercion-Huh E1) -> (Failed-Coercion-Huh E2)]
+   [(Failed-Coercion-Label E1) -> (Failed-Coercion-Label E2)]
+   [(Ref-Coercion-Huh E1) -> (Ref-Coercion-Huh E2)]
+   [(Fn-Coercion-Huh E1) -> (Fn-Coercion-Huh E2)]
+   [(Make-Coercion E1 E1 E1) -> (Make-Coercion E2 E2 E2)]
+   [(Make-Fn-Coercion Uid E1 E1 E1) -> (Make-Fn-Coercion Uid E2 E2 E2)]
+   [(Compose-Fn-Coercion Uid E1 E1) -> (Compose-Fn-Coercion Uid E2 E2)]
+   [(Id-Coercion-Huh E1) -> (Id-Coercion-Huh E2)]
+   [Id-Coercion -> Id-Coercion]   
+   [(Tag Tag-Symbol) -> (Tag Tag-Symbol)]))
+
+;; TODO submit a patch to racket so that this isn't necisarry
+;; adhoc polymorphism encoded by case lambda across all
+
+
+;(: map-expr (All (A B) (A -> B) -> (Map-Expr A B)))
+#;(define ((map-expr f) e)
+  (match e
+    [(and c (or (Type _) (Quote _) (Quote-Coercion _)
+                (Code-Label _) (Var _) (Static-Id _)
+                (Tag _)))
+     c]
+    [(and c (or (No-Op) (Halt) (Success))) c]
+    ;; Don't use compound forms anymore
+    [(Lambda i* e) (Lambda i* (f e))]
+    [(App e e*) (App (f e) (map f e*))]
+    [(App-Code e e*) (App-Code (f e) (map f e*))]
+    [(App-Fn e e*) (App-Fn (f e) (map f e*))]
+    [(App-Fn-or-Proxy u e e*) (App-Fn-or-Proxy u (f e) (map f e*))]
+    [(Fn-Proxy i e1 e2)
+     (Fn-Proxy i (f e1) (f e2))]
+    [(Fn-Proxy-Huh e) 
+     (Fn-Proxy-Huh (f e))]
+    [(Fn-Proxy-Closure e)
+     (Fn-Proxy-Closure (f e))]
+    [(Fn-Proxy-Coercion e)
+     (Fn-Proxy-Coercion (f e))]
+    [(If e1 e2 e3) (If (f e1) (f e2) (f e3))]
+    [(Op p e*) (Op p (map f e*))]
+    [(Letrec b* e) (Letrec (map (map-bnd f) b*) (f e))]
+    [(Let b* e) (Let (map (map-bnd f) b*) (f e))]
+    [(Labels b* e) (Labels (map (map-bnd-code f) b*) (f e))]
+    [(Begin e* e) (Begin (map f e*) (f e))]
+    [(Gbox e) (Gbox (f e))]
+    [(Gunbox e) (Gunbox (f e))]
+    [(Gbox-set! e1 e2) (Gbox-set! (f e1) (f e2))]
+    [(Gvector e1 e2) (Gvector (f e1) (f e1))]
+    [(Gvector-set! e1 e2 e3) (Gvector-set! (f e1) (f e2) (f e3))]
+    [(Gvector-ref e1 e2) (Gvector-ref (f e1) (f e2))]
+    [(Cast e i) (Cast (f e) i)]
+    [(Interpreted-Cast e1 (Twosome e2 e3 e4))
+     (Interpreted-Cast (f e1) (Twosome (f e2) (f e3) (f e4)))]
+    [(Interpreted-Cast e1 (Coercion e2))
+     (Interpreted-Cast (f e1) (Coercion (f e2)))]
+    [(Compose-Coercions e1 e2) (Compose-Coercions (f e1) (f e2))]
+    [(Compose-Fn-Coercion u c1 c2)
+     (Compose-Fn-Coercion u (f c1) (f c2))]
+    [(Id-Coercion-Huh e) (Id-Coercion-Huh (f e))]
+    [(and id (Id-Coercion)) id]
+    [(Fn-Caster e) (Fn-Caster (f e))]
+    [(Type-Dyn-Huh e) (Type-Dyn-Huh (f e))]
+    [(Type-Tag e) (Type-Tag (f e))] 
+    [(Type-Fn-arity e) (Type-Fn-arity (f e))]
+    [(Type-Fn-arg e1 e2) (Type-Fn-arg (f e1) (f e2))]
+    [(Type-Fn-return e) (Type-Fn-return (f e))]
+    [(Type-Fn-Huh e) (Type-Fn-Huh (f e))]
+    [(Type-GVect-Huh e) (Type-GVect-Huh (f e))]
+    [(Type-GRef-Huh e) (Type-GRef-Huh (f e))]
+    [(Type-GRef-Of e) (Type-GRef-Of (f e))]
+    [(Type-GVect-Of e) (Type-GRef-Of (f e))]
+    [(App-Closure e1 e2 e*) (App-Closure (f e1) (f e2) (map f e*))]
+    [(Let-Static* bt bc e) (Let-Static* bt bc (f e))]
+    [(Dyn-tag e) (Dyn-tag (f e))]
+    [(Dyn-immediate e) (Dyn-immediate (f e))]
+    [(Dyn-type e) (Dyn-type (f e))]
+    [(Dyn-value e) (Dyn-value (f e))]
+    [other (error 'forms/map-expr "match failed: ~a" other)]))
+
+(define-type (Map-Bnd E1 E2)
+  (case->
+   [(Bnd Uid Schml-Type E1) -> (Bnd Uid Schml-Type E2)]
+   [(Pair Uid E1) -> (Pair Uid E2)]))
+
+(: map-bnd (All (A B) (A -> B) -> (Map-Bnd A B)))
+(define ((map-bnd f) b)
+  (match b
+    [(Bnd i t e) (Bnd i t (f e))]
+    [(cons i e) (cons i (f e))]))
+
+

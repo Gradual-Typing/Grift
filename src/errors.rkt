@@ -104,6 +104,9 @@
 (define-syntax-rule (raise-lambda-exn stx* src)
   (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'lambda stx*)))
 
+(define-syntax-rule (raise-tuple-exn stx* src)
+  (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'tuple stx*)))
+
 (define-syntax-rule (raise-let-exn form stx* src)
   (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* 'form stx*)))
 

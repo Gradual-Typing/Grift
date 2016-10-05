@@ -1,0 +1,9 @@
+*.pdf
+*.tex
+*.schml
+*.csv
+*.txt
+*.png
+src
+tmp
+exe

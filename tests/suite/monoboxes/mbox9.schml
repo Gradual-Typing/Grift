@@ -1,0 +1,7 @@
+(let ([r : (MRef Dyn) (mbox (: 41 Dyn))]) ;; I am not casting the underlying value to Dyn
+  (begin
+    (if (= (munbox r) 8)
+        (mbox-set! r #t)
+        (mbox-set! r #f))
+    (: (munbox r) Bool))) ;; the read value is integer not Dyn
+        

@@ -20,11 +20,10 @@
 
 (define-type D1-Tail
   (Rec T
-   (U (Let D1-Bnd* T)
-      (If D1-Pred T T)
+   (U (If D1-Pred T T)
       (Begin D1-Effect* T)
       (App-Code D1-Value D1-Value*)
-      (Op (U IxI->I-Prim Array-Prim) D1-Value*)
+      (Op UIL-Expr-Prim D1-Value*)
       (Var Uid)
       Halt Success
       (Var Uid)
@@ -33,11 +32,10 @@
 
 (define-type D1-Value
  (Rec V
-  (U (Let D1-Bnd* V)
-     (If D1-Pred V V)
+  (U (If D1-Pred V V)
      (Begin D1-Effect* V)
      (App-Code V (Listof V))
-     (Op (U IxI->I-Prim Array-Prim) (Listof V))
+     (Op UIL-Expr-Prim (Listof V))
      Halt
      (Var Uid)
      (Code-Label Uid)
@@ -45,17 +43,15 @@
 
 (define-type D1-Pred
  (Rec P
-  (U (Let D1-Bnd* P)
-     (If D1-Pred P P)
+  (U (If D1-Pred P P)
      (Begin D1-Effect* P)
      (Relop IxI->B-Prim D1-Value D1-Value))))
 
 (define-type D1-Effect
  (Rec E
-  (U (Let D1-Bnd* E)
-     (If D1-Pred E E)
+  (U (If D1-Pred E E)
      (Begin D1-Effect* No-Op)
-     (Repeat Uid D1-Value D1-Value E)
+     (Repeat Uid D1-Value D1-Value #f #f E)
      (App-Code D1-Value D1-Value*)
      (UIL-Op! D1-Value)
      (Assign Uid D1-Value)

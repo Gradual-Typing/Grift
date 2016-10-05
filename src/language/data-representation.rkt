@@ -5,10 +5,13 @@
 | The Constants for the representation of casts                                |
 +-----------------------------------------------------------------------------|#
 ;; The Representation of functional types is an array
-(define FN-TYPE-TAG #b000)
-(define FN-ARITY-INDEX 0)
-(define FN-RETURN-INDEX 1)
-(define FN-FMLS-OFFSET 2)
+(define TYPE-FN-ARITY-INDEX 0)
+(define TYPE-FN-RETURN-INDEX 1)
+(define TYPE-FN-FMLS-OFFSET 2)
+
+;; The representation of tuple types is an array
+(define TYPE-TUPLE-COUNT-INDEX 0)
+(define TYPE-TUPLE-ELEMENTS-OFFSET 1)
 
 ;; The representation of tagged structure types
 ;; My thought is that types can be allocated statically
@@ -21,6 +24,7 @@
 (define TYPE-GVECT-TAG #b010)
 (define TYPE-MREF-TAG #b011)
 (define TYPE-MVECT-TAG #b100)
+(define TYPE-TUPLE-TAG #b101)
 ;; Hypothetical extensions to type tags
 ;; Though more organization could le
 ;;(define TYPE-IARRAY-TAG #b101)
@@ -94,22 +98,23 @@
 (define MVECT-RTTI-INDEX 1)
 (define MVECT-OFFSET 2)
 (define MVECT-TAG #b000) ;; no tags, one concrete value
+(define TUPLE-TAG #b000)
 
 ;; GREF Type Representation
 (define TYPE-GREF-SIZE  1)
-(define GREF-TO-INDEX 0)
+(define TYPE-GREF-TYPE-INDEX 0)
 
 ;; GVECT Type Representation
 (define TYPE-GVECT-SIZE  1)
-(define GVECT-TO-INDEX 0)
+(define TYPE-GVECT-TYPE-INDEX 0)
 
 ;; MRef Type Representation
 (define TYPE-MREF-SIZE  1)
-(define MREF-TO-INDEX 0)
+(define TYPE-MREF-TYPE-INDEX 0)
 
 ;; MVECT Type Representation
 (define TYPE-MVECT-SIZE  1)
-(define MVECT-TO-INDEX 0)
+(define TYPE-MVECT-TYPE-INDEX 0)
 
 ;; Closure representation
 (define CLOS-CODE-INDEX 0)
@@ -121,3 +126,15 @@
 (define HYBRID-PROXY-CODE-INDEX 0)
 (define HYBRID-PROXY-CLOS-INDEX 1)
 (define HYBRID-PROXY-CRCN-INDEX 2)
+
+;; Shifting for secondary tags
+(define COERCION-SECOND-TAG-SHIFT 3)
+
+;; The Representation of function coercion is an array
+(define COERCION-FN-ARITY-INDEX 0)
+(define COERCION-FN-RETURN-INDEX 1)
+(define COERCION-FN-FMLS-OFFSET 2)
+
+;; The representation of tuple coercion is an array
+(define COERCION-TUPLE-COUNT-INDEX 0)
+(define COERCION-TUPLE-ELEMENTS-OFFSET 1)

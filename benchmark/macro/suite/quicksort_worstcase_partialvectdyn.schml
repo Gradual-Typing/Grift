@@ -1,0 +1,43 @@
+(let ([iters : Int (read-int)])
+  (let ([a : (GVect Int) (gvector iters 1)])
+    (begin
+      (repeat (i 0 iters)
+              (gvector-set! a i (- iters i)))
+      (timer-start)
+      (letrec ([sort : ((GVect Int) Int Int -> Int)
+                     (lambda ([a : (GVect Int)] [p : Int] [r : Int]) : Int
+                             (let ([ad : (GVect Dyn) a])
+                               (if (< p r)
+                                   (let ([q : Int (partition ad p r)])
+                                     (begin
+                                       (sort ad p (- q 1))
+                                       (sort ad (+ q 1) r)))
+                                   0)))]
+               [partition : ((GVect Int) Int Int -> Int)
+                          (lambda ([a : (GVect Int)] [p : Int] [r : Int]) : Int
+                                  (let ([ad : (GVect Dyn) a])
+                                    (let ([i : (GRef Int) (gbox (- p 1))]
+                                          [x : Int (gvector-ref ad r)])
+                                      (begin
+                                        (repeat (j p r)
+                                                (if (<= (gvector-ref ad j) x)
+                                                    (begin
+                                                      (gbox-set! i (+ (gunbox i) 1))
+                                                      (swap ad (gunbox i) j))
+                                                    0))
+                                        (swap ad (+ (gunbox i) 1) r)
+                                        (+ (gunbox i) 1)))))]
+               [swap : ((GVect Int) Int Int -> Int)
+                     (lambda ([a : (GVect Int)] [i : Int] [j : Int]) : Int
+                             (let ([ad : (GVect Dyn) a])
+                               (if (= i j)
+                                   0
+                                   (let ([t : Int (gvector-ref ad i)])
+                                     (begin
+                                       (gvector-set! ad i (gvector-ref ad j))
+                                       (gvector-set! ad j t)
+                                       0)))))])
+        (sort a 0 (- iters 1)))
+      (timer-stop)
+      (gvector-ref a (- iters 1))
+      (timer-report))))

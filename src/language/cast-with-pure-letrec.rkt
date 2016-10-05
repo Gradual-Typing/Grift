@@ -36,6 +36,9 @@
           (Mvector-set! E E E) ;; fast write
           (MVectCastedRef Uid E Schml-Type)
           (MVectCastedSet! Uid E E Schml-Type)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
 	  ;; Terminals
 	  (Var Uid)
 	  (Quote Cast-Literal))))

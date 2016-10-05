@@ -36,7 +36,7 @@
  (Rec E
   (U (If D4-Pred E E)
      (Begin D4-Effect* No-Op)
-     (Repeat Uid D4-Trivial D4-Trivial E)
+     (Repeat Uid D4-Trivial D4-Trivial #f #f E)
      (UIL-Op! D4-Trivial)
      (Assign Uid D4-Value)
      No-Op)))

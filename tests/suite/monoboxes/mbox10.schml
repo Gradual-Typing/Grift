@@ -1,0 +1,4 @@
+(let ([b (mbox #t)])
+ (if (munbox b)
+     42
+     -42))

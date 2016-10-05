@@ -48,7 +48,7 @@ to test the efficiency of applying a casted function.
                  (if (or (symbol? casts) (even? casts))
                      (values '(Int -> Int) `(cast-loop ,casts f))
                      (values '(Dyn -> Dyn)
-                             `(: (cast-loop ,(sub1 casts) f) (Dyn -> Dyn))))])
+                      `(: (cast-loop ,(sub1 casts) f) (Dyn -> Dyn))))])
      `(letrec ([cast-loop
                 : (Int (Int -> Int) -> (Int -> Int))
                 (lambda ([n : Int] [g : (Int -> Int)])
@@ -59,7 +59,7 @@ to test the efficiency of applying a casted function.
           (let ([f^ : ,annotation ,invocation])
             (begin
               (timer-start)
-              (repeat (i 0 ,iterations ) (f^ 0))
+              (repeat (i 0 ,iterations) (f^ 0))
               (timer-stop)
               (timer-report))))))
    output-port 1))
@@ -149,8 +149,8 @@ the base file name, the path to the file, and the number of casts.
       (list base src n))))
 
 (call-with-output-file
-  (build-path this-dir "fn-app-code-template.schml") #:exists 'replace
-  (lambda (p) (generate-source p 'N-ITERATIONS 'N-CASTS)))
+  (build-path this-dir "fn-app.schml") #:exists 'replace
+  (lambda (p) (generate-source p iterations 'N-CASTS)))
 
 ;; Run each benchmark for a particular compiler configuration
 (define (run-series out cast-rep)
@@ -205,7 +205,7 @@ the base file name, the path to the file, and the number of casts.
     ;; here generate source is writing to a temp buffer so that we
     ;; can comment out the code.
     (let-values ([(in out) (make-pipe)])
-      (generate-source out 'ITERATIONS 'CASTS)
+      (generate-source out iterations 'N-CASTS)
       ;; Sends eof
       (close-output-port out)
       (for ([line (in-lines in)])

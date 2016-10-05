@@ -2,6 +2,7 @@
 
 (require "./rackunit.rkt"
          "../src/helpers.rkt"
+         "../src/configuration.rkt"
          "./test-compile.rkt"
          "./paths.rkt"
          racket/cmdline)
@@ -34,16 +35,20 @@
     (box     . ,box-tests)
     (monobox . ,monobox-tests)
     (vector  . ,vector-tests)
+    (tuples  . ,tuple-tests)
     (tool    . ,tool-tests)
     (program . ,program-tests)
     (large   . ,large-tests)))
+
+(define test-cast-representation : (Parameterof (Listof Cast-Representation))
+  (make-parameter (list 'Type-Based 'Coercions)))
 
 ;; Parse the command line arguments
 (command-line
  #:program "schml-test-runner"
  #:once-each
  [("-s" "--suite") choice
-  "specify which suite to run"
+  "specify suite: all most core box vector tool program large"
   (let* ([s? (assq (to-symbol choice) suite-choices)])
     (if s?
         (suite (cdr s?))
@@ -51,8 +56,16 @@
  [("-r" "--cast-representation") crep
   "specify which cast representation to use (Twosomes or Coercions)"
   (let ((crep (to-symbol crep)))
-    (if (or (eq? 'Twosomes crep)
+    (if (or (eq? 'Type-Based crep)
             (eq? 'Coercions crep))
-        (compiler-config-cast-representation crep)
+        (test-cast-representation (list crep))
         (error 'tests "--cast-representation given invalid argument ~a" crep)))]
- #:args () (run-tests (suite)))
+ #:args ()
+ (for ([cast-rep : Cast-Representation (test-cast-representation)])
+   (parameterize ([cast-representation cast-rep]
+                  [output-path (build-path test-tmp-path "t.out")]
+                  [c-path (build-path test-tmp-path "t.c")]
+                  [c-flags (cons "-O3" (c-flags))]
+                  [specialize-cast-code-generation? #t])
+     (printf "~a tests running:\n" cast-rep)
+     (run-tests (suite)))))

@@ -9,7 +9,9 @@
 
 (define-type Cast-or-Coerce5-Lang
   (Prog (List String Natural Schml-Type)
-        (LetT* CoC5-Bnd-Type* CoC5-Expr)))
+        (Let-Static* CoC5-Bnd-Type*
+                     CoC5-Bnd-Crcn*
+                     CoC5-Expr)))
 
 (define-type CoC5-Expr
   (Rec E (U ;; Code Labels
@@ -27,7 +29,7 @@
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
-          (Quote-Coercion Coercion/Prim-Type)
+          (Quote-Coercion Immediate-Coercion)
           ;(Compose-Coercions E E)
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
@@ -84,7 +86,7 @@
           ;; Controll Flow
           (If E E E)
           (Begin CoC5-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
           ;;Primitives
           (Op Schml-Primitive (Listof E))
           (Quote Cast-Literal)
@@ -118,6 +120,7 @@
           (Mbox-rtti-set! Uid E)
           (Mbox-rtti-ref Uid)
           (Make-Fn-Type Uid E E)
+          (Make-Tuple-Type Uid E E)
           (MRef-Coercion-Huh E)
           (MRef-Coercion-Type E)
           (MRef-Coercion E)
@@ -145,7 +148,21 @@
           (Type-MVect-Of E)
           (MVect-Coercion-Huh E)
           (MVect-Coercion-Type E)
-          (MVect-Coercion E))))
+          (MVect-Coercion E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
+          (Tuple-Coercion-Huh E)
+          (Tuple-Coercion-Num E)
+          (Tuple-Coercion-Item E Index)
+          (Coerce-Tuple Uid E E)
+          (Cast-Tuple Uid E E E E)
+          (Type-Tuple-Huh E)
+          (Type-Tuple-num E)
+          (Type-Tuple-item E Index)
+          (Make-Tuple-Coercion Uid E E E)
+          (Compose-Tuple-Coercion Uid E E)
+          (Mediating-Coercion-Huh? E))))
 
 
 
@@ -160,4 +177,6 @@
 (define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
 (define-type CoC5-Bnd-Type  (Pairof Uid Compact-Type))
 (define-type CoC5-Bnd-Type* (Listof CoC5-Bnd-Type))
+(define-type CoC5-Bnd-Crcn  (Pairof Uid Compact-Coercion))
+(define-type CoC5-Bnd-Crcn* (Listof CoC5-Bnd-Crcn))
 

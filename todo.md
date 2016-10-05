@@ -1,18 +1,37 @@
+# For Maintainability 
+- [ ] Add an ast pretty printer (ast -> sexp)
+- [ ] normalize context to before specify representation
+- [ ] Simplify parser (make it untyped) and use macros (this could be done)
+- [ ] switch twosomes to type-based every where
+
+# For Research
+- [X] Add Hoist coercion constants
+- [X] Add simplify known casts (v <id;T!> -> <T!> | tag v t)
+- [X] Add Dynamic-Operation optimization (App-Dyn, Dyn-Gbox-ref, ...)
+- [ ] Fix letrec (ie add letrec* and optimizations)
+- [ ] Add closure optimizations
+- [ ] add inlining, constant propagation, common subexpression elimination
+      dead code elimination pass. (remove specialization of casts)
+- [?] Start using better timers that measure process time instead of wall-clock time
+- [X] Lower the letrec purification pass or raise unguarded boxes
+- [ ] Add Lazy Shadow Stack GC + Cheney Copy Collector + Bump Pointer Allocation + GC Statistics
+- [ ] Implement a switch construct for multiway branching endemic to gradual typing
 - [ ] Add no-optimize annotations for testing purposes
 - [ ] Make sure that data structure function rep works space inefficent coercions
-- [ ] Add Dynamic-Operation optimization (App-Dyn, Dyn-Gbox-ref, ...)
+- [ ] look at the code function casts created by extracting a dynamic
+      value and make sure that (Id -> Id) is getting collapsed to Id
+      this may be implicitly occuring due to pointer equality of types.
 - [ ] Manually specialize the code for the fast cases of make coercion
       in compose.
-- [ ] Add Hoist coercion constants
-- [ ] Lower the letrec purification pass or raise unguarded boxes
-- [ ] Simplify parser (make it untyped) and use macros (this could be done)
-- [ ] Fix letrec
-- [ ] add define, include
-- [ ] add constant propagation, common subexpression elimination,
-      and dead code elimination pass after specify
-- [ ] normalize context to before specify representation
-- [ ] add inlining, constant propagation, common subexpression elimination
-      dead code elimination pass.
+- [ ] Add hoisting of constants in general
 - [ ] Tail coercions optimization.
 - [ ] Custom backend that allows us to play with the return register
-      
+
+# For Language 
+- [ ] add define, include, define-type,
+- [ ] recursive types
+- [X] product types (tuples and structs)
+- [ ] parametric polymorphism
+- [ ] unions (tagged?, untagged)
+- [ ] Structural Objects 
+- [ ] Move to a LLVM Backend 

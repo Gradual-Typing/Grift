@@ -7,9 +7,7 @@ ast, and finally converts that ast into an equivalent ast
 of the cast calculus.
 |#
 
-(require "../configuration.rkt"
-         "../helpers.rkt"
-         "./read.rkt"
+(require "./read.rkt"
          "./syntax-to-schml0.rkt"
          "./type-check.rkt"
          "./insert-casts.rkt"
@@ -17,11 +15,11 @@ of the cast calculus.
 (provide (all-defined-out)
          (all-from-out "../language/cast0.rkt"))
 
-(: reduce-to-cast-calculus (Path Config -> Cast0-Lang))
-(trace-define (reduce-to-cast-calculus path config)
-  (let* ((stx-lang (read path config))
-	 (s0 (syntax->schml0 stx-lang config))
-         (s1 (type-check s0 config)))
-    (insert-casts s1 config)))
+(: reduce-to-cast-calculus (Path -> Cast0-Lang))
+(define (reduce-to-cast-calculus path)
+  (let* ((stx-lang (read path))
+	 (s0 (syntax->schml0 stx-lang))
+         (s1 (type-check s0)))
+    (insert-casts s1)))
 
 

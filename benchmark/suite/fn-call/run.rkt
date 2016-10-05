@@ -15,8 +15,7 @@ Thoughts about improvements
 
 ;; Controls how many time each function call is repeated in
 ;; order to scale the time to a measurable quantity.
-(define c-iterations 1000000)
-(define schml-iterations 1000000)
+(define schml-iterations 10000)
 
 (define PAGE-SIZE 4096)
 ;; Number of decimals in formatted latex output
@@ -82,7 +81,7 @@ Thoughts about improvements
 ;; freshly compile the c tests
 (define (c-compile/run/parse base)
   (define (micro->pico x) (* x (expt 10 6)))
-  (define spec #px"^time \\(us\\): (\\d+)\n$")
+  (define spec #px"^time \\(us\\): (\\d+.\\d+)\n$")
   (define src (path-string src-dir base ".c"))
   (define asm (path-string tmp-dir base ".s"))
   (define exe (path-string exe-dir base ".out"))
@@ -90,46 +89,58 @@ Thoughts about improvements
                (system (format "cc ~a -O3 -o ~a" src exe)))
     (raise (exn (format "compile-c ~a" base) (current-continuation-marks))))
   (for/list ([run (in-range runs)])
-    (let* ([result (with-output-to-string
-                     (lambda () (system (format "~a ~a" exe c-iterations))))]
+    (let* ([result (with-output-to-string (lambda () (system exe)))]
            [parse?  (regexp-match spec result)])
       (unless parse?
         (error 'c-compile/run/parse
                "failed to parse ~a with ~a"
                exe result))
-      (let* ([time-ms (string->number (cadr parse?))]
-             [time-ps (micro->pico time-ms)]
-             [time/iter (/ (exact->inexact time-ps) c-iterations)])
-        (printf "~a ~a ~a\n" base time-ps time/iter)
-        time/iter))))
+      (let* ([time-us (string->number (cadr parse?))]
+             [time-ps (micro->pico time-us)])
+        (printf "~a ~a\n" base time-ps)
+        time-ps))))
 
 (define c-results
-  (for/list ([test '("c-direct" 
-                     "c-stkIndirect" "c-memIndirect")])
+  (for/list ([test '("c-loop"
+                     "c-direct" 
+                     "c-indirect-stack"
+                     "c-indirect-memory")])
     (let-values ([(results) (c-compile/run/parse test)])
       (list test (mean results) (stddev results)))))
 
-(define (schml-compile/run/parse test rep)
+(define (schml-compile/run/parse test [rep #f])
   (define (sec->pico x) (* x (expt 10 12)))
-  (define spec #px"^time \\(sec\\): (\\d+.\\d+)\nUnit : \\(\\)\n$")
+  (define spec #px"^time \\(sec\\): (\\d+.\\d+)\n")
   (define base (car test))
   (define code (cdr test))
-  (define base^ (string-downcase (format "~a-~a" base rep)))
+  (define base^
+    (string-downcase
+     (if rep
+         (string-append base "-" (~a rep))
+         base)))
   (define src  (path src-dir base ".schml"))
   (define tmpa (path tmp-dir base^ ".s"))
   (define tmpc (path tmp-dir base^ ".c"))
   (define exe  (path exe-dir base^ ".out"))
+  ;; Always regenerate and recompile the files
   (call-with-output-file src #:exists 'replace
     (lambda (p) (pretty-print code p 1)))
+  
   (with-output-to-string
     (lambda ()
-      (compile src #:cast-rep rep #:output exe
-               #:keep-c tmpc #:keep-a tmpa 
-               #:cc-opt "-w -O3" #:mem (* PAGE-SIZE 30000))))
+      (compile src #:cast-rep (or rep 'Twosomes) #:output exe
+               #:keep-c tmpc #:keep-a tmpa
+               #:cc-opt "-w -O3"
+               #:mem (* PAGE-SIZE 3000)
+               #:rt (build-path "./runtime.o"))))
+  
   (define results
     (for/list ([run (in-range runs)])
       (let* ([result (with-output-to-string
-                       (lambda () (system (format "~a" (path->string exe)))))]
+                       (lambda ()
+                         (with-input-from-string (format "~a" schml-iterations)
+                           (lambda ()
+                            (system (format "~a" (path->string exe)))))))]
              [parse?  (regexp-match spec result)])
         (unless parse?
           (error 'schml-compile/run/parse
@@ -144,67 +155,167 @@ Thoughts about improvements
 
 (define schml-loop-test
   `("gtlc-loop" .
-    (begin
-      (timer-start)
-      (repeat (i 0 ,schml-iterations) ())
-      (timer-stop)
-      (timer-report))))
+    (let ([acc : (GRef Int) (gbox 0)]
+          [iters : Int (read-int)])
+      (letrec ([run-test
+                : (Int -> ())
+                (lambda ([i : Int])
+                  (gbox-set! acc (+ i (gunbox acc))))])
+        (begin
+          (timer-start)
+          (repeat (i 0 iters) (run-test i))
+          (timer-stop)
+          (timer-report)
+          (gunbox acc))))))
 
 (define schml-tests
-  `(("gtlc-static-int" .
+  `(("gtlc-static-int-x1" .
      (letrec ([f : (Int -> Int) (lambda (n) n)])
-       (begin
-         (timer-start)
-         (repeat (i 0 ,schml-iterations) (f 0))
-         (timer-stop)
-         (timer-report))))
-    ("gtlc-static-dyn" .
-     (letrec ([f : (Dyn -> Dyn) (lambda (n) n)])
-       (begin
-         (timer-start)
-         (repeat (i 0 ,schml-iterations) (f 0))
-         (timer-stop)
-         (timer-report))))
-    ("gtlc-dynamic-int" .
+       (let ([acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (f i) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+
+    ("gtlc-static-int-x2" .
      (letrec ([f : (Int -> Int) (lambda (n) n)])
-       (let ([d : Dyn f])
-         (begin
-           (timer-start)
-           (repeat (i 0 ,schml-iterations) (d 0))
-           (timer-stop)
-           (timer-report)))))
-    ("gtlc-dynamic-dyn" .
-     (letrec ([f : (Dyn -> Dyn) (lambda (n) n)])
-       (let ([d : Dyn f])
-         (begin
-           (timer-start)
-           (repeat (i 0 ,schml-iterations) (d 0))
-           (timer-stop)
-           (timer-report)))))
+       (let ([acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (f (f i)) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+
+    ("gtlc-static-int-x3" .
+     (letrec ([f : (Int -> Int) (lambda (n) n)])
+       (let ([acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (f (f (f i))) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+
+    ("gtlc-static-int-x4" .
+     (letrec ([f : (Int -> Int) (lambda (n) n)])
+       (let ([acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (f (f (f (f i)))) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+    
     ("gtlc-wrapped-int" .
      (letrec ([f : (Int -> Int) (lambda (n) n)])
-       (let ([w : (Dyn -> Dyn) f])
-         (begin
-           (timer-start)
-           (repeat (i 0 ,schml-iterations) (w 0))
-           (timer-stop)
-           (timer-report)))))
+       (let ([w : (Dyn -> Dyn) f]
+             [acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (w i) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+    
+    ("gtlc-dynamic-int" .
+     (letrec ([f : (Int -> Int) (lambda (n) n)])
+       (let ([d : Dyn f]
+             [acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (d i) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+    
+    ("gtlc-static-dyn" .
+     (letrec ([f : (Dyn -> Dyn) (lambda (n) n)])
+       (let ([acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (f i) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+
     ("gtlc-wrapped-dyn" .
      (letrec ([f : (Dyn -> Dyn) (lambda (n) n)])
-       (let ([w : (Int -> Int) f])
-         (begin
-           (timer-start)
-           (repeat (i 0 ,schml-iterations) (w 0))
-           (timer-stop)
-           (timer-report)))))))
+       (let ([w : (Int -> Int) f]
+             [acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (w i) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))
+    
+    ("gtlc-dynamic-dyn" .
+     (letrec ([f : (Dyn -> Dyn) (lambda (n) n)])
+       (let ([d : Dyn f]
+             [acc : (GRef Int) (gbox 0)]
+             [iters : Int (read-int)])
+         (letrec ([run-test
+                   : (Int -> ())
+                   (lambda ([i : Int])
+                     (gbox-set! acc (+ (d i) (gunbox acc))))])
+           (begin
+             (timer-start)
+             (repeat (i 0 iters) (run-test i))
+             (timer-stop)
+             (timer-report)
+             (gunbox acc))))))))
 
 (define schml-results
-  #;(let-values ([(name results) (schml-compile/run/parse schml-loop-test 'Twosomes)])
-  (list name (mean results) (stddev results)))
-  (for*/list ([test (in-list schml-tests)]
-              [rep  '(Twosomes Coercions)])
-    (let-values ([(name results) (schml-compile/run/parse test rep)])
-      (list name (mean results) (stddev results)))))
+  (cons
+   (let-values ([(name results) (schml-compile/run/parse schml-loop-test)])
+     (list name (mean results) (stddev results)))
+   (for*/list ([test (in-list schml-tests)]
+               [rep  '(Twosomes Coercions)])
+     (let-values ([(name results) (schml-compile/run/parse test rep)])
+       (list name (mean results) (stddev results))))))
 
 (define (check-for x)
   (with-output-to-file "/dev/null" #:exists 'append
@@ -258,19 +369,19 @@ Thoughts about improvements
    (lambda (p)
      (display
       (string-append
-       "\\begin{tabular}{| c | r @{.} l | r@{.}l |}\n"
+       "\\begin{tabular}{| l | r | r |}\n"
        "\\hline\n"
-       "Test Name & "
-       "\\multicolumn{2}{c|}{ Time (ps) } &"
-       "\\multicolumn{2}{c|}{ Std Dev } \\\\ \n"
+       "Test Name & Time (ps) & Std Dev \\\\ \n"
+       #|"\\multicolumn{2}{c|}{  } &"
+         "\\multicolumn{2}{c|}{  } \\\\ \n"|#
        "\\hline\n")
       p)
      (for ([r (in-list r*)])
        (match-let ([(list name mean sdev) r])
          (fprintf p "~a & ~a & ~a \\\\ \\hline\n"
-                  name
-                  (decimal->align mean decimals)
-                  (decimal->align sdev decimals))))
+                  name 
+                  (real->decimal-string mean decimals)
+                  (real->decimal-string sdev decimals))))
      (display "\\end{tabular}\n" p))))
 
 (define results (append c-results schml-results gambit-results))

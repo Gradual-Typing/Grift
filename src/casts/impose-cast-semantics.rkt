@@ -6,15 +6,18 @@ This is a micro compiler that removes the cast language form.
 (require "../helpers.rkt"
          "../configuration.rkt"
          "./purify-letrec.rkt"
-         "./hoist-types.rkt"
-         "casts-to-coercions.rkt"
+         "./hoist-types-and-coercions.rkt"
          "lower-function-casts.rkt"
-         "lower-reference-casts.rkt"
+         #;"lower-reference-casts.rkt"
          "interpret-casts-with-twosomes.rkt"
+         "casts-to-coercions.rkt"
          "interpret-casts-with-coercions.rkt"
+         #;"casts-to-super-coercions.rkt"
+         #;"interpret-casts-with-super-coercions.rkt"
          "label-lambdas.rkt"
          "uncover-free.rkt"
          "convert-closures.rkt"
+
          "specify-representation.rkt"
          "../language/cast0.rkt"
          "../language/data0.rkt")
@@ -24,70 +27,23 @@ This is a micro compiler that removes the cast language form.
           "../language/cast0.rkt"
           "../language/data0.rkt"))
 
+(: impose-cast-semantics : Cast0-Lang -> Data0-Lang)
+(define (impose-cast-semantics c0)
+  (define c1
+    (case (cast-representation)
+      [(Type-Based)
+       (interpret-casts/twosomes (lower-function-casts c0))]
+      [(Coercions)
+       (interpret-casts/coercions (lower-function-casts (casts->coercions c0)))]
+      #;
+      [(Super-Coercions)
+       (define c2 (casts->super-coercions c0))
+       (interpret-casts/super-coercions (error 'impose-cast-semantics/todo))]))
+  (define c5 (hoist-types-and-coercions c1))
+  (define c5.5 (purify-letrec c5))
+  (define c6 (label-lambdas c5.5))
+  (define c7 (uncover-free c6))
+  (define c8 (convert-closures c7))
+  (specify-representation c8))
 
-(require (for-syntax racket/base racket/syntax))
-
-(define-syntax-rule (nop . a) (void))
-
-(define-syntax compose-passes
-  (syntax-rules (when get-ast begin)
-    [(_ (a c t)) a]
-    [(_ (a c t) (get-ast v) p* ...)
-     (let ([v a])
-       (compose-passes (a c t) p* ...))]
-    [(_ (a c t) (begin e* ...) p* ...)
-     (begin e* ... (compose-passes (a c t) p* ...))]
-    [(_ (a c t) (when t? p) p* ...)
-     (begin
-       (t a (format "pre ~a" 'p))
-       (let ([a (if (t? a c) (p a c) a)])
-         (compose-passes (a c t) p* ...)))]
-    [(_ (a c t) (if t? pc pa) p* ...)
-     (begin
-       (t a (format "pre ~a" 'p))
-       (let ([a (if (t? a c) (pc a c) (pa a c))])
-         (compose-passes (a c t) p* ...)))]
-    [(_ (a c t) p p* ...)
-     (begin
-       (t a (format "pre ~a" 'p))
-       (let ([a (p a c)])
-         (compose-passes (a c t) p* ...)))]))
-
-(define-syntax (define-compiler stx)
-  (syntax-case stx (:)
-    [(_ name : t p* ...)
-     (with-syntax ([test-name (format-id #'name "test-~a" #'name)])
-       #'(begin
-           (: name t)
-           (define (name ast config)
-             (compose-passes (ast config nop) p* ...))
-           (define-syntax-rule (test-name ast config test-macro)
-             (let ([ast-value    ast]
-                   [config-value config])
-               (compose-passes (ast-value config-value test-macro) p* ...)))))]))
-
-(: coercion-representation? (Any Config -> Boolean))
-(define (coercion-representation? _ c)
-  (equal? 'Coercions (Config-cast-rep c)))
-
-(define-compiler impose-cast-semantics : (Cast0-Lang Config -> Data0-Lang)
-  purify-letrec
-  (when coercion-representation?
-    casts->coercions)
-  lower-function-casts
-  lower-reference-casts
-  (if coercion-representation?
-      interpret-casts/coercions
-      interpret-casts/twosomes)
-  hoist-types
-  label-lambdas
-  uncover-free
-  convert-closures
-  specify-representation)
-
-(: t (Crcn-Expr -> Cast-or-Coerce0-Lang))
-(define (t p)
-  (if (Lambda? p)
-      (error 'todo)
-      (Prog (list "" 0 (Int)) p)))
 

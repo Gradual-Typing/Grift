@@ -4,6 +4,5 @@
      (begin
        (gvector-set! r2 0 42)
        (let ([r3 (: r2 Dyn)])
-         (: (gvector-ref r3 0) Int "wrong")
-         )))))
+         (: (gvector-ref r3 0) Int "wrong"))))))
         

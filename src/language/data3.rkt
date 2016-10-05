@@ -32,7 +32,7 @@
      Halt
      (If D3-Pred V V)
      (Begin D3-Effect* V)
-     (Op (U IxI->I-Prim Array-Prim) (Listof D3-Trivial))
+     (Op UIL-Expr-Prim (Listof D3-Trivial))
      (App-Code D3-Trivial D3-Trivial*))))
 
 (define-type D3-Pred
@@ -45,7 +45,7 @@
  (Rec E
   (U (If D3-Pred E E)
      (Begin D3-Effect* No-Op)
-     (Repeat Uid D3-Trivial D3-Trivial E)
+     (Repeat Uid D3-Trivial D3-Trivial #f #f E)
      (App-Code D3-Trivial D3-Trivial*)
      (UIL-Op! D3-Trivial)
      (Assign Uid D3-Value)

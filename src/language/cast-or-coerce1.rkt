@@ -22,7 +22,7 @@
 	  (If E E E)
           ;; Terminals
           (Begin CoC1-Expr* E)
-          (Repeat Uid E E E)
+          (Repeat Uid E E Uid E E)
 	  (Var Uid)
           (Quote-Coercion Schml-Coercion)
           (Type Schml-Type)
@@ -70,7 +70,16 @@
           (Mvector-ref E E) ;; fast read
           (Mvector-set! E E E) ;; fast write
           (MVectCastedRef Uid E Schml-Type)
-          (MVectCastedSet! Uid E E Schml-Type))))
+          (MVectCastedSet! Uid E E Schml-Type)
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-Fn-App E CoC1-Expr* Schml-Type* Blame-Label)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index))))
 
 (define-type CoC1-Expr* (Listof CoC1-Expr))
 (define-type CoC1-Bnd   (Pairof Uid CoC1-Expr))

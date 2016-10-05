@@ -1,0 +1,9 @@
+(let ([r0 (mbox 1)])
+  (let ([r1 (: r0 (MRef Dyn))])
+    (let ([r2 (: r1 (MRef Int))])
+     (begin
+       (mbox-set! r2 42)
+       (let ([r3 (: r2 Dyn)])
+         (: (munbox r3) Int "wrong")
+         )))))
+        

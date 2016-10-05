@@ -11,20 +11,19 @@
 ;; The define-pass syntax
 (require "../helpers.rkt"
          "../errors.rkt"
-         "../configuration.rkt"
          "../language/cast-or-coerce4.rkt"
          "../language/cast-or-coerce5.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-free)
 
-(: uncover-free (Cast-or-Coerce4-Lang Config . -> . Cast-or-Coerce5-Lang))
-(define (uncover-free prgm comp-config)
+(: uncover-free (Cast-or-Coerce4-Lang . -> . Cast-or-Coerce5-Lang))
+(define (uncover-free prgm)
   (logging uncover-free (All) prgm)
-  (match-let ([(Prog (list name count type) (LetT* tbnd* exp)) prgm])
+  (match-let ([(Prog (list name count type) (Let-Static* tbnd* cbnd* exp)) prgm])
     (let-values ([(exp free*) (uf-expr exp)])
       (if (set-empty? free*)
-	  (Prog (list name count type) (LetT* tbnd* exp))
+	  (Prog (list name count type) (Let-Static* tbnd* cbnd* exp))
 	  (raise-pass-exn 'uncover-free "Free variables detect ~a" free*)))))
 
 (: uf-expr (CoC4-Expr -> (values CoC5-Expr (Setof Uid))))
@@ -44,9 +43,8 @@
     ;; I do not think that labels need to be treated like variables
     [(Labels (app uf-bnd-code* b*) (app uf-expr e fv))
      (values (Labels b* e) fv)]
-    [(Repeat i (app uf-expr e1 f1) (app uf-expr e2 f2) (app uf-expr e3 f3))
-     (values (Repeat i e1 e2 e3) (set-subtract (set-union f1 f2 f3) (set i)))]
-    
+    [(Repeat i (app uf-expr e1 f1) (app uf-expr e2 f2) a (app uf-expr e3 f3) (app uf-expr e4 f4))
+     (values (Repeat i e1 e2 a e3 e4) (set-subtract (set-union f1 f2 f3 f4) (set i a)))]
     [(If (app uf-expr t t-fv) (app uf-expr c c-fv) (app uf-expr a a-fv))
      (values (If t c a) (set-union t-fv c-fv a-fv))]
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
@@ -230,8 +228,16 @@
     [(Mvector-rtti-set! u (app uf-expr e fv))
      (values (Mvector-rtti-set! u e) fv)]
     [(Mvector-rtti-ref u) (values (Mvector-rtti-ref u) (set))]
+    [(Type-MVect (app uf-expr e fv)) (values (Type-MVect e) fv)]
+    [(Type-MVect-Huh (app uf-expr e fv)) (values (Type-MVect-Huh e) fv)]
+    [(Type-MVect-Of (app uf-expr e fv)) (values (Type-MVect-Of e) fv)]
+    [(MVect-Coercion-Huh (app uf-expr e fv)) (values (MVect-Coercion-Huh e) fv)]
+    [(MVect-Coercion-Type (app uf-expr e fv)) (values (MVect-Coercion-Type e) fv)]
+    [(MVect-Coercion (app uf-expr e fv)) (values (MVect-Coercion e) fv)]
     [(Make-Fn-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
      (values (Make-Fn-Type e1 e2 e3) (set-union fv1 fv2))]
+    [(Make-Tuple-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
+     (values (Make-Tuple-Type e1 e2 e3) (set-union fv1 fv2))]
     [(MRef-Coercion-Huh (app uf-expr e fv)) (values (MRef-Coercion-Huh e) fv)]
     [(MRef-Coercion-Type (app uf-expr e fv)) (values (MRef-Coercion-Type e) fv)]
     [(MRef-Coercion (app uf-expr e fv)) (values (MRef-Coercion e) fv)]
@@ -241,6 +247,24 @@
     [(Type-MRef-Huh (app uf-expr e fv)) (values (Type-MRef-Huh e) fv)]
     [(Type-MRef-Of (app uf-expr e fv)) (values (Type-MRef-Of e) fv)]
     [(Error (app uf-expr e fv)) (values (Error e) fv)]
+    [(Create-tuple (app uf-expr* e* e*-fvars)) (values (Create-tuple e*) e*-fvars)]
+    [(Tuple-proj (app uf-expr e e-fvars) i) (values (Tuple-proj e i) e-fvars)]
+    [(Tuple-Coercion-Huh (app uf-expr e e-fvars)) (values (Tuple-Coercion-Huh e) e-fvars)]
+    [(Tuple-Coercion-Num (app uf-expr e e-fvars)) (values (Tuple-Coercion-Num e) e-fvars)]
+    [(Tuple-Coercion-Item (app uf-expr e e-fvars) i) (values (Tuple-Coercion-Item e i) e-fvars)]
+    [(Cast-Tuple uid
+                 (app uf-expr e1 fv1) (app uf-expr e2 fv2)
+                 (app uf-expr e3 fv3) (app uf-expr e4 fv4))
+     (values (Cast-Tuple uid e1 e2 e3 e4) (set-union fv1 fv2 fv3 fv4))]
+    [(Coerce-Tuple uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Coerce-Tuple uid e1 e2) (set-union fv1 fv2))]
+    [(Type-Tuple-Huh (app uf-expr e e-fvars)) (values (Type-Tuple-Huh e) e-fvars)]
+    [(Type-Tuple-num (app uf-expr e e-fvars)) (values (Type-Tuple-num e) e-fvars)]
+    [(Make-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
+     (values (Make-Tuple-Coercion uid e1 e2 e3) (set-union fv1 fv2 fv3))]
+    [(Compose-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Compose-Tuple-Coercion uid e1 e2) (set-union fv1 fv2))]
+    [(Mediating-Coercion-Huh? (app uf-expr e fv)) (values (Mediating-Coercion-Huh? e) fv)]
     [other (error 'uncover-free "unmatched ~a" other)]))
 
 

@@ -9,9 +9,9 @@
 |syntax-objects as we convert them to core forms.
 +------------------------------------------------------------------------------|#
 (require "../helpers.rkt"
-         "../errors.rkt"
-         "../configuration.rkt"
-         "../language/schml0.rkt")
+         "../errors.rkt" 
+         "../language/schml0.rkt"
+         racket/path)
 
 (provide (all-from-out "../language/schml0.rkt")
          read)
@@ -25,10 +25,6 @@ This helper function called by read extracts a file name from a path.
     (if maybe-name
 	(path->string maybe-name)
 	(raise-file-name-exn p))))
-
-(require/typed racket/path
-  [file-name-from-path
-   (Path -> (Option Path))])
 
 #|
 Function: get-reader
@@ -62,8 +58,8 @@ it as a list.
 Pass: read
 Collects the syntax from a file and returns it a Stx-Prog ast.
 |#
-(: read (Path Config . -> . Syntax-Lang))
-(define (read path config)
+(: read (Path . -> . Syntax-Lang))
+(define (read path)
   (parameterize
       ;; The following parameters change what the reader is willing
       ;; to accept as input.

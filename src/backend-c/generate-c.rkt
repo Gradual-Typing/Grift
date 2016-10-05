@@ -15,30 +15,45 @@
          "../language/data5.rkt"
          "../macros.rkt")
 
-
 ;; Only the pass is provided by this module
 (provide generate-c)
 
 (define display-mem-statistics? : (Parameterof Boolean)
   (make-parameter #f))
 
-(: IMDT-C-TYPE String)
-(define IMDT-C-TYPE "long")
+(define timer-uses-process-time? : (Parameterof Boolean)
+  (make-parameter #f))
 
-(: C-EXIT String)
-(define C-EXIT "exit(-1)")
+(: IMDT-C-TYPE String)
+(define IMDT-C-TYPE "int64_t")
+
+(: ~exit : Any -> String)
+(define (~exit error)
+  (format "exit(~a)" error))
+
+(define C-EXIT : String (~exit "EXIT_FAILURE"))
+(define ERROR-OUT-OF-MEMORY : String "EXIT_FAILURE")
+(define ERROR-INDEX-OUT-OF-BOUNDS : String "EXIT_FAILURE")
+(define ERROR-CAST-ERROR : String "EXIT_FAILURE")
 
 (: C-INCLUDES (Listof String))
-(define C-INCLUDES '("stdio.h" "stdlib.h" "sys/time.h"))
+(define C-INCLUDES
+  (let ([timer (if (timer-uses-process-time?)
+                   "time.h"
+                   "sys/time.h")])
+    `("stdio.h" "stdlib.h" "stdint.h" ,timer)))
 
+(: C-DECLARATIONS (Listof String))
+(define C-DECLARATIONS
+  '("int64_t read_int();"))
 
-(: generate-c (-> Data5-Lang Config Void))
-(define (generate-c prgm config)
+(: generate-c (-> Data5-Lang Path Void))
+(define (generate-c prgm out-path)
   (match-let ([(Prog (list name count type) (GlobDecs d* (Labels lbl* exp))) prgm])
-    (call-with-output-file (Config-c-path config) #:exists 'replace #:mode 'text
+    (call-with-output-file out-path #:exists 'replace #:mode 'text
       (lambda ([p : Output-Port])
         (parameterize ([current-output-port p])
-          (emit-program name type lbl* d* exp (Config-mem-limit config)))))))
+          (emit-program name type lbl* d* exp (init-heap-kilobytes)))))))
 
 (: emit-program (-> String Schml-Type D5-Bnd-Code* (Listof Uid) D5-Body Natural Void))
 (define (emit-program name type code* d* body mem-limit)
@@ -51,37 +66,65 @@
 
 (: init-mem (Natural -> Void))
 (define (init-mem n)
-  (let ([s (number->string n)])
-    (display "free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
-    (display s)
-    (display "), alloc_ptr);")
-    (display "limit = free_ptr + ")
-    (display s)
-    (display ";\n")
-    (display "allocd_mem = 0;\n")))
+  (printf
+   "free_ptr = (int64_t)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);\n" n)
+  (printf "limit = free_ptr + ~a;\n" n)
+  (display "allocd_mem = 0;\n"))
 
-(define timer-boiler-plate
-  (concat-string-literal
-   "//This is the global state for the timer\n"
-   "struct timeval timer_start_time;\n"
-   "struct timeval timer_stop_time;\n"
-   "struct timeval timer_result_time;\n"
-   "int timer_started = 1;\n"
-   "int timer_stopped = 1;\n\n"
-   "void timer_report(){\n\n"
-   "    // some very minor error checking\n"
-   "    if(timer_started){\n"
-   "        printf(\"error starting timer\");\n"
-   "        exit(-1);\n"
-   "    }\n"
-   "    if(timer_stopped){\n"
-   "        printf(\"error stopping timer\");\n"
-   "        exit(-1);\n"
-   "    }\n\n"
-   "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);\n"
-   "double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);\n"
-   "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
-   "}\n"))
+(define-values (timer-start timer-stop timer-report timer-boiler-plate)
+  (cond
+   [(timer-uses-process-time?)
+    (values
+     "timer_started = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_start_time)"
+     "timer_stopped = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_stop_time)"
+     "timer_report()"
+     (concat-string-literal
+     "//This is the global state for the timer\n"
+     "struct timespec timer_start_time;\n"
+     "struct timespec timer_stop_time;\n"
+     "struct timespec timer_result_time;\n"
+     "int timer_started = 1;\n"
+     "int timer_stopped = 1;\n\n"
+     "void timer_report(){\n\n"
+     "    // some very minor error checking\n"
+     "    if(timer_started){\n"
+     "        printf(\"error starting timer\");\n"
+     "        exit(-1);\n"
+     "    }\n"
+     "    if(timer_stopped){\n"
+     "        printf(\"error stopping timer\");\n"
+     "        exit(-1);\n"
+     "    }\n\n"
+     "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_nsec / 1.0e9);\n"
+     "double t2 = timer_stop_time.tv_sec  + (timer_stop_time.tv_nsec  / 1.0e9);\n"
+     "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+     "}\n"))]
+   [else
+    (values
+     "timer_started = gettimeofday(&timer_start_time, NULL)"
+     "timer_stopped = gettimeofday(&timer_stop_time, NULL)"
+     "timer_report()"
+     (concat-string-literal
+       "//This is the global state for the timer\n"
+       "struct timeval timer_start_time;\n"
+       "struct timeval timer_stop_time;\n"
+       "struct timeval timer_result_time;\n"
+       "int timer_started = 1;\n"
+       "int timer_stopped = 1;\n\n"
+       "void timer_report(){\n\n"
+       "    // some very minor error checking\n"
+       "    if(timer_started){\n"
+       "        printf(\"error starting timer\");\n"
+       "        exit(-1);\n"
+       "    }\n"
+       "    if(timer_stopped){\n"
+       "        printf(\"error stopping timer\");\n"
+       "        exit(-1);\n"
+       "    }\n\n"
+       "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1.0e6);\n"
+       "double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1.0e6);\n"
+       "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+       "}\n"))]))
 
 
 (define (emit-source-comment name type)
@@ -90,19 +133,19 @@
 (: emit-alloc (Natural -> Void))
 (define (emit-alloc n)
   (let ([s (number->string n)])
-    (display "long alloc(int n){")
-    (display "    long result = free_ptr;")
-    (display "    long newFree = result + n;")
-    (display "    allocd_mem+=n;")
+    (display "int64_t alloc(int n){")
+    (display "    int64_t result = free_ptr;")
+    (display "    int64_t newFree = result + n;")
+    (display "    allocd_mem += n;")
     (display "    if (newFree >= limit){")
-    (display "        printf(\"Requesting more memory\\n\");")
-    (display "          free_ptr = (long)(posix_memalign(&alloc_ptr, 8, ")
-    (display s)
-    (display "), alloc_ptr);")
-    (display "          limit = free_ptr + ")
-    (display s)
-    (display ";")
-    (display "          return alloc (n);")
+    (display "        puts(\"Requesting more memory\\n\");")
+    (printf  "        free_ptr = (int64_t)(posix_memalign(&alloc_ptr, 8, ~a), alloc_ptr);" s)
+    (display "        if (free_ptr == (int64_t)NULL){\n")
+    (display "           fputs(\"couldn't allocate any more memory\", stderr);\n")
+    (printf  "           exit(~a);" ERROR-OUT-OF-MEMORY)
+    (display "        }\n")
+    (printf  "        limit = free_ptr + ~a;" s)
+    (display "        return alloc (n);")
     (display "    }")
     (display "    free_ptr = newFree;")
     (display "    return result;")
@@ -114,7 +157,10 @@
   (for ([i : String C-INCLUDES])
     (display "#include <") (display i) (display ">\n"))
   (newline)
-  (display "void* alloc_ptr;\nlong free_ptr;\nlong limit;\nunsigned long allocd_mem;\n\n")
+  (for ([d : String C-DECLARATIONS])
+    (display d)
+    (newline))
+  (display "void* alloc_ptr;\nint64_t free_ptr;\nint64_t limit;\nint64_t allocd_mem;\n\n")
   (emit-alloc n)
   (newline)
   (display timer-boiler-plate)
@@ -219,7 +265,7 @@
             (newline))]
     [(Return e)
      (if (Success? e)
-         (display "return 0;")
+         (display "return EXIT_SUCCESS;")
          (begin
            (display "return ")
            (emit-value e)
@@ -246,7 +292,7 @@
     [(Halt)           (display "exit(-1),-1")]
     [(Code-Label i)  (begin
                        (display "((")
-                       (display "long)")
+                       (display "int64_t)")
                        (display (uid->string i))
                        (display ")"))]
     [other   (error 'generate-c-emit-value-match)]))
@@ -265,7 +311,7 @@
             (emit-begin a (void))
             (display "}")
             (newline))]
-    [(Repeat i st sp (Begin e* _))
+    [(Repeat i st sp #f #f (Begin e* _))
      (begin (display "for(")
             (display (uid->string i))
             (display " = ")
@@ -277,7 +323,7 @@
             (display " ; ")
             (display (uid->string i))
             (display " += 1 ) {\n")
-            (display "__asm__(\"\");")
+            ;;(display "__asm__(\"\");")
             (emit-begin e* (void))
             (display "}\n"))]
     [(Op p exp*)
@@ -294,14 +340,14 @@
   (match* (p exp*)
     ;;[('Exit '()) (display C-EXIT)]
     [('Array-set! (list a o v)) (begin
-                                  (emit-wrap (display "(long*)")
+                                  (emit-wrap (display "(int64_t*)")
                                              (emit-value a))
                                   (display "[")
                                   (emit-value o)
                                   (display "] = ")
                                   (emit-value v))]
     [('Array-ref (list a o)) (begin
-                               (emit-wrap (display "(long*)")
+                               (emit-wrap (display "(int64_t*)")
                                           (emit-value a))
                                (display "[")
                                (emit-value o)
@@ -317,12 +363,10 @@
                                 (emit-value exp)
                                 (display ")"))]
     [('Exit (list exp)) (begin (display "exit") (emit-wrap (emit-value exp)))]
-    [('timer-start (list))
-     (display "timer_started = gettimeofday(&timer_start_time, NULL)")]
-    [('timer-stop  (list))
-     (display "timer_stopped = gettimeofday(&timer_stop_time, NULL)")]
-    [('timer-report (list))
-     (display "timer_report()")]
+    [('timer-start (list)) (display timer-start)]
+    [('timer-stop  (list)) (display timer-stop)]
+    [('timer-report (list)) (display timer-report)]
+    [('read-int (list)) (display "read_int()")]
     [(p (list exp1 exp2))
      (emit-wrap
       (emit-value exp1)
@@ -332,6 +376,7 @@
         [(%>>) (display " >> ")]
         [(%<<) (display " << ")]
         [(%/) (display " / ")]
+        [(%%) (display " % ")]
         [(binary-and) (display " & ")]
         [(binary-or)  (display " | ")]
         [(binary-xor) (display " ^ ")]

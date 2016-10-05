@@ -40,8 +40,8 @@ Provide comments about where to find definitions of types and data
           "../language/schml0.rkt"
           "../language/schml1.rkt"))
 
-(: type-check (Schml0-Lang Config . -> . Schml1-Lang))
-(define (type-check prgm config)
+(: type-check (Schml0-Lang . -> . Schml1-Lang))
+(define (type-check prgm)
   (match-let ([(Prog (list name next-uid) exp) prgm])
     (let-values ([(exp type) (tc-expr exp (hash))])
       (Prog (list name next-uid type) exp))))
@@ -71,6 +71,20 @@ The type rules for core forms that have interesting type rules
     [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
     [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
     [else (raise-lambda-inconsistent src t-body return-ann)]))
+
+(: tuple-type-rule (Schml-Type* -> Schml-Type))
+(define (tuple-type-rule t*)
+  (STuple (length t*) t*))
+
+(: tuple-proj-type-rule (Schml-Type Integer -> Schml-Type))
+(define (tuple-proj-type-rule ty i)
+  (match ty
+    [(Dyn) DYN-TYPE]
+    [(STuple l t*)
+     (cond
+       [(< i l) (list-ref t* i)]
+       [else (error 'schml "type error: tuple index out of bounds")])]
+    [otherwise (error 'schml/type-check/tuple-proj-type-rule "internal error")]))
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
@@ -133,12 +147,22 @@ The type rules for core forms that have interesting type rules
 (: begin-type-rule (-> Schml-Type* Schml-Type Schml-Type))
 (define (begin-type-rule t* ty) ty)
 
-(: repeat-type-rule (Schml-Type Schml-Type Schml-Type -> Schml-Type))
-(define (repeat-type-rule tstart tstop teffect)
+(: repeat-type-rule (Schml-Type Schml-Type Schml-Type Schml-Type -> Schml-Type))
+(define (repeat-type-rule tstart tstop tacc tbody)
   (cond
-    [(not (consistent? tstart INT-TYPE)) (TODO error message we tstart not int)]
-    [(not (consistent? tstop INT-TYPE)) (TODO error message when tstop not INT)]
-    [else UNIT-TYPE]))
+    [(not (consistent? tstart INT-TYPE))
+     (error 'type-check/repeat-type-rule
+            "Index initialization must be consistent with Int, actual type: ~a"
+            tstart)]
+    [(not (consistent? tstop INT-TYPE))
+     (error 'type-check/repeat-type-rule
+            "Index limit must be consistent with Int, actual type: ~a"
+            tstop)]
+    [(not (consistent? tacc tbody))
+     (error 'type-check/repeat-type-rule
+            "Accumulator and body inconsistent with types:\n accumulator: ~a\n body: ~a"
+            tacc tbody)]
+    [else tacc]))
 
 ;; The type of wrapping a value in a gaurded box is a
 ;; Gref of the value's type
@@ -153,17 +177,23 @@ The type rules for core forms that have interesting type rules
   (match ty
     [(Dyn) DYN-TYPE]
     [(GRef g) g]
-    [otherwise (TODO raise an appropriate error here)]))
+    [otherwise (error 'type-check/todo)]))
 
 ;; The type of setting a reference is always unit
 (: gbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
 (define (gbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) UNIT-TYPE]
-    [(GRef g) (if (consistent? g val-ty)
-                  UNIT-TYPE
-                  (TODO raise an error about type inconsistency between g and val-ty))]
-    [otherwise (TODO raise an error about box-type being type-incorrect)]))
+    [(GRef g)
+     (if (consistent? g val-ty)
+         UNIT-TYPE
+         (error 'type-error
+                "incompatible types in guarded assignment: ~a ~a"
+                g val-ty))]
+    [otherwise
+     (error 'type-error
+            "attempt to make guarded box assignment to non guarded box: ~a"
+            box-ty)]))
 
 ;; The type of wrapping a value in a monotonic box is a
 ;; MRef of the value's type
@@ -177,8 +207,8 @@ The type rules for core forms that have interesting type rules
 (define (munbox-type-rule ty)
   (match ty
     [(Dyn) DYN-TYPE]
-    [(MRef t) t]
-    [otherwise (TODO raise an error about there a type error here)]))
+    [(MRef m) m]
+    [otherwise (error 'type-error "attempt to unbox non-monotonic box: ~a" ty)]))
 
 ;; The type of setting a dyn value is dyn
 ;; The type of setting a MRef value is the type of the argument
@@ -186,10 +216,10 @@ The type rules for core forms that have interesting type rules
 (define (mbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) DYN-TYPE]
-    [(MRef t) (if (consistent? t val-ty)
+    [(MRef m) (if (consistent? m val-ty)
                   UNIT-TYPE
-                  (TODO raise an error about type inconsistency between m and val-ty))]
-    [otherwise (TODO raise an error about box-type beinm type-incorrect)]))
+                  (error 'type-check/todo))]
+    [otherwise (error 'type-check/todo)]))
 
 (: mbox-val-type (-> Schml-Type Schml-Type))
 (define (mbox-val-type box-ty)
@@ -204,7 +234,7 @@ The type rules for core forms that have interesting type rules
 (define (gvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (GVect init-ty)
-      (TODO come up with an error for being inconsistent with int here)))
+      (error 'type-check/todo)))
 
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
@@ -215,8 +245,8 @@ The type rules for core forms that have interesting type rules
       (match vect-ty
         [(Dyn) DYN-TYPE]
         [(GVect g) g]
-        [otherwise (TODO raise inconsistent with GVECT 'a here)])
-      (TODO raise inconsistent with INT here)))
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 ;; The type of setting a guarded vector of type T is the type of
 ;; The new value as long as the new value is consistent with the old value
@@ -228,12 +258,12 @@ The type rules for core forms that have interesting type rules
 (define (gvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
-        [(Dyn) DYN-TYPE]
+        [(Dyn) UNIT-TYPE]
         [(GVect g) (if (consistent? g val-ty)
                        UNIT-TYPE
-                       (TODO raise a error about consistency between g and val-ty))]
-        [otherwise (TODO raise an error about consistency between (Gvect val-ty))])
-      (TODO raise an error about consistency between index-ty and int)))
+                       (error 'type-check/todo))]
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 
 ;; The type of creating an array is Vect of the type of the initializing argument
@@ -242,7 +272,7 @@ The type rules for core forms that have interesting type rules
 (define (mvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (MVect init-ty)
-      (TODO come up with an error for being inconsistent with int here)))
+      (error 'type-check/todo)))
 
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
@@ -252,9 +282,9 @@ The type rules for core forms that have interesting type rules
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
         [(Dyn) DYN-TYPE]
-        [(MVect t) t]
-        [otherwise (TODO raise inconsistent with MVECT 'a here)])
-      (TODO raise inconsistent with INT here)))
+        [(MVect g) g]
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 ;; The type of setting a monotonic vector of type T is the type of
 ;; The new value as long as the new value is consistent with the old value
@@ -267,9 +297,9 @@ The type rules for core forms that have interesting type rules
         [(Dyn) DYN-TYPE]
         [(MVect g) (if (consistent? g val-ty)
                        UNIT-TYPE
-                       (TODO raise a error about consistency between g and val-ty))]
-        [otherwise (TODO raise an error about consistency between (Mvect val-ty))])
-      (TODO raise an error about consistency between index-ty and int)))
+                       (error 'type-check/todo))]
+        [otherwise (error 'type-check/todo)])
+      (error 'type-check/todo)))
 
 (: mvector-val-type (-> Schml-Type Schml-Type))
 (define (mvector-val-type vect-ty)
@@ -318,12 +348,15 @@ The type rules for core forms that have interesting type rules
 		    (values (Ann (Var id) (cons src ty)) ty))]
 	[(Quote lit) (let* ([ty (const-type-rule lit)])
 		       (values (Ann (Quote lit) (cons src ty)) ty))]
-        [(Repeat id start stop eff)
+        [(Repeat index start stop (Ann acc type?) acc-init exp)
          (let*-values ([(start tstart) (recur start)]
                        [(stop  tstop)  (recur stop)]
-                       [(eff   teff)   (tc-expr eff (hash-set env id INT-TYPE))]
-                       [(ty) (repeat-type-rule tstart tstop teff)])
-           (values (Ann (Repeat id start stop eff) (cons src ty)) ty))]
+                       [(acc-init tacc-init) (recur acc-init)]
+                       [(tacc) (let-binding-type-rule type? tacc-init acc src)]
+                       [(exp texp) (tc-expr exp (hash-set (hash-set env index INT-TYPE)
+                                                          acc tacc))]
+                       [(ty) (repeat-type-rule tstart tstop tacc texp)])
+           (values (Ann (Repeat index start stop acc acc-init exp) (cons src ty)) ty))]
         [(Begin e* e)
          (let*-values ([(e  t1) (recur e)]
                        [(e* t*) (map-recur e*)]
@@ -388,7 +421,15 @@ The type rules for core forms that have interesting type rules
                        [(e3 t3) (recur e3)]
                        [(ty)    (mvector-set!-type-rule t1 t2 t3)]
                        [(T)     (mvector-val-type t1)])
-           (values (Ann (if (completely-static-type? T) (Mvector-set! e1 e2 e3) (Mvector-set!T e1 e2 e3 T)) (cons src ty)) ty))])))
+           (values (Ann (if (completely-static-type? T) (Mvector-set! e1 e2 e3) (Mvector-set!T e1 e2 e3 T)) (cons src ty)) ty))]
+        [(Create-tuple e*)
+         (let*-values ([(e* t*) (map-recur e*)]
+                       [(ty)    (tuple-type-rule t*)])
+           (values (Ann (Create-tuple e*) (cons src ty)) ty))]
+        [(Tuple-proj e i)
+         (let*-values ([(e1 t) (recur e)]
+                       [(ty)    (tuple-proj-type-rule t i)])
+           (values (Ann (Tuple-proj e1 i) (cons src ty)) ty))])))
   (recur exp))
 
 (: tc-lambda (-> Schml-Fml* Schml-Type? S0-Expr Src Env
