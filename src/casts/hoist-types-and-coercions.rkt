@@ -349,6 +349,11 @@
        (Var i)]
       [(If (app recur t) (app recur c) (app recur a))
        (If t c a)]
+      [(Switch e c* d)
+       (: recur-case : (Switch-Case CoC3-Expr) -> (Switch-Case L0-Expr))
+       (define/match (recur-case c)
+         [((cons l r)) (cons l (recur r))])
+       (Switch (recur e) (map recur-case c*) (recur d))]
       [(Begin (app recur* e*) (app recur e))
        (Begin e* e)]
       [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))

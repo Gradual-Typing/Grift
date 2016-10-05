@@ -27,7 +27,8 @@
 	  (App E (Listof E))
 	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
-	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
+          (Switch E (Switch-Case* E) E)
+          (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
           (Begin C0-Expr* E)
           (Repeat Uid E E Uid E E)
           ;; Guarded effects

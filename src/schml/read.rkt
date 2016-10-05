@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang racket/base
 #|------------------------------------------------------------------------------+
 |Pass: src/read                                                                 |
 +-------------------------------------------------------------------------------+
@@ -8,62 +8,60 @@
 |the function read-syntax so that the source locations may be lifted from the
 |syntax-objects as we convert them to core forms.
 +------------------------------------------------------------------------------|#
-(require "../helpers.rkt"
-         "../errors.rkt" 
-         "../language/schml0.rkt"
+(require "../language/schml0.rkt"
+         "../logging.rkt"
          racket/path)
 
-(provide (all-from-out "../language/schml0.rkt")
-         read)
+(provide read)
 
 #|
 Function: get-name-of-file
 This helper function called by read extracts a file name from a path.
 |#
-(define (get-name-of-file [p : Path]) : String
+(define (get-name-of-file p)
   (let ([maybe-name (file-name-from-path p)])
     (if maybe-name
 	(path->string maybe-name)
-	(raise-file-name-exn p))))
+	(error 'schml "expected path to file: ~a" p))))
 
 #|
 Function: get-reader
 This helper function called by read-syntax-from-file creates a syntax-reader
 that annotates the syntax with source location and file name.
 |#
-(define (get-reader [name : String]) : (Input-Port -> (U Stx EOF))
-  (lambda ([p : Input-Port]) : (U Stx EOF)
-     (cast (read-syntax name p) (U Stx EOF))))
+;; string -> input-port -> syntax
+(define ((get-reader name) p) 
+  (read-syntax name p))
 
 #|
 Function: read-syntax-from-file
 This helper function called by read collects all syntax in a file and returns
 it as a list.
 |#
-(: read-syntax-from-file (Path String . -> . (Listof Stx)))
-(define (read-syntax-from-file [path : Path] [name : String]) : (Listof Stx)
-  (call-with-input-file path
-    (lambda ([p : Input-Port])
-      (let ((read (get-reader name)))
-	(letrec ([loop : ((U Stx EOF) -> (Listof Stx)) 
-		  (lambda ([stx : (U Stx EOF)])
-		    (if (eof-object? stx)
-			'()
-			(cons stx (loop (read p)))))])
-	  (loop (read p)))))
-    #:mode 'text))
+;(: read-syntax-from-file (Path String . -> . (Listof (Syntaxof Any))))
+(define (read-syntax-from-file path name)
+  (call-with-input-file path #:mode 'text
+    (lambda (p) (read-syntax-from-port p name))))
+
+(define (read-syntax-from-port port name)
+  (let ((read (get-reader name)))
+    (let loop ([stx (read port)])
+      (if (eof-object? stx)
+          '()
+          (cons stx (loop (read port)))))))
 
 
 #|
 Pass: read
-Collects the syntax from a file and returns it a Stx-Prog ast.
+Collects the syntax from a file and returns it a Syntax-Prog ast.
 |#
-(: read (Path . -> . Syntax-Lang))
+;(: read (Path . -> . Syntax-Lang))
 (define (read path)
   (parameterize
       ;; The following parameters change what the reader is willing
       ;; to accept as input.
-      ([read-case-sensitive #t]
+      ([port-count-lines-enabled #t]
+       [read-case-sensitive #t]
        [read-square-bracket-as-paren #t]
        [read-curly-brace-as-paren #t]
        [read-accept-box #f]
@@ -76,8 +74,8 @@ Collects the syntax from a file and returns it a Stx-Prog ast.
        [read-accept-quasiquote #f]
        [read-accept-reader #f]
        [read-accept-lang #f])
-    (let ([name : String (get-name-of-file path)])
-      (Prog name (read-syntax-from-file path name)))))
+    (let ([name (get-name-of-file path)])
+      (debug path (Prog name (read-syntax-from-file path name))))))
 
 
 

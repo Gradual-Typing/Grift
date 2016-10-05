@@ -21,6 +21,7 @@
             (UIL-Op! E)
             (UIL-Op E)
 	    (If E E E)
+            (Switch E (Switch-Case* E) E)
 	    (Begin D0-Expr* E)
             (Repeat Uid E E Uid E E)
 	    (Var Uid)

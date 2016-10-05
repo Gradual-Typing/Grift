@@ -847,6 +847,8 @@ but a static single assignment is implicitly maintained.
            (Begin a* (recur/env e env cenv)))]
         [(If (app recur t) (app recur c) (app recur a))
          (If t c a)]
+        [(Switch e c* d)
+         (Switch (recur e) (map-switch-case* recur c*) (recur d))]
         [(Op p (app recur* e*))
          (cond
            [(uil-prim-value? p) (Op p e*)]

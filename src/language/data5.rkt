@@ -22,6 +22,7 @@
 (define-type D5-Tail
   (Rec T
    (U (If D5-Pred T T)
+      (Switch D5-Trivial (Switch-Case* T) T)
       (Begin D5-Effect* T)
       (Return D5-Value)
       (Return Success))))
@@ -33,7 +34,9 @@
       (U 
        (Repeat Uid D5-Trivial D5-Trivial #f #f (Begin D5-Effect* No-Op))
        (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
-       
+       (Switch D5-Trivial
+               (Switch-Case* (Begin D5-Effect* No-Op))
+               (Begin D5-Effect* No-Op))
        (UIL-Op! D5-Trivial)
          (Assign Uid D5-Value)
          No-Op)))

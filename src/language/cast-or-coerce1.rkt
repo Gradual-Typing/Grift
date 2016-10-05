@@ -20,6 +20,7 @@
           (App-Fn E (Listof E))
 	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
+          (Switch E (Switch-Case* E) E)
           ;; Terminals
           (Begin CoC1-Expr* E)
           (Repeat Uid E E Uid E E)
@@ -34,7 +35,6 @@
           (Fn-Coercion-Arg E E)
           (Fn-Coercion-Return E)
           ;; Casts with different ways of getting the same semantics
-
           (Interpreted-Cast E (Coercion E))
           (Interpreted-Cast E (Twosome E E E))
 	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))

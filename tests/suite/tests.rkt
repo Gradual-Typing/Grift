@@ -24,8 +24,16 @@
           "large/tests.rkt"))
 
 (define most-tests : Test
-  (test-suite "most tests"
-    core-tests box-tests vector-tests monobox-tests tuple-tests tool-tests program-tests))
+  (test-suite
+   "most tests"
+   tiny-tests
+   core-tests
+   box-tests
+   #;monobox-tests
+   vector-tests
+   tuple-tests
+   tool-tests
+   program-tests))
 
 (define all-tests : Test
   (test-suite "all tests"

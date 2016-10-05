@@ -83,27 +83,6 @@
                              (Tag Tag-Symbol)
                              (Type Schml-Type)
                              (Var Uid)))
-#|
-;(: trivial? (CoC3-Expr -> Boolean : Trivial))
-(define (trivial? x)
-  (or (Quote? x)
-      (Tag? x)
-      (Type? x)
-      (Var? x)))
-
-(: trivialize ((Box Nat) String CoC3-Expr CoC3-Bnd* ->
-               (Pair CoC3-Bnd* let$-Trivial)))
-(define (trivialize next s e b*)
-  (if (or (Quote? e) (Tag? e) (Type? e) (Var? e))
-      `(,b* . ,e)
-      (let ([u (unbox next)])
-        (set-box! next (add1 u))
-        ())
-      (bind-state
-       (uid-state s)
-       (lambda ([u : Uid])
-         : (State Nat (Pair CoC3-Bnd* (Var Uid)))
-         (return-state `(((,u . ,e) . ,b*) . ,(Var u)))))))
 
 ;; This is meant to help let$* which accumulates the list of
 ;; bindings backwards. This gives proper let* behavior
@@ -112,7 +91,6 @@
   (if (null? b*)
       b
       (let$*-help (cdr b*) (Let (list (car b*)) b))))
-|#
 
 (: make-trivialize :
    (String -> Uid)
@@ -149,17 +127,6 @@
             (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
               (let ([body : CoC3-Expr b])
                 (let$*-help b* body))))])))))
-
-#|
-(do (bind-state : (State Nat CoC3-Expr))
-    ((cons b* t*) : (Pair CoC3-Bnd* CoC3-Trivial)
-     <- (trivialize (~a 't*) v* b*)) ...
-     (b^ : CoC3-Expr <- b)
-     (if (null? b*)
-         (return-state b^)
-         (return-state (let$*-help b* b^))))|#
-
-
 
 ;; performs compile time folding of prim = on literals
 ;; todo convert this to using eq-huh
@@ -242,7 +209,7 @@
   (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh?))
 
 (define (mediating-crcn? x)
-  (or (CTuple? x) (Ref? x) (Fn? x)))
+  (or (CTuple? x) (Ref? x) (Fn? x) (MonoRef? x)))
 
 (define-syntax-rule
   (define-smart-access (name check kuote compile-time run-time) ...)

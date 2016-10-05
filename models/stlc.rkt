@@ -1,8 +1,7 @@
 #lang racket
 
 (require redex
-         "helpers.rkt"
-         "base.rkt")
+         "helpers.rkt")
 
 (module+ test
   ;; Make sure that we test the entire stack of languages
@@ -22,9 +21,9 @@
  ;; (=α/racket t1 t2) racket function
  ;; is t1 alpha equivalent to t2? 
  =α/racket
- ;; (⊢ ((xs τs) ...) e τ) : Judgement (⊢ I I O)
- ;; from the environment, ((xs τs) ...), we can infer that expression
- ;; e is of type τ.
+ ;; (⊢ ((xs Ts) ...) e T) : Judgement (⊢ I I O)
+ ;; from the environment, ((xs Ts) ...), we can infer that expression
+ ;; e is of type T.
  ⊢
  ;; Reduction relation for the calculus
  -->β
@@ -33,22 +32,26 @@
  ;; (tyop o) what is the type of o.
  tyop)
 
-(define-extended-language STLC BASE
+(define-language STLC
   ;; Things that should definately not be included in the grammar
   ;; if produced as a pic or pdf
   (x ::= variable-not-otherwise-mentioned)
+  (i ::= integer)
+  (b ::= boolean)
+  (k ::= i   b    ())
+  (B ::= Int Bool ())
   ;; End things that must not be named 
   (e   ::= k x f
-           (letrec ([x_!_ : τ f] ...) e)
-           (let ([x_!_ : τ e] ...) e)
+           (letrec ([x_!_ : T f] ...) e)
+           (let ([x_!_ : T e] ...) e)
            (o e ...)
            (e e ...)
            (if e e e))
-  (f ::= (lambda ([x_!_ : τ] ...) e))
+  (f ::= (lambda ([x_!_ : T] ...) e))
   ;;
   (o ::= + - * =)
   ;; Types
-  (τ ::= ι (τ ... -> τ)))
+  (T ::= B (T ... -> T)))
 
 ;;———————————————————————————————————————————————————–———————————————————–——————
 ;; Scope helpers
@@ -143,12 +146,12 @@
 
 ;; sd convert regular bindings
 (define-extended-language STLCΔ STLC
-  (τ ::= any)
+  (T ::= any)
   (e ::= any)
   (m ::= e (K n n)
-         (letrec ([τ f] ...) m)
-         (let ([τ m] ...) m))
-  (f ::= (lambda (τ ...) m))
+         (letrec ([T f] ...) m)
+         (let ([T m] ...) m))
+  (f ::= (lambda (T ...) m))
   (n ::= natural)
   (Γ ::= ((x ...) ...)))
 
@@ -165,13 +168,13 @@
       ,(length (term (x_2 ...))))
    (where #f (in x (x_1 ... ...)))]
   [(sd/env x _) x]
-  [(sd/env (lambda ([x_n : τ_n] ...) m) ((x ...) ...))
-   (lambda (τ_n ...) (sd/env m ((x_n ...) (x ...) ...)))]
-  [(sd/env (letrec ([x : τ f] ...) e) (any_1 ...))
-   (letrec ([τ (sd/env f ((x ...) any_1 ...))] ...)
+  [(sd/env (lambda ([x_n : T_n] ...) m) ((x ...) ...))
+   (lambda (T_n ...) (sd/env m ((x_n ...) (x ...) ...)))]
+  [(sd/env (letrec ([x : T f] ...) e) (any_1 ...))
+   (letrec ([T (sd/env f ((x ...) any_1 ...))] ...)
      (sd/env e ((x ...) any_1 ...)))]
-  [(sd/env (let ([x : τ m_rhs] ...) m_body) (any_1 ...))
-   (let([τ (sd/env m_rhs ((x ...) any_1 ...))] ...)
+  [(sd/env (let ([x : T m_rhs] ...) m_body) (any_1 ...))
+   (let([T (sd/env m_rhs ((x ...) any_1 ...))] ...)
      (sd/env m_body ((x ...) any_1 ...)))]
   [(sd/env (m ...) Γ) ((sd/env m Γ) ...)]
   [(sd/env e Γ) e])
@@ -291,46 +294,59 @@
 (define-extended-language STLC/tc STLC
   (Γ  ::= ((x any) ...)))
 
+
+(define-judgment-form STLC
+  #:mode (⊢_k I O)
+  #:contract (⊢_k k B)
+  [----------------------- "⊢ₖUnit"
+   (⊢_k () ())]
+  
+  [----------------------- "⊢ₖBool"
+   (⊢_k b Bool)]
+  
+  [----------------------- "⊢ₖInt"
+   (⊢_k i Int)])
+
 (define-judgment-form STLC/tc
   #:mode (⊢ I I O)
-  ;;#:contract (⊢ Γ e τ)
-  [(where (some τ) (lookup Γ x))
+  ;;#:contract (⊢ Γ e T)
+  [(where (some T) (lookup Γ x))
    ------------------------ "λvar"
-   (⊢ Γ x τ)]
-  [(⊢_k k ι)
+   (⊢ Γ x T)]
+  [(⊢_k k B)
    ------------------------ "⊢base"
-   (⊢ Γ k ι)]
-  [(where Γ_new (extend Γ ((x_m τ_n) ...)))
-   (⊢ Γ_new e τ_r)
+   (⊢ Γ k B)]
+  [(where Γ_new (extend Γ ((x_m T_n) ...)))
+   (⊢ Γ_new e T_r)
    ------------------------ "λlam"
-   (⊢ Γ (lambda ([x_m : τ_n] ...) e) (τ_n ... -> τ_r))]
+   (⊢ Γ (lambda ([x_m : T_n] ...) e) (T_n ... -> T_r))]
 
-  [(where Γ_new (extend Γ ((x_n τ_n) ...)))
-   (⊢ Γ_new e_body τ_body)
-   (⊢ Γ_new f_n τ_n) ...
+  [(where Γ_new (extend Γ ((x_n T_n) ...)))
+   (⊢ Γ_new e_body T_body)
+   (⊢ Γ_new f_n T_n) ...
    ------------------------ "λletrec"
-   (⊢ Γ (letrec ([x_n : τ_n f_n] ...) e_body) τ_body)]
+   (⊢ Γ (letrec ([x_n : T_n f_n] ...) e_body) T_body)]
   
-  [(where Γ_new (extend Γ ((x_n τ_n) ...)))
-   (⊢ Γ_new e_body τ_body)
-   (⊢ Γ e_n τ_n) ...
+  [(where Γ_new (extend Γ ((x_n T_n) ...)))
+   (⊢ Γ_new e_body T_body)
+   (⊢ Γ e_n T_n) ...
    ------------------------ "λlet"
-   (⊢ Γ (let ([x_n : τ_n e_n] ...) e_body) τ_body)]
+   (⊢ Γ (let ([x_n : T_n e_n] ...) e_body) T_body)]
 
-  [(⊢ Γ e_0 (τ_1 ..._n -> τ_r))
-   (⊢ Γ e_1 τ_1) ...
+  [(⊢ Γ e_0 (T_1 ..._n -> T_r))
+   (⊢ Γ e_1 T_1) ...
    ------------------------ "λapp"
-   (⊢ Γ (e_0 e_1 ..._n) τ_r)]
-  [(where (τ ..._n -> τ_r) (tyop o))
-   (⊢ Γ e τ) ...
+   (⊢ Γ (e_0 e_1 ..._n) T_r)]
+  [(where (T ..._n -> T_r) (tyop o))
+   (⊢ Γ e T) ...
    ------------------------ "λop"
-   (⊢ Γ (o e ..._n) τ_r)]
-  [(⊢ Γ e_t Bool) (⊢ Γ e_c τ) (⊢ Γ e_a τ)
+   (⊢ Γ (o e ..._n) T_r)]
+  [(⊢ Γ e_t Bool) (⊢ Γ e_c T) (⊢ Γ e_a T)
    ------------------------ "λif"
-   (⊢ Γ (if e_t e_c e_a) τ)])
+   (⊢ Γ (if e_t e_c e_a) T)])
 
 (define-metafunction STLC
-  tyop : o -> τ
+  tyop : o -> T
   [(tyop +) (Int Int -> Int)]
   [(tyop -) (Int Int -> Int)]
   [(tyop *) (Int Int -> Int)]
@@ -383,8 +399,8 @@
 (module+ test
 
   (test-true (redex-match? STLC/tc Γ '()))
-  (test-true (redex-match? STLC/tc (lambda ([x_m : τ_n] ...) e) fst0))
-  (test-true (redex-match? STLC/tc τ (term (() -> (() -> ())))))
+  (test-true (redex-match? STLC/tc (lambda ([x_m : T_n] ...) e) fst0))
+  (test-true (redex-match? STLC/tc T (term (() -> (() -> ())))))
   (test-true (judgment-holds (⊢ ((x ())) x ())))
   (test-true (judgment-holds (⊢ () ,fst0  (() -> (() -> ())))))
   (test-true (judgment-holds (⊢ () ,fst1  (() -> (() -> ())))))
@@ -404,21 +420,21 @@
 ;; The simply typed lambda calculus
 
 (define-extended-language STLC-> STLC
-  (v ::= i b () (lambda ([x_!_ : τ] ...) e))
+  (v ::= i b () (lambda ([x_!_ : T] ...) e))
   (C ::= hole
          (e ... C e ...)
          (o e ... C e ...)
          (if C e e)
          (if e C e)
          (if e e C)
-         (letrec ([x_1 : τ_1 f_1] ...
-                  [x : τ (lambda ([x_l : τ_l]) C)]
-                  [x_2 : τ_2 f_2] ...)
+         (letrec ([x_1 : T_1 f_1] ...
+                  [x : T (lambda ([x_l : T_l]) C)]
+                  [x_2 : T_2 f_2] ...)
            e)
-         (letrec ([x : τ l] ...) C)
-         (let ([x_1 : τ_1 e_1] ... [x : τ C] [x_2 : τ_2 e_1] ...) e)
-         (let ([x : τ e] ...) C)
-         (lambda ((x : τ) ...) C)))
+         (letrec ([x : T l] ...) C)
+         (let ([x_1 : T_1 e_1] ... [x : T C] [x_2 : T_2 e_1] ...) e)
+         (let ([x : T e] ...) C)
+         (lambda ((x : T) ...) C)))
 
 (define f0  (term (lambda ([x : ()]) x)))
 (define ex1 (term (,f0 ())))
@@ -451,8 +467,8 @@
         (in-hole C (δ o v ...))
         δ)
    ;; Letrecs get unrolled by one loop
-   (--> (in-hole C (letrec ([x : τ f] ...) e))
-        (in-hole C (subst ([x (letrec ([x : τ f] ...) f)] ...) e))
+   (--> (in-hole C (letrec ([x : T f] ...) e))
+        (in-hole C (subst ([x (letrec ([x : T f] ...) f)] ...) e))
         μ)
    ;; Branching conditionals
    (--> (in-hole C (if #t e_c e_a))
@@ -489,7 +505,7 @@
   (reduction-relation
    STLC->cbv
    ;; Standard Beta for Call by Value 
-   (--> (in-hole E ((lambda ([x : τ] ..._n) e) v ..._n))
+   (--> (in-hole E ((lambda ([x : T] ..._n) e) v ..._n))
         (in-hole E (subst ((x v) ...) e))
         β)
    ;; Primitive operators are evaluated using the delta metafuntion
@@ -497,12 +513,12 @@
         (in-hole E (δ o v ...))
         δ)
    ;; Letrecs get unrolled by one loop
-   (--> (in-hole E (letrec ([x : (τ_1 ...n -> τ_2)
-                               (lambda ([x_a : τ_1] ...n) e_f)] ...)
+   (--> (in-hole E (letrec ([x : (T_1 ...n -> T_2)
+                               (lambda ([x_a : T_1] ...n) e_f)] ...)
                      e_b))
-        (in-hole E (subst ([x (letrec ([x : (τ_1 ... -> τ_2)
-                                          (lambda ([x_a : τ_1] ...) e_f)] ...)
-                                (lambda ([x_a : τ_1] ...) e_f))] ...)
+        (in-hole E (subst ([x (letrec ([x : (T_1 ... -> T_2)
+                                          (lambda ([x_a : T_1] ...) e_f)] ...)
+                                (lambda ([x_a : T_1] ...) e_f))] ...)
                           e_b))
         μ)
    ;; Branching conditionals

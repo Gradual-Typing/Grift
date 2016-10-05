@@ -84,6 +84,7 @@
           (Var Uid)
           ;; Controll Flow
           (If E E E)
+          (Switch E (Switch-Case* E) E)
           (Begin L1-Expr* E)
           (Repeat Uid E E Uid E E)
           ;;Primitives

@@ -20,42 +20,38 @@ becuse it is actually more of a stmt contexts itself.
 
 (require "../language/data3.rkt"
          "../language/data4.rkt"
-         "../language/make-begin.rkt"
+         (submod "../language/make-begin.rkt" typed)
          "../configuration.rkt"
          "../helpers.rkt")
 
 (provide flatten-values)
 (: flatten-values (Data3-Lang -> Data4-Lang))
 (define (flatten-values prog)
-  (match-let ([(Prog (list name next type) (GlobDecs d* (Labels bnd* body))) prog])
-    (let* ([next : (Boxof Nat) (box next)]
-           [body (fv-body next body)]
-           [bnd* (for/list : D4-Bnd-Code* #;(Listof ) ([b bnd*]) (fv-bnd-code next b)
-                           )]
-           [next : Nat (unbox next)])
-      (Prog (list name next type) (GlobDecs d* (Labels bnd* body))))))
+  (match-define (Prog (list n c t) (GlobDecs d* (Labels b* b))) prog)
+  (define uc (make-unique-counter c))
+  (define-values (bnd* body)
+    (parameterize ([current-unique-counter uc])
+      (let* ([body (fv-body b)]
+             [bnd* (map fv-bnd-code b*)])
+        (values bnd* body))))
+  (Prog (list n (unique-counter-next! uc) t) (GlobDecs d* (Labels bnd* body))))
 
 ;; Simple recursion into the body of code bindings
-(: fv-bnd-code ((Boxof Nat) D3-Bnd-Code -> D4-Bnd-Code))
-(define (fv-bnd-code next bnd)
-  (match-let ([(cons i (Code i* b)) bnd])
-    (let ([b : D4-Body (fv-body next b)])
-      (cons i (Code i* b)))))
+(: fv-bnd-code (D3-Bnd-Code -> D4-Bnd-Code))
+(define (fv-bnd-code bnd)
+  (match-define (cons i (Code i* b)) bnd)
+  (cons i (Code i* (fv-body b))))
 
 ;; Add new local variables to the declaration to each body
-(: fv-body ((Boxof Nat) D3-Body -> D4-Body))
-(define (fv-body next body)
-  (define loc* : (Boxof Uid*) (box '()))
-  
-  (: next-uid! (String -> Uid))
-  (define (next-uid! s)
-    (let* ([n (unbox next)]
-           [u* (unbox loc*)]
-           [u (Uid s n)])
-      (set-box! next (+ n 1))
-      (set-box! loc* (cons u u*))
-      u))
-  
+(: fv-body (D3-Body -> D4-Body))
+(define (fv-body body)
+  (match-define (Locals l* t) body)
+  (define new-locals : Uid* l*)
+  (: local-next-uid! (String -> Uid))
+  (define (local-next-uid! s)
+    (define u (next-uid! s))
+    (set! new-locals (cons u new-locals))
+    u)
   (: fv-tail (D3-Tail -> D4-Tail))
   (define (fv-tail tail)
     (match tail
@@ -64,6 +60,10 @@ becuse it is actually more of a stmt contexts itself.
              [c (fv-tail c)]
              [a (fv-tail a)])
          (If t c a))]
+      [(Switch t c* d)
+       ;; I Jumped the gun and flattened the expression during remove complex
+       ;; opera. perhaps we should combine the passes?
+       (Switch (fv-trivial t) (map-switch-case* fv-tail c*) (fv-tail d))]
       [(Begin e* v) (make-begin (fv-effect* e*) (fv-tail v))]
       [(Return v)
        (if (Success? v)
@@ -78,7 +78,8 @@ becuse it is actually more of a stmt contexts itself.
        (let ([t (fv-pred t)])
          (match-let ([(cons c* c) (fv-value c)]
                      [(cons a* a) (fv-value a)]
-                     [id (next-uid! "ifValue")])
+                     [id (local-next-uid! "ifValue"
+                          )])
            (let* ([ca : D4-Effect (Assign id c)]
                   [aa : D4-Effect (Assign id a)]
                   [cb : D4-Effect (make-begin (snoc c* ca) NO-OP)]
@@ -86,6 +87,15 @@ becuse it is actually more of a stmt contexts itself.
                   [e  : D4-Effect (If t cb ab)]
                   [v  : D4-Value  (Var id)])
              (cons (list e) v))))]
+      [(Switch t c* d)
+       (define u (local-next-uid! "tmp_fv"))
+       (define c*^
+         (for/list : (Switch-Case* D4-Effect) ([c c*])
+           (match-define (cons l (app fv-value (cons s* r))) c)
+           (cons l (make-begin (append s* (list (Assign u r))) NO-OP))))
+       (match-define (cons s* v) (fv-value d))
+       (define s (Switch t c*^ (make-begin (append s* (list (Assign u v))) NO-OP)))
+       (cons (list s) (Var u))]
       [(Begin e* v)
        (match-let ([(cons e*^ v) (fv-value v)])
          (cons (append (fv-effect* e*) e*^) v))]
@@ -103,6 +113,8 @@ becuse it is actually more of a stmt contexts itself.
              [c (fv-pred c)]
              [a (fv-pred a)])
          (If t c a))]
+      [(Switch t c* d)
+       (Switch t (map-switch-case* fv-pred c*) (fv-pred d))]
       [(Begin e* p) (Begin (fv-effect* e*) (fv-pred p))]
       [(Relop p t1 t2)
        (let ([t1 (fv-trivial t1)]
@@ -119,6 +131,8 @@ becuse it is actually more of a stmt contexts itself.
              [c (fv-effect c)]
              [a (fv-effect a)])
          (If t c a))]
+      [(Switch t c* a)
+       (Switch t (map-switch-case* fv-effect c*) (fv-effect a))]
       [(Begin e* _) (Begin (fv-effect* e*) NO-OP)]
       [(Repeat i t1 t2 #f #f e)
        (let ([t1 (fv-trivial t1)]
@@ -128,7 +142,7 @@ becuse it is actually more of a stmt contexts itself.
       [(App-Code t t*)
        (let ([t (fv-trivial t)]
              [t* (fv-trivial* t*)]
-             [u (next-uid! "unused_return")])
+             [u (local-next-uid! "unused_return")])
          (Assign u (App-Code t t*)))]
       [(Op p t*) (Op p (fv-trivial* t*))]
       [(No-Op) NO-OP]
@@ -147,21 +161,12 @@ becuse it is actually more of a stmt contexts itself.
       [(Op p t*) (Assign var (Op p (map fv-trivial t*)))]
       [(App-Code t t*)
        (Assign var (App-Code (fv-trivial t) (fv-trivial* t*)))]
-      [(If t c a)
-       (let ([t (fv-pred t)]
-             [c (simplify-assignment var c)]
-             [a (simplify-assignment var a)])
-         (If t c a))]
-      [(Begin e* v)
-       (let ([e* (fv-effect* e*)]
-             [e (simplify-assignment var v)])
-         (make-begin (snoc e* e) NO-OP))]
+      [(If t c a) (If (fv-pred t) (sa c) (sa a))]
+      [(Switch t c* d) (Switch (fv-trivial t) (map-switch-case* sa c*) (sa d))]
+      [(Begin e* v) (make-begin (snoc (fv-effect* e*) (sa v)) NO-OP)]
       [err (error 'simplify-assignment "unmatched datum ~a" err)]))
-
-  (match-let ([(Locals i* t) body])
-    (let ([t (fv-tail t)]
-          [x (append (unbox loc*) i*)])
-      (Locals x t))))
+  (define tail (fv-tail t))
+  (Locals new-locals tail))
 
 (: fv-trivial (D3-Trivial -> D4-Trivial))
 (define (fv-trivial triv)

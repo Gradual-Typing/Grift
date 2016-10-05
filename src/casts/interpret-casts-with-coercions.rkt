@@ -25,7 +25,7 @@ form, to the shortest branch of the cast tree that is relevant.
  racket/list
  racket/set
  (except-in  "../helpers.rkt" logging)
- "../logging.rkt"
+ (submod "../logging.rkt" typed)
  "../unique-identifiers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
@@ -383,22 +383,24 @@ form, to the shortest branch of the cast tree that is relevant.
                        (Coercion composed_crcn)))))
              (Guarded-Proxy val (Coercion crcn)))]
        [(mrefC?$ crcn)
-        (match-let ([(Var a) v])
-          (let$* ([t2 (mrefC-type$ crcn)])
-            (if$ (dyn?$ t2)
-                 v
-                 (let$* ([t1 (Mbox-rtti-ref a)]
-                         [t3 (glbt t1 t2)])
-                   (if$ (op=? t1 t3)
-                        v
-                        (let$* ([c (mk-crcn t1 t3 (Quote ""))]
-                                [cv (Mbox-val-ref v)]
-                                [cv_ (CastedValue cv (Coercion crcn))])
-                          (Begin
-                            (list
-                             (Mbox-val-set! v cv_)
-                             (Mbox-rtti-set! a t3))
-                            v)))))))]
+        (match val
+          [(Var a)
+           (let$* ([t2 (mrefC-type$ crcn)])
+             (if$ (dyn?$ t2)
+                  val
+                  (let$* ([t1 (Mbox-rtti-ref a)]
+                          [t3 (glbt t1 t2)])
+                    (if$ (op=? t1 t3)
+                         val
+                         (let$* ([c (mk-crcn t1 t3 (Quote ""))]
+                                 [cv (Mbox-val-ref val)]
+                                 [cv_ (CastedValue cv (Coercion crcn))])
+                           (Begin
+                             (list
+                              (Mbox-val-set! val cv_)
+                              (Mbox-rtti-set! a t3))
+                             val))))))]
+          [_ (error 'interp-cast/mrefC)])]
        [(tuple?$ crcn)
         (match crcn
           [(not (Quote-Coercion _)) (Coerce-Tuple cast-u val crcn)]
@@ -860,6 +862,11 @@ form, to the shortest branch of the cast tree that is relevant.
        (Blame (recur e))]
       [(If tst csq alt)
        (If (recur tst) (recur csq) (recur alt))]
+      [(Switch e c* d)
+       (: recur-case : (Switch-Case CoC1-Expr) -> (Switch-Case CoC3-Expr))
+       (define/match (recur-case c)
+         [((cons l r)) (cons l (recur r))])
+       (Switch (recur e) (map recur-case c*) (recur d))]
       [(Var i) (Var i)]
       [(Type t) (Type t)]
       [(Quote k) (Quote k)]

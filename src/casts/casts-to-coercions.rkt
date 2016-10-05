@@ -91,6 +91,8 @@ should be able to compile programs this the twosome casts for future comparison.
      (Op p (c2c-expr* exp*))]
     [(If tst csq alt)
      (If (c2c-expr tst) (c2c-expr csq) (c2c-expr alt))]
+    [(Switch e c* d)
+     (Switch (c2c-expr e) (map-switch-case* c2c-expr c*) (c2c-expr d))]
     [(Begin e* e)
      (Begin (c2c-expr* e*) (c2c-expr e))]
     [(Repeat i e1 e2 a e3 e4)

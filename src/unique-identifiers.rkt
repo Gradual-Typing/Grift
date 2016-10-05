@@ -37,6 +37,12 @@
 (define ((make-next-uid! uc) s)
   (Uid s (unique-counter-next! uc)))
 
+(: next-uid! (->* (String) (Unique-Counter) Uid))
+(define (next-uid! s [uc : (Option Unique-Counter) (current-unique-counter)])
+  (cond
+    [uc (Uid s (unique-counter-next! uc))]
+    [else (error 'next-uid "current-unique-counter isn't parameterized in the dynamic extent")]))
+
 ;; If you are in the state monad you can purely allocate and increment
 (define-type Nat Natural)
 (: uid-state (String -> (State Nat Uid)))

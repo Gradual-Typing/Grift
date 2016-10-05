@@ -16,7 +16,7 @@
          "../language/data0.rkt"
          "../language/data1.rkt"
          "../language/data-representation.rkt"
-         "../language/make-begin.rkt")
+         (submod "../language/make-begin.rkt" typed))
 
 ;; Only the pass is provided by this module
 (provide normalize-context
@@ -45,6 +45,8 @@
        (Let (nc-bnd* bnd*) (nc-tail tail))]
       [(If t c a)
        (If (nc-pred t) (nc-tail c) (nc-tail a))]
+      [(Switch e c* d)
+       (Switch (nc-value e) (map-switch-case* nc-tail c*) (nc-tail d))]
       [(Begin eff* exp)
        (Begin (nc-effect* eff*) (nc-tail exp))]
       [(Repeat i e1 e2 a e3 e4)
@@ -81,6 +83,8 @@
        (Let (nc-bnd* bnd*) (nc-value exp))]
       [(If t c a)
        (If (nc-pred t) (nc-value c) (nc-value a))]
+      [(Switch e c* d)
+       (Switch (nc-value e) (map-switch-case* nc-value c*) (nc-value d))]
       [(Begin eff* exp)
        (Begin (nc-effect* eff*) (nc-value exp))]
       [(Repeat i e1 e2 a e3 e4)
@@ -115,6 +119,8 @@
        (Let bnd* tail)]
       [(If (app nc-pred t) (app nc-effect c) (app nc-effect a))
        (If t c a)]
+      [(Switch e c* d)
+       (Switch (nc-value e) (map-switch-case* nc-effect c*) (nc-effect d))]
       [(Begin eff* exp)
        (Begin (append (nc-effect* eff*) (list (nc-effect exp))) NO-OP)]
       [(Repeat i e1 e2 a e3 e4)
@@ -143,6 +149,8 @@
        (nc-pred exp)]
       [(If (app nc-pred t) (app nc-pred c) (app nc-pred a))
        (If t c a)]
+      [(Switch e c* d)
+       (Switch (nc-value e) (map-switch-case* nc-pred c*) (nc-pred d))]
       [(Begin eff* exp)
        (Begin (nc-effect* eff*) (nc-pred exp))]
       [(Repeat i e1 e2 a e3 e4)

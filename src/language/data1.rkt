@@ -21,6 +21,7 @@
 (define-type D1-Tail
   (Rec T
    (U (If D1-Pred T T)
+      (Switch D1-Value (Switch-Case* T) T)
       (Begin D1-Effect* T)
       (App-Code D1-Value D1-Value*)
       (Op UIL-Expr-Prim D1-Value*)
@@ -32,30 +33,33 @@
 
 (define-type D1-Value
  (Rec V
-  (U (If D1-Pred V V)
-     (Begin D1-Effect* V)
-     (App-Code V (Listof V))
-     (Op UIL-Expr-Prim (Listof V))
-     Halt
-     (Var Uid)
-     (Code-Label Uid)
-     (Quote D1-Literal))))
+      (U (If D1-Pred V V)
+         (Switch V (Switch-Case* V) V)
+         (Begin D1-Effect* V)
+         (App-Code V (Listof V))
+         (Op UIL-Expr-Prim (Listof V))
+         Halt
+         (Var Uid)
+         (Code-Label Uid)
+         (Quote D1-Literal))))
 
 (define-type D1-Pred
  (Rec P
-  (U (If D1-Pred P P)
-     (Begin D1-Effect* P)
-     (Relop IxI->B-Prim D1-Value D1-Value))))
+      (U (If D1-Pred P P)
+         (Switch D1-Value (Switch-Case* P) P)
+         (Begin D1-Effect* P)
+         (Relop IxI->B-Prim D1-Value D1-Value))))
 
 (define-type D1-Effect
  (Rec E
-  (U (If D1-Pred E E)
-     (Begin D1-Effect* No-Op)
-     (Repeat Uid D1-Value D1-Value #f #f E)
-     (App-Code D1-Value D1-Value*)
-     (UIL-Op! D1-Value)
-     (Assign Uid D1-Value)
-     No-Op)))
+      (U (If D1-Pred E E)
+         (Switch D1-Value (Switch-Case* E) E)
+         (Begin D1-Effect* No-Op)
+         (Repeat Uid D1-Value D1-Value #f #f E)
+         (App-Code D1-Value D1-Value*)
+         (UIL-Op! D1-Value)
+         (Assign Uid D1-Value)
+         No-Op)))
 
 
 (define-type D1-Value* (Listof D1-Value))

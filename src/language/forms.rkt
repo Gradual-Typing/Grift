@@ -2,6 +2,7 @@
 
 (require "../helpers.rkt"
          "../unique-identifiers.rkt"
+         "../errors.rkt"
          (for-syntax racket/base)
          racket/match)
 
@@ -38,6 +39,8 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Top level wrapper for combining compiler
   ;; state, meta-information, and the program AST
   (Prog annotation expression)
+  ;; Top Level Forms
+  (Expression e)
   ;; Annotations that may be added to other AST nodes
   (Ann value data)
   ;; Function abstraction
@@ -58,6 +61,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (Let bindings body)
   ;; sequence operator
   (Begin effects value)
+  ;; Prim Multi-way branching
+  (Switch expr cases default)
   ;; Perform a No Operation
   (No-Op)
   ;; Effect operations
@@ -232,7 +237,21 @@ And a type constructor "name" expecting the types of field1 and field2
   |#
   )
 
+(define-type (Switch-Case  e) (Pair (Listof Integer) e))
+(define-type (Switch-Case* e) (Listof (Switch-Case e)))
+
+(: map-switch-case :
+   (All (A B) (A -> B) -> ((Switch-Case A) -> (Switch-Case B))))
+(define ((map-switch-case f) c)
+  (cons (car c) (f (cdr c))))
+
+(: map-switch-case* :
+   (All (A B) (A -> B) (Switch-Case* A) -> (Switch-Case* B)))
+(define (map-switch-case* f c*)
+  (map (map-switch-case f) c*))
+
 (define NO-OP (No-Op))
+
 
 
 (define-type Blame-Label String)
@@ -604,27 +623,140 @@ Dyn --> Dyn
 Dyn
 |#
 
-(: join (Schml-Type Schml-Type . -> . Schml-Type))
-(define (join t g)
-  (cond
-    [(Dyn? t) g] [(Dyn? g) t]
-    [(and (Unit? t) (Unit? g)) UNIT-TYPE]
-    [(and (Int? t) (Int? g)) INT-TYPE]
-    [(and (Bool? t) (Bool? g)) BOOL-TYPE]
-    [(and (Fn? t) (Fn? g) (= (Fn-arity t) (Fn-arity g)))
-     (Fn (Fn-arity t)
-         (map join (Fn-fmls t) (Fn-fmls g))
-         (join (Fn-ret t) (Fn-ret g)))]
-    [(and (STuple? t) (STuple? g) (= (STuple-num t) (STuple-num g)))
-     (STuple (STuple-num t)
-         (map join (STuple-items t) (STuple-items g)))]
-    [(and (GRef? t) (GRef? g))
-     (GRef (join (GRef-arg t) (GRef-arg g)))]
-    [(and (GVect? t) (GVect? g))
-     (join (GVect-arg t) (GVect-arg g))]
-    [(and (MRef? t) (MRef? g))
-     (join (MRef-arg t) (MRef-arg g))]
-    [else (error 'join "Types are not consistent")]))
+(struct Bottom ([t1 : Schml-Type] [t2 : Schml-Type]) #:transparent)
+(define-type Schml-Type?! (U Bottom Schml-Type))
+
+#;(: join+ (Schml-Type* -> Schml-Type?!))
+#;(define (join+ t+)
+  (match t+
+    [(list) (error 'join+ "needs non-empty list")]
+    [(list t) t]
+    [(cons t t+)
+     (let ([t?! (join+ t+)])
+       (if (Bottom? t?!)
+           t?!
+           (join t t?!)))]))
+
+(: up ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type)))
+(define ((up exit) t g)
+  (match* (t g)
+    [((Dyn) g)     g]
+    [(t     (Dyn)) t]
+    [(t     t)     t]
+    [(t     g)     (exit (Bottom t g))]))
+
+(: down ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type)))
+(define ((down exit) t g)
+  (match* (t g)
+    [((and t (Dyn)) _) t]
+    [(_ (and g (Dyn))) g]
+    [(t t) t]
+    [(t g) (exit (Bottom t g))]))
+  
+#;(: join (Schml-Type Schml-Type -> Schml-Type?!))
+#;(define (join t g)
+  ;; Typed racket made me do it...
+  (call/ec
+   (lambda ([exit : (Bottom -> Schml-Type)])
+     (: j (Schml-Type Schml-Type -> Schml-Type))
+     (define (j t g)
+       (match* (t g)
+         [((Dyn) g) g]
+         [(t (Dyn)) t]
+         [((Unit) (Unit)) UNIT-TYPE]
+         [((Int)  (Int))  INT-TYPE]
+         [((Bool) (Bool)) BOOL-TYPE]
+         [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
+          (Fn ta (map j ta* ga*) (j tr gr))]
+         [((STuple ta t*) (STuple ga g*)) #:when (= ta ga)
+          (STuple ta (map j t* g*))]
+         [((GRef t) (GRef g))
+          (GRef (j t g))]
+         [((GVect t) (GVect g))
+          (GVect (j t g))]
+         [((MRef t) (MRef g))
+          (j t g)]
+         [(t g) (exit (Bottom t g))]))
+     (j t g))))
+
+(: move :
+   (Schml-Type Schml-Type -> Schml-Type)
+   -> (Schml-Type Schml-Type -> Schml-Type))
+(define ((move u/d/fail) t g)
+  (let m : Schml-Type ([t : Schml-Type t] [g : Schml-Type g])
+       (match* (t g)
+         [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
+          (Fn ta (map m ta* ga*) (m tr gr))]
+         [((STuple ta t*) (STuple ga g*)) #:when (= ta ga)
+          (STuple ta (map m t* g*))]
+         [((GRef t) (GRef g))
+          (GRef (m t g))]
+         [((GVect t) (GVect g))
+          (GVect (m t g))]
+         [((MRef t) (MRef g))
+          (MRef (m t g))]
+         [(t g) (u/d/fail t g)])))
+
+(: move?! : ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type))
+   -> (Schml-Type Schml-Type -> Schml-Type?!))
+(define ((move?! u/d) t g)
+  (call/ec
+   (lambda ([return : (Bottom -> Schml-Type)])
+     ((move (u/d return)) t g))))
+
+(: move+ : ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type))
+   -> (Schml-Type* -> Schml-Type?!))
+(define ((move+ u/d) t+)
+  (call/ec
+   (lambda ([return : (Bottom -> Schml-Type)])
+     (define m (move (u/d return)))
+     (let move+ : Schml-Type ([t+ : Schml-Type* t+])
+          (match t+
+            [(list) (error 'move+ "must be non empty list")]
+            [(list t) t]
+            [(cons t t+) (m t (move+ t+))])))))
+
+(: join : Schml-Type Schml-Type -> Schml-Type?!)
+(define join (move?! up))
+
+(: join+ : Schml-Type* -> Schml-Type?!)
+(define join+ (move+ up))
+
+(: meet : Schml-Type Schml-Type -> Schml-Type?!)
+(define meet (move?! down))
+(: meet+ : Schml-Type* -> Schml-Type?!)
+(define meet+ (move+ down))
+
+
+(module* test racket
+  (require (submod ".."))
+  (require rackunit)
+
+  (define dynxdyn->dyn (Fn 2 (list (Dyn) (Dyn)) (Dyn)))
+  
+  (check-equal? (join INTxINT->INT-TYPE dynxdyn->dyn)
+                INTxINT->INT-TYPE)
+  (check-equal? (join+ (list (Fn 2 (list (Int) (Int)) (Dyn))
+                             (Fn 2 (list (Dyn) (Int)) (Int))
+                             dynxdyn->dyn))
+                INTxINT->INT-TYPE)
+
+  (check-equal? (meet INTxINT->INT-TYPE dynxdyn->dyn)
+                dynxdyn->dyn)
+  (check-equal? (meet+ (list (Fn 2 (list (Int) (Int)) (Dyn))
+                             (Fn 2 (list (Dyn) (Int)) (Int))
+                             dynxdyn->dyn))
+                dynxdyn->dyn)
+
+  (check-equal? (meet (Fn 1 (list (Bool)) (Int))
+                      (Fn 1 (list (Int)) (Int)))
+                (Bottom (Bool) (Int)))
+
+  (check-equal? (join (Fn 1 (list (Bool)) (Int))
+                      (Fn 1 (list (Int)) (Int)))
+                (Bottom (Bool) (Int)))
+  
+)
 
 
 (define-forms

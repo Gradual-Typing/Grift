@@ -25,6 +25,7 @@
 	  (App E (Listof E))
 	  (Op Schml-Primitive (Listof E))
 	  (If E E E)
+          (Switch E (Switch-Case* E) E)
           (Begin Crcn-Expr* E)
           (Repeat Uid E E Uid E E)
           ;; Guarded effects

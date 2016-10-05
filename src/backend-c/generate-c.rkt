@@ -197,6 +197,7 @@
     (newline)
     (newline)))
 
+;; This is dumb why do we have this and emit tail -andre
 (: emit-main-tail (-> D5-Tail Void))
 (define (emit-main-tail tail)
   (logging emit-tail (Vomit) tail)
@@ -215,6 +216,22 @@
             ;; main branches around return
             (emit-block '() a)
             (newline))]
+    [(Switch t c* d)
+     (begin (display "switch (") (emit-value t) (display "){\n")
+            (for ([c c*])
+              (let loop : Void ([l* (car c)])
+                   (match l* 
+                     [(list l)
+                      (printf "  case ~a:\n    " l)
+                      (emit-tail (cdr c))
+                      (display "    break;")]
+                     [(cons l l*)
+                      (printf "  case ~a:\n" l)
+                      (loop l*)]
+                     [(list) (error 'switch)])))
+            (display "  default:\n")
+            (emit-tail d)
+            (display "}\n"))]
     [(Return e) (display "")]))
 
 (: emit-subroutines (-> D5-Bnd-Code* Void))
@@ -263,6 +280,22 @@
             (display " else ")
             (emit-block '() a)
             (newline))]
+        [(Switch t c* d)
+     (begin (display "switch (") (emit-value t) (display "){\n")
+            (for ([c c*])
+              (let loop : Void ([l* (car c)])
+                   (match l* 
+                     [(list l)
+                      (printf "  case ~a:\n    " l)
+                      (emit-tail (cdr c))
+                      (display "    break;")]
+                     [(cons l l*)
+                      (printf "  case ~a:\n" l)
+                      (loop l*)]
+                     [(list) (error 'switch)])))
+            (display "  default:\n")
+            (emit-tail d)
+            (display "}\n"))]
     [(Return e)
      (if (Success? e)
          (display "return EXIT_SUCCESS;")
@@ -311,6 +344,22 @@
             (emit-begin a (void))
             (display "}")
             (newline))]
+    [(Switch t c* d)
+     (begin (display "switch (") (emit-value t) (display "){\n")
+            (for ([c c*])
+              (let loop : Void ([l* (car c)])
+                   (match l* 
+                     [(list l)
+                      (printf "  case ~a:\n    " l)
+                      (emit-begin (Begin-effects (cdr c)) (void))
+                      (display "    break;")]
+                     [(cons l l*)
+                      (printf "  case ~a:\n" l)
+                      (loop l*)]
+                     [(list) (error 'switch)])))
+            (display "  default:\n")
+            (emit-begin (Begin-effects d) (void))
+            (display "}\n"))]
     [(Repeat i st sp #f #f (Begin e* _))
      (begin (display "for(")
             (display (uid->string i))

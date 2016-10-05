@@ -19,6 +19,7 @@
                   (App E (Listof E))
                   (Op (Ann Schml-Primitive Schml-Type*) (Listof E))
                   (If E E E)
+                  (Switch E (Switch-Case* E) E)
                   (Ascribe E Schml-Type (Option Blame-Label))
                   (Var Uid)
                   (Quote Schml-Literal)
