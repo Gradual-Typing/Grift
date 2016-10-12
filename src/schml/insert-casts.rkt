@@ -35,10 +35,13 @@
 
 (: insert-casts (Schml1-Lang -> Cast0-Lang))
 (define (insert-casts prgm)
-  (match-define (Prog ann exp) prgm)
-  (debug (Prog ann (ic-expr exp))))
+  (match-define (Prog (list name unique type) exp) prgm)
+  (define uc (make-unique-counter unique))
+  (define e (parameterize ([current-unique-counter uc])
+              (ic-expr exp)))
+  (debug (Prog (list name (unique-counter-next! uc) type) e)))
 
-(: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type . -> . C0-Expr))
+(: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type -> C0-Expr))
 (define (mk-cast l-th e t1 t2)
   (if (equal? t1 t2) e (Cast e (Twosome t1 t2 (l-th)))))
 
@@ -59,7 +62,7 @@
        (Let (map ic-bnd bnd*) (mk-cast (mk-label "let" src) (ic-expr body) type^ type))]
       [(Letrec bnd* (and (Ann _ (cons src type^)) body))
        (Letrec (map ic-bnd bnd*)
-               (mk-cast (mk-label "letrec" src) (ic-expr body) type^ type))]
+         (mk-cast (mk-label "letrec" src) (ic-expr body) type^ type))]
       [(App rator rand*) (ic-application rator rand* src type)]
       [(Op (Ann prim rand-ty*) rand*)
        (Op prim (map (ic-operand/cast src) rand* rand-ty*))]
@@ -94,9 +97,9 @@
            index
            (mk-cast (mk-label "Repeat" s1) e1 t1 INT-TYPE)
            (mk-cast (mk-label "Repeat" s2) e2 t2 INT-TYPE)
-           acc
-           (mk-cast (mk-label "Repeat" s3) e3 t3 type)
-           (mk-cast (mk-label "Repeat" s4) e4 t4 type))]
+         acc
+         (mk-cast (mk-label "Repeat" s3) e3 t3 type)
+         (mk-cast (mk-label "Repeat" s4) e4 t4 type))]
       ;; These rules are a rough translation of the coercion semantics that
       ;; are presented in space-efficient gradual typing figure 4
       ;; Their system was using lazy-ud and this system is lazy-d
@@ -179,6 +182,91 @@
          [else (error 'insert-casts/gvector-set!
                       "unexpected value for e1 type: ~a"
                       e1-ty)])]
+      [(Mbox (app ic-expr e) t) (Mbox e t)]
+      [(Munbox (app ic-expr e)) (Munbox e)]
+      [(Mbox-set! (app ic-expr e1) (app ic-expr e2)) (Mbox-set! e1 e2)]
+      [(MunboxT (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) t)
+       (cond
+         [(Dyn? e-ty)
+          (let ([addr (next-uid! "addr")])
+            (Let `((,addr
+                    .
+                    ,(mk-cast (mk-label "munbox" e-src) e e-ty (MRef DYN-TYPE))))
+              (MBoxCastedRef addr t)))]
+         [(MRef? e-ty) (match e
+                         [(Var addr) (MBoxCastedRef addr t)]
+                         [else (let ([addr (next-uid! "addr")])
+                                 (Let `((,addr . ,e))
+                                   (MBoxCastedRef addr t)))])]
+         [else (error 'insert-casts/MunboxT
+                      "unexpected value for e-ty: ~a"
+                      e-ty)])]
+      [(Mbox-set!T (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
+                   (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2))
+                   t)
+       (cond
+         [(Dyn? e1-ty)
+          (let ([addr (next-uid! "addr")])
+            (Let `((,addr
+                    .
+                    ,(mk-cast (mk-label "mbox-set" e1-src) e1 e1-ty (MRef DYN-TYPE))))
+              (MBoxCastedSet! addr e2 t)))]
+         [(MRef? e1-ty) (match e1
+                          [(Var addr) (MBoxCastedSet! addr e2 t)]
+                          [else (let ([addr (next-uid! "mboxaddr")])
+                                  (Let `((,addr . ,e1))
+                                    (MBoxCastedSet! addr e2 t)))])]
+         [else (error 'insert-casts/Mbox-set!T
+                      "unexpected value for e1-ty: ~a"
+                      e1-ty)])]
+      [(Mvector (app ic-expr e1) (app ic-expr e2) t) (Mvector e1 e2 t)]
+      [(Mvector-ref (app ic-expr e1) (app ic-expr e2))
+       (Mvector-ref e1 e2)]
+      [(Mvector-set! (app ic-expr e1) (app ic-expr e2) (app ic-expr e3))
+       (Mvector-set! e1 e2 e3)]
+      [(Mvector-refT (and (Ann _ (cons e-src e-ty)) (app ic-expr e))
+                     (and (Ann _ (cons i-src i-ty)) (app ic-expr i))
+                     t)
+       (let ([i (if (Dyn? i-ty)
+                    (mk-cast (mk-label "mvector-ref index" i-src) i i-ty INT-TYPE)
+                    i)])
+         (cond
+           [(Dyn? e-ty)
+            (let ([addr (next-uid! "addr")])
+              (Let `((,addr
+                      .
+                      ,(mk-cast (mk-label "munbox" e-src) e e-ty (MVect DYN-TYPE))))
+                (MVectCastedRef addr i t)))]
+           [(MVect? e-ty) (match e
+                            [(Var addr) (MVectCastedRef addr i t)]
+                            [else (let ([addr (next-uid! "addr")])
+                                    (Let `((,addr . ,e))
+                                      (MVectCastedRef addr i t)))])]
+           [else (error 'insert-casts/Mvector-refT
+                        "unexpected value for e type: ~a"
+                        e-ty)]))]
+      [(Mvector-set!T (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
+                      (and (Ann _ (cons i-src i-ty)) (app ic-expr i))
+                      (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2))
+                      t)
+       (let ([i (if (Dyn? i-ty)
+                    (mk-cast (mk-label "mvector-ref index" i-src) i i-ty INT-TYPE)
+                    i)])
+         (cond
+           [(Dyn? e1-ty)
+            (let ([addr (next-uid! "addr")])
+              (Let `((,addr
+                      .
+                      ,(mk-cast (mk-label "mbox-set" e1-src) e1 e1-ty (MRef DYN-TYPE))))
+                (MVectCastedSet! addr i e2 t)))]
+           [(MVect? e1-ty) (match e1
+                             [(Var addr) (MVectCastedSet! addr i e2 t)]
+                             [else (let ([addr (next-uid! "mboxaddr")])
+                                     (Let `((,addr . ,e1))
+                                       (MVectCastedSet! addr i e2 t)))])]
+           [else (error 'insert-casts/Mvector-set!T
+                        "unexpected value for e1 type: ~a"
+                        e1-ty)]))]
       [(Create-tuple e*) (Create-tuple (map ic-expr e*))]
       [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) i)
        (cond
@@ -231,7 +319,7 @@
        (App (ic-expr rator)
             (map (ic-operand/cast src) rand* (Fn-fmls rator-type)))]
       [else (error 'unmatched "~a" rator-type)#;
-       (raise-pass-exn "insert-casts"
+            (raise-pass-exn "insert-casts"
                             "error in ic-application's implimentation")])))
 
 (: make-dyn-fn-type (-> Index (Fn Index (Listof Schml-Type) Schml-Type)))
@@ -243,10 +331,10 @@
        (values (Listof C0-Expr) (Listof Schml-Type))))
 (define (ic-operands rand*)
   (for/lists (cf* ty*)
-      #;
-      ([cf* : (Listof C0-Expr)]
-       [ty* : Schml-Type*])
-      ([rand #;#;: S1-Expr rand*])
+             #;
+             ([cf* : (Listof C0-Expr)]
+              [ty* : Schml-Type*])
+    ([rand #;#;: S1-Expr rand*])
     (match-let ([(Ann _ (cons _ type)) rand])
       (values (ic-expr rand) type))))
 
@@ -266,7 +354,7 @@
     [(_ pos src)
      (lambda ()
        (format "Implicit cast in ~a on expression at ~a"
-	       pos (srcloc->string src)))]
+               pos (srcloc->string src)))]
     [(_ pos sup-src sub-src)
      (mk-label (format "~a at ~a" pos (srcloc->string sup-src))
-	       sub-src)]))
+               sub-src)]))

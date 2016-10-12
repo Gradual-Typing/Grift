@@ -205,6 +205,59 @@
      (values (Guarded-Proxy-Blames e) fv)]
     [(Guarded-Proxy-Coercion (app uf-expr e fv))
      (values (Guarded-Proxy-Coercion e) fv)]
+    [(CastedValue-Huh (app uf-expr e fv))
+     (values (CastedValue-Huh e) fv)]
+    [(CastedValue (app uf-expr e fv0) r)
+     (match r
+       [(Twosome (app uf-expr t1 fv1) (app uf-expr t2 fv2) (app uf-expr l fv3))
+        (values (CastedValue e (Twosome t1 t2 l))
+                (set-union fv0 fv1 fv2 fv3))]
+       [(Coercion (app uf-expr c fv1))
+        (values (CastedValue e (Coercion c)) (set-union fv0 fv1))])]
+    [(CastedValue-Value (app uf-expr e fv))
+     (values (CastedValue-Value e) fv)]
+    [(CastedValue-Source (app uf-expr e fv))
+     (values (CastedValue-Source e) fv)]
+    [(CastedValue-Target (app uf-expr e fv))
+     (values (CastedValue-Target e) fv)]
+    [(CastedValue-Blames (app uf-expr e fv))
+     (values (CastedValue-Blames e) fv)]
+    [(CastedValue-Coercion (app uf-expr e fv))
+     (values (CastedValue-Coercion e) fv)]
+    [(Mbox (app uf-expr e fv) t) (values (Mbox e t) fv)]
+    [(Mbox-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Mbox-val-set! e1 e2) (set-union fv1 fv2))]
+    [(Mbox-val-ref (app uf-expr e fv)) (values (Mbox-val-ref e) fv)]
+    [(Mbox-rtti-set! u (app uf-expr e fv)) (values (Mbox-rtti-set! u e) fv)]
+    [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) (set))]
+    [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
+     (values (Mvector e1 e2 t) (set-union fv1 fv2))]
+    [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
+     (values (Mvector-val-set! e1 e2 e3) (set-union fv1 fv2 fv3))]
+    [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2))
+     (values (Mvector-val-ref e1 e2) (set-union fv1 fv2))]
+    [(Mvector-rtti-set! u (app uf-expr e fv))
+     (values (Mvector-rtti-set! u e) fv)]
+    [(Mvector-rtti-ref u) (values (Mvector-rtti-ref u) (set))]
+    [(Type-MVect (app uf-expr e fv)) (values (Type-MVect e) fv)]
+    [(Type-MVect-Huh (app uf-expr e fv)) (values (Type-MVect-Huh e) fv)]
+    [(Type-MVect-Of (app uf-expr e fv)) (values (Type-MVect-Of e) fv)]
+    [(MVect-Coercion-Huh (app uf-expr e fv)) (values (MVect-Coercion-Huh e) fv)]
+    [(MVect-Coercion-Type (app uf-expr e fv)) (values (MVect-Coercion-Type e) fv)]
+    [(MVect-Coercion (app uf-expr e fv)) (values (MVect-Coercion e) fv)]
+    [(Make-Fn-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
+     (values (Make-Fn-Type e1 e2 e3) (set-union fv1 fv2))]
+    [(Make-Tuple-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
+     (values (Make-Tuple-Type e1 e2 e3) (set-union fv1 fv2))]
+    [(MRef-Coercion-Huh (app uf-expr e fv)) (values (MRef-Coercion-Huh e) fv)]
+    [(MRef-Coercion-Type (app uf-expr e fv)) (values (MRef-Coercion-Type e) fv)]
+    [(MRef-Coercion (app uf-expr e fv)) (values (MRef-Coercion e) fv)]
+    [(Type-GRef (app uf-expr e fv)) (values (Type-GRef e) fv)]
+    [(Type-GVect (app uf-expr e fv)) (values (Type-GVect e) fv)]
+    [(Type-MRef (app uf-expr e fv)) (values (Type-MRef e) fv)]
+    [(Type-MRef-Huh (app uf-expr e fv)) (values (Type-MRef-Huh e) fv)]
+    [(Type-MRef-Of (app uf-expr e fv)) (values (Type-MRef-Of e) fv)]
+    [(Error (app uf-expr e fv)) (values (Error e) fv)]
     [(Create-tuple (app uf-expr* e* e*-fvars)) (values (Create-tuple e*) e*-fvars)]
     [(Tuple-proj (app uf-expr e e-fvars) i) (values (Tuple-proj e i) e-fvars)]
     [(Tuple-Coercion-Huh (app uf-expr e e-fvars)) (values (Tuple-Coercion-Huh e) e-fvars)]

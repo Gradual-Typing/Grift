@@ -14,7 +14,7 @@ form, to the shortest branch of the cast tree that is relevant.
 - Replaces tags atomic types with the Type form.
 - Introduces the short lived dynamic type manipulation forms
 +------------------------------------------------------------------------------+
-|Input Grammar Cast2-Language                                                  |
+|Input Grammar Cast1-Language                                                  |
 |Output Grammar Cast3-Language                                                 |
 +-----------------------------------------------------------------------------|#
 ;; The define-pass syntax
@@ -26,7 +26,7 @@ form, to the shortest branch of the cast tree that is relevant.
  racket/set
  (except-in  "../helpers.rkt" logging)
  (submod "../logging.rkt" typed)
-  "../unique-identifiers.rkt"
+ "../unique-identifiers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
  "../language/cast-or-coerce1.rkt"
@@ -100,10 +100,28 @@ form, to the shortest branch of the cast tree that is relevant.
     (cond
       [(open-coded? 'compose-coercions) gen-compose-coercions-code]
       [else compose-coercions-call]))
+
+  ;; The runtime label for the greatest lower bound
+  (define greatest-lower-bound-type-uid (next-uid! "greatest_lower_bound"))
+  ;; a call to the runtime greatest lower bound
+  (: greatest-lower-bound-type-call GreatestLowerBound-Type)
+  (define (greatest-lower-bound-type-call t1 t2)
+    (App-Code (Code-Label greatest-lower-bound-type-uid) (list t1 t2)))
+
+  (define gen-greatest-lower-bound-type : GreatestLowerBound-Type
+    (gen-greatest-lower-bound-type-code next-uid! greatest-lower-bound-type-call
+                                        greatest-lower-bound-type-uid))
+
+  (define greatest-lower-bound-type : GreatestLowerBound-Type
+    (cond
+      [(open-coded? 'greatest-lower-bound-type) gen-greatest-lower-bound-type]
+      [else greatest-lower-bound-type-call]))
   
   ;; Code generators for the coercion casting runtime
   (define gen-interp-cast-code
-    (make-cast-code next-uid! interp-cast-call interp-cast-uid make-coercion compose-coercions))
+    (make-cast-code next-uid! interp-cast-call interp-cast-uid
+                    make-coercion compose-coercions
+                    greatest-lower-bound-type))
 
   (define interp-cast
     (cond
@@ -122,6 +140,13 @@ form, to the shortest branch of the cast tree that is relevant.
         [,make-coercion-uid
          . ,(Code (list mc-t1 mc-t2 mc-lbl)
               (gen-make-coercion-code (Var mc-t1) (Var mc-t2) (Var mc-lbl)))])))
+  
+  (define bindings-needed-for-monotonic-refs
+    (let ([glbt-t1    (next-uid! "type1")]
+          [glbt-t2    (next-uid! "type2")])
+      `([,greatest-lower-bound-type-uid
+         . ,(Code (list glbt-t1 glbt-t2)
+              (gen-greatest-lower-bound-type (Var glbt-t1) (Var glbt-t2)))])))
 
   (define bindings-needed-for-space-efficiency
     (cond
@@ -142,7 +167,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (: gvec-set! : Gvec-setT)
   (: bindings-needed-for-guarded : CoC3-Bnd-Code*)
   (define-values (gbox-ref gbox-set! gvec-ref gvec-set!
-                  bindings-needed-for-guarded)
+                           bindings-needed-for-guarded)
     ;; First we create initialize the code generators
     (let ([gen-gbox-ref-code (make-gbox-ref-code interp-cast-call)]
           [gen-gbox-set!-code (make-gbox-set!-code interp-cast-call)]
@@ -276,6 +301,7 @@ form, to the shortest branch of the cast tree that is relevant.
      bindings-needed-for-guarded
      bindings-needed-for-dynamic-operations
      bindings-needed-for-space-efficiency
+     bindings-needed-for-monotonic-refs
      bindings-needed-for-interp-cast))
 
   (define exp-with-lowered-gradual-operations
@@ -289,7 +315,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (Prog (list prgm-name (unique-counter-next! unique-counter) prgm-type)
     (Labels gradual-runtime-bindings
       (Observe  exp-with-lowered-gradual-operations prgm-type))))
-  
+
 ;; These templates are used to build the code that performs
 ;; casting at runtime. The templates are a little over
 ;; parameterized currently in hopes that it make specialization
@@ -297,10 +323,11 @@ form, to the shortest branch of the cast tree that is relevant.
 (define-type Cast-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
 (: make-cast-code :
-   (String -> Uid) Cast-Type Uid Make-Coercion-Type Compose-Coercions-Type
+   (String -> Uid) Cast-Type Uid Make-Coercion-Type
+   Compose-Coercions-Type GreatestLowerBound-Type
    ->
    Cast-Type)
-(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn) v c)
+(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt) v c)
   (define who 'make-cast-code)
   (debug who v c)
   (define-syntax-let$* let$* next-uid!)
@@ -311,7 +338,7 @@ form, to the shortest branch of the cast tree that is relevant.
     (cond$
      [(id?$ crcn) val]
      [(seq?$ crcn)
-      ;; I think that something better crcnould be done here
+      ;; I think that something better could be done here
       ;; why recur there are only so many things that the underlying
       ;; sequence could be?
       
@@ -355,6 +382,25 @@ form, to the shortest branch of the cast tree that is relevant.
                        old_val 
                        (Coercion composed_crcn)))))
              (Guarded-Proxy val (Coercion crcn)))]
+       [(mrefC?$ crcn)
+        (match val
+          [(Var a)
+           (let$* ([t2 (mrefC-type$ crcn)])
+             (if$ (dyn?$ t2)
+                  val
+                  (let$* ([t1 (Mbox-rtti-ref a)]
+                          [t3 (glbt t1 t2)])
+                    (if$ (op=? t1 t3)
+                         val
+                         (let$* ([c (mk-crcn t1 t3 (Quote ""))]
+                                 [cv (Mbox-val-ref val)]
+                                 [cv_ (CastedValue cv (Coercion crcn))])
+                           (Begin
+                             (list
+                              (Mbox-val-set! val cv_)
+                              (Mbox-rtti-set! a t3))
+                             val))))))]
+          [_ (error 'interp-cast/mrefC)])]
        [(tuple?$ crcn)
         (match crcn
           [(not (Quote-Coercion _)) (Coerce-Tuple cast-u val crcn)]
@@ -445,6 +491,9 @@ form, to the shortest branch of the cast tree that is relevant.
               [read_crcn  (mk-crcn gr1_of gr2_of lbl)]
               [write_crcn (mk-crcn gr2_of gr1_of lbl)])
         (ref$ read_crcn write_crcn))]
+     [(and$ (mref?$ t1) (mref?$ t2))
+      (let$* ([t (mref-of$ t2)])
+        (mrefC$ t))]
      [(and$ (tupleT?$ t1) (tupleT?$ t2))
       (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
            (if (and (Type? t1) (Type? t2))
@@ -532,7 +581,7 @@ form, to the shortest branch of the cast tree that is relevant.
            (unless (and (Fn? c1) (Fn? c2))
              (error 'compose-fn-crcn$ "given ~a ~a" c1 c2))
            (match-define-values ((Fn _ c1-args c1-ret) (Fn _ c2-args c2-ret))
-                                (values c1 c2))
+             (values c1 c2))
            (define arg* (map help-comp c2-args c1-args))
            (define ret  (help-comp c1-ret c2-ret))
            (Quote-Coercion (Fn (Fn-arity c1) arg* ret)))]
@@ -544,9 +593,9 @@ form, to the shortest branch of the cast tree that is relevant.
               [ref2_write (ref-write$ c2)]
               [read  (compose ref1_read  ref2_read)]
               [write (compose ref2_write ref1_write)])
-             (if$ (and$ (id?$ read) (id?$ write))
-                  (Quote-Coercion (Identity))
-                  (ref$ read write)))]
+        (if$ (and$ (id?$ read) (id?$ write))
+             (Quote-Coercion (Identity))
+             (ref$ read write)))]
      [(tuple?$ c1)
       (if (and (Quote-Coercion? c1) (Quote-Coercion? c2))
           (let* ([c1 (Quote-Coercion-const c1)]
@@ -558,7 +607,7 @@ form, to the shortest branch of the cast tree that is relevant.
                   (Quote-Coercion (CTuple (CTuple-num c2) arg*)))
                 (error 'compose-coercions "given ~a ~a" c1 c2)))
           (Compose-Tuple-Coercion compose-uid c1 c2))]
-       [else (Blame (Quote "bad implemention of mediating coercions"))])]
+     [else (Blame (Quote "bad implemention of mediating coercions"))])]
    ;; C1 must be a failed coercion
    [else (Blame (fail-label$ c1))]))
 
@@ -685,6 +734,43 @@ form, to the shortest branch of the cast tree that is relevant.
        (if (null? b*)
            (gvect-set! v^ i^ w^)
            (Let b* (gvect-set! v^ i^ w^)))]
+      [(Mbox (app recur e) t) (Mbox e t)]
+      [(Munbox (app recur e)) (Mbox-val-ref e)]
+      [(Mbox-set! (app recur e1) (app recur e2))
+       (Mbox-val-set! e1 e2)]
+      [(MBoxCastedRef addr t)
+       (let ([t2 (next-uid! "t2")])
+         (Let (list (cons t2 (Type t)))
+           (let ([t1 (next-uid! "t1")]
+                 [c  (next-uid! "crcn")])
+             (Let (list (cons t1 (Mbox-rtti-ref addr)))
+               (Let (list (cons c (mk-coercion (Var t1) (Var t2) (Quote ""))))
+                 (interp-cast (Mbox-val-ref (Var addr)) (Var c)))))))]
+      [(MBoxCastedSet! addr (app recur e) t)
+       (: mbox-set! (Uid
+                     (U (Quote Cast-Literal) (Var Uid))
+                     (Var Uid) ->
+                     CoC3-Expr))
+       (define (mbox-set! addr val t1)
+         (let ([t2 (next-uid! "t2")]
+               [c  (next-uid! "crcn")])
+           (Let (list (cons t2 (Mbox-rtti-ref addr)))
+             (Let (list (cons c (mk-coercion t1 (Var t2) (Quote ""))))
+               (Mbox-val-set! (Var addr) (CastedValue val (Coercion (Var c))))))))
+       (let ([t1 (next-uid! "t1")])
+         (Let (list (cons t1 (Type t)))
+           (if (or (Var? e) (Quote? e))
+               (mbox-set! addr e (Var t1))
+               (let ([val (next-uid! "write_cv")])
+                 (Let (list (cons val e))
+                   (mbox-set! addr (Var val) (Var t1)))))))]
+      [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
+      [(Mvector-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+      [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
+       (Mvector-val-set! e1 e2 e3)]
+      ;; [(MVectCastedRef u i t) (error)]
+      ;; [(MVectCastedSet! u i e t) (error)]
+      
       ;; The translation of the dynamic operation 
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
        (define arg-names

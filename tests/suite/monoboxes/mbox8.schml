@@ -1,0 +1,10 @@
+(let ((mre : Dyn #f))
+ (let ((dynref : (MRef Dyn) (mbox mre)))
+  (let ((boolref : (MRef Bool) dynref)
+        (intref  : (MRef Int)  dynref))
+   (begin
+    (if (munbox boolref)
+        (mbox-set! intref 6)
+        (mbox-set! intref 7))
+    (mbox-set! intref (* (munbox intref) 6))
+    (: (munbox dynref) Int)))))

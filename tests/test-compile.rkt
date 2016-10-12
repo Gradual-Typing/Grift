@@ -5,12 +5,17 @@
 
 (require "./rackunit.rkt"
          "../src/configuration.rkt"
-         ;;"../src/language.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
          (only-in "../src/compile.rkt" compile)
          "./values.rkt"
          "./paths.rkt")
+(require/typed racket/control
+  (abort (Any -> Nothing)))
+
+(require/typed racket/exn
+  (exn->string (exn -> String)))
+
 
 (require/typed racket/control
   [abort (Any -> Nothing)])

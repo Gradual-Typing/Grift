@@ -5,6 +5,7 @@
 
 (require "core/tests.rkt"
          "boxes/tests.rkt"
+         "monoboxes/tests.rkt"
          "vectors/tests.rkt"
          "tuples/tests.rkt"
          "tools/tests.rkt"
@@ -15,6 +16,7 @@
          (all-from-out
           "core/tests.rkt"
           "boxes/tests.rkt"
+          "monoboxes/tests.rkt"
           "vectors/tests.rkt"
           "tuples/tests.rkt"
           "tools/tests.rkt"
@@ -27,6 +29,7 @@
    tiny-tests
    core-tests
    box-tests
+   #;monobox-tests
    vector-tests
    tuple-tests
    tool-tests

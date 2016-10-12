@@ -4,10 +4,10 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
- Discription:
+ Description:
  This pass adds the castable form which extends all lambdas that
  are castable with a free variable which represents the function that is
- necissary in order to cast the closure created by this lambda. It can now be
+ necessary in order to cast the closure created by this lambda. It can now be
  extracted from a closure value using the fn-cast form. Note that lambdas
  created in the process of creating these casting functions are not castable.
  Though their return values are.
@@ -16,7 +16,7 @@
  used in each of the higher order casting functions because the values needed
  to perform the cast are not available until runtime.
 
- This pass also substitutes all casts of the for (cast v Fn1 Fn2 l) with the
+ This pass also substitutes all casts of the form (cast v Fn1 Fn2 l) with the
  equivalent form (fn-cast v Fn1 Fn2 l), in order to show that the cast specific
  to the closure value is being used.
 
@@ -253,6 +253,7 @@ T?l $ (_  ; )  = what here
 #;(define ((get-bnd i) s)
   (match-let ([(cons n h) s])
     (values (hash-ref h i #f) s)))
+
 (: lfc-expr :
    (Nat -> Uid)
    (CoC1-Expr CoC1-Expr* -> CoC1-Expr)
@@ -313,6 +314,23 @@ T?l $ (_  ; )  = what here
        (Gvector-ref e i)]
       [(Gvector-set! (app recur e1) (app recur i) (app recur e2))
        (Gvector-set! e1 i e2)]
+      [(Mbox (app recur e) t) (Mbox e t)]
+      [(Munbox (app recur e)) (Munbox e)]
+      [(Mbox-set! (app recur e1) (app recur e2))
+       (Mbox-set! e1 e2)]
+      [(MBoxCastedRef u t) (MBoxCastedRef u t)]
+      [(MBoxCastedSet! u (app recur e) t)
+       (MBoxCastedSet! u e t)]
+      [(Mvector (app recur e1) (app recur e2) t)
+       (Mvector e1 e2 t)]
+      [(Mvector-ref (app recur e1) (app recur e2))
+       (Mvector-ref e1 e2)]
+      [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
+       (Mvector-set! e1 e2 e3)]
+      [(MVectCastedRef u (app recur i) t)
+       (MVectCastedRef u i t)]
+      [(MVectCastedSet! u (app recur i) (app recur e) t)
+       (MVectCastedSet! u i e t)]
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
        (Dyn-Fn-App e e* t* l)]
       [(Dyn-GRef-Ref (app recur e) l)
@@ -495,7 +513,3 @@ T?l $ (_  ; )  = what here
 (: build-apply/coercion : CoC1-Expr CoC1-Expr* -> CoC1-Expr)
 (define (build-apply/coercion exp exp*)
   (App/Fn-Proxy-Huh exp exp*))
-
-
-  
-  

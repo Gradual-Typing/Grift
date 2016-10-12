@@ -208,6 +208,53 @@
        (Ref-Coercion-Read (ll-expr e))]
       [(Ref-Coercion-Write e)
        (Ref-Coercion-Write (ll-expr e))]
+      [(Mbox (app ll-expr e) t) (Mbox e t)]
+      [(Mbox-val-set! (app ll-expr e1) (app ll-expr e2)) (Mbox-val-set! e1 e2)]
+      [(Mbox-val-ref (app ll-expr e)) (Mbox-val-ref e)]
+      [(Mbox-rtti-set! u (app ll-expr e)) (Mbox-rtti-set! u e)]
+      [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+      [(Make-Fn-Type e1 (app ll-expr e2) (app ll-expr e3))
+       (Make-Fn-Type e1 e2 e3)]
+      [(Make-Tuple-Type e1 (app ll-expr e2) (app ll-expr e3))
+       (Make-Tuple-Type e1 e2 e3)]
+      [(MRef-Coercion-Huh (app ll-expr e)) (MRef-Coercion-Huh e)]
+      [(MRef-Coercion-Type (app ll-expr e)) (MRef-Coercion-Type e)]
+      [(MRef-Coercion (app ll-expr e)) (MRef-Coercion e)]
+      [(Type-GRef (app ll-expr e)) (Type-GRef e)]
+      [(Type-GVect (app ll-expr e)) (Type-GVect e)]
+      [(Type-MRef (app ll-expr e)) (Type-MRef e)]
+      [(Type-MRef-Huh (app ll-expr e)) (Type-MRef-Huh e)]
+      [(Type-MRef-Of (app ll-expr e)) (Type-MRef-Of e)]
+      [(CastedValue-Huh exp)
+       (CastedValue-Huh (ll-expr exp))]
+      [(CastedValue (app ll-expr e) r)
+       (match r
+         [(Twosome t1 t2 l)
+          (CastedValue e (Twosome (ll-expr t1) (ll-expr t2) (ll-expr l)))]
+         [(Coercion c)
+          (CastedValue e (Coercion (ll-expr c)))])]
+      [(CastedValue-Value exp)
+       (CastedValue-Value (ll-expr exp))]
+      [(CastedValue-Source exp)
+       (CastedValue-Source (ll-expr exp))]
+      [(CastedValue-Target exp)
+       (CastedValue-Target (ll-expr exp))]
+      [(CastedValue-Blames exp)
+       (CastedValue-Blames (ll-expr exp))]
+      [(CastedValue-Coercion exp)
+       (CastedValue-Coercion (ll-expr exp))]
+      [(Mvector (app ll-expr e1) (app ll-expr e2) t) (Mvector e1 e2 t)]
+      [(Mvector-val-set! (app ll-expr e1) (app ll-expr e2) (app ll-expr e3)) (Mvector-val-set! e1 e2 e3)]
+      [(Mvector-val-ref (app ll-expr e1) (app ll-expr e2)) (Mvector-val-ref e1 e2)]
+      [(Mvector-rtti-set! u (app ll-expr e)) (Mvector-rtti-set! u e)]
+      [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+      [(Type-MVect e) (Type-MVect (ll-expr e))]
+      [(Type-MVect-Huh e) (Type-MVect-Huh (ll-expr e))]
+      [(Type-MVect-Of e) (Type-MVect-Of (ll-expr e))]
+      [(MVect-Coercion-Huh e) (MVect-Coercion-Huh (ll-expr e))]
+      [(MVect-Coercion-Type e) (MVect-Coercion-Type (ll-expr e))]
+      [(MVect-Coercion e) (MVect-Coercion (ll-expr e))]
+      [(Error (app ll-expr e)) (Error e)]
       [(Create-tuple e*) (Create-tuple (map ll-expr e*))]
       [(Tuple-proj e i) (Tuple-proj (ll-expr e) i)]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (ll-expr e))]

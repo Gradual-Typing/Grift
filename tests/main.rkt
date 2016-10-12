@@ -39,6 +39,7 @@
     (tiny    . ,tiny-tests)
     (core    . ,core-tests)
     (box     . ,box-tests)
+    (monobox . ,monobox-tests)
     (vector  . ,vector-tests)
     (tuples  . ,tuple-tests)
     (tool    . ,tool-tests)
@@ -62,6 +63,8 @@
      ("-O3" "-Wno-int-conversion" "-Wno-format" "-Wno-unused-value"))))
 
 (define test-suite-dir (make-parameter test-suite-path))
+
+
 
 (define (run-test-suite)
   (define dir  (build-path (test-suite-dir)))

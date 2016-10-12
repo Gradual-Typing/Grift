@@ -30,10 +30,10 @@
      (Begin (Listof E) E)
      (Repeat Uid E E (Ann Uid (Option Schml-Type)) E E)
      ;; Monotonic effects
-     (Mbox E)
+     (MboxS E)
      (Munbox E)
      (Mbox-set! E E)
-     (Mvector E E)
+     (MvectorS E E)
      (Mvector-set! E E E)
      (Mvector-ref E E)
      ;; Guarded effects

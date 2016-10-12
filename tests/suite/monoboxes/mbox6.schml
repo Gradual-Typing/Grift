@@ -1,0 +1,4 @@
+(let ([r0 (mbox 6)])
+  (let ([r1 (: r0 (MRef Dyn))])
+    (let ([r2 : (MRef Int) r1])
+      (munbox r2))))

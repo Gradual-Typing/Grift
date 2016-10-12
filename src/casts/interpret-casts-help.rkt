@@ -83,27 +83,6 @@
                              (Tag Tag-Symbol)
                              (Type Schml-Type)
                              (Var Uid)))
-#|
-;(: trivial? (CoC3-Expr -> Boolean : Trivial))
-(define (trivial? x)
-  (or (Quote? x)
-      (Tag? x)
-      (Type? x)
-      (Var? x)))
-
-(: trivialize ((Box Nat) String CoC3-Expr CoC3-Bnd* ->
-               (Pair CoC3-Bnd* let$-Trivial)))
-(define (trivialize next s e b*)
-  (if (or (Quote? e) (Tag? e) (Type? e) (Var? e))
-      `(,b* . ,e)
-      (let ([u (unbox next)])
-        (set-box! next (add1 u))
-        ())
-      (bind-state
-       (uid-state s)
-       (lambda ([u : Uid])
-         : (State Nat (Pair CoC3-Bnd* (Var Uid)))
-         (return-state `(((,u . ,e) . ,b*) . ,(Var u)))))))
 
 ;; This is meant to help let$* which accumulates the list of
 ;; bindings backwards. This gives proper let* behavior
@@ -112,7 +91,6 @@
   (if (null? b*)
       b
       (let$*-help (cdr b*) (Let (list (car b*)) b))))
-|#
 
 (: make-trivialize :
    (String -> Uid)
@@ -150,17 +128,6 @@
               (let ([body : CoC3-Expr b])
                 (let$*-help b* body))))])))))
 
-#|
-(do (bind-state : (State Nat CoC3-Expr))
-    ((cons b* t*) : (Pair CoC3-Bnd* CoC3-Trivial)
-     <- (trivialize (~a 't*) v* b*)) ...
-     (b^ : CoC3-Expr <- b)
-     (if (null? b*)
-         (return-state b^)
-         (return-state (let$*-help b* b^))))|#
-
-
-
 ;; performs compile time folding of prim = on literals
 ;; todo convert this to using eq-huh
 ;; TODO this should be op=?$
@@ -196,6 +163,7 @@
           [(GRef? v) (Tag 'GRef)]
           [(GVect? v) (Tag 'GVect)]
           [(Fn? v) (Tag 'Fn)]
+          [(MRef? v) (Tag 'MRef)]
           [(STuple? v) (Tag 'STuple)]
           [else (error 'interpret-casts/type-tag
                        "Unexpected ~a" v)]))
@@ -236,11 +204,12 @@
   (fail?$            Failed?         Failed-Coercion-Huh)
   (fnC?$             Fn?             Fn-Coercion-Huh)
   (ref?$             Ref?            Ref-Coercion-Huh)
+  (mrefC?$           MonoRef?        MRef-Coercion-Huh)
   (tuple?$           CTuple?         Tuple-Coercion-Huh)
   (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh?))
 
 (define (mediating-crcn? x)
-  (or (CTuple? x) (Ref? x) (Fn? x)))
+  (or (CTuple? x) (Ref? x) (Fn? x) (MonoRef? x)))
 
 (define-syntax-rule
   (define-smart-access (name check kuote compile-time run-time) ...)
@@ -263,6 +232,7 @@
   (inj-type$   Inject?    Type           Inject-type   Inject-Coercion-Type)
   (ref-read$   Ref?       Quote-Coercion Ref-read      Ref-Coercion-Read)
   (ref-write$  Ref?       Quote-Coercion Ref-write     Ref-Coercion-Write)
+  (mrefC-type$ MonoRef?   Type           MonoRef-type  MRef-Coercion-Type)
   (tuple-num$  CTuple?    Quote          CTuple-num    Tuple-Coercion-Num)
   (fail-label$ Failed?    Quote          Failed-label  Failed-Coercion-Label))
 
@@ -296,6 +266,13 @@
 (define-smart-coercion
   (seq$  Sequence Sequence-Coercion fst snd)
   (ref$  Ref      Ref-Coercion      read write))
+
+(: mrefC$ (CoC3-Expr -> CoC3-Expr))
+(define (mrefC$ type)
+  (if (Type? type)
+      (let ([t (Type-type type)])
+        (Quote-Coercion (MonoRef t)))
+      (MRef-Coercion type)))
 
 (: inj$ (CoC3-Expr -> CoC3-Expr))
 (define (inj$ type)
@@ -341,6 +318,7 @@
   (fnT?$    Fn?     Type-Fn-Huh)
   (gvect?$  GVect?  Type-GVect-Huh)
   (gref?$   GRef?   Type-GRef-Huh)
+  (mref?$   MRef?   Type-MRef-Huh)
   (tupleT?$ STuple? Type-Tuple-Huh))
 
 (: fnT-arity$ (CoC3-Expr -> CoC3-Expr))
@@ -377,7 +355,34 @@
       (let ([x (Type-type x)])
         (if (GRef? x)
             (Type (GRef-arg x))
-            (error 'gvect-of$ "given ~a" x)))))
+            (error 'gref-of$ "given ~a" x)))))
+
+(: mref-of$ (CoC3-Expr -> CoC3-Expr))
+(define (mref-of$ x)
+  (if (not (Type? x))
+      (Type-MRef-Of x)
+      (let ([x (Type-type x)])
+        (if (MRef? x)
+            (Type (MRef-arg x))
+            (error 'mref-of$ "given ~a" x)))))
+
+;; building types, I do not think we will ever need to build them in
+;; compile time, but monotonic references need to build them in runtime
+(define-syntax-rule
+  (define-smart-type (name compile-time run-time field ...) ...)
+  (begin
+    (define (name (field : CoC3-Expr) ...) : CoC3-Expr
+      (if (and (Type? field) ...)
+          (Type (compile-time (Type-type field) ...))
+          (run-time field ...)))
+    ...))
+
+(define-smart-type
+  (gref$  GRef  Type-GRef  type)
+  (gvect$ GVect Type-GVect type)
+  (mref$  MRef  Type-MRef  type))
+
+(define-type GreatestLowerBound-Type (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
 
 (: bnd-non-vars
    (((String -> Uid) CoC3-Expr*) (#:names (Option (Listof String)))
@@ -396,7 +401,7 @@
          (let ([u (next-uid! n)])
            (values (cons (cons u e) bnd*) (cons (Var u) var*)))])))
   #;(printf "bnd-non-vars:\ne*=~a\nnames=~a\nbnd*=~a\nvar*=~a\n\n"
-          e* names? bnd* var*)
+            e* names? bnd* var*)
   (values bnd* (reverse var*)))
 
 
@@ -405,3 +410,70 @@
      (Uid -> (->* () #:rest A (App-Code (Code-Label Uid) (Listof A))))))
 (define ((apply-code u) . a*)
   (App-Code (Code-Label u) a*))
+
+(: gen-greatest-lower-bound-type-code : (String -> Uid) GreatestLowerBound-Type Uid -> GreatestLowerBound-Type)
+(define ((gen-greatest-lower-bound-type-code next-uid! glbt glbt-uid) t1 t2)
+  (define-syntax-let$* let$* next-uid!)
+  (: static-glbt (Schml-Type Schml-Type -> Schml-Type))
+  (define (static-glbt t1 t2)
+    (let ([t : CoC3-Expr (glbt (Type t1) (Type t2))])
+      (if (Type? t)
+          (Type-type t)
+          ;; This should always be possible if all the code is correct
+          (error 'greatest-lower-bound-type-fn-code/static-glbt))))
+  (: greatest-lower-bound-type-tuple-code GreatestLowerBound-Type)
+  (define (greatest-lower-bound-type-tuple-code t1 t2)
+    ;; This is suppose to be outside of the specializing code
+    ;; because we are defining the meta make function coercion
+    (cond
+      [(and (Type? t1) (Type? t2))
+       (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
+         (unless (and (STuple? t1) (STuple? t2))
+           (error 'greatest-lower-bound-type-tuple-code))
+         (let* ([t1-args (STuple-items t1)]
+                [t2-args (STuple-items t2)]
+                [e* (map static-glbt t2-args t1-args)])
+           (Type (STuple (STuple-num t2) e*))))]
+      [else (Make-Tuple-Type glbt-uid t1 t2)]))
+
+  (: greatest-lower-bound-type-fn-code GreatestLowerBound-Type)
+  (define (greatest-lower-bound-type-fn-code t1 t2)
+    ;; This is suppose to be outside of the specializing code
+    ;; because we are defining the meta make function coercion
+    (cond
+      [(and (Type? t1) (Type? t2))
+       (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
+         (unless (and (Fn? t1) (Fn? t2))
+           (error 'greatest-lower-bound-type-fn-code))
+         (let* ([t1-args (Fn-fmls t1)]
+                [t2-args (Fn-fmls t2)]
+                [t1-ret  (Fn-ret  t1)]
+                [t2-ret  (Fn-ret  t2)]
+                [arg* (map static-glbt t2-args t1-args)]
+                [ret  (static-glbt t1-ret t2-ret)])
+           (Type (Fn (Fn-arity t1) arg* ret))))]
+      [else (Make-Fn-Type glbt-uid t1 t2)]))
+  
+  (cond$
+   [(op=? t1 t2) t1]
+   [(dyn?$ t1) t2]
+   [(dyn?$ t2) t1]
+   [(and$ (fnT?$ t1) (fnT?$ t2))
+    (if$ (op=? (fnT-arity$ t1) (fnT-arity$ t2))
+         (greatest-lower-bound-type-fn-code t1 t2)
+         (Error (Quote "can not compute the greatest lower bound for function types with mismatch arities")))]
+   [(and$ (gref?$ t1) (gref?$ t2))
+    (let$* ([gr1_of (gref-of$ t1)]
+            [gr2_of (gref-of$ t2)]
+            [t  (glbt gr1_of gr2_of)])
+      (gref$ t))]
+   [(and$ (gvect?$ t1) (gvect?$ t2))
+    (let$* ([gr1_of (gvect-of$ t1)]
+            [gr2_of (gvect-of$ t2)]
+            [t  (glbt gr1_of gr2_of)])
+      (gvect$ t))]
+   [(and$ (tupleT?$ t1) (tupleT?$ t2))
+    (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
+         (greatest-lower-bound-type-tuple-code t1 t2)
+         (Error (Quote "can not compute the greatest lower bound for tuple types with inconsistent sizes")))]
+   [else (Error (Quote "inconsistent types"))]))

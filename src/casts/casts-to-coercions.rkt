@@ -4,7 +4,7 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
- Discription: This pass translates casts in the AST to their corresponding
+Description: This pass translates casts in the AST to their corresponding
 coercions. The output type doesn't allow casts in the AST but is a subset of
 future languages that do. This is because this pass is optional and the compiler
 should be able to compile programs this the twosome casts for future comparison.
@@ -29,6 +29,7 @@ should be able to compile programs this the twosome casts for future comparison.
 ;; The entry point for this pass it is called by impose-casting semantics
 (: casts->coercions (Cast0-Lang . -> . Coercion-Lang))
 (define (casts->coercions prgm)
+
   (match-let ([(Prog (list name next type) exp) prgm])
     (let ([exp (c2c-expr exp)])
       (Prog (list name next type) exp))))
@@ -63,12 +64,12 @@ should be able to compile programs this the twosome casts for future comparison.
        (Ref (recur t1 t2) (recur t2 t1))]
       [((GVect t1) (GVect t2))
        (Ref (recur t1 t2) (recur t2 t1))]
+      [((MRef _) (MRef t2)) (MonoRef t2)]
       [((STuple n1 t1*) (STuple n2 t2*)) #:when (= n1 n2)
        (CTuple n1 (map recur t1* t2*))]
       [(_ _) (Failed lbl)]))
   (logging make-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
-
 
 ;; Fold through the expression converting casts to coercions
 (: c2c-expr (C0-Expr -> Crcn-Expr))
@@ -108,6 +109,22 @@ should be able to compile programs this the twosome casts for future comparison.
      (Gvector-ref (c2c-expr e) (c2c-expr i))]
     [(Gvector-set! e1 e2 e3)
      (Gvector-set! (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
+    [(Mbox e t) (Mbox (c2c-expr e) t)]
+    [(Munbox e) (Munbox (c2c-expr e))]
+    [(Mbox-set! e1 e2) (Mbox-set! (c2c-expr e1) (c2c-expr e2))]
+    [(MBoxCastedRef u t)
+     (MBoxCastedRef u t)]
+    [(MBoxCastedSet! u (app c2c-expr e) t)
+     (MBoxCastedSet! u e t)]
+    [(Mvector e1 e2 t) (Mvector (c2c-expr e1) (c2c-expr e2) t)]
+    [(Mvector-ref e1 e2) (Mvector-ref (c2c-expr e1) (c2c-expr e2))]
+    [(Mvector-set! e1 e2 e3)
+     (Mvector-set! (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
+    [(MVectCastedRef u i t)
+     (MVectCastedRef u (c2c-expr i) t)]
+    [(MVectCastedSet! u (app c2c-expr i) (app c2c-expr e) t)
+     (MVectCastedSet! u i e t)]
+    [(Var id) (Var id)]
     ;; While each of these forms implicitly have coercive behavior
     ;; this will be exposed when we have make coercion
     [(Dyn-Fn-App e e* t* l)

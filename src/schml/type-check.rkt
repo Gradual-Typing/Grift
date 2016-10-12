@@ -4,12 +4,15 @@
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
-|Discription: This is a first attempt at typechecking for the GTLC core         |
+|Description: This is a first attempt at typechecking for the GTLC core         |
 |language.  It is currently limited to just the grammar noted below but with the|
-|with the addition of a unification algorithm is could be generalize to mutually|
+|addition of a unification algorithm is could be generalize to mutually         |
 |recursive functions. There is a major way in which this algorithm is different |
 |from that of the STLC. The difference is that instead of checking for type     |
 |equality the algorithm is checking for type consitency.                        |
+|                                                                               |
+|splits each elimination form of monotonic references to one that is annotated  |
+|and the one that is not, refer to the paper for the rules                      |
 |                                                                               |
 |Essence of the consistency relationship:                                       |
 |Two type are consistent any of the following relationships are true.           |
@@ -229,15 +232,22 @@ The type rules for core forms that have interesting type rules
     [otherwise (error 'type-error "attempt to unbox non-monotonic box: ~a" ty)]))
 
 ;; The type of setting a dyn value is dyn
-;; The type of setting a MRef value is the type of the armurment
+;; The type of setting a MRef value is the type of the argument
 (: mbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
 (define (mbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) DYN-TYPE]
     [(MRef m) (if (consistent? m val-ty)
-                  val-ty
+                  UNIT-TYPE
                   (error 'type-check/todo))]
     [otherwise (error 'type-check/todo)]))
+
+(: mbox-val-type (-> Schml-Type Schml-Type))
+(define (mbox-val-type box-ty)
+  (match box-ty
+    [(Dyn) DYN-TYPE]
+    [(MRef t) t]
+    [otherwise (error 'typecheck/mbox-val-type)]))
 
 ;; The type of creating an array is Vect of the type of the initializing argument
 ;; The size argument must be consistent with Int
@@ -307,11 +317,17 @@ The type rules for core forms that have interesting type rules
       (match vect-ty
         [(Dyn) DYN-TYPE]
         [(MVect g) (if (consistent? g val-ty)
-                       val-ty
+                       UNIT-TYPE
                        (error 'type-check/todo))]
         [otherwise (error 'type-check/todo)])
       (error 'type-check/todo)))
 
+(: mvector-val-type (-> Schml-Type Schml-Type))
+(define (mvector-val-type vect-ty)
+  (match vect-ty
+    [(Dyn) DYN-TYPE]
+    [(MVect t) t]
+    [otherwise (error 'type-check/mvector-val-type)]))
 
 ;;; Procedures that destructure and restructure the ast
 (: tc-expr (-> S0-Expr Env (values S1-Expr Schml-Type)))
@@ -409,24 +425,31 @@ The type rules for core forms that have interesting type rules
          (values (Gunbox e) (gunbox-type-rule t))]
         [(Gbox-set! (app recur e1 t1) (app recur e2 t2))
          (values (Gbox-set! e1 e2) (gbox-set!-type-rule t1 t2))]
-        [(Mbox (app recur e t))
-         (values (Mbox e) (mbox-type-rule t))]
+        [(MboxS (app recur e t))
+         (values (Mbox e t) (mbox-type-rule t))]
         [(Munbox (app recur e t))
-         (values (Munbox e) (munbox-type-rule t))]
+         (let ([ty (munbox-type-rule t)])
+           (values (if (completely-static-type? ty) (Munbox e) (MunboxT e ty)) ty))]
         [(Mbox-set! (app recur e1 t1) (app recur e2 t2))
-         (values (Mbox-set! e1 e2) (mbox-set!-type-rule t1 t2))]
+         (let ([ty (mbox-set!-type-rule t1 t2)]
+               [T  (mbox-val-type t1)])
+           (values (if (completely-static-type? T) (Mbox-set! e1 e2) (Mbox-set!T e1 e2 T)) ty))]
+        [(MvectorS (app recur e1 t1) (app recur e2 t2))
+         (let ([ty (mvector-type-rule t1 t2)])
+           (values (Mvector e1 e2 t2) ty))]
+        [(Mvector-ref (app recur e1 t1) (app recur e2 t2))
+         (let ([ty (mvector-ref-type-rule t1 t2)])
+           (values (if (completely-static-type? ty) (Mvector-ref e1 e2) (Mvector-refT e1 e2 ty)) ty))]
+        [(Mvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
+         (let ([ty (mvector-set!-type-rule t1 t2 t3)]
+               [T  (mvector-val-type t1)])
+           (values (if (completely-static-type? T) (Mvector-set! e1 e2 e3) (Mvector-set!T e1 e2 e3 T)) ty))]
         [(Gvector (app recur e1 t1) (app recur e2 t2))
          (values (Gvector e1 e2) (gvector-type-rule t1 t2))]
         [(Gvector-ref (app recur e1 t1) (app recur e2 t2))
          (values (Gvector-ref e1 e2) (gvector-ref-type-rule t1 t2))]
         [(Gvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
          (values (Gvector-set! e1 e2 e3) (gvector-set!-type-rule t1 t2 t3))]
-        [(Mvector (app recur e1 t1) (app recur e2 t2))
-         (values (Mvector e1 e2) (mvector-type-rule t1 t2))]
-        [(Mvector-ref (app recur e1 t1) (app recur e2 t2))
-         (values (Mvector-ref e1 e2) (mvector-ref-type-rule t1 t2))]
-        [(Mvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
-         (values (Mvector-set! e1 e2 e3) (mvector-set!-type-rule t1 t2 t3))]
         [(Create-tuple (app map-recur e* t*))
          (values (Create-tuple e*) (tuple-type-rule t*))]
         [(Tuple-proj (app recur e t) i)

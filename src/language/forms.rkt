@@ -67,12 +67,40 @@ And a type constructor "name" expecting the types of field1 and field2
   (No-Op)
   ;; Effect operations
   ;; Monotonic effects
-  (Mbox value)
+  (MboxS value) ;; source level mbox has no type annotation
+  (Mbox value type)
   (Munbox box)
+  (MunboxT box type)
   (Mbox-set! box value)
-  (Mvector value constructor)
-  (Mvector-set! vector offset value)
-  (Mvector-ref vector offset)
+  (Mbox-set!T box value type)
+  (Mbox-val-ref expression)
+  (Mbox-val-set! expression1 expression2)
+  (Mbox-rtti-ref address)
+  (Mbox-rtti-set! address expression)
+  (Make-Fn-Type expression1 expression2 expression3) ;; create meeted function type in runtime
+  (Make-Tuple-Type expression1 expression2 expression3)
+  ;; the underlying value can be accessed by the location encoded in the type
+  (MBoxCastedRef addr type)
+  (MBoxCastedSet! addr v type)
+  (CastedValue-Huh expression)
+  (CastedValue expression1 expression2)
+  (CastedValue-Value expression)
+  (CastedValue-Source expression)
+  (CastedValue-Target expression)
+  (CastedValue-Blames expression)
+  (CastedValue-Coercion expression)
+  (MvectorS value constructor)
+  (Mvector value constructor type)
+  (Mvector-set! vector index value)
+  (Mvector-set!T vector index value type)
+  (Mvector-ref vector index)
+  (Mvector-refT vector index type)
+  (Mvector-val-ref vector index)
+  (Mvector-val-set! vector index value)
+  (Mvector-rtti-ref vector)
+  (Mvector-rtti-set! address expression)
+  (MVectCastedRef addr index type)
+  (MVectCastedSet! addr index value type)
   ;; Guarded effects
   (Gbox value)
   (Gunbox box)
@@ -103,6 +131,11 @@ And a type constructor "name" expecting the types of field1 and field2
   ;;Type Operations
   (Type-Dyn-Huh exp)
   (Type-Tag expression)
+  (Type-Fn index return-type argument-types)
+  (Type-GRef type)
+  (Type-GVect type)
+  (Type-MRef type)
+  (Type-MVect type)
   (Type-Fn-arity expression)
   (Type-Fn-arg expression index)
   (Type-Fn-return expression)
@@ -111,6 +144,10 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-GRef-Huh type)
   (Type-GRef-Of expression)
   (Type-GVect-Of expression)
+  (Type-MRef-Huh expression)
+  (Type-MRef-Of expression)
+  (Type-MVect-Huh expression)
+  (Type-MVect-Of expression)
   (Type-Tuple-Huh type)
   (Type-Tuple-num type)
   (Type-Tuple-item type index)
@@ -141,6 +178,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Observational Operations
   (Blame expression)
   (Observe expression type)
+  (Error expression)
   ;; Lambda subforms
   (Castable caster body)
   (Bound closure variables body)
@@ -327,9 +365,6 @@ And a type constructor "name" expecting the types of field1 and field2
 
 
 
-
-
-
 #|-----------------------------------------------------------------------------+
 | Types shared by the Schml language family
 +-----------------------------------------------------------------------------|#
@@ -421,8 +456,8 @@ And a type constructor "name" expecting the types of field1 and field2
       (eq? 'timer-report x)))
 
 #| Literals of the schml languages
-   Only Integers and Booleans in the schml language are first
-   class literal constants
+Only Integers and Booleans in the schml language are first
+class literal constants
 |#
 
 (define-type Schml-Literal
@@ -464,6 +499,10 @@ And a type constructor "name" expecting the types of field1 and field2
      Schml-Ref-Type
      Schml-Tuple-Type))
 
+;; type known at runtime only for monotonic references, the uid is for
+;; the entire reference cell, you have to access the second component
+;; of the cell to get the type.
+
 (define-type Schml-Fn-Type
   (Fn Index Schml-Type* Schml-Type))
 
@@ -485,7 +524,6 @@ And a type constructor "name" expecting the types of field1 and field2
       (schml-fn? x)
       (schml-ref? x)
       (schml-tuple? x)))
-      
 
 (define-predicate schml-type*? Schml-Type*)
 #;(: schml-type*? (Any -> Boolean : Schml-Type*))
@@ -500,10 +538,10 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-predicate schml-tuple? Schml-Tuple-Type)
 #;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
 #;(define (schml-fn? x)
-   (and (Fn? x)
-    (index? (Fn-arity x))
-    (schml-type*? (Fn-fmls x))
-    (schml-type? (Fn-ret x))))
+    (and (Fn? x)
+         (index? (Fn-arity x))
+         (schml-type*? (Fn-fmls x))
+         (schml-type? (Fn-ret x))))
 
 
 (define-predicate schml-ref? Schml-Ref-Type)
@@ -523,7 +561,6 @@ And a type constructor "name" expecting the types of field1 and field2
 (: consistent? ConsistentT)
 (define (consistent? t g)
   ;; Typed racket made me structure the code this way.
-  ;; TODO change the names to be both-unit? ...
   (: both-unit? ConsistentT)
   (define (both-unit? t g) (and (Unit? t) (Unit? g)))
   (: both-bool? ConsistentT)
@@ -549,6 +586,14 @@ And a type constructor "name" expecting the types of field1 and field2
   (define (consistent-gvects? t g)
     (and (GVect? t) (GVect? g)
          (consistent? (GVect-arg t) (GVect-arg g))))
+  (: consistent-mrefs? ConsistentT)
+  (define (consistent-mrefs? t g)
+    (and (MRef? t) (MRef? g)
+         (consistent? (MRef-arg t) (MRef-arg g))))
+  (: consistent-mvects? ConsistentT)
+  (define (consistent-mvects? t g)
+    (and (MVect? t) (MVect? g)
+         (consistent? (MVect-arg t) (MVect-arg g))))
   (or (Dyn? t)
       (Dyn? g)
       (both-unit? t g)
@@ -557,25 +602,26 @@ And a type constructor "name" expecting the types of field1 and field2
       (consistent-fns? t g)
       (consistent-tuples? t g)
       (consistent-grefs? t g)
-      (consistent-gvects? t g)))
+      (consistent-gvects? t g)
+      (consistent-mrefs? t g)
+      (consistent-mvects? t g)))
 
 #|
- Join :: type X type -> type
- This is the join of the least precise latice
-     ⊑ latice example:
-      Int --> Int
-         /   \
-        /     \
-       /       \        Joins ↑
+Join :: type X type -> type
+This is the join of the least precise latice
+⊑ latice example:
+Int --> Int
+/   \
+/     \
+/       \        Joins ↑
 Dyn --> Int Int --> Dyn
-       \       /        Meets ↓
-        \     /
-         \   /
-      Dyn --> Dyn
-           |
-          Dyn
+\       /        Meets ↓
+\     /
+\   /
+Dyn --> Dyn
+|
+Dyn
 |#
-
 
 (struct Bottom ([t1 : Schml-Type] [t2 : Schml-Type]) #:transparent)
 (define-type Schml-Type?! (U Bottom Schml-Type))
@@ -628,6 +674,8 @@ Dyn --> Int Int --> Dyn
           (GRef (j t g))]
          [((GVect t) (GVect g))
           (GVect (j t g))]
+         [((MRef t) (MRef g))
+          (j t g)]
          [(t g) (exit (Bottom t g))]))
      (j t g))))
 
@@ -645,6 +693,8 @@ Dyn --> Int Int --> Dyn
           (GRef (m t g))]
          [((GVect t) (GVect g))
           (GVect (m t g))]
+         [((MRef t) (MRef g))
+          (MRef (m t g))]
          [(t g) (u/d/fail t g)])))
 
 (: move?! : ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type))
@@ -709,14 +759,13 @@ Dyn --> Int Int --> Dyn
 )
 
 
-
-
 (define-forms
   (Coercion coercion)
   (Twosome type1 type2 lbl)
   ;; TODO Come up with a better name for this
   (Quote-Coercion const)
   (Compose-Coercions fst snd)
+  (Make-Coercion t1 t2)
   ;; I am swithing to using the Cast and Interpreted Cast for the following
   ;; Forms
   ;(Coerce coercion expression) 
@@ -724,7 +773,7 @@ Dyn --> Int Int --> Dyn
   ;; Identity Cast
   ;; "Calculated No Op Cast"
   (Identity)
-  (Id-Coercion-Huh E)
+  (Id-Coercion-Huh expression)
   (Id-Coercion)
   ;; Projection Coercion
   ;; "Project from dynamic at type blaming label if it fails"
@@ -763,6 +812,11 @@ Dyn --> Int Int --> Dyn
   (Ref-Coercion read write)
   (Ref-Coercion-Read expression)
   (Ref-Coercion-Write ref)
+  (MonoRef type) ;; Monotonic Reference Coercion
+  (MRef-Coercion type)
+  (MRef-Coercion-Type expression)
+  (MVect-Coercion expression)
+  (MVect-Coercion-Type expression)
   (Fn-Proxy arity coercion closure)
   (Fn-Proxy-Coercion expression)
   (Fn-Proxy-Closure expression)
@@ -787,8 +841,10 @@ Dyn --> Int Int --> Dyn
   (Failed-Coercion-Huh crcn)
   (Failed-Coercion-Label fld)
   (Ref-Coercion-Huh crcn)
+  (MRef-Coercion-Huh crcn)
+  (MVect-Coercion-Huh crcn)
   (Fn-Coercion-Huh crcn)
-  (Make-Coercion t1 t2 lbl)
+  ;; (Make-Coercion t1 t2 lbl)
   (Make-Fn-Coercion make-uid t1 t2 lbl)
   (Compose-Fn-Coercion comp-uid c1 c2))
 
@@ -799,7 +855,7 @@ Dyn --> Int Int --> Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'STuple))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef 'STuple))
 
 (define-type Schml-Coercion
   (Rec C (U Identity
@@ -809,6 +865,7 @@ Dyn --> Int Int --> Dyn
             (Failed Blame-Label)
             (Fn Index (Listof C) C)
             (Ref C C)
+            (MonoRef Schml-Type)
             (CTuple Index (Listof C)))))
 
 (define IDENTITY : Identity (Identity))
@@ -839,6 +896,7 @@ Dyn --> Int Int --> Dyn
      (Sequence Immediate-Coercion Immediate-Coercion)
      (Failed Blame-Label)
      (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
+     (MonoRef Prim-Type)
      (CTuple Index (Listof Immediate-Coercion))
      (Ref Immediate-Coercion Immediate-Coercion)))
 
@@ -867,6 +925,7 @@ Dyn --> Int Int --> Dyn
             (Sequence C C)
             (Fn Index (Listof C) C)
             (Ref C C)
+            (MonoRef Prim-Type)
             (CTuple Index (Listof C)))))
 
 (define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))

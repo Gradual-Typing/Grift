@@ -41,7 +41,6 @@
   (Prog (list prgm-name (unique-counter-next! unique) prgm-type)
     (Let-Static* prgm-type-bnd* prgm-crcn-bnd* expr/pure-letrec)))
 
-
 ;; TODO: is it possible to merge simple? and pl-expr to make only one
 ;; pass over the AST?
 (: simple? (L0-Expr (Setof Uid) Integer Boolean -> Boolean))
@@ -156,6 +155,45 @@
     [(Guarded-Proxy-Target e) (recur e)]
     [(Guarded-Proxy-Blames e) (recur e)]
     [(Guarded-Proxy-Coercion e) (recur e)]
+    [(Mbox e t) (recur e)]
+    [(Mbox-val-set! e1 e2) (recur-all e1 e2)]
+    [(Mbox-val-ref e) (recur e)]
+    [(Mbox-rtti-set! u e) (recur e)]
+    [(Mbox-rtti-ref u) #f]
+    [(Make-Fn-Type u e1 e2) (recur-all e1 e2)]
+    [(Make-Tuple-Type u e1 e2) (recur-all e1 e2)]
+    [(MRef-Coercion-Huh e) (recur e)]
+    [(MRef-Coercion-Type e) (recur e)]
+    [(MRef-Coercion e) (recur e)]
+    [(Type-GRef e) (recur e)]
+    [(Type-GVect e) (recur e)]
+    [(Type-MRef e) (recur e)]
+    [(Type-MRef-Huh e) (recur e)]
+    [(Type-MRef-Of e) (recur e)]
+    [(CastedValue-Huh e) (recur e)]
+    [(CastedValue e r)
+     (match r
+       [(Twosome t1 t2 l)
+        (recur-all e t1 t2)]
+       [(Coercion c)
+        (recur-all e c)])]
+    [(CastedValue-Value e) (recur e)]
+    [(CastedValue-Source e) (recur e)]
+    [(CastedValue-Target e) (recur e)]
+    [(CastedValue-Blames e) (recur e)]
+    [(CastedValue-Coercion e) (recur e)]
+    [(Mvector e1 e2 t) (recur-all e1 e2)]
+    [(Mvector-val-set! e1 e2 e3) (recur-all e1 e2 e3)]
+    [(Mvector-val-ref e1 e2) (recur-all e1 e2)]
+    [(Mvector-rtti-set! u e) (recur e)]
+    [(Mvector-rtti-ref u) #f]
+    [(Type-MVect e) (recur e)]
+    [(Type-MVect-Huh e) (recur e)]
+    [(Type-MVect-Of e) (recur e)]
+    [(MVect-Coercion-Huh e) (recur e)]
+    [(MVect-Coercion-Type e) (recur e)]
+    [(MVect-Coercion e) (recur e)]
+    [(Error e) (recur e)]
     [(Create-tuple e*) (recur* e*)]
     [(Tuple-proj e i) (recur e)]
     [(Tuple-Coercion-Huh e) (recur e)]
@@ -169,28 +207,6 @@
     [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
     [(Mediating-Coercion-Huh? e) (recur e)]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
-
-;; Computes the intersection between two lists and the list of elements
-;; that is in the first list but not in the second.
-(: diff1-intersect (L1-Bnd-Lambda* Uid* -> (Values L1-Bnd-Lambda* L1-Bnd-Lambda*)))
-(define (diff1-intersect l1 l2)
-  (for/fold ([no* : L1-Bnd-Lambda* '()]
-             [yes* : L1-Bnd-Lambda* '()])
-            ([a : L1-Bnd-Lambda l1])
-    (match-let ([(cons i e) a])
-      (if (memq i l2)
-          (values no* (cons a yes*))
-          (values (cons a no*) yes*)))))
-
-;; Computes the list of elements in the second list but not in the first.
-(: diff2 (Uid* Uid* -> Uid*))
-(define (diff2 l1 l2)
-  (let-values ([(l) (for/fold ([no* : Uid* '()])
-                              ([a : Uid l2])
-                      (if (memq a l1)
-                          (values no*)
-                          (values (cons a no*))))])
-    l))
 
 (: replace-ref-lam (L1-Lambda (Setof Uid) -> L1-Lambda))
 (define (replace-ref-lam expr v*)
@@ -256,7 +272,7 @@
      (Id-Coercion-Huh e)]
     [(Fn-Coercion-Huh (app recur e))
      (Fn-Coercion-Huh e)]
-    [(Make-Fn-Coercion u (app recur e1)(app recur e2)(app recur e3))
+    [(Make-Fn-Coercion u (app recur e1)(app recur e2)e3)
      (Make-Fn-Coercion u e1 e2 e3)]
     [(Compose-Fn-Coercion u (app recur e1) (app recur e2))
      (Compose-Fn-Coercion u e1 e2)]
@@ -379,11 +395,56 @@
      (Guarded-Proxy-Blames expr)]
     [(Guarded-Proxy-Coercion (app recur expr))
      (Guarded-Proxy-Coercion expr)]
+    [(Mbox (app recur e) t) (Mbox e t)]
+    [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
+    [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
+    [(Mbox-rtti-set! u (app recur e)) (Mbox-rtti-set! u e)]
+    [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+    [(Make-Fn-Type e1 (app recur e2) (app recur e3))
+     (Make-Fn-Type e1 e2 e3)]
+    [(Make-Tuple-Type e1 (app recur e2) (app recur e3))
+     (Make-Tuple-Type e1 e2 e3)]
+    [(MRef-Coercion-Huh (app recur e)) (MRef-Coercion-Huh e)]
+    [(MRef-Coercion-Type (app recur e)) (MRef-Coercion-Type e)]
+    [(MRef-Coercion (app recur e)) (MRef-Coercion e)]
+    [(Type-GRef (app recur e)) (Type-GRef e)]
+    [(Type-GVect (app recur e)) (Type-GVect e)]
+    [(Type-MRef (app recur e)) (Type-MRef e)]
+    [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
+    [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
+    [(CastedValue-Huh exp)
+     (CastedValue-Huh (recur exp))]
+    [(CastedValue (app recur e) r)
+     (match r
+       [(Twosome t1 t2 l)
+        (CastedValue e (Twosome (recur t1) (recur t2) (recur l)))]
+       [(Coercion c)
+        (CastedValue e (Coercion (recur c)))])]
+    [(CastedValue-Value exp)
+     (CastedValue-Value (recur exp))]
+    [(CastedValue-Source exp)
+     (CastedValue-Source (recur exp))]
+    [(CastedValue-Target exp)
+     (CastedValue-Target (recur exp))]
+    [(CastedValue-Blames exp)
+     (CastedValue-Blames (recur exp))]
+    [(CastedValue-Coercion exp)
+     (CastedValue-Coercion (recur exp))]
+    [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
+    [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
+    [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+    [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
+    [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+    [(Type-MVect e) (Type-MVect (recur e))]
+    [(Type-MVect-Huh e) (Type-MVect-Huh (recur e))]
+    [(Type-MVect-Of e) (Type-MVect-Of (recur e))]
+    [(MVect-Coercion-Huh e) (MVect-Coercion-Huh (recur e))]
+    [(MVect-Coercion-Type e) (MVect-Coercion-Type (recur e))]
+    [(MVect-Coercion e) (MVect-Coercion (recur e))]
+    [(Error (app recur e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (recur* e*))]
     [(Tuple-proj e i) (Tuple-proj (recur e) i)]
     [other (error 'purify-letrec/replace-ref "unmatched ~a" other)]))
-
-
 
 
 (: pl-expr (L0-Expr -> L1-Expr))
@@ -622,6 +683,53 @@
      (Guarded-Proxy-Blames expr)]
     [(Guarded-Proxy-Coercion (app pl-expr expr))
      (Guarded-Proxy-Coercion expr)]
+    [(Mbox (app pl-expr e) t) (Mbox e t)]
+    [(Mbox-val-set! (app pl-expr e1) (app pl-expr e2)) (Mbox-val-set! e1 e2)]
+    [(Mbox-val-ref (app pl-expr e)) (Mbox-val-ref e)]
+    [(Mbox-rtti-set! u (app pl-expr e)) (Mbox-rtti-set! u e)]
+    [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+    [(Make-Fn-Type e1 (app pl-expr e2) (app pl-expr e3))
+     (Make-Fn-Type e1 e2 e3)]
+    [(Make-Tuple-Type e1 (app pl-expr e2) (app pl-expr e3))
+     (Make-Tuple-Type e1 e2 e3)]
+    [(MRef-Coercion-Huh (app pl-expr e)) (MRef-Coercion-Huh e)]
+    [(MRef-Coercion-Type (app pl-expr e)) (MRef-Coercion-Type e)]
+    [(MRef-Coercion (app pl-expr e)) (MRef-Coercion e)]
+    [(Type-GRef (app pl-expr e)) (Type-GRef e)]
+    [(Type-GVect (app pl-expr e)) (Type-GVect e)]
+    [(Type-MRef (app pl-expr e)) (Type-MRef e)]
+    [(Type-MRef-Huh (app pl-expr e)) (Type-MRef-Huh e)]
+    [(Type-MRef-Of (app pl-expr e)) (Type-MRef-Of e)]
+    [(CastedValue-Huh exp)
+     (CastedValue-Huh (pl-expr exp))]
+    [(CastedValue (app pl-expr e) r)
+     (match r
+       [(Twosome t1 t2 l)
+        (CastedValue e (Twosome (pl-expr t1) (pl-expr t2) (pl-expr l)))]
+       [(Coercion c)
+        (CastedValue e (Coercion (pl-expr c)))])]
+    [(CastedValue-Value exp)
+     (CastedValue-Value (pl-expr exp))]
+    [(CastedValue-Source exp)
+     (CastedValue-Source (pl-expr exp))]
+    [(CastedValue-Target exp)
+     (CastedValue-Target (pl-expr exp))]
+    [(CastedValue-Blames exp)
+     (CastedValue-Blames (pl-expr exp))]
+    [(CastedValue-Coercion exp)
+     (CastedValue-Coercion (pl-expr exp))]
+    [(Mvector (app pl-expr e1) (app pl-expr e2) t) (Mvector e1 e2 t)]
+    [(Mvector-val-set! (app pl-expr e1) (app pl-expr e2) (app pl-expr e3)) (Mvector-val-set! e1 e2 e3)]
+    [(Mvector-val-ref (app pl-expr e1) (app pl-expr e2)) (Mvector-val-ref e1 e2)]
+    [(Mvector-rtti-set! u (app pl-expr e)) (Mvector-rtti-set! u e)]
+    [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+    [(Type-MVect e) (Type-MVect (pl-expr e))]
+    [(Type-MVect-Huh e) (Type-MVect-Huh (pl-expr e))]
+    [(Type-MVect-Of e) (Type-MVect-Of (pl-expr e))]
+    [(MVect-Coercion-Huh e) (MVect-Coercion-Huh (pl-expr e))]
+    [(MVect-Coercion-Type e) (MVect-Coercion-Type (pl-expr e))]
+    [(MVect-Coercion e) (MVect-Coercion (pl-expr e))]
+    [(Error (app pl-expr e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (pl-expr* e*))]
     [(Tuple-proj e i) (Tuple-proj (pl-expr e) i)]
     [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (pl-expr e))]
@@ -636,7 +744,7 @@
     [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (pl-expr e))]
     [other (error 'purify-letrec/expr "unmatched ~a" other)]))
 
-         #|
+#|
 [(and (null? complex*) (null? lambda*) (null? simple*)) (return-state exp)]
 [(and (null? complex*) (null? simple*)) (return-state (Letrec lambda* exp))]
 [(and (null? complex*) (null? lambda*)) (return-state (Let simple* exp))]
@@ -669,50 +777,50 @@
                        (make-list (length c*) (Gbox (Quote 0))))]
        [let-tbnd* (map (inst cons Uid L1-Expr) t* (map (inst cdr Uid L1-Expr) complex*))])
 
-      [(Lambda f* e) (Lambda f* (recur e))]
-      [(Cast exp r)
-       (exp : L1-Expr <- (pl-expr exp))
-       (match r
-         [(Twosome t1 t2 lbl)
-          (return-state (Cast exp (Twosome t1 t2 lbl)))]
-         [(Coercion c)
-          (return-state (Cast exp (Coercion c)))])]
+  [(Lambda f* e) (Lambda f* (recur e))]
+  [(Cast exp r)
+   (exp : L1-Expr <- (pl-expr exp))
+   (match r
+     [(Twosome t1 t2 lbl)
+      (return-state (Cast exp (Twosome t1 t2 lbl)))]
+     [(Coercion c)
+      (return-state (Cast exp (Coercion c)))])]
 
-      [(Let bnd* exp)
-       (bnd* : L1-Bnd* <- (pl-bnd* bnd*))
-       (exp : L1-Expr  <- (pl-expr exp))
-       (return-state (Let bnd* exp))]
-      [(App exp exp*)
-       (exp  : L1-Expr  <- (pl-expr  exp))
-       (exp* : L1-Expr* <- (map-state pl-expr exp*))
-       (return-state (App exp exp*))]
-      [(Op p exp*)
-       (exp* : L1-Expr* <- (map-state pl-expr exp*))
-       (return-state (Op p exp*))]
-      [(If tst csq alt)
-       (tst : L1-Expr <- (pl-expr tst))
-       (csq : L1-Expr <- (pl-expr csq))
-       (alt : L1-Expr <- (pl-expr alt))
-       (return-state (If tst csq alt))]
-      [(Begin e* e)
-       (e* : L1-Expr* <- (map-state pl-expr e*))
-       (e  : L1-Expr  <- (pl-expr  e))
-       (return-state (Begin e* e))]
-      [(Repeat i e1 e2 e3)
-       (e1 : L1-Expr <- (pl-expr e1))
-       (e2 : L1-Expr <- (pl-expr e2))
-       (e3 : L1-Expr <- (pl-expr e3))
-       (return-state (Repeat i e1 e2 e3))]
-      [(Gbox e) (lift-state (inst Gbox L1-Expr) (pl-expr e))]
-      [(Gunbox e) (lift-state (inst Gunbox L1-Expr) (pl-expr e))]
-      [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! L1-Expr L1-Expr)
-                                     (pl-expr e1) (pl-expr e2))]
-      [(Gvector n e) (lift-state (inst Gvector L1-Expr L1-Expr) (pl-expr n) (pl-expr e))]
-      [(Gvector-ref e index) (lift-state (inst Gvector-ref L1-Expr L1-Expr) (pl-expr e) (pl-expr index))]
-      [(Gvector-set! e1 index e2) (lift-state (inst Gvector-set! L1-Expr L1-Expr L1-Expr)
-                                              (pl-expr e1) (pl-expr index) (pl-expr e2))]
-      [(Var id)    (return-state (Var id))]
-      [(Quote lit) (return-state (Quote lit))]
-       
-        
+  [(Let bnd* exp)
+   (bnd* : L1-Bnd* <- (pl-bnd* bnd*))
+   (exp : L1-Expr  <- (pl-expr exp))
+   (return-state (Let bnd* exp))]
+  [(App exp exp*)
+   (exp  : L1-Expr  <- (pl-expr  exp))
+   (exp* : L1-Expr* <- (map-state pl-expr exp*))
+   (return-state (App exp exp*))]
+  [(Op p exp*)
+   (exp* : L1-Expr* <- (map-state pl-expr exp*))
+   (return-state (Op p exp*))]
+  [(If tst csq alt)
+   (tst : L1-Expr <- (pl-expr tst))
+   (csq : L1-Expr <- (pl-expr csq))
+   (alt : L1-Expr <- (pl-expr alt))
+   (return-state (If tst csq alt))]
+  [(Begin e* e)
+   (e* : L1-Expr* <- (map-state pl-expr e*))
+   (e  : L1-Expr  <- (pl-expr  e))
+   (return-state (Begin e* e))]
+  [(Repeat i e1 e2 e3)
+   (e1 : L1-Expr <- (pl-expr e1))
+   (e2 : L1-Expr <- (pl-expr e2))
+   (e3 : L1-Expr <- (pl-expr e3))
+   (return-state (Repeat i e1 e2 e3))]
+  [(Gbox e) (lift-state (inst Gbox L1-Expr) (pl-expr e))]
+  [(Gunbox e) (lift-state (inst Gunbox L1-Expr) (pl-expr e))]
+  [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! L1-Expr L1-Expr)
+                                 (pl-expr e1) (pl-expr e2))]
+  [(Gvector n e) (lift-state (inst Gvector L1-Expr L1-Expr) (pl-expr n) (pl-expr e))]
+  [(Gvector-ref e index) (lift-state (inst Gvector-ref L1-Expr L1-Expr) (pl-expr e) (pl-expr index))]
+  [(Gvector-set! e1 index e2) (lift-state (inst Gvector-set! L1-Expr L1-Expr L1-Expr)
+                                          (pl-expr e1) (pl-expr index) (pl-expr e2))]
+  [(Var id)    (return-state (Var id))]
+  [(Quote lit) (return-state (Quote lit))]
+  
+  
   |#
