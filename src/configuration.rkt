@@ -27,7 +27,11 @@
 (define output-path : (Parameterof (Option Path))
   (make-parameter #f))
 (define init-heap-kilobytes : (Parameterof Natural)
-  (make-parameter (expt 1024 2)))
+  (make-parameter 1024))
+(define-type GC (U 'Boehm 'None))
+(define garbage-collector : (Parameterof GC)
+  (make-parameter 'Boehm))
+
 
 ;; Interaction with the c compiler
 (define c-flags : (Parameterof (Listof String))

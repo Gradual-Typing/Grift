@@ -8,23 +8,32 @@
          ;;"../src/language.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
-         racket/exn
          (only-in "../src/compile.rkt" compile)
          "./values.rkt"
          "./paths.rkt")
+
+(require/typed racket/control
+  [abort (Any -> Nothing)])
+
+(require/typed racket/exn
+  [exn->string (exn -> String)])
 
 (provide (all-defined-out)
          (all-from-out "./values.rkt"))
 
 (define-syntax-rule (test-compile name path expected)
   (test-case name 
-    (with-handlers ([exn?
-                      (lambda ([e : exn])
-                        (begin
-                          (check value=?
-                                 expected
-                                 (blame #t (exn-message e))
-                                 "static type error")))])
+    (with-handlers ([exn:break? abort] 
+                    [exn?
+                     (lambda ([e : exn])
+                       (let ([t? (value=? expected (blame #t (exn-message e)))])
+                         (unless t?
+                           (display (exn->string e))
+                           (check value=?
+                                  expected
+                                  (blame #t (exn-message e))
+                                  "static type error"))
+                         (void)))])
       (define f
         (compile path))
       (parameterize ([current-input-port (open-test-input path)])

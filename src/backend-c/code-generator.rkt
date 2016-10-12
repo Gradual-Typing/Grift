@@ -10,14 +10,20 @@
          (for-syntax "runtime-location.rkt")
          "runtime-location.rkt")
 
-(provide (all-defined-out))
-
+#;
 (begin-for-syntax
-  (define runtime.o-str (path->string runtime.o-path))
-  (define runtime.c-str (path->string runtime.c-path))
-  (unless (system (format "cc ~a -c -o ~a" runtime.c-str runtime.o-str))
-    (error 'schml/backend-c/code-generator "error compiling the runtime")))
+  (unless (system (format "cc ~a -c -o ~a" runtime.c-path runtime.o-path))
+    (error 'schml/backend-c/code-generator "error compiling the runtime"))
+  (unless (parameterize ([current-directory boehm-gc-dir])
+            (and (system "make distclean")
+                 (system (format "./configure --prefix=~a" boehm-gc-install))
+                 (system "./make; make check; make install")))
+    (error 'schml/backend-c/code-generator "error compiling the boehm"))
+  (unless (system (format "cc ~a -c -o ~a" none-gc.c-path none-gc.o-path))
+    (error 'schml/backend-c/code-generator "error compiling the nonegc")))
 
+
+(provide (all-defined-out))
 
 (define (find-unused-path [suffix : String]) : Path
   (let loop ([i 0])
@@ -72,7 +78,11 @@
 
 (: cc/runtime (->* (String String String) (#:runtime Path) Void))
 (define (cc/runtime out in flags #:runtime [rt runtime.o-path])
-  (define cmd (format "clang -o ~a ~a ~a ~a" out in (path->string rt) flags))
+  (define gc
+    (match (garbage-collector)
+      ['Boehm boehm-gc.a-path]
+      ['None  none-gc.o-path]))
+  (define cmd (format "clang -o ~a ~a ~a ~a ~a" out in rt gc flags))
   (when (trace? 'Vomit)
     (logf "System call: ~a" cmd))
   (flush-output (current-log-port))

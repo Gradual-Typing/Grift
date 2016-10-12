@@ -151,6 +151,7 @@
     (if s?
         (suite (cdr s?))
         (error 'tests "--suite given invalid argument ~a" choice)))]
+ ;; Compiler Configuration
  #:once-each
  [("-r" "--cast-representation") crep
   "specify which cast representation to use (Type-Based or Coercions)"
@@ -159,6 +160,10 @@
             (eq? 'Coercions crep))
         (test-cast-representation (list crep))
         (error 'tests "--cast-representation given invalid argument ~a" crep)))]
+ ;; Compiler Configuration -> GC Selection
+ #:once-any
+ ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
+ ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
  #:args ()
  (debug off (test-suite-dir) (test-cast-representation))
  ((main-function)))

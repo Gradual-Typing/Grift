@@ -44,7 +44,8 @@
                  #:mem      Natural
                  #:rt       (Option (U String Path))
                  #:log-level Log-Level
-                 #:log-port  (Option (U String Path Output-Port)))
+                 #:log-port  (Option (U String Path Output-Port))
+                 #:gc       GC)
                 Path))
 (define (compile target
                  #:output    [output    (output-path)]
@@ -56,14 +57,15 @@
                  #:mem       [mem       (init-heap-kilobytes)]
                  #:rt        [rt        (runtime-path)]
                  #:log-level [log-level (schml-log-level)]
-                 #:log-port  [log-port  (schml-log-port)])
-  ;; convert all strings to paths
+                 #:log-port  [log-port  (schml-log-port)]
+                 #:gc        [gc        (garbage-collector)])
+  ;; convert all convience types to internal API
   (let* ([target  (if (string? target) (build-path target) target)]
          [output  (if (string? output) (build-path output) output)]
          [keep-c  (if (string? keep-c) (build-path keep-c) keep-c)]
          [keep-s  (if (string? keep-s) (build-path keep-s) keep-s)]
          [cc-opts (if (string? cc-opts) (list cc-opts) cc-opts)] 
-         [rt      (if (string? rt) (build-path rt) rt)]
+         [rt      (if (string? rt)     (build-path rt)     rt)]
          [log-port : (U #f Output-Port Path)
                    (if (string? log-port) (build-path log-port) log-port)])
     ;; Setup compile time parameters based off of these flags
@@ -74,7 +76,8 @@
                    [cast-representation cast]
                    [c-flags     cc-opts]
                    [init-heap-kilobytes mem]
-                   [runtime-path rt])
+                   [runtime-path rt]
+                   [garbage-collector gc])
       (define (compile-target) : Path (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
         (with-logging-to-port p compile-target log-level 'schml))

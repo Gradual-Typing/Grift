@@ -25,6 +25,9 @@
       [("Hyper-Coercions") (error 'schml "Hyper-Coercions not yet supported")]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
+   [("-o") output-str
+    "specify output path for executable"
+    (output-path (string->path output-str))]
    [("--keep-c") name
     "keep the c intermediate representation"
     (c-path (build-path name))]
@@ -57,6 +60,9 @@
    [("-g" "--with-debug-symbols")
     "Invoke c compiler so that debugging symbols are retained."
     (c-flags (cons "-g" (c-flags)))]
+   #:once-any
+   ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
+   ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
    #:args (target)
    (cond
      [(string->path target) =>
