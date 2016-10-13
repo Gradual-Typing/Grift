@@ -16,13 +16,6 @@
 (require/typed racket/exn
   (exn->string (exn -> String)))
 
-
-(require/typed racket/control
-  [abort (Any -> Nothing)])
-
-(require/typed racket/exn
-  [exn->string (exn -> String)])
-
 (provide (all-defined-out)
          (all-from-out "./values.rkt"))
 

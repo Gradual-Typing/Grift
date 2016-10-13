@@ -1,15 +1,17 @@
-BOEHM_GC_INSTALL=boehm-gc-install
+all : boehm-gc-install runtime.o nonegc.o
+
 boehm-gc-install :
-	PWD=`pwd`; cd boehm-gc; ./configure --prefix=${PWD}/${BOEHM_GC_INSTALL}
+	PWD=`pwd`; cd boehm-gc; ./configure --prefix=${PWD}/boehm-gc-install
 	cd boehm-gc; make
 	cd boehm-gc; make check
 	cd boehm-gc; make install
 
-all : boehm-gc-install
-	cc runtime.c -c -o runtime.o
-	cc nonegc.c  -c -o nonegc.o
+%.c :
+
+%.o : %.c
+	cc $< -c -o $@
 
 clean :
 	cd boehm-gc; make distclean
-	rm -rf $BOEHM_GC_INSTALL
+	rm -rf boehm-gc-install
 	rm -f *.o
