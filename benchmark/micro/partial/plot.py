@@ -4,12 +4,17 @@ import matplotlib as mpl
 latex_output = False
 show_regression = True
 
+tb_color = '#f4a582'
+cr_color = '#0571b0'
+
+
 if latex_output:
     mpl.use('PDF')
-    mpl.rc('font',**{'family':'serif','serif':['Computer Modern Roman']})
+    mpl.rc('font',**{'family':'serif','serif':['Times'], 'size' : 15})
     mpl.rc('text', usetex=True)
-    
-mpl.rcParams.update({'font.size': 15})
+else:
+    mpl.rc('font',**{'family':'serif','serif':['Times'], 'size' : 15})
+    #mpl.rcParams.update({'font.size': 15})
     
 import matplotlib.pyplot  as plt
 import matplotlib.patches as mpatch
@@ -26,6 +31,7 @@ def sort_for_violin_plot(data_set, key, value):
 def set_violin_color_label(vplot, color, label):
     for p in vplot['bodies']:
         p.set_color(color)
+        p.set_alpha(.6)
     return mpatch.Patch(color=color, label=label)
 
 def violin_plot(data, x, y, widths, color, label, do_regression=None):
@@ -74,7 +80,7 @@ def cast_plot(fignum, test, test_action, rx, ry, calc_plot_bounds=None):
                                                    , "coercions"
                                                    , "time"
                                                    , 7
-                                                   , "blue"
+                                                   , tb_color
                                                    , "Type-Based Casts"
                                                    ,do_regression=reg_params)
 
@@ -88,7 +94,7 @@ def cast_plot(fignum, test, test_action, rx, ry, calc_plot_bounds=None):
                                                  ,"coercions"
                                                  ,"time"
                                                  , 7
-                                                 , "green"
+                                                 , cr_color
                                                  , "Coercions"
                                                  ,do_regression=reg_params)
     
@@ -134,7 +140,7 @@ cast_plot(2, "ref-cast", "reference cast", 40, 200,
 #                               , "coercions"
 #                               , "time"
 #                               , 7
-#                               , "blue"
+#                               , tb_color
 #                               , "Type-Based Casts")
 
 
@@ -189,13 +195,13 @@ def use_by_casts_plot(fignum, test, rx, ry, test_action, calc_bounds=None):
                          ,"casts"
                          ,"titer"
                          , 0.5
-                         , "blue"
+                         , tb_color
                          , "Type-Based Casts"
                          ,do_regression=reg_params)
 
     reg_params = ("purple", "$N_i$", "Linear Model of Coercions", rx, ry - 100)
     c_vplt, c_lplt = violin_plot(c_data ,"casts" ,"titer" , 0.5
-                               , "green" , "Coercions", do_regression=reg_params)
+                               , cr_color , "Coercions", do_regression=reg_params)
 
     if calc_bounds:
         plt.axis(calc_bounds(min(c_data["casts"]),
@@ -246,12 +252,12 @@ def use_by_crcns_plot(fignum, test, rx, ry, test_action, w, calc_bounds):
 
     reg_params = ("purple" , "$N_c$" , "Linear Model of Type-Based" , rx ,  ry - 100)
     t_vplt, t_lplt = violin_plot(t_data ,"coercions" ,"titer"
-                               ,w ,"blue" ,"Type-Based Casts"
+                               ,w ,tb_color ,"Type-Based Casts"
                                , do_regression=reg_params)
 
     reg_params = ("red" , "$N_c$" , "Linear Model of Coercions" , rx ,  ry)
     c_vplt, c_lplt = violin_plot(c_data ,"coercions" ,"titer" ,w
-                                 ,"green" ,"Coercions", do_regression=reg_params)
+                                 ,cr_color ,"Coercions", do_regression=reg_params)
 
     plt.axis(calc_bounds(min(c_data["coercions"]),
                          max(c_data["coercions"]),

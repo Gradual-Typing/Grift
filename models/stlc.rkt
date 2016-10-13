@@ -1,19 +1,12 @@
 #lang racket
 
-(require redex
-         "helpers.rkt")
+(require "helpers.rkt" (for-syntax racket/syntax))
 
-(module+ test
-  ;; Make sure that we test the entire stack of languages
-  (require (submod "base.rkt" test)))
+(provide (all-from-out "helpers.rkt"))
 
 (provide
  ;; The syntax of the simply typeded lambda calculus
  STLC STLC/tc
- ;; Capture avoiding substitution
- ;; (subst '((xs es) ...) e) : metafunction
- ;; subsitute all xs for es in e renaming as needed to avoid capture
- subst
  ;; Alpha equivalence
  ;; (=α t1 t2) : metafunction
  ;; is t1 alpha equivalent to t2? 
@@ -35,6 +28,7 @@
 (define-language STLC
   ;; Things that should definately not be included in the grammar
   ;; if produced as a pic or pdf
+  (Γ ::= · (x any Γ))
   (x ::= variable-not-otherwise-mentioned)
   (i ::= integer)
   (b ::= boolean)
@@ -42,20 +36,70 @@
   (B ::= Int Bool ())
   ;; End things that must not be named 
   (e   ::= k x f
-           (letrec ([x_!_ : T f] ...) e)
-           (let ([x_!_ : T e] ...) e)
-           (o e ...)
-           (e e ...)
-           (if e e e))
-  (f ::= (lambda ([x_!_ : T] ...) e))
+       (letrec  ([x : T f]) e)
+       (letrec2 ([x_!_ : T f] [x_!_ : T f]) e)
+       (let ([x : T e]) e)
+       (let2 ([x_!_ : T e] [x_!_ : T e]) e)
+       (o e e)
+       (e e)
+       (if e e e))
+  (f ::= (lambda ([x : T]) e))
   ;;
   (o ::= + - * =)
   ;; Types
-  (T ::= B (T ... -> T)))
+  (T ::= B (T -> T))
+  #:binding-forms
+  (lambda ([x_param : T_param]) e #:refers-to x_param)
+  (let ([x_bnd : T_bnd e_bnd])
+    e #:refers-to x_bnd)
+  (let2 ([x_1 : T_1 e_1]
+         [x_2 : T_2 e_2])
+        e #:refers-to (shadow x_1 x_2))
+  (letrec ([x_bnd : T_bnd e_bnd #:refers-to x_bnd])
+    e #:refers-to x_bnd)
+  (letrec2 ([x_1 : T_1 e_1 #:refers-to (shadow x_1 x_2)]
+            [x_2 : T_2 e_2 #:refers-to (shadow x_1 x_2)])
+    e #:refers-to (shadow x_1 x_2)))
+
+(module+ test
+  (test-true
+   (alpha-equivalent? STLC
+    (term (lambda ([x : Int]) x))
+    (term (lambda ([y : Int]) y))))
+  (test-true
+   (alpha-equivalent? STLC
+    (term (lambda ([x : Int]) (lambda ([y : Int]) y)))
+    (term (lambda ([y : Int]) (lambda ([y : Int]) y)))))
+  (test-false
+   (alpha-equivalent?
+    STLC
+    (term (lambda ([x : Int]) (lambda ([y : Int]) y)))
+    (term (lambda ([x : Int]) (lambda ([y : Int]) x)))))
+  (test-true
+   (alpha-equivalent?
+    STLC
+    (term (let ([x : Int 1]) x))
+    (term (let ([y : Int 1]) y))))
+  (test-true
+   (alpha-equivalent?
+    STLC
+    (term (letrec ([x : Int x]) x))
+    (term (letrec ([y : Int y]) y))))
+  (test-true
+   (alpha-equivalent?
+    STLC
+    (term (letrec2 ([x : Int y] [y : Int x]) x))
+    (term (letrec2 ([y : Int x] [x : Int y]) y))))
+  (test-false
+   (alpha-equivalent?
+    STLC
+    (term (letrec2 ([x : Int y] [y : Int x]) x))
+    (term (letrec2 ([x : Int y] [y : Int x]) y)))))
 
 ;;———————————————————————————————————————————————————–———————————————————–——————
 ;; Scope helpers
 
+#;
 (define-metafunction STLC
   in : any (any ...) -> boolean
   [(in any_1 (any_n ... any_1 any_m ...)) #t]
@@ -76,25 +120,19 @@
 
   (define fst0  (term (lambda ([x : ()]) (lambda ([y : ()]) x))))
   (define fst1  (term (lambda ([n : ()]) (lambda ([m : ()]) n))))
-  (define fst10 (term (lambda ([x : ()] [y : ()]) x)))
-  (define fst11 (term (lambda ([n : ()] [m : ()]) n)))
   (define snd0  (term (lambda ([x : ()]) (lambda ([y : ()]) y))))
   (define snd1  (term (lambda ([n : ()]) (lambda ([m : ()]) m))))
-  (define snd10 (term (lambda ([x : ()] [y : ()]) y)))
-  (define snd11 (term (lambda ([n : ()] [m : ()]) m)))
 
   (test-true (redex-match? STLC e fst0))
   (test-true (redex-match? STLC e fst1))
-  (test-true (redex-match? STLC e fst10))
-  (test-true (redex-match? STLC e fst11))
   (test-true (redex-match? STLC e snd0))
   (test-true (redex-match? STLC e snd1))
-  (test-true (redex-match? STLC e snd11))
-  (test-true (redex-match? STLC e snd10))
+
   )
 
 
 ;; fvs : Collect the unique free variables of a gradual expression
+#;
 (define-metafunction STLC
   fvs : any -> (x_!_ ...)
   [(fvs x) (x)]
@@ -104,10 +142,12 @@
    ,(foldr set-union (term ()) (term ((fvs any) ...)))])
 
 ;; fv? : Does a variable occur free in a expression?
+#;
 (define-metafunction STLC
   fv? : x any -> boolean
   [(fv? x any) (in x (fvs any))])
 
+#;
 (module+ test
   (test-true  (term (fv? x ,xfree0)))
   (test-true  (term (fv? x ,xfree1)))
@@ -115,6 +155,7 @@
   (test-false (term (fv? x ,x!free1))))
 
 ;; bvs : return the bound variables of an expression
+#;
 (define-metafunction STLC
   bvs : any -> (x_!_ ...)
   [(bvs x) ()]
@@ -124,10 +165,12 @@
   [(bvs (any ...)) ,(foldr set-union (term ()) (term ((bvs any) ...)))])
 
 ;; bv? : test if a variable occurs bound in an expression
+#;
 (define-metafunction STLC
   bv? : x any -> boolean
   [(bv? x any) (in x (bvs any))])
 
+#;
 (module+ test
   (test-true  (term (bv? x ,xbound0)))
   (test-true  (term (bv? x ,xbound1)))
@@ -139,45 +182,10 @@
 ;; =α : are two expression alpha equivalent?
 (define-metafunction STLC
   =α : any any -> boolean
-  [(=α any_1 any_2) ,(equal? (term (sd any_1))
-                             (term (sd any_2)))])
+  [(=α any any) #t]
+  [(=α _   _)   #f])
 
 (define (=α/racket t1 t2) (term (=α ,t1 ,t2)))
-
-;; sd convert regular bindings
-(define-extended-language STLCΔ STLC
-  (T ::= any)
-  (e ::= any)
-  (m ::= e (K n n)
-         (letrec ([T f] ...) m)
-         (let ([T m] ...) m))
-  (f ::= (lambda (T ...) m))
-  (n ::= natural)
-  (Γ ::= ((x ...) ...)))
-
-(define-metafunction STLCΔ
-  sd : any -> any
-  [(sd any) (sd/env any ())])
-
-(define-metafunction STLCΔ
-  sd/env : m Γ -> m
-  [(sd/env x ((x_1 ...) ...
-              (x_2 ... x x_3 ...)
-              (x_4 ...) ...))
-   (K ,(length (term ((x_1 ...) ...)))
-      ,(length (term (x_2 ...))))
-   (where #f (in x (x_1 ... ...)))]
-  [(sd/env x _) x]
-  [(sd/env (lambda ([x_n : T_n] ...) m) ((x ...) ...))
-   (lambda (T_n ...) (sd/env m ((x_n ...) (x ...) ...)))]
-  [(sd/env (letrec ([x : T f] ...) e) (any_1 ...))
-   (letrec ([T (sd/env f ((x ...) any_1 ...))] ...)
-     (sd/env e ((x ...) any_1 ...)))]
-  [(sd/env (let ([x : T m_rhs] ...) m_body) (any_1 ...))
-   (let([T (sd/env m_rhs ((x ...) any_1 ...))] ...)
-     (sd/env m_body ((x ...) any_1 ...)))]
-  [(sd/env (m ...) Γ) ((sd/env m Γ) ...)]
-  [(sd/env e Γ) e])
 
 (module+ test
   (test-true (term (=α (lambda ([x : ()]) x)
@@ -186,114 +194,17 @@
                         (lambda ([y : ()]) y))))
   (test-true (term (=α (lambda ([x : ()]) x)
                        (lambda ([x : ()]) x))))
-  (test-false (term (=α (lambda ([a : ()] [b : ()]) (a b))
-                        (lambda ([a : ()] [b : ()])
-                          ((lambda ([a : ()] [b : ()]) (a b)) a b)))))
   (test-true (term (=α (lambda ([x : ()]) (lambda ([y : ()]) (x y)))
                        (lambda ([x : ()]) (lambda ([y : ()]) (x y))))))
   (test-false (term (=α (y x) (a b)))))
-
-(define-metafunction STLC
-  subst : ((x any) ...) any -> any
-  [(subst ((x_0 any_0) ... (x any) (x_1 any_1) ...) x) any]
-  [(subst ((x_0 any_0) ...) x) x]
-  [(subst ((x_0 any_0) ...) (lambda ([x_1 : any_t] ...) any_e))
-   (lambda ([x_new : any_t] ...)
-     (subst ((x_0 any_0) ...) (subst-raw ((x_1 x_new) ...) any_e)))
-   (where (x_new ...) ,(variables-not-in (term (any_e x_0 ... any_0 ...)) (term (x_1 ...))))
-   ]
-  [(subst ((x_0 any_0) ...) (letrec ([x_1 : any_t any_l] ...) any_e))
-   (letrec ([x_new : any_t
-             (subst ((x_0 any_0) ...) (subst-raw ((x_1 x_new) ...) any_l))] ...)
-     (subst ((x_0 any_0) ...)
-            (subst-raw ((x_1 x_new) ...) any_e)))
-   (where (x_new ...) ,(variables-not-in (term (any_e x_0 ... any_l ... any_0 ...)) (term (x_1 ...))))]
-  [(subst ((x_0 any_0) ...) (let ([x_1 : any_t any_rhs] ...) any_e))
-   (let ([x_new : any_t (subst ((x_0 any_0) ...) any_rhs)] ...)
-     (subst ((x_0 any_0) ...) (subst-raw ((x_1 x_new) ...) any_e)))
-   (where (x_new ...) ,(variables-not-in (term (any_e x_0 ... any_0 ...)) (term (x_1 ...))))]
-  [(subst [(x_0 any_0) ...] (any ...)) ((subst [(x_0 any_0) ...]  any) ...)]
-  [(subst _ any) any #;,(error 'subst "unmatched term ~a" (term any))
-   ])
-
-(module+ test
-  (test-true (term (=α (subst ((x (lambda ([x : Int]) y)))
-                              (lambda ([y : Int]) x))
-                       (lambda ([y1 : Int]) (lambda ([x : Int]) y)))))
-  (test-true (term (=α (subst ((x (lambda ([a : Int]) (x a)))
-                               (y (lambda ([a : Int]) (y a))))
-                              (letrec ([x : (Int -> Int)
-                                          (lambda ([a : Int])
-                                            (z a))]
-                                       [z : (Int -> Int)
-                                          (lambda ([a : Int])
-                                            (x (y a)))])
-                                (x (z (y 1)))))
-                       (letrec ([x1 : (Int -> Int)
-                                    (lambda ([a1 : Int])
-                                           (z1 a1))]
-                                [z1 : (Int -> Int)
-                                    (lambda ([a1 : Int])
-                                      (x1 ((lambda ([a : Int])
-                                             (y a)) a1)))])
-                         (x1 (z1 ((lambda ([a : Int]) (y a)) 1))))))))
-
-(define-environment-helpers STLC lookup extend)
-
-(module+ test
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) x)) (term (some 1)))
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) y)) (term (some 2)))
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) z)) (term (some 3)))
-  (test-equal (term (lookup ((x 1) (y 2) (z 3)) a)) (term (none))))
-
-(define-metafunction STLC
-  subst-raw : ((x x) ...) any -> any
-  [(subst-raw ((x_o1 x_n1) ... (x_o x_n) (x_o2 x_n2) ...) x_o) x_n]
-  [(subst-raw ((x_o1 x_n1) ...) x) x]
-  [(subst-raw ((x_o1 x_n1) ...) (any ...))
-   ((subst-raw ((x_o1 x_n1) ...) any) ...)]
-  [(subst-raw ((x_o1 x_n1) ...) any) any]
-  [(subst-raw ((x_o1 x_n1) ...) (lambda (any_1 ...) any))
-   (lambda (any_1 ...) (subst-raw ((x_o1 x_n1) ...) any))])
-
-(module+ test
-  (test-equal
-   (term (subst ((x1 5)) (if (= x1 0)
-                             1
-                             (* x1 ((letrec ((fact : (Int -> Int)
-                                                   (lambda ((x : Int))
-                                                     (if (= x 0)
-                                                         1
-                                                         (* x (fact (- x 1)))))))
-                                      (lambda ((x : Int))
-                                        (if (= x 0)
-                                            1
-                                            (* (fact (- x 1))))))
-                                    (- x1 1))))))
-   (term (if (= 5 0)
-             1
-             (* 5 ((letrec ((fact : (Int -> Int)
-                                  (lambda ((x : Int))
-                                    (if (= x 0)
-                                        1
-                                        (* x (fact (- x 1)))))))
-                     (lambda ((x : Int))
-                       (if (= x 0)
-                           1
-                           (* (fact (- x 1))))))
-                   (- 5 1)))))
-    #:equiv =α/racket))
-
-
-(module+ test
-  (test-true (term (=α ,fst0 (subst ((x a) (y b)) ,fst0)))))
 
 ;;———————————————————————————————————————————————————–———————————————————–——————
 ;; Typing
 
 (define-extended-language STLC/tc STLC
-  (Γ  ::= ((x any) ...)))
+  (Γ  ::= · (x T Γ)))
 
+(define-environment-helpers (t-lu t-ex) STLC/tc Γ · x T)
 
 (define-judgment-form STLC
   #:mode (⊢_k I O)
@@ -309,132 +220,164 @@
 
 (define-judgment-form STLC/tc
   #:mode (⊢ I I O)
-  ;;#:contract (⊢ Γ e T)
-  [(where (some T) (lookup Γ x))
-   ------------------------ "λvar"
+  #:contract (⊢ Γ e T)
+  [(where (some T) (t-lu Γ x))
+   ------------------------ "wt-var"
    (⊢ Γ x T)]
   [(⊢_k k B)
-   ------------------------ "⊢base"
+   ------------------------ "wt-base"
    (⊢ Γ k B)]
-  [(where Γ_new (extend Γ ((x_m T_n) ...)))
-   (⊢ Γ_new e T_r)
-   ------------------------ "λlam"
-   (⊢ Γ (lambda ([x_m : T_n] ...) e) (T_n ... -> T_r))]
-
-  [(where Γ_new (extend Γ ((x_n T_n) ...)))
+  [(where Γ_new (t-ex Γ x T))
+   (⊢ Γ_new e T_e)
+   ------------------------ "wt-lambda"
+   (⊢ Γ (lambda ([x : T]) e) (T -> T_e))]
+  [(where Γ_new (t-ex Γ x T))
    (⊢ Γ_new e_body T_body)
-   (⊢ Γ_new f_n T_n) ...
-   ------------------------ "λletrec"
-   (⊢ Γ (letrec ([x_n : T_n f_n] ...) e_body) T_body)]
+   (⊢ Γ_new f T)
+   ------------------------ "wt-letrec"
+   (⊢ Γ (letrec ([x : T f]) e_body) T_body)]
+
+  [(where Γ_new (t-ex (t-ex Γ x_1 T_1) x_2 T_2))
+   (⊢ Γ_new e_body T_body)
+   (⊢ Γ_new f_1 T_1)
+   (⊢ Γ_new f_2 T_2)
+   ------------------------ "wt-letrec2"
+   (⊢ Γ (letrec2 ([x_1 : T_1 f_1] [x_2 : T_2 f_2]) e_body) T_body)]
   
-  [(where Γ_new (extend Γ ((x_n T_n) ...)))
+  [(where Γ_new (t-ex Γ x_1 T_1))
    (⊢ Γ_new e_body T_body)
-   (⊢ Γ e_n T_n) ...
-   ------------------------ "λlet"
-   (⊢ Γ (let ([x_n : T_n e_n] ...) e_body) T_body)]
-
-  [(⊢ Γ e_0 (T_1 ..._n -> T_r))
-   (⊢ Γ e_1 T_1) ...
-   ------------------------ "λapp"
-   (⊢ Γ (e_0 e_1 ..._n) T_r)]
-  [(where (T ..._n -> T_r) (tyop o))
-   (⊢ Γ e T) ...
-   ------------------------ "λop"
-   (⊢ Γ (o e ..._n) T_r)]
-  [(⊢ Γ e_t Bool) (⊢ Γ e_c T) (⊢ Γ e_a T)
-   ------------------------ "λif"
+   (⊢ Γ e_1 T_1)
+   ------------------------ "wt-let"
+   (⊢ Γ (let ([x_1 : T_1 e_1]) e_body) T_body)]
+  [(where Γ_new (t-ex (t-ex Γ  x_1 T_1) x_2 T_2))
+   (⊢ Γ_new e_body T_body)
+   (⊢ Γ e_1 T_1)
+   (⊢ Γ e_2 T_2)
+   ------------------------ "wt-let2"
+   (⊢ Γ (let ([x_1 : T_1 e_1][x_2 : T_2 e_2]) e_body) T_body)]
+  [(⊢ Γ e_0 (T_1 -> T_r))
+   (⊢ Γ e_1 T_1)
+   ------------------------ "wt-app"
+   (⊢ Γ (e_0 e_1) T_r)]
+  [(where (T_1 T_2 -> T_r) (tyop o))
+   (⊢ Γ e_1 T_1)
+   (⊢ Γ e_2 T_2)
+   ------------------------ "wt-op"
+   (⊢ Γ (o e_1 e_2) T_r)]
+  [(⊢ Γ e_t Bool)
+   (⊢ Γ e_c T)
+   (⊢ Γ e_a T)
+   ------------------------ "wt-if"
    (⊢ Γ (if e_t e_c e_a) T)])
 
 (define-metafunction STLC
-  tyop : o -> T
+  tyop : o -> (T T -> T)
   [(tyop +) (Int Int -> Int)]
   [(tyop -) (Int Int -> Int)]
   [(tyop *) (Int Int -> Int)]
   [(tyop =) (Int Int -> Bool)])
 
-(define good (term ((lambda ([a : ()] [b : Bool] [c : Int])
-                      ((if b
-                          (lambda ([a : Int])
-                            ((lambda () (+ a c))))
-                          (lambda ([b : Int])
-                            (- b c)))
-                       42))
-                    () #t 0)))
+(define (gen-stlc-term-and-type!)
+  (match (generate-term STLC #:satisfying (⊢ · e T) (random 1 5))
+    [`(⊢ · ,e ,t) (values e t)]
+    [#f (gen-stlc-term-and-type!)]))
 
-(define bad (term ((lambda ([a : ()] [b : Bool] [c : Int])
-                      ((if b
-                          (lambda ([a : Int])
-                            ((lambda () (+ a c))))
-                          (lambda ([b : Int])
-                            (- b c)))
-                       #f))
-                    () #t 0)))
+(define-term good.0 (+ 1 2))
+(define-term good.1 (lambda ([c : Int])
+                      (lambda ([a : Int])
+                        (+ a c))))
+(define-term good.2 (lambda ([a : ()])
+                      (lambda ([b : Bool])
+                        (lambda ([c : Int])
+                          ((if b
+                               (lambda ([a : Int])
+                                 (+ a c))
+                               (lambda ([b : Int])
+                                 (- b c)))
+                           41)))))
+(define-term good ((((lambda ([a : ()])
+                             (lambda ([b : Bool])
+                               (lambda ([c : Int])
+                                 ((if b
+                                      (lambda ([a : Int])
+                                        (+ a c))
+                                      (lambda ([b : Int])
+                                        (- b c)))
+                                  41))))
+                           ())
+                          #t)
+                         1))
 
-(define fact5 (term (letrec ([fact : (Int -> Int)
+
+(define-term fact5
+  (letrec ([fact : (Int -> Int)
+                 (lambda ([x : Int])
+                   (if (= x 0)
+                       1
+                       (* x (fact (- x 1)))))])
+    (fact 5)))
+
+(define-term fact3
+  (letrec ([fact : (Int -> Int)
                               (lambda ([x : Int])
                                 (if (= x 0)
                                     1
                                     (* x (fact (- x 1)))))])
-                      (fact 5))))
+    (fact 3)))
 
-(define fact3 (term (letrec ([fact : (Int -> Int)
-                              (lambda ([x : Int])
-                                (if (= x 0)
-                                    1
-                                    (* x (fact (- x 1)))))])
-                      (fact 3))))
-
-(define odd5 (term (letrec ([even? : (Int -> Bool)
-                             (lambda ([n : Int])
-                               (if (= n 0)
-                                   #t
-                                   (odd? (- n 1))))]
-                            [odd?  : (Int -> Bool)
-                             (lambda ([n : Int])
-                               (if (= n 0)
-                                   #t
-                                   (even? (- n 1)))) ])
-                      (odd? 5))))
+(define-term odd5
+  (letrec2 ([even? : (Int -> Bool)
+                                    (lambda ([n : Int])
+                                      (if (= n 0)
+                                          #t
+                                          (odd? (- n 1))))]
+                             [odd?  : (Int -> Bool)
+                                    (lambda ([n : Int])
+                                      (if (= n 0)
+                                          #t
+                                          (even? (- n 1)))) ])
+                      (odd? 5)))
 
 (module+ test
-
-  (test-true (redex-match? STLC/tc Γ '()))
-  (test-true (redex-match? STLC/tc (lambda ([x_m : T_n] ...) e) fst0))
+  (test-true (redex-match? STLC/tc Γ (term ·)))
+  (test-true (redex-match? STLC/tc (lambda ([x : T]) e) fst0))
   (test-true (redex-match? STLC/tc T (term (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ ((x ())) x ())))
-  (test-true (judgment-holds (⊢ () ,fst0  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,fst1  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,fst10 (() () -> ()))))
-  (test-true (judgment-holds (⊢ () ,fst11 (() () -> ()))))
-  (test-true (judgment-holds (⊢ () ,snd0  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,snd1  (() -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,snd10 (() () -> ()))))
-  (test-true  (judgment-holds (⊢ () ,good Int)))
-  (test-false (judgment-holds (⊢ () ,bad Int)))
-  (redex-let STLC ([e_f5 fact5]
-                   [e_o5 odd5])
-   (test-true (judgment-holds (⊢ () e_f5 Int)))
-   (test-true (judgment-holds (⊢ () e_o5 Bool)))))
+  (test-true (judgment-holds (⊢ (t-ex · x ()) x ())))
+  (test-true (judgment-holds (⊢ · (lambda ([x : ()]) x) (() -> ()))))
+  (test-true (judgment-holds (⊢ · (lambda ([x : ()]) (lambda ([x : ()]) x))  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢ · ,fst0  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢ · ,fst1  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢ · ,snd0  (() -> (() -> ())))))
+  (test-true (judgment-holds (⊢ · ,snd1  (() -> (() -> ())))))
+  (test-true  (judgment-holds (⊢ · good.0 Int)))
+  (test-true  (judgment-holds (⊢ · good.1 (Int -> (Int -> Int)))))
+  (test-true  (judgment-holds (⊢ · good.2 (() -> (Bool -> (Int -> Int))))))
+  (test-true  (judgment-holds (⊢ · good Int)))
+  (test-true (judgment-holds (⊢ · fact5 Int)))
+  (test-true (judgment-holds (⊢ · odd5 Bool))))
 
 ;;---------------------------------------------------------------------
 ;; The simply typed lambda calculus
 
 (define-extended-language STLC-> STLC
-  (v ::= i b () (lambda ([x_!_ : T] ...) e))
+  (v ::= i b () (lambda ([x : T]) e))
   (C ::= hole
          (e ... C e ...)
          (o e ... C e ...)
          (if C e e)
          (if e C e)
          (if e e C)
-         (letrec ([x_1 : T_1 f_1] ...
-                  [x : T (lambda ([x_l : T_l]) C)]
-                  [x_2 : T_2 f_2] ...)
-           e)
-         (letrec ([x : T l] ...) C)
-         (let ([x_1 : T_1 e_1] ... [x : T C] [x_2 : T_2 e_1] ...) e)
-         (let ([x : T e] ...) C)
-         (lambda ((x : T) ...) C)))
+         (letrec ([x : T C]) e)
+         (letrec ([x : T f]) C)
+         (letrec2 ([x : T C] [x : T f]) e)
+         (letrec2 ([x : T f] [x : T C]) e)
+         (letrec2 ([x : T f] [x : T f]) C)
+         (let ([x : T C]) e)
+         (let ([x : T e]) C)
+         (let2 ([x : T C] [x : T e]) e)
+         (let2 ([x : T e] [x : T C]) e)
+         (let2 ([x : T e] [x : T e]) C)
+         (lambda ([x : T]) C)))
 
 (define f0  (term (lambda ([x : ()]) x)))
 (define ex1 (term (,f0 ())))
@@ -443,11 +386,10 @@
 (define ex3 (term ((,f1 (,f1 ,f0)) ,ex1)))
 
 (module+ test
-
-  (test-true (judgment-holds (⊢ () ,ex1 ())))
-  (test-true (judgment-holds (⊢ () ,f1 ((() -> ()) -> (() -> ())))))
-  (test-true (judgment-holds (⊢ () ,ex2 ())))
-  (test-true (judgment-holds (⊢ () ,ex3 ()))))
+  (test-true (judgment-holds (⊢ · ,ex1 ())))
+  (test-true (judgment-holds (⊢ · ,f1 ((() -> ()) -> (() -> ())))))
+  (test-true (judgment-holds (⊢ · ,ex2 ())))
+  (test-true (judgment-holds (⊢ · ,ex3 ()))))
 
 (define-metafunction STLC->
   δ : o e ... -> e
@@ -459,17 +401,30 @@
 (define -->β
   (reduction-relation
    STLC->
-   (--> (in-hole C ((lambda ([x_0 : _] ..._n) e) e_n ..._n))
-        (in-hole C (subst ([x_0 e_n] ...) e))
+   (--> (in-hole C ((lambda ([x : _]) e_b) e_p))
+        (in-hole C (substitute e_b x e_p))
         β)
    ;; Primitive operators are evaluated using the delta metafuntion
-   (--> (in-hole C (o v ...))
-        (in-hole C (δ o v ...))
+   (--> (in-hole C (o v_1 v_2))
+        (in-hole C (δ o v_1 v_2))
         δ)
    ;; Letrecs get unrolled by one loop
-   (--> (in-hole C (letrec ([x : T f] ...) e))
-        (in-hole C (subst ([x (letrec ([x : T f] ...) f)] ...) e))
+   (--> (in-hole C (letrec ([x : T f]) e))
+        (in-hole C (substitute e x e_knot))
+        (where e_knot (letrec ([x : T f]) f))
         μ)
+   (--> (in-hole C (letrec2 ([x_1 : T_1 f_1][x_2 : T_2 f_2]) e))
+        (in-hole C (substitute (substitute e x_1 e_knot1) x_2 e_knot2))
+        (where e_knot1 (letrec2 ([x_1 : T_1 f_1][x_2 : T_2 f_2]) f_1))
+        (where e_knot2 (letrec2 ([x_1 : T_1 f_1][x_2 : T_2 f_2]) f_2))
+        μ2)
+   ;; Let get unrolled by one loop
+   (--> (in-hole C (let ([x : T e]) e_body))
+        (in-hole C (substitute e_body x e))
+        let)
+   (--> (in-hole C (let2 ([x_1 : T_1 e_1][x_2 : T_2 e_2]) e))
+        (in-hole C (substitute (substitute e x_1 e_1) x_2 e_2))
+        let2)
    ;; Branching conditionals
    (--> (in-hole C (if #t e_c e_a))
         (in-hole C e_c)
@@ -478,68 +433,151 @@
         (in-hole C e_a)
         iff)))
 
-
 (module+ test
-  ;; Way Too long to run every time
-  ;;(test-->>∃ #:steps 10 -->β fact3 6)
-  #|
-  (add-coverage! -->β)
-  
-  (test-->>∃ #:steps 20 -->β odd5 #t)
-  (traces -->β odd5)
-  |#
   (test-->> -->β #:equiv =α/racket ex1 (term ()))
   (test-->> -->β #:equiv =α/racket ex2 (term ()))
-  (test-->> -->β #:equiv =α/racket ex3 (term ()))
+  (test-->> -->β #:equiv =α/racket ex3 (term ())))
 
-  )
+(begin-for-syntax
+  (define-syntax-rule (with-prefixed-ids p (i ...) b ...)
+    (with-syntax ([(i ...) #`(#,(format-id #'p "~a~a" #'p #'i) ...)])
+      b ...)))
 
 ;; ——————-
 ;; call by value semantics for the simply typed lambda calculus
+(define-syntax (define-stlc-like-reduction-relation stx)
+  (syntax-case stx ()
+    [(_ s->βv lang var unit int bool fun expr type oper)
+     (with-prefixed-ids stlc
+       (e e_f e_b e_k e_k1 e_k2 e_c e_a
+          v v_1 v_2
+          E o f
+          x x_b x_f x_1 x_2 x_12 x_22
+          T T_b T_f T_1 T_2 T_12 T_22)
+       #`(begin
+           ))]))
 
-(define-extended-language STLC->cbv STLC->
+(define-extended-language cbv STLC
+  #;(o ::= oper)
+  #;(e ::= expr)
+  #;(f ::= fun)
+  #;(v ::= unit int bool fun)
   (v ::= () i b f)
-  (E ::= hole (v ... E e ...) (if E e e) (o v ... E e ...)))
+  #;(x ::= var)
+  #;(T ::= type)
+  (E ::=
+     hole
+     (E e)
+     (v E)
+     (o E e)
+     (o v E)
+     (if E e e)
+     (let ([x : T E]) e)
+     (let2 ([x : T E] [x : T e]) e)
+     (let2 ([x : T v] [x : T E]) e)))
 
 (define s->βv
   (reduction-relation
-   STLC->cbv
+   cbv
    ;; Standard Beta for Call by Value 
-   (--> (in-hole E ((lambda ([x : T] ..._n) e) v ..._n))
-        (in-hole E (subst ((x v) ...) e))
+   (--> (in-hole E ((lambda ([x : T]) e) v))
+        (in-hole E (substitute e x v))
         β)
    ;; Primitive operators are evaluated using the delta metafuntion
-   (--> (in-hole E (o v ...))
-        (in-hole E (δ o v ...))
+   (--> (in-hole E (o v_1 v_2))
+        (in-hole E (δ o v_1 v_2))
         δ)
    ;; Letrecs get unrolled by one loop
-   (--> (in-hole E (letrec ([x : (T_1 ...n -> T_2)
-                               (lambda ([x_a : T_1] ...n) e_f)] ...)
+   (--> (in-hole E (letrec ([x_b : T_b (lambda ([x_f : T_f]) e_f)])
                      e_b))
-        (in-hole E (subst ([x (letrec ([x : (T_1 ... -> T_2)
-                                          (lambda ([x_a : T_1] ...) e_f)] ...)
-                                (lambda ([x_a : T_1] ...) e_f))] ...)
-                          e_b))
+        (in-hole E (substitute e_b x_b e_k))
+        (where e_k (letrec ([x_b : T_b (lambda ([x_f : T_f]) e_f)])
+                     (lambda ([x_f : T_f]) e_f)))
         μ)
+   (--> (in-hole E (letrec2 ([x_1 : T_1 (lambda ([x_12 : T_12]) e_1)]
+                             [x_2 : T_2 (lambda ([x_22 : T_22]) e_2)])
+                            e_b))
+        (in-hole E (substitute (substitute e_b x_1 e_k1) x_2 e_k2))
+        (where e_k1 (letrec2 ([x_1 : T_1 (lambda ([x_12 : T_12]) e_1)]
+                              [x_2 : T_2 (lambda ([x_22 : T_22]) e_2)])
+                             (lambda ([x_12 : T_12]) e_1)))
+        (where e_k2 (letrec2 ([x_1 : T_1 (lambda ([x_12 : T_12]) e_1)]
+                              [x_2 : T_2 (lambda ([x_22 : T_22]) e_2)])
+                             (lambda ([x_22 : T_22]) e_2)))
+        μ2)
+   ;; Let get unrolled by one loop
+   (--> (in-hole E (let ([x : T v]) e_b))
+        (in-hole E (substitute e_b x v))
+        let)
+   (--> (in-hole E (let2 ([x_1 : T_1 v_1][x_2 : T_2 v_2]) e))
+        (in-hole E (substitute (substitute e x_1 v_1) x_2 v_2))
+        let2)
    ;; Branching conditionals
    (--> (in-hole E (if #t e_c e_a))
         (in-hole E e_c)
         ift)
    (--> (in-hole E (if #f e_c e_a))
         (in-hole E e_a)
-        iff)
-   ))
+        iff)))
+
+#;
+(define-stlc-like-reduction-relation s->βv
+  STLC v () i b f e T o)
 
 (module+ test
   (add-coverage! s->βv)
-
+  (test-->> s->βv #:equiv =α/racket (term ()) (term ()))
+  (test-->> s->βv #:equiv =α/racket (term ((lambda ([x : ()]) ()) ())) (term ()))
+  (test-->> s->βv #:equiv =α/racket (term ((lambda ([x : ()]) x) ())) (term ()))
   (test-->> s->βv #:equiv =α/racket ex1 (term ()))
   (test-->> s->βv #:equiv =α/racket ex2 (term ()))
   (test-->> s->βv #:equiv =α/racket ex3 (term ()))
-  (test-->> s->βv #:equiv =α/racket fact3 6)
-  (test-->> s->βv #:equiv =α/racket odd5 #t))
+  (test-->> s->βv #:equiv =α/racket (term fact3) 6)
+  (test-->> s->βv #:equiv =α/racket (term odd5) #t))
+
+
+(define-judgment-form STLC
+  #:mode (=> I O)
+  #:contract (=> e e)
+  [(where (e_2) ,(apply-reduction-relation s->βv (term e_1)))
+   --------------------
+   (=> e_1 e_2)])
+
+(define-judgment-form STLC
+  #:mode (progress I)
+  #:contract (progress e)
+  [(where #f ,(judgment-holds (⊢ · e T)))
+   --------------------------------------- "progress e ∉ T " 
+   (progress e)]
+  [--------------- "progress e=v"
+   (progress v)]
+  [(=> e_1 e_2) 
+   ----------------------------- "progress e->e'"
+   (progress e_1)])
+
+(define-judgment-form STLC
+  #:mode (preservation I)
+  #:contract (preservation e)
+  [(where #f ,(judgment-holds (⊢ · e T)))
+   --------------------------------------- "preservation e ∈ T " 
+   (preservation e)]
+  [-------------------- "preservation e -/-> e'"
+   (preservation v)]
+  [(=> e_1 e_2) (⊢ · e_1 T) (⊢ · e_2 T)
+   -------------------- "presevation "
+   (preservation e_1)])
+
+(define-judgment-form STLC
+  #:mode (sound I)
+  #:contract (sound e)
+  [(progress e) (preservation e)
+   -------------------- ""
+   (sound e)])
 
 
 
-       
+
+(module+ test
+  (redex-check STLC #:satisfying (⊢ · e t)
+               (judgment-holds (sound e))))
 
