@@ -142,10 +142,12 @@ form, to the shortest branch of the cast tree that is relevant.
               b* 'glbt glbt-uid
               (gen-greatest-lower-bound-type-code next-uid! glbt glbt-uid)
               CoC3-Expr "type1" "type2")]
+            [(cast-uid) (next-uid! "interp_cast")]
+            [(cast) (ann (apply-code cast-uid) Cast-Type)]
             [(b* cast-mbox)
              (inline-or-bnd-cast
               b* 'cast-mbox "cast_mbox"
-              (make-cast-mbox-code next-uid! glbt)
+              (make-cast-mbox-code next-uid! cast glbt)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
             [(b* cast-gvec)
              (inline-or-bnd-cast
@@ -157,8 +159,6 @@ form, to the shortest branch of the cast tree that is relevant.
             ;;   b* 'cast-mvec "cast_mvec"
             ;;   (make-cast-mvect-code next-uid! glbt)
             ;;   CoC3-Expr "value" "type1" "type2" "blame_info")]
-            [(cast-uid) (next-uid! "interp_cast")]
-            [(cast) (ann (apply-code cast-uid) Cast-Type)]
             [(b* cast-tuple)
              (inline-or-bnd-cast
               b* 'cast-tuple "cast_tuple"
@@ -506,28 +506,35 @@ form, to the shortest branch of the cast tree that is relevant.
          (proxy-gvect val type1 type2 label))))
 
 ;; How to cast a Monotonic Reference to some other type
-(: make-cast-mbox-code : (String -> Uid) GreatestLowerBound-Type -> Cast-Type)
-(define ((make-cast-mbox-code next-uid! glbt) v t1 t2 lbl)
+(: make-cast-mbox-code : (String -> Uid) Cast-Type GreatestLowerBound-Type -> Cast-Type)
+(define ((make-cast-mbox-code next-uid! cast glbt) v t1 t2 lbl)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([val v] [type1 t1] [type2 t2] [tag_mref (type-tag type2)] [label lbl])
     (if$ (op=? (Type DYN-TYPE) type2)
          (Dyn-make val type1)
          (if$ (op=? tag_mref (Tag 'MRef))
-              (match-let ([(Var a) val])
-                (let$* ([t2 (mref-of$ type2)])
-                  (if (dyn?$ t2)
-                      v
-                      (let$* ([t1 (Mbox-rtti-ref a)]
-                              [t3 (glbt t1 t2)])
-                        (if$ (op=? t1 t3)
-                             v
-                             (let$* ([cv (Mbox-val-ref v)]
-                                     [cv_ (CastedValue cv (Twosome t1 t3 (Quote "")))])
-                               (Begin
-                                 (list
-                                  (Mbox-val-set! v cv_)
-                                  (Mbox-rtti-set! a t3))
-                                 v)))))))
+              (match val
+                [(Var a)
+                 (let$* ([t2 (mref-of$ type2)])
+                   (if (dyn?$ t2)
+                       val
+                       (let$* ([t1 (Mbox-rtti-ref a)]
+                               [t3 (glbt t1 t2)])
+                         ;; pointer equality, make sure hash consing of types is working
+                         (if$ (op=? t1 t3)
+                              val
+                              (Begin
+                                (list
+                                 (Mbox-rtti-set! a t3))
+                                (let$* ([vv (Mbox-val-ref val)]
+                                        [cv (cast vv type1 t3 (Quote ""))]
+                                        [t4 (Mbox-rtti-ref a)])
+                                  (if$ (op=? t3 t4)
+                                       (Begin
+                                         (list (Mbox-val-set! val cv))
+                                         val)
+                                       val)))))))]
+                [_ (error 'interp-cast/mref)])
               (Blame lbl)))))
 
 ;; How to Cast a Function to some other type
@@ -766,9 +773,13 @@ form, to the shortest branch of the cast tree that is relevant.
                      (Var Uid) ->
                      CoC3-Expr))
        (define (mbox-set! addr val type)
-         (Mbox-val-set!
-          (Var addr)
-          (CastedValue val (Twosome type (Mbox-rtti-ref addr) (Quote "")))))
+         (define-syntax-let$* let$* next-uid!)
+         (let$* ([t1 (Mbox-rtti-ref addr)]
+                 [cv (interp-cast val type t1 (Quote ""))]
+                 [t2 (Mbox-rtti-ref addr)])
+           (if$ (op=? t1 t2)
+                (Mbox-val-set! (Var addr) cv)
+                (Quote '()))))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
            (if (or (Var? e) (Quote? e))

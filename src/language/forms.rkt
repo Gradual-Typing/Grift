@@ -82,13 +82,6 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; the underlying value can be accessed by the location encoded in the type
   (MBoxCastedRef addr type)
   (MBoxCastedSet! addr v type)
-  (CastedValue-Huh expression)
-  (CastedValue expression1 expression2)
-  (CastedValue-Value expression)
-  (CastedValue-Source expression)
-  (CastedValue-Target expression)
-  (CastedValue-Blames expression)
-  (CastedValue-Coercion expression)
   (MvectorS value constructor)
   (Mvector value constructor type)
   (Mvector-set! vector index value)

@@ -90,7 +90,7 @@ The type rules for core forms that have interesting type rules
     [(Dyn) DYN-TYPE]
     [(STuple l t*)
      (cond
-       [(< i l) (list-ref t* i)]
+       [(< -1 i l) (list-ref t* i)]
        [else (error 'schml "type error: tuple index out of bounds")])]
     [otherwise (error 'schml/type-check/tuple-proj-type-rule "internal error")]))
 
@@ -430,6 +430,7 @@ The type rules for core forms that have interesting type rules
         [(Munbox (app recur e t))
          (let ([ty (munbox-type-rule t)])
            (values (if (completely-static-type? ty) (Munbox e) (MunboxT e ty)) ty))]
+        ;; move it to insert casts
         [(Mbox-set! (app recur e1 t1) (app recur e2 t2))
          (let ([ty (mbox-set!-type-rule t1 t2)]
                [T  (mbox-val-type t1)])

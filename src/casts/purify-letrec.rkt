@@ -170,18 +170,6 @@
     [(Type-MRef e) (recur e)]
     [(Type-MRef-Huh e) (recur e)]
     [(Type-MRef-Of e) (recur e)]
-    [(CastedValue-Huh e) (recur e)]
-    [(CastedValue e r)
-     (match r
-       [(Twosome t1 t2 l)
-        (recur-all e t1 t2)]
-       [(Coercion c)
-        (recur-all e c)])]
-    [(CastedValue-Value e) (recur e)]
-    [(CastedValue-Source e) (recur e)]
-    [(CastedValue-Target e) (recur e)]
-    [(CastedValue-Blames e) (recur e)]
-    [(CastedValue-Coercion e) (recur e)]
     [(Mvector e1 e2 t) (recur-all e1 e2)]
     [(Mvector-val-set! e1 e2 e3) (recur-all e1 e2 e3)]
     [(Mvector-val-ref e1 e2) (recur-all e1 e2)]
@@ -412,24 +400,6 @@
     [(Type-MRef (app recur e)) (Type-MRef e)]
     [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
     [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
-    [(CastedValue-Huh exp)
-     (CastedValue-Huh (recur exp))]
-    [(CastedValue (app recur e) r)
-     (match r
-       [(Twosome t1 t2 l)
-        (CastedValue e (Twosome (recur t1) (recur t2) (recur l)))]
-       [(Coercion c)
-        (CastedValue e (Coercion (recur c)))])]
-    [(CastedValue-Value exp)
-     (CastedValue-Value (recur exp))]
-    [(CastedValue-Source exp)
-     (CastedValue-Source (recur exp))]
-    [(CastedValue-Target exp)
-     (CastedValue-Target (recur exp))]
-    [(CastedValue-Blames exp)
-     (CastedValue-Blames (recur exp))]
-    [(CastedValue-Coercion exp)
-     (CastedValue-Coercion (recur exp))]
     [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
     [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
     [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
@@ -700,24 +670,6 @@
     [(Type-MRef (app pl-expr e)) (Type-MRef e)]
     [(Type-MRef-Huh (app pl-expr e)) (Type-MRef-Huh e)]
     [(Type-MRef-Of (app pl-expr e)) (Type-MRef-Of e)]
-    [(CastedValue-Huh exp)
-     (CastedValue-Huh (pl-expr exp))]
-    [(CastedValue (app pl-expr e) r)
-     (match r
-       [(Twosome t1 t2 l)
-        (CastedValue e (Twosome (pl-expr t1) (pl-expr t2) (pl-expr l)))]
-       [(Coercion c)
-        (CastedValue e (Coercion (pl-expr c)))])]
-    [(CastedValue-Value exp)
-     (CastedValue-Value (pl-expr exp))]
-    [(CastedValue-Source exp)
-     (CastedValue-Source (pl-expr exp))]
-    [(CastedValue-Target exp)
-     (CastedValue-Target (pl-expr exp))]
-    [(CastedValue-Blames exp)
-     (CastedValue-Blames (pl-expr exp))]
-    [(CastedValue-Coercion exp)
-     (CastedValue-Coercion (pl-expr exp))]
     [(Mvector (app pl-expr e1) (app pl-expr e2) t) (Mvector e1 e2 t)]
     [(Mvector-val-set! (app pl-expr e1) (app pl-expr e2) (app pl-expr e3)) (Mvector-val-set! e1 e2 e3)]
     [(Mvector-val-ref (app pl-expr e1) (app pl-expr e2)) (Mvector-val-ref e1 e2)]

@@ -404,24 +404,6 @@
         [(Type-MRef (app recur e)) (Type-MRef e)]
         [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
         [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
-        [(CastedValue-Huh exp)
-         (CastedValue-Huh (recur exp))]
-        [(CastedValue (app recur e) r)
-         (match r
-           [(Twosome t1 t2 l)
-            (CastedValue e (Twosome (recur t1) (recur t2) (recur l)))]
-           [(Coercion c)
-            (CastedValue e (Coercion (recur c)))])]
-        [(CastedValue-Value exp)
-         (CastedValue-Value (recur exp))]
-        [(CastedValue-Source exp)
-         (CastedValue-Source (recur exp))]
-        [(CastedValue-Target exp)
-         (CastedValue-Target (recur exp))]
-        [(CastedValue-Blames exp)
-         (CastedValue-Blames (recur exp))]
-        [(CastedValue-Coercion exp)
-         (CastedValue-Coercion (recur exp))]
         [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
         [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
         [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]

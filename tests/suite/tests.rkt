@@ -29,11 +29,12 @@
    tiny-tests
    core-tests
    box-tests
-   #;monobox-tests
+   monobox-tests
    vector-tests
    tuple-tests
    tool-tests
-   program-tests))
+   program-tests
+   ))
 
 (define all-tests : Test
   (test-suite "all tests"

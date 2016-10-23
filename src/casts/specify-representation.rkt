@@ -16,6 +16,7 @@ but a static single assignment is implicitly maintained.
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
+         "../language/data-representation.rkt"
          "../language/cast-or-coerce6.rkt"
          "../language/data0.rkt"
          )
@@ -42,186 +43,6 @@ but a static single assignment is implicitly maintained.
 
 (TODO Talk to jeremy about taging all heap values)
 |#
-
-(require (prefix-in l: "../language/data-representation.rkt"))
-
-(define TYPE-TAG-MASK                  (Quote l:TYPE-TAG-MASK))
-
-;; unallocated types
-(define TYPE-ATOMIC-TAG                (Quote l:TYPE-ATOMIC-TAG))
-(define TYPE-DYN-RT-VALUE              (Quote l:TYPE-DYN-RT-VALUE))
-(define TYPE-INT-RT-VALUE              (Quote l:TYPE-INT-RT-VALUE))
-(define TYPE-BOOL-RT-VALUE             (Quote l:TYPE-BOOL-RT-VALUE))
-(define TYPE-UNIT-RT-VALUE             (Quote l:TYPE-UNIT-RT-VALUE))
-
-;; function type representation
-(define TYPE-FN-TAG                    (Quote l:TYPE-FN-TAG))
-(define TYPE-FN-ARITY-INDEX            (Quote l:TYPE-FN-ARITY-INDEX))
-(define TYPE-FN-RETURN-INDEX           (Quote l:TYPE-FN-RETURN-INDEX))
-(define TYPE-FN-FMLS-OFFSET            (Quote l:TYPE-FN-FMLS-OFFSET))
-
-;; guarded types representation
-(define TYPE-GREF-TAG                  (Quote l:TYPE-GREF-TAG))
-(define TYPE-GREF-SIZE                 (Quote l:TYPE-GREF-SIZE))
-(define TYPE-GREF-TYPE-INDEX           (Quote l:TYPE-GREF-TYPE-INDEX))
-
-(define TYPE-GVECT-TAG                 (Quote l:TYPE-GVECT-TAG))
-(define TYPE-GVECT-SIZE                (Quote l:TYPE-GVECT-SIZE))
-(define TYPE-GVECT-TYPE-INDEX          (Quote l:TYPE-GVECT-TYPE-INDEX))
-
-;; monotonic types representation
-(define TYPE-MREF-TAG                  (Quote l:TYPE-MREF-TAG))
-(define TYPE-MREF-SIZE                 (Quote l:TYPE-MREF-SIZE))
-(define TYPE-MREF-TYPE-INDEX           (Quote l:TYPE-MREF-TYPE-INDEX))
-
-(define TYPE-MVECT-TAG                 (Quote l:TYPE-MVECT-TAG))
-(define TYPE-MVECT-SIZE                (Quote l:TYPE-MVECT-SIZE))
-(define TYPE-MVECT-TYPE-INDEX          (Quote l:TYPE-MVECT-TYPE-INDEX))
-
-;; tuple type representation
-(define TYPE-TUPLE-TAG                 (Quote l:TYPE-TUPLE-TAG))
-(define TYPE-TUPLE-COUNT-INDEX         (Quote l:TYPE-TUPLE-COUNT-INDEX))
-(define TYPE-TUPLE-ELEMENTS-OFFSET     (Quote l:TYPE-TUPLE-ELEMENTS-OFFSET))
-
-
-(define COERCION-TAG-MASK              (Quote #b111)) ;; the same for primary and secondary tags
-
-;; project coercion representation
-(define l:COERCION-PROJECT-TAG         #b000)
-(define COERCION-PROJECT-TAG           (Quote l:COERCION-PROJECT-TAG))
-(define COERCION-PROJECT-TYPE-INDEX    (Quote 0))
-(define COERCION-PROJECT-LABEL-INDEX   (Quote 1))
-
-;; inject coercion representation
-(define l:COERCION-INJECT-TAG          #b001)
-(define COERCION-INJECT-TAG            (Quote l:COERCION-INJECT-TAG))
-(define COERCION-INJECT-TYPE-INDEX     (Quote 0))
-
-;; sequence coercion representation
-(define l:COERCION-SEQUENCE-TAG        #b010)
-(define COERCION-SEQUENCE-TAG          (Quote l:COERCION-SEQUENCE-TAG))
-(define COERCION-SEQUENCE-FST-INDEX    (Quote 0))
-(define COERCION-SEQUENCE-SND-INDEX    (Quote 1))
-
-;; identity coercion representation
-(define COERCION-IDENTITY-TAG          (Quote #b011))
-(define COERCION-IDENTITY-IMDT         COERCION-IDENTITY-TAG)
-
-;; fail coercion representation
-(define l:COERCION-FAILED-TAG          #b110)
-(define COERCION-FAILED-TAG            (Quote l:COERCION-FAILED-TAG))
-(define COERCION-FAILED-LABEL-INDEX    (Quote 0))
-
-;; mediating coercion representation
-(define COERCION-SECOND-TAG-SHIFT      (Quote l:COERCION-SECOND-TAG-SHIFT))
-(define l:COERCION-MEDIATING-TAG       #b100)
-(define COERCION-MEDIATING-TAG         (Quote l:COERCION-MEDIATING-TAG))
-
-;; function coercion representation
-(define l:COERCION-FN-SECOND-TAG       #b001)
-(define COERCION-FN-SECOND-TAG         (Quote l:COERCION-FN-SECOND-TAG))
-(define COERCION-FN-ARITY-INDEX        (Quote l:COERCION-FN-ARITY-INDEX))
-(define COERCION-FN-RETURN-INDEX       (Quote l:COERCION-FN-RETURN-INDEX))
-(define COERCION-FN-FMLS-OFFSET        (Quote l:COERCION-FN-FMLS-OFFSET))
-
-;; tuple coercion representation
-(define l:COERCION-TUPLE-SECOND-TAG #b010)
-(define COERCION-TUPLE-SECOND-TAG      (Quote l:COERCION-TUPLE-SECOND-TAG))
-(define COERCION-TUPLE-COUNT-INDEX     (Quote l:COERCION-TUPLE-COUNT-INDEX))
-(define COERCION-TUPLE-ELEMENTS-OFFSET (Quote l:COERCION-TUPLE-ELEMENTS-OFFSET))
-
-;; monotonic coercion representation
-(define l:COERCION-MREF-SECOND-TAG     #b011)
-(define COERCION-MREF-SECOND-TAG       (Quote l:COERCION-MREF-SECOND-TAG))
-(define COERCION-MREF-TAG-INDEX        (Quote 0))
-(define COERCION-MREF-TYPE-INDEX       (Quote 1))
-
-
-;; guarded coercion representation
-(define l:COERCION-REF-SECOND-TAG      #b000)
-(define COERCION-REF-SECOND-TAG        (Quote l:COERCION-REF-SECOND-TAG))
-(define COERCION-REF-TAG-INDEX         (Quote 0))
-(define COERCION-REF-READ-INDEX        (Quote 1))
-(define COERCION-REF-WRITE-INDEX       (Quote 2))
-
-;; simple dynamic value representation
-(define DYN-TAG-MASK                   (Quote l:DYN-TAG-MASK))
-(define DYN-BOXED-TAG                  (Quote l:DYN-BOXED-TAG))
-(define DYN-INT-TAG                    (Quote l:DYN-INT-TAG))
-(define DYN-BOOL-TAG                   (Quote l:DYN-BOOL-TAG))
-(define DYN-UNIT-TAG                   (Quote l:DYN-UNIT-TAG))
-(define DYN-IMDT-SHIFT                 (Quote l:DYN-IMDT-SHIFT))
-
-;; allocated dynamic value representation
-(define DYN-BOX-SIZE                   (Quote l:DYN-BOX-SIZE))
-(define DYN-VALUE-INDEX                (Quote l:DYN-VALUE-INDEX))
-(define DYN-TYPE-INDEX                 (Quote l:DYN-TYPE-INDEX))
-
-;; bool value representation
-(define FALSE-IMDT                     (Quote l:FALSE-IMDT))
-(define TRUE-IMDT                      (Quote l:TRUE-IMDT))
-
-;; unit representation
-(define UNIT-IMDT                      (Quote l:UNIT-IMDT))
-(define GREP-TAG-MASK                  (Quote l:GREP-TAG-MASK))
-
-;; 0
-(define UNDEF-IMDT                     (Quote l:UNDEF-IMDT))
-
-;; guarded values representation
-(define UGBOX-TAG                      (Quote l:UGBOX-TAG))
-(define UGBOX-SIZE                     (Quote l:UGBOX-SIZE))
-(define UGBOX-VALUE-INDEX              (Quote l:UGBOX-VALUE-INDEX))
-(define UGVECT-SIZE-INDEX              (Quote l:UGVECT-SIZE-INDEX))
-(define UGVECT-OFFSET                  (Quote l:UGVECT-OFFSET))
-
-(define GPROXY-TAG                     (Quote l:GPROXY-TAG))
-(define GPROXY/TWOSOME-SIZE            (Quote l:GPROXY/TWOSOME-SIZE))
-(define GPROXY/COERCION-SIZE           (Quote l:GPROXY/COERCION-SIZE))
-(define GPROXY-COERCION-INDEX          (Quote l:GPROXY-COERCION-INDEX))
-(define GPROXY-FOR-INDEX               (Quote l:GPROXY-FOR-INDEX))
-(define GPROXY-FROM-INDEX              (Quote l:GPROXY-FROM-INDEX))
-(define GPROXY-TO-INDEX                (Quote l:GPROXY-TO-INDEX))
-(define GPROXY-BLAMES-INDEX            (Quote l:GPROXY-BLAMES-INDEX))
-
-;; monotonic values representation
-(define MBOX-SIZE                      (Quote l:MBOX-SIZE))
-(define MBOX-VALUE-INDEX               (Quote l:MBOX-VALUE-INDEX))
-(define MBOX-RTTI-INDEX                (Quote l:MBOX-RTTI-INDEX))
-(define MBOX-TAG                       (Quote l:MBOX-TAG))
-(define MVECT-SIZE-INDEX               (Quote l:MVECT-SIZE-INDEX))
-(define MVECT-SIZE                     (Quote l:MVECT-SIZE))
-(define MVECT-OFFSET                   (Quote l:MVECT-OFFSET))
-(define MVECT-RTTI-INDEX               (Quote l:MVECT-RTTI-INDEX))
-(define MVECT-TAG                      (Quote l:MVECT-TAG))
-(define CV-TAG-MASK                    (Quote l:CV-TAG-MASK))
-(define CASTEDVALUE-TAG                (Quote l:CASTEDVALUE-TAG))
-(define CASTEDVALUE/TWOSOME-SIZE       (Quote l:CASTEDVALUE/TWOSOME-SIZE))
-(define CASTEDVALUE/COERCION-SIZE      (Quote l:CASTEDVALUE/COERCION-SIZE))
-(define CASTEDVALUE-COERCION-INDEX     (Quote l:CASTEDVALUE-COERCION-INDEX))
-(define CASTEDVALUE-FOR-INDEX          (Quote l:CASTEDVALUE-FOR-INDEX))
-(define CASTEDVALUE-FROM-INDEX         (Quote l:CASTEDVALUE-FROM-INDEX))
-(define CASTEDVALUE-TO-INDEX           (Quote l:CASTEDVALUE-TO-INDEX))
-(define CASTEDVALUE-BLAMES-INDEX       (Quote l:CASTEDVALUE-BLAMES-INDEX))
-
-;; function value representation
-(define CLOS-CODE-INDEX                (Quote l:CLOS-CODE-INDEX))
-(define CLOS-CSTR-INDEX                (Quote l:CLOS-CSTR-INDEX))
-(define CLOS-FVAR-OFFSET               (Quote l:CLOS-FVAR-OFFSET))
-(define l:FN-TAG-MASK                  #b111)
-(define FN-TAG-MASK                    (Quote l:FN-TAG-MASK))
-(define l:CLOSURE-VALUE-MASK           -8) ;; signed long compliment of fn tag mask
-(define CLOSURE-VALUE-MASK             (Quote l:CLOSURE-VALUE-MASK))
-(define l:FN-PROXY-TAG                 #b001)
-(define FN-PROXY-TAG                   (Quote l:FN-PROXY-TAG))
-(define l:FN-PROXY-CRCN-INDEX          1)
-(define l:FN-PROXY-CLOS-INDEX          0)
-(define FN-PROXY-CRCN-INDEX            (Quote l:FN-PROXY-CRCN-INDEX))
-(define FN-PROXY-CLOS-INDEX            (Quote l:FN-PROXY-CLOS-INDEX))
-(define l:HYBRID-PROXY-TAG             #b001)
-(define HYBRID-PROXY-TAG               (Quote l:HYBRID-PROXY-TAG))
-(define HYBRID-PROXY-CRCN-INDEX        (Quote l:HYBRID-PROXY-CRCN-INDEX))
-(define HYBRID-PROXY-CLOS-INDEX        (Quote l:HYBRID-PROXY-CLOS-INDEX))
 
 (: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))
 (trace-define (specify-representation prgm)
@@ -1209,25 +1030,6 @@ but a static single assignment is implicitly maintained.
          ((untag-deref-gproxy GPROXY-BLAMES-INDEX) e)]
         [(Guarded-Proxy-Coercion (app recur e))
          ((untag-deref-gproxy GPROXY-COERCION-INDEX) e)]
-        [(CastedValue-Huh (app recur e))
-         (Op '= `(,(Op 'binary-and (list e CV-TAG-MASK))
-                  ,CASTEDVALUE-TAG))]
-        [(CastedValue (app recur e) r)
-         (match r
-           [(Twosome (app recur t1) (app recur t2) (app recur l))
-            (alloc-tag-set-cv/twosome next-uid! e t1 t2 l)]
-           [(Coercion (app recur c))
-            (alloc-tag-set-cv/coercion next-uid! e c)])]
-        [(CastedValue-Value (app recur e))
-         ((untag-deref-castedvalue CASTEDVALUE-FOR-INDEX) e)]
-        [(CastedValue-Coercion (app recur e))
-         ((untag-deref-castedvalue CASTEDVALUE-COERCION-INDEX) e)]
-        [(CastedValue-Source (app recur e))
-         ((untag-deref-castedvalue CASTEDVALUE-FROM-INDEX) e)]
-        [(CastedValue-Target (app recur e))
-         ((untag-deref-castedvalue CASTEDVALUE-TO-INDEX) e)]
-        [(CastedValue-Blames (app recur e))
-         ((untag-deref-castedvalue CASTEDVALUE-BLAMES-INDEX) e)]
         [(Mbox (app recur e) (app sr-prim-type t))
          (sr-alloc "mbox" l:MBOX-TAG (list (cons "init_value" e) (cons "init_type" t)))]
         [(Mbox-val-set! (app recur e1) (app recur e2))
@@ -1655,12 +1457,6 @@ but a static single assignment is implicitly maintained.
       (list (Op 'binary-xor (list proxy GPROXY-TAG))
             index)))
 
-(: untag-deref-castedvalue (-> D0-Expr (-> D0-Expr D0-Expr)))
-(define ((untag-deref-castedvalue index) cv)
-  (Op 'Array-ref
-      (list (Op 'binary-xor (list cv CASTEDVALUE-TAG))
-            index)))
-
 (: alloc-tag-set-gproxy/twosome
    ((String -> Uid) D0-Expr D0-Expr D0-Expr D0-Expr -> D0-Expr))
 (define (alloc-tag-set-gproxy/twosome uid! ref-e src-e tar-e lbl-e)
@@ -1683,30 +1479,6 @@ but a static single assignment is implicitly maintained.
           (Op 'Array-set! (list var GPROXY-BLAMES-INDEX (Var lbl))))
     (Op 'binary-or (list var GPROXY-TAG))))
 
-;; TODO: parameterize over the body of this function
-(: alloc-tag-set-cv/twosome
-   ((String -> Uid) D0-Expr D0-Expr D0-Expr D0-Expr -> D0-Expr))
-(define (alloc-tag-set-cv/twosome uid! e src-e tar-e lbl-e)
-  ;; TODO Consider using sr-alloc here
-  (define cv (uid! "casted_value"))
-  (define val   (uid! "value"))
-  (define src   (uid! "source_t"))
-  (define tar   (uid! "target_t"))
-  (define lbl   (uid! "blame"))
-  (define var   (Var cv))
-  (Begin
-    (list
-     (Assign cv e)
-     (Assign src src-e)
-     (Assign tar tar-e)
-     (Assign lbl lbl-e)
-     (Assign cv (Op 'Alloc (list CASTEDVALUE/TWOSOME-SIZE)))
-     (Op 'Array-set! (list var CASTEDVALUE-FOR-INDEX    (Var val)))
-     (Op 'Array-set! (list var CASTEDVALUE-FROM-INDEX   (Var src)))
-     (Op 'Array-set! (list var CASTEDVALUE-TO-INDEX     (Var tar)))
-     (Op 'Array-set! (list var CASTEDVALUE-BLAMES-INDEX (Var lbl))))
-    (Op 'binary-or (list var CASTEDVALUE-TAG))))
-
 (: alloc-tag-set-gproxy/coercion
    ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
 (define (alloc-tag-set-gproxy/coercion uid! ref-e crcn-e)
@@ -1722,23 +1494,6 @@ but a static single assignment is implicitly maintained.
      (Op 'Array-set! (list var GPROXY-FOR-INDEX      (Var ref)))
      (Op 'Array-set! (list var GPROXY-COERCION-INDEX (Var crcn))))
     (Op 'binary-or (list var GPROXY-TAG))))
-
-(: alloc-tag-set-cv/coercion
-   ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
-(define (alloc-tag-set-cv/coercion uid! e crcn-e)
-  (define cv (uid! "casted_value"))
-  (define val   (uid! "value"))
-  (define crcn  (uid! "coercion"))
-  (define var   (Var cv))
-  (Begin
-    (list
-     (Assign val e)
-     (Assign crcn crcn-e)
-     (Assign cv (Op 'Alloc (list CASTEDVALUE/COERCION-SIZE)))
-     (Op 'Array-set! (list var CASTEDVALUE-FOR-INDEX      (Var val)))
-     (Op 'Array-set! (list var CASTEDVALUE-COERCION-INDEX (Var crcn))))
-    (Op 'binary-or (list var CASTEDVALUE-TAG))))
-
 
 ;; fold map through bindings
 (: sr-bnd* ((CoC6-Expr -> D0-Expr) -> (CoC6-Bnd-Data* -> D0-Bnd*)))

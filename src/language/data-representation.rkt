@@ -1,140 +1,140 @@
-#lang typed/racket/base
+#lang typed/racket
+(require (for-syntax racket/syntax))
+(require "../language/data0.rkt")
 (provide (all-defined-out))
 
-#|-----------------------------------------------------------------------------+
-| The Constants for the representation of casts                                |
-+-----------------------------------------------------------------------------|#
-;; The Representation of functional types is an array
-(define TYPE-FN-ARITY-INDEX 0)
-(define TYPE-FN-RETURN-INDEX 1)
-(define TYPE-FN-FMLS-OFFSET 2)
+(define-syntax (define-constants stx)
+    (syntax-case stx ()
+      [(_ (name val) ...)
+       (with-syntax ([(lname ...) (map (lambda (x) (format-id stx "l:~a" x)) (syntax->list #'(name ...)))])
+         #'(begin
+             (define lname val) ...
+             (define name (Quote lname)) ...))]))
 
-;; The representation of tuple types is an array
-(define TYPE-TUPLE-COUNT-INDEX 0)
-(define TYPE-TUPLE-ELEMENTS-OFFSET 1)
-
-;; The representation of tagged structure types
-;; My thought is that types can be allocated statically
-;; so there doesn't really need to be much though put
-;; it may even be worth not tagging them and just laying
-;; the types explicitly;
-(define TYPE-TAG-MASK #b111)
-(define TYPE-FN-TAG #b000)
-(define TYPE-GREF-TAG #b001)
-(define TYPE-GVECT-TAG #b010)
-(define TYPE-MREF-TAG #b011)
-(define TYPE-MVECT-TAG #b100)
-(define TYPE-TUPLE-TAG #b101)
-;; Hypothetical extensions to type tags
-;; Though more organization could le
-;;(define TYPE-IARRAY-TAG #b101)
-;;(define TYPE-MU-TAG #b110)
-
-(define TYPE-ATOMIC-TAG #b111) ;; This should be TYPE-IMDT-TAG
-;; Immediate types are tagged with #b111
-(define TYPE-DYN-RT-VALUE #b0111)
-(define TYPE-INT-RT-VALUE #b1111)
-(define TYPE-BOOL-RT-VALUE #b10111)
-(define TYPE-UNIT-RT-VALUE #b11111)
-
-;; The representation of Dynamic Immediates
-(define DYN-TAG-MASK  #b111)
-(define DYN-IMDT-SHIFT 3)
-(define DYN-BOXED-TAG #b000)
-(define DYN-INT-TAG   #b001)
-(define DYN-UNIT-TAG  #b010)
-(define DYN-BOOL-TAG  #b111)
-
-;; Boxed Dynamics are just a cons cell
-(define DYN-BOX-SIZE 2)
-(define DYN-VALUE-INDEX 0)
-(define DYN-TYPE-INDEX 1)
-
-;; Immediates
-(define FALSE-IMDT #b000)
-(define TRUE-IMDT #b001)
-(define UNIT-IMDT #b000)
-;; Unreachable Value
-(define UNDEF-IMDT 0)
-
-;; Guarded Representation
-(define GREP-TAG-MASK #b111)
-(define UGBOX-SIZE 1)
-(define UGBOX-VALUE-INDEX 0)
-(define UGBOX-TAG #b000)
-(define GPROXY-TAG  #b001)
-(define GPROXY/COERCION-SIZE 2)
-(define GPROXY/TWOSOME-SIZE  4)
-(define GPROXY-FOR-INDEX 0)
-(define GPROXY-COERCION-INDEX 1)
-(define GPROXY-FROM-INDEX 1)
-(define GPROXY-TO-INDEX 2)
-(define GPROXY-BLAMES-INDEX 3)
-(define UGVECT-SIZE #f)
-(define UGVECT-TAG #b000)
-(define UGVECT-SIZE-INDEX 0)
-(define UGVECT-OFFSET 1)
-
-;; CastedValue Representation
-
-(define CV-TAG-MASK #b111)
-(define CASTEDVALUE-TAG #b010) ;; this tag should not conflict with any other tagged value
-(define CASTEDVALUE/TWOSOME-SIZE 4)
-(define CASTEDVALUE/COERCION-SIZE 1)
-(define CASTEDVALUE-COERCION-INDEX 1)
-(define CASTEDVALUE-FOR-INDEX 0)
-(define CASTEDVALUE-FROM-INDEX 1)
-(define CASTEDVALUE-TO-INDEX 2)
-(define CASTEDVALUE-BLAMES-INDEX 3)
-
-;; Monotonic Representation
-(define MBOX-SIZE 2)
-(define MBOX-VALUE-INDEX 0)
-(define MBOX-RTTI-INDEX 1)
-(define MBOX-TAG #b000) ;; no tags, one concrete value
-
-(define MVECT-SIZE #f)
-(define MVECT-SIZE-INDEX 0)
-(define MVECT-RTTI-INDEX 1)
-(define MVECT-OFFSET 2)
-(define MVECT-TAG #b000) ;; no tags, one concrete value
-(define TUPLE-TAG #b000)
-
-;; GREF Type Representation
-(define TYPE-GREF-SIZE  1)
-(define TYPE-GREF-TYPE-INDEX 0)
-
-;; GVECT Type Representation
-(define TYPE-GVECT-SIZE  1)
-(define TYPE-GVECT-TYPE-INDEX 0)
-
-;; MRef Type Representation
-(define TYPE-MREF-SIZE  1)
-(define TYPE-MREF-TYPE-INDEX 0)
-
-;; MVECT Type Representation
-(define TYPE-MVECT-SIZE  1)
-(define TYPE-MVECT-TYPE-INDEX 0)
-
-;; Closure representation
-(define CLOS-CODE-INDEX 0)
-(define CLOS-CSTR-INDEX 1)
-(define CLOS-FVAR-OFFSET 2)
-
-;; Function Proxy Representation
-(define HYBRID-PROXY-CRCN-SIZE 3)
-(define HYBRID-PROXY-CODE-INDEX 0)
-(define HYBRID-PROXY-CLOS-INDEX 1)
-(define HYBRID-PROXY-CRCN-INDEX 2)
-
-;; Shifting for secondary tags
-(define COERCION-SECOND-TAG-SHIFT 3)
-
-;; The Representation of function coercion is an array
-(define COERCION-FN-ARITY-INDEX 0)
-(define COERCION-FN-RETURN-INDEX 1)
-(define COERCION-FN-FMLS-OFFSET 2)
-
-;; The representation of tuple coercion is an array
-(define COERCION-TUPLE-COUNT-INDEX 0)
-(define COERCION-TUPLE-ELEMENTS-OFFSET 1)
+(define-constants
+  ;; types
+  (TYPE-TAG-MASK                  #b111)  
+  ;; unallocated types
+  (TYPE-ATOMIC-TAG                #b111)
+  (TYPE-DYN-RT-VALUE              #b0111)
+  (TYPE-INT-RT-VALUE              #b1111)
+  (TYPE-BOOL-RT-VALUE             #b10111)
+  (TYPE-UNIT-RT-VALUE             #b11111)
+  ;; function type representation
+  (TYPE-FN-TAG                    #b000)
+  (TYPE-FN-ARITY-INDEX            0)
+  (TYPE-FN-RETURN-INDEX           1)
+  (TYPE-FN-FMLS-OFFSET            2)
+  ;; guarded types representation
+  (TYPE-GREF-TAG                  #b001)
+  (TYPE-GREF-SIZE                 1)
+  (TYPE-GREF-TYPE-INDEX           0)
+  (TYPE-GVECT-TAG                 #b010)
+  (TYPE-GVECT-SIZE                1)
+  (TYPE-GVECT-TYPE-INDEX          0)
+  ;; monotonic types representation
+  (TYPE-MREF-TAG                  #b011)
+  (TYPE-MREF-SIZE                 1)
+  (TYPE-MREF-TYPE-INDEX           0)
+  (TYPE-MVECT-TAG                 #b100)
+  (TYPE-MVECT-SIZE                1)
+  (TYPE-MVECT-TYPE-INDEX          0)
+  ;; tuple type representation
+  (TYPE-TUPLE-TAG                 #b101)
+  (TYPE-TUPLE-COUNT-INDEX         0)
+  (TYPE-TUPLE-ELEMENTS-OFFSET     1)
+  ;; coercions
+  (COERCION-TAG-MASK              #b111) ;; the same for primary and secondary tags
+  ;; project coercion representation
+  (COERCION-PROJECT-TAG           #b000)
+  (COERCION-PROJECT-TYPE-INDEX    0)
+  (COERCION-PROJECT-LABEL-INDEX   1)
+  ;; inject coercion representation
+  (COERCION-INJECT-TAG            #b001)
+  (COERCION-INJECT-TYPE-INDEX     0)
+  ;; sequence coercion representation
+  (COERCION-SEQUENCE-TAG          #b010)
+  (COERCION-SEQUENCE-FST-INDEX    0)
+  (COERCION-SEQUENCE-SND-INDEX    1)
+  ;; identity coercion representation
+  (COERCION-IDENTITY-TAG          #b011)
+  (COERCION-IDENTITY-IMDT         #b011)
+  ;; fail coercion representation
+  (COERCION-FAILED-TAG            #b110)
+  (COERCION-FAILED-LABEL-INDEX    0)
+  ;; mediating coercion representation
+  (COERCION-SECOND-TAG-SHIFT      3)
+  (COERCION-MEDIATING-TAG         #b100)
+  ;; function coercion representation
+  (COERCION-FN-SECOND-TAG         #b001)
+  (COERCION-FN-ARITY-INDEX        0)
+  (COERCION-FN-RETURN-INDEX       1)
+  (COERCION-FN-FMLS-OFFSET        2)
+  ;; tuple coercion representation
+  (COERCION-TUPLE-SECOND-TAG      #b010)
+  (COERCION-TUPLE-COUNT-INDEX     0)
+  (COERCION-TUPLE-ELEMENTS-OFFSET 1)
+  ;; monotonic coercion representation
+  (COERCION-MREF-SECOND-TAG       #b011)
+  (COERCION-MREF-TAG-INDEX        0)
+  (COERCION-MREF-TYPE-INDEX       1)
+  ;; guarded coercion representation
+  (COERCION-REF-SECOND-TAG        #b000)
+  (COERCION-REF-TAG-INDEX         0)
+  (COERCION-REF-READ-INDEX        1)
+  (COERCION-REF-WRITE-INDEX       2)
+  ;; values
+  ;; simple dynamic value representation
+  (DYN-TAG-MASK                   #b111)
+  (DYN-BOXED-TAG                  #b000)
+  (DYN-INT-TAG                    #b001)
+  (DYN-BOOL-TAG                   #b111)
+  (DYN-UNIT-TAG                   #b010)
+  (DYN-IMDT-SHIFT                 3)
+  ;; allocated dynamic value representation
+  (DYN-BOX-SIZE                   2)
+  (DYN-VALUE-INDEX                0)
+  (DYN-TYPE-INDEX                 1)
+  ;; bool value representation
+  (FALSE-IMDT                     #b000)
+  (TRUE-IMDT                      #b001)
+  ;; unit representation
+  (UNIT-IMDT                      #b000)
+  (GREP-TAG-MASK                  #b111)
+  ;; 0
+  (UNDEF-IMDT                     0)
+  ;; guarded values representation
+  (UGBOX-TAG                      #b000)
+  (UGBOX-SIZE                     1)
+  (UGBOX-VALUE-INDEX              0)
+  (UGVECT-SIZE-INDEX              0)
+  (UGVECT-OFFSET                  1)
+  (GPROXY-TAG                     #b001)
+  (GPROXY/TWOSOME-SIZE            4)
+  (GPROXY/COERCION-SIZE           2)
+  (GPROXY-COERCION-INDEX          1)
+  (GPROXY-FOR-INDEX               0)
+  (GPROXY-FROM-INDEX              1)
+  (GPROXY-TO-INDEX                2)
+  (GPROXY-BLAMES-INDEX            3)
+  ;; monotonic values representation
+  (MBOX-SIZE                      2)
+  (MBOX-VALUE-INDEX               0)
+  (MBOX-RTTI-INDEX                1)
+  (MBOX-TAG                       #b000)
+  (MVECT-SIZE-INDEX               0)
+  (MVECT-OFFSET                   2)
+  (MVECT-RTTI-INDEX               1)
+  (MVECT-TAG                      #b000)
+  ;; function value representation
+  (CLOS-CODE-INDEX                0)
+  (CLOS-CSTR-INDEX                1)
+  (CLOS-FVAR-OFFSET               2)
+  (FN-TAG-MASK                    #b111)
+  (CLOSURE-VALUE-MASK             -8) ;; signed long compliment of fn tag mask
+  (FN-PROXY-TAG                   #b001)
+  (FN-PROXY-CRCN-INDEX            1)
+  (FN-PROXY-CLOS-INDEX            0)
+  (HYBRID-PROXY-TAG               #b001)
+  (HYBRID-PROXY-CRCN-INDEX        2)
+  (HYBRID-PROXY-CLOS-INDEX        1))

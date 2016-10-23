@@ -24,6 +24,7 @@
    (test-file "monoboxes" "mbox7-5.schml" (int 42))
    (test-file "monoboxes" "mbox7-6.schml" (int 42))
    (test-file "monoboxes" "mbox7-7.schml" (int 42))
-   (test-file "monoboxes" "mbox8.schml" (int 42))
+   ;; (test-file "monoboxes" "mbox8.schml" (int 42))
    (test-file "monoboxes" "mbox9.schml" (bool #f))
+   (test-file "monoboxes" "mbox10.schml" (int 42))
    ))

@@ -52,10 +52,6 @@
 
   ;; (TODO remove relops and just use value in predicate context)
   ;; I think that having relops is not actually necissary  
-  (: TRUE D5-Trivial)
-  (define TRUE (Quote TRUE-IMDT))
-  (: FALSE D5-Trivial)
-  (define FALSE (Quote FALSE-IMDT))
   (: sp-pred (D4-Pred -> (Values D5-Effect* D5-Pred)))
   (define (sp-pred pred)
     (match pred
@@ -66,10 +62,10 @@
        ;; This seems dumb both the if and the snoc we should make
        ;; effectfull begins able to handle having an effect in the
        ;; value position.
-       (define ce (Begin (snoc ce* (Assign u (If c TRUE FALSE))) NO-OP))
-       (define ae (Begin (snoc ae* (Assign u (If a TRUE FALSE))) NO-OP))
+       (define ce (Begin (snoc ce* (Assign u (If c TRUE-IMDT FALSE-IMDT))) NO-OP))
+       (define ae (Begin (snoc ae* (Assign u (If a TRUE-IMDT FALSE-IMDT))) NO-OP))
        (values (snoc te* (If t ce ae))
-               (Relop '= (Var u) TRUE))]
+               (Relop '= (Var u) TRUE-IMDT))]
       [(Begin (app sp-effect* e*) (app sp-pred pe* p))
        (values (append e* pe*) p)]
       [(Relop p (app sp-trivial t1) (app sp-trivial t2))

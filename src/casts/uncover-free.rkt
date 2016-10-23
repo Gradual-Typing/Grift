@@ -205,25 +205,6 @@
      (values (Guarded-Proxy-Blames e) fv)]
     [(Guarded-Proxy-Coercion (app uf-expr e fv))
      (values (Guarded-Proxy-Coercion e) fv)]
-    [(CastedValue-Huh (app uf-expr e fv))
-     (values (CastedValue-Huh e) fv)]
-    [(CastedValue (app uf-expr e fv0) r)
-     (match r
-       [(Twosome (app uf-expr t1 fv1) (app uf-expr t2 fv2) (app uf-expr l fv3))
-        (values (CastedValue e (Twosome t1 t2 l))
-                (set-union fv0 fv1 fv2 fv3))]
-       [(Coercion (app uf-expr c fv1))
-        (values (CastedValue e (Coercion c)) (set-union fv0 fv1))])]
-    [(CastedValue-Value (app uf-expr e fv))
-     (values (CastedValue-Value e) fv)]
-    [(CastedValue-Source (app uf-expr e fv))
-     (values (CastedValue-Source e) fv)]
-    [(CastedValue-Target (app uf-expr e fv))
-     (values (CastedValue-Target e) fv)]
-    [(CastedValue-Blames (app uf-expr e fv))
-     (values (CastedValue-Blames e) fv)]
-    [(CastedValue-Coercion (app uf-expr e fv))
-     (values (CastedValue-Coercion e) fv)]
     [(Mbox (app uf-expr e fv) t) (values (Mbox e t) fv)]
     [(Mbox-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Mbox-val-set! e1 e2) (set-union fv1 fv2))]

@@ -392,15 +392,19 @@ form, to the shortest branch of the cast tree that is relevant.
                           [t3 (glbt t1 t2)])
                     (if$ (op=? t1 t3)
                          val
-                         (let$* ([c (mk-crcn t1 t3 (Quote ""))]
-                                 [cv (Mbox-val-ref val)]
-                                 [cv_ (CastedValue cv (Coercion crcn))])
-                           (Begin
-                             (list
-                              (Mbox-val-set! val cv_)
-                              (Mbox-rtti-set! a t3))
-                             val))))))]
-          [_ (error 'interp-cast/mrefC)])]
+                         (Begin
+                           (list
+                            (Mbox-rtti-set! a t3))
+                           (let$* ([c (mk-crcn t1 t3 (Quote ""))]
+                                   [vv (Mbox-val-ref val)]
+                                   [cv (cast vv c)]
+                                   [t4 (Mbox-rtti-ref a)])
+                             (if$ (op=? t3 t4)
+                                  (Begin
+                                    (list (Mbox-val-set! val cv))
+                                    val)
+                                  val)))))))]
+          [other (error 'interp-cast/mrefC "unmatched value ~a" other)])]
        [(tuple?$ crcn)
         (match crcn
           [(not (Quote-Coercion _)) (Coerce-Tuple cast-u val crcn)]
@@ -751,12 +755,17 @@ form, to the shortest branch of the cast tree that is relevant.
                      (U (Quote Cast-Literal) (Var Uid))
                      (Var Uid) ->
                      CoC3-Expr))
-       (define (mbox-set! addr val t1)
-         (let ([t2 (next-uid! "t2")]
-               [c  (next-uid! "crcn")])
-           (Let (list (cons t2 (Mbox-rtti-ref addr)))
-             (Let (list (cons c (mk-coercion t1 (Var t2) (Quote ""))))
-               (Mbox-val-set! (Var addr) (CastedValue val (Coercion (Var c))))))))
+       (define (mbox-set! addr val type)
+         (define-syntax-let$* let$* next-uid!)
+         (let$* ([t1 (Mbox-rtti-ref addr)]
+                 [c (mk-coercion type t1 (Quote ""))]
+                 [cv (interp-cast val c)]
+                 [t2 (Mbox-rtti-ref addr)])
+           (begin
+             ;; (debug val t1 c cv t2 type addr)
+             (if$ (op=? t1 t2)
+                (Mbox-val-set! (Var addr) cv)
+                (Quote '())))))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
            (if (or (Var? e) (Quote? e))
