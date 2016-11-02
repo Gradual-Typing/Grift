@@ -416,6 +416,11 @@
     [(Error (app recur e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (recur* e*))]
     [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+    [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
+     (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
+    [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+    [(Coerce-Tuple-In-Place uid e1 e2 e3) (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
     [other (error 'purify-letrec/replace-ref "unmatched ~a" other)]))
 
 
