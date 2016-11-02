@@ -95,8 +95,14 @@ but a static single assignment is implicitly maintained.
   (: coerce-tuple-code-label? (Boxof (Option (Code-Label Uid))))
   (define coerce-tuple-code-label? (box #f))
 
+  (: coerce-tuple-in-place-code-label? (Boxof (Option (Code-Label Uid))))
+  (define coerce-tuple-in-place-code-label? (box #f))
+
   (: cast-tuple-code-label? (Boxof (Option (Code-Label Uid))))
   (define cast-tuple-code-label? (box #f))
+
+  (: cast-tuple-in-place-code-label? (Boxof (Option (Code-Label Uid))))
+  (define cast-tuple-in-place-code-label? (box #f))
 
   (: mk-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
   (define mk-tuple-coercion-code-label? (box #f))
@@ -414,7 +420,7 @@ but a static single assignment is implicitly maintained.
       (define i              (Var i-u))
       (define a              (Var a-u))
       (define coerce-tuple   (Code-Label coerce-tuple-u))
-      (define mk-c           (Code-Label cast))
+      (define cast-l         (Code-Label cast))
       (define coerce-tuple-c : D0-Code
         (Code `(,v-u ,c-u ,i-u ,a-u)
           (If (Op '= `(,i ,a))
@@ -424,7 +430,7 @@ but a static single assignment is implicitly maintained.
                  (Assign va-u (Op 'Array-ref (list v i)))
                  (Assign ca-u (sr-tagged-array-ref c COERCION-MEDIATING-TAG
                                                    (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
-                 (Assign cva-u (App-Code mk-c `(,(Var va-u) ,(Var ca-u))))
+                 (Assign cva-u (App-Code cast-l `(,(Var va-u) ,(Var ca-u) ,(Quote 0))))
                  (Assign v2-u (App-Code coerce-tuple `(,v ,c ,(sr-plus (Quote 1) i) ,a)))
                  (Op 'Array-set! (list v2 i (Var cva-u))))
                 v2))))
@@ -434,11 +440,115 @@ but a static single assignment is implicitly maintained.
     (let ([cl? (unbox coerce-tuple-code-label?)])
       (or cl? (make-code! cast))))
 
+  (: get-coerce-tuple-in-place! (Uid -> (Code-Label Uid)))
+  (define (get-coerce-tuple-in-place! cast)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! cast)
+      (define coerce-tuple-u (next-uid! "coerce-tuple-in-place"))
+      (define v-u            (next-uid! "tuple-val"))
+      (define c-u            (next-uid! "tuple-coercion"))
+      (define mono-u         (next-uid! "mono-address"))
+      (define tmp-u          (next-uid! "tuple-count-tagged"))
+      (define n-u            (next-uid! "tuple-count"))
+      (define i-u            (next-uid! "index"))
+      (define va-u           (next-uid! "tuple-val-item"))
+      (define ca-u           (next-uid! "tuple-coercion-item"))
+      (define t1-u           (next-uid! "mono-type1"))
+      (define t2-u           (next-uid! "mono-type2"))
+      (define a              (next-uid! "_"))
+      (define new-va-u       (next-uid! "new-tuple-item"))
+      (define v              (Var v-u))
+      (define c              (Var c-u))
+      (define mono           (Var mono-u))
+      (define n              (Var n-u))
+      (define t1             (Var t1-u))
+      (define t2             (Var t2-u))
+      (define i              (Var i-u))
+      (define cast-l         (Code-Label cast))
+      (define coerce-tuple   (Code-Label coerce-tuple-u))
+      (define coerce-tuple-c : D0-Code
+        (Code `(,v-u ,c-u ,mono-u)
+          (Begin
+            (list
+             (Assign tmp-u (sr-tagged-array-ref c COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
+             (Assign n-u (Op '%>> (list (Var tmp-u) COERCION-SECOND-TAG-SHIFT)))
+             (Repeat i-u (Quote 0) n a UNIT-IMDT
+                     (Begin
+                       (list
+                        (Assign va-u (Op 'Array-ref (list v i)))
+                        (Assign ca-u (sr-tagged-array-ref c COERCION-MEDIATING-TAG
+                                                          (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
+                        (Assign t1-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX)))
+                        (Assign new-va-u (App-Code cast-l `(,(Var va-u) ,(Var ca-u) ,mono)))
+                        (Assign t2-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX))))
+                       (If (Op '= (list t1 t2))
+                           (Op 'Array-set! (list v i (Var new-va-u)))
+                           (Quote 0)))))
+            v)))
+      (add-new-code! (cons coerce-tuple-u coerce-tuple-c))
+      (set-box! coerce-tuple-in-place-code-label? coerce-tuple)
+      coerce-tuple)
+    (let ([cl? (unbox coerce-tuple-in-place-code-label?)])
+      (or cl? (make-code! cast))))
+
+  (: get-cast-tuple-in-place! (Uid -> (Code-Label Uid)))
+  (define (get-cast-tuple-in-place! cast)
+    (: make-code! (Uid -> (Code-Label Uid)))
+    (define (make-code! cast)
+      (define cast-u     (next-uid! "cast-tuple-in-place"))
+      (define v-u        (next-uid! "val"))
+      (define mono-u     (next-uid! "mono-address"))
+      (define t1-u       (next-uid! "tuple-type1"))
+      (define t2-u       (next-uid! "tuple-type2"))
+      (define t1m-u      (next-uid! "mono-type"))
+      (define t2m-u      (next-uid! "mono-type-updated"))
+      (define l-u        (next-uid! "label"))
+      (define i-u        (next-uid! "index"))
+      (define n-u        (next-uid! "tuple-type-num"))
+      (define t1a-u      (next-uid! "tuple-type1-item"))
+      (define t2a-u      (next-uid! "tuple-type2-item"))
+      (define va-u       (next-uid! "item-val"))
+      (define new-va-u   (next-uid! "new-tuple-item"))
+      (define a          (next-uid! "_"))
+      (define v          (Var v-u))
+      (define t1         (Var t1-u))
+      (define t2         (Var t2-u))
+      (define l          (Var l-u))
+      (define va         (Var va-u))
+      (define i          (Var i-u))
+      (define n          (Var n-u))
+      (define mono       (Var mono-u))
+      (define cast-tuple (Code-Label cast-u))
+      (define cast-l       (Code-Label cast))
+      (define cast-tuple-c : D0-Code
+        (Code `(,v-u ,t1-u ,t2-u ,l-u ,mono-u)
+          (Begin
+            (list
+             (Assign n-u (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+             (Repeat i-u (Quote 0) n a UNIT-IMDT
+                     (Begin
+                       (list
+                        (Assign va-u (Op 'Array-ref (list v i)))
+                        (Assign t1a-u (sr-tagged-array-ref t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
+                        (Assign t2a-u (sr-tagged-array-ref t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
+                        (Assign t1m-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX)))
+                        (Assign new-va-u (App-Code cast-l `(,va ,(Var t1a-u) ,(Var t2a-u) ,l ,mono)))
+                        (Assign t2m-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX))))
+                       (If (Op '= (list (Var t1m-u) (Var t2m-u)))
+                           (Op 'Array-set! (list v i (Var new-va-u)))
+                           (Quote 0)))))
+            v)))
+      (add-new-code! (cons cast-u cast-tuple-c))
+      (set-box! cast-tuple-in-place-code-label? cast-tuple)
+      cast-tuple)
+    (let ([cl? (unbox cast-tuple-in-place-code-label?)])
+      (or cl? (make-code! cast))))
+
   (: get-cast-tuple! (Uid -> (Code-Label Uid)))
   (define (get-cast-tuple! cast)
     (: make-code! (Uid -> (Code-Label Uid)))
     (define (make-code! cast)
-      (define cast-u     (next-uid! "cast"))
+      (define cast-u     (next-uid! "cast-tuple"))
       (define v-u        (next-uid! "val"))
       (define t1-u       (next-uid! "tuple-type1"))
       (define t2-u       (next-uid! "tuple-type2"))
@@ -461,7 +571,7 @@ but a static single assignment is implicitly maintained.
       (define i          (Var i-u))
       (define a          (Var a-u))
       (define cast-tuple (Code-Label cast-u))
-      (define mk-c       (Code-Label cast))
+      (define cast-l       (Code-Label cast))
       (define cast-tuple-c : D0-Code
         (Code `(,v-u ,t1-u ,t2-u ,l-u ,i-u ,a-u)
           (If (Op '= `(,i ,a))
@@ -471,7 +581,7 @@ but a static single assignment is implicitly maintained.
                  (Assign va-u (Op 'Array-ref (list v i)))
                  (Assign t1a-u (sr-tagged-array-ref t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
                  (Assign t2a-u (sr-tagged-array-ref t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-                 (Assign ca-u (App-Code mk-c `(,va ,(Var t1a-u) ,(Var t2a-u) ,l)))
+                 (Assign ca-u (App-Code cast-l `(,va ,(Var t1a-u) ,(Var t2a-u) ,l ,(Quote 0))))
                  (Assign c2-u (App-Code cast-tuple `(,v ,t1 ,t2 ,l ,(sr-plus (Quote 1) i) ,a)))
                  (Op 'Array-set! (list c2 i (Var ca-u))))
                 c2))))
@@ -1057,7 +1167,7 @@ but a static single assignment is implicitly maintained.
                  (Op 'Array-set! (list (Var tmp3) MVECT-SIZE-INDEX (Var tmp1)))
                  (Op 'Array-set! (list (Var tmp3) MVECT-RTTI-INDEX (Var rtti)))
                  (Repeat i MVECT-OFFSET (Var tmp4) a UNIT-IMDT
-                   (Op 'Array-set! (list (Var tmp3) (Var i) (Var tmp2)))))
+                         (Op 'Array-set! (list (Var tmp3) (Var i) (Var tmp2)))))
                 (Var tmp3))]
         [(Mvector-rtti-set! u (app recur e))
          (Op 'Array-set! (list (Var u) MVECT-RTTI-INDEX e))]
@@ -1220,6 +1330,29 @@ but a static single assignment is implicitly maintained.
                  (Begin
                    (list (Assign u v))
                    (invoke-coerce-tuple coerce-tuple (Var u) c)))))]
+        [(Coerce-Tuple-In-Place uid (app recur v) (app recur c) (app recur mono-type))
+         (: invoke-coerce-tuple ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr -> D0-Expr))
+         (define (invoke-coerce-tuple coerce-tuple v c a)
+           (App-Code
+            coerce-tuple
+            (list v c a)))
+         (let ([coerce-tuple (get-coerce-tuple-in-place! uid)])
+           (if (Var? v)
+               (invoke-coerce-tuple coerce-tuple v c mono-type)
+               (let ([u (next-uid! "tuple_val1")])
+                 (Begin
+                   (list (Assign u v))
+                   (invoke-coerce-tuple coerce-tuple (Var u) c mono-type)))))]
+        [(Cast-Tuple-In-Place uid (app recur v) (app recur t1) (app recur t2) (app recur lbl) (app recur mono-address))
+         (: invoke-cast-tuple ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr D0-Expr D0-Expr -> D0-Expr))
+         (define (invoke-cast-tuple cast-tuple v t1 t2 lbl a)
+           (App-Code cast-tuple (list v t1 t2 lbl a)))
+         (let ([cast-tuple (get-cast-tuple-in-place! uid)])
+           (if (Var? v)
+               (invoke-cast-tuple cast-tuple v t1 t2 lbl mono-address)
+               (let ([u (next-uid! "tuple_val1")])
+                 (Begin (list (Assign u v))
+                        (invoke-cast-tuple cast-tuple (Var u) t1 t2 lbl mono-address)))))]
         [(Cast-Tuple uid (app recur v) (app recur t1) (app recur t2) (app recur lbl))
          (: invoke-cast-tuple ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr D0-Expr -> D0-Expr))
          (define (invoke-cast-tuple cast-tuple v t1 t2 lbl)

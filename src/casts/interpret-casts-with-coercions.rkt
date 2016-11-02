@@ -66,7 +66,7 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; The runtime label for the runtime coercion interpreter
   (define interp-cast-uid (next-uid! "interp_coercion"))
 
-  (: interp-cast-call : CoC3-Expr CoC3-Expr -> CoC3-Expr)
+  (: interp-cast-call : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
   (define interp-cast-call (apply-code interp-cast-uid))
 
   ;; The runtime label for the compose interpreter
@@ -131,12 +131,13 @@ form, to the shortest branch of the cast tree that is relevant.
   (define bindings-needed-for-interp-cast
     (let ([interp-v (next-uid! "value")]
           [interp-c (next-uid! "coercion")]
+          [interp-a (next-uid! "mono-address")]
           [mc-t1    (next-uid! "type1")]
           [mc-t2    (next-uid! "type2")]
           [mc-lbl   (next-uid! "blame_info")])
       `([,interp-cast-uid
-         . ,(Code (list interp-v interp-c)
-              (gen-interp-cast-code (Var interp-v) (Var interp-c)))]
+         . ,(Code (list interp-v interp-c interp-a)
+              (gen-interp-cast-code (Var interp-v) (Var interp-c) (Var interp-a)))]
         [,make-coercion-uid
          . ,(Code (list mc-t1 mc-t2 mc-lbl)
               (gen-make-coercion-code (Var mc-t1) (Var mc-t2) (Var mc-lbl)))])))
@@ -320,14 +321,14 @@ form, to the shortest branch of the cast tree that is relevant.
 ;; casting at runtime. The templates are a little over
 ;; parameterized currently in hopes that it make specialization
 ;; and customization easier in the future.
-(define-type Cast-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Cast-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
 (: make-cast-code :
    (String -> Uid) Cast-Type Uid Make-Coercion-Type
    Compose-Coercions-Type GreatestLowerBound-Type
    ->
    Cast-Type)
-(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt) v c)
+(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt) v c mono_type)
   (define who 'make-cast-code)
   (debug who v c)
   (define-syntax-let$* let$* next-uid!)
@@ -347,8 +348,8 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; For the specialized sub grammers.
       (let$* ([seq_fst (seq-fst$ crcn)]
               [seq_snd (seq-snd$ crcn)]
-              [fst_cast_value (cast val seq_fst)])
-        (cast fst_cast_value seq_snd))]
+              [fst_cast_value (cast val seq_fst mono_type)])
+        (cast fst_cast_value seq_snd mono_type))]
      ;; By the typing rules of coercions we know v must be a dyn value
      [(prj?$ crcn)
       (let$* ([prj_type  (prj-type$ crcn)]
@@ -363,7 +364,7 @@ form, to the shortest branch of the cast tree that is relevant.
         ;; I did it this way because I know this code won't build
         ;; the injection coercion
         (let$* ([projected_type (mk-crcn dyn_type prj_type prj_label)])
-          (cast dyn_value projected_type)))]
+          (cast dyn_value projected_type mono_type)))]
      [(inj?$ crcn) (Dyn-make val (inj-type$ crcn))]
      [(mediating-crcn?$ crcn)
       (cond$
@@ -397,7 +398,8 @@ form, to the shortest branch of the cast tree that is relevant.
                             (Mbox-rtti-set! a t3))
                            (let$* ([c (mk-crcn t1 t3 (Quote ""))]
                                    [vv (Mbox-val-ref val)]
-                                   [cv (cast vv c)]
+                                   ;; TODO: pass a deep copy of vv
+                                   [cv (cast vv c val)]
                                    [t4 (Mbox-rtti-ref a)])
                              (if$ (op=? t3 t4)
                                   (Begin
@@ -407,7 +409,9 @@ form, to the shortest branch of the cast tree that is relevant.
           [other (error 'interp-cast/mrefC "unmatched value ~a" other)])]
        [(tuple?$ crcn)
         (match crcn
-          [(not (Quote-Coercion _)) (Coerce-Tuple cast-u val crcn)]
+          [(not (Quote-Coercion _)) (If (Op '= (list (Quote 0) mono_type))
+                                        (Coerce-Tuple cast-u val crcn)
+                                        (Coerce-Tuple-In-Place cast-u val crcn mono_type))]
           [(Quote-Coercion (CTuple n c*))
            (define-values (bnd* var*)
              (for/lists ([bnd* : CoC3-Bnd*] [var* : CoC3-Expr*])
@@ -416,7 +420,7 @@ form, to the shortest branch of the cast tree that is relevant.
                  [(index? i)
                   (define tmp (next-uid! "element"))
                   (values
-                   (cons tmp (cast (Tuple-proj val i) (Quote-Coercion c)))
+                   (cons tmp (cast (Tuple-proj val i) (Quote-Coercion c) (Quote 0)))
                    (Var tmp))]
                  [else (error 'interpret-casts-with-coercions "bad index")])))
            (Let bnd* (Create-tuple var*))]
@@ -621,7 +625,7 @@ form, to the shortest branch of the cast tree that is relevant.
 (: interpret-casts-in-expr :
    (String -> Uid)
    Uid
-   (CoC3-Expr CoC3-Expr -> CoC3-Expr)
+   (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
    (CoC3-Expr CoC3-Expr -> CoC3-Expr)
    (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
    Gbox-setT Gbox-refT Gvec-setT Gvec-refT
@@ -660,9 +664,9 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; Interesting Cases -----------------------------------------------
       ;; Transformations for Casting runtime
       [(Interpreted-Cast (app recur v) (Coercion (app recur c)))
-       (interp-cast v c)]
+       (interp-cast v c (Quote 0))]
       [(Cast (app recur e) (Coercion c))
-       (interp-cast e (Quote-Coercion c))]
+       (interp-cast e (Quote-Coercion c) (Quote 0))]
       [(Cast e (Coercion (Ref r w))) #:when #f
        ;; TODO (Andre) delete this branch
        ;; Here this specialization of reference coercions
@@ -743,13 +747,14 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Mbox-set! (app recur e1) (app recur e2))
        (Mbox-val-set! e1 e2)]
       [(MBoxCastedRef addr t)
-       (let ([t2 (next-uid! "t2")])
-         (Let (list (cons t2 (Type t)))
-           (let ([t1 (next-uid! "t1")]
-                 [c  (next-uid! "crcn")])
-             (Let (list (cons t1 (Mbox-rtti-ref addr)))
-               (Let (list (cons c (mk-coercion (Var t1) (Var t2) (Quote ""))))
-                 (interp-cast (Mbox-val-ref (Var addr)) (Var c)))))))]
+       (let ([t1 (next-uid! "t1")]
+             [t2 (next-uid! "t2")]
+             [c  (next-uid! "crcn")])
+         (Let (list
+               (cons t1 (Mbox-rtti-ref addr))
+               (cons t2 (Type t)))
+           (Let (list (cons c (mk-coercion (Var t1) (Var t2) (Quote ""))))
+             (interp-cast (Mbox-val-ref (Var addr)) (Var c) (Quote 0)))))]
       [(MBoxCastedSet! addr (app recur e) t)
        (: mbox-set! (Uid
                      (U (Quote Cast-Literal) (Var Uid))
@@ -759,13 +764,13 @@ form, to the shortest branch of the cast tree that is relevant.
          (define-syntax-let$* let$* next-uid!)
          (let$* ([t1 (Mbox-rtti-ref addr)]
                  [c (mk-coercion type t1 (Quote ""))]
-                 [cv (interp-cast val c)]
+                 [cv (interp-cast val c (Var addr))]
                  [t2 (Mbox-rtti-ref addr)])
            (begin
              ;; (debug val t1 c cv t2 type addr)
              (if$ (op=? t1 t2)
                 (Mbox-val-set! (Var addr) cv)
-                (Quote '())))))
+                (Quote 0)))))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
            (if (or (Var? e) (Quote? e))
@@ -903,7 +908,7 @@ form, to the shortest branch of the cast tree that is relevant.
        CoC3-Expr))
 (: make-smart-cast :
    (String -> Uid)
-   (CoC3-Expr CoC3-Expr  -> CoC3-Expr)
+   (CoC3-Expr CoC3-Expr CoC3-Expr  -> CoC3-Expr)
    (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
    -> Smart-Cast-Type)
 (define ((make-smart-cast next-uid! cast mk-coercion)
@@ -914,19 +919,19 @@ form, to the shortest branch of the cast tree that is relevant.
     [(val (Type t) (Type t)) val]
     [(val (Type (Dyn)) t2) #:when t2-not-dyn
      (match val
-       [(or (Var _) (Quote _)) (cast val (Project-Coercion t2 lbl))]
+       [(or (Var _) (Quote _)) (cast val (Project-Coercion t2 lbl) (Quote 0))]
        [other
         (define u (next-uid! "tmp"))
         (Let (list (cons u val))
-          (cast (Var u) (Project-Coercion t2 lbl)))])]
+          (cast (Var u) (Project-Coercion t2 lbl) (Quote 0)))])]
     [((or (Var _) (Quote _)) (Type (Dyn)) t2)
-     (If (Type-Dyn-Huh t2) val (cast val (Project-Coercion t2 lbl)))]
+     (If (Type-Dyn-Huh t2) val (cast val (Project-Coercion t2 lbl) (Quote 0)))]
     [(val t1 (Type (Dyn))) #:when t1-not-dyn
-     (cast val (Inject-Coercion t1))]
+     (cast val (Inject-Coercion t1) (Quote 0))]
     [((Var _) t1 (Type (Dyn)))
-     (If (Type-Dyn-Huh t1) val (cast val (Inject-Coercion t1)))]
+     (If (Type-Dyn-Huh t1) val (cast val (Inject-Coercion t1) (Quote 0)))]
     [(val t1 t2)
-     (cast val (mk-coercion t1 t2 lbl))]))
+     (cast val (mk-coercion t1 t2 lbl) (Quote 0))]))
 
 (define-type Dyn-Gbox-refT
   ((Var Uid) (Var Uid) -> CoC3-Expr))
@@ -1070,30 +1075,32 @@ form, to the shortest branch of the cast tree that is relevant.
 (define-type Gvec-refT ((Var Uid) (Var Uid) -> CoC3-Expr))
 (define-type Gvec-setT ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
 
-(: make-gbox-ref-code ((CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gbox-refT))
+(: make-gbox-ref-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gbox-refT))
 (define ((make-gbox-ref-code cast) gref)
   (If (Guarded-Proxy-Huh gref)
       (cast
        (Unguarded-Box-Ref (Guarded-Proxy-Ref gref))
-       (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
+       (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))
+       (Quote 0))
       (Unguarded-Box-Ref gref)))
 
-(: make-gbox-set!-code ((CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gbox-setT))
+(: make-gbox-set!-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gbox-setT))
 (define ((make-gbox-set!-code cast) gref val)
   (If (Guarded-Proxy-Huh gref)
       (Unguarded-Box-Set!
        (Guarded-Proxy-Ref gref)
-       (cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
+       (cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref)) (Quote 0)))
       (Unguarded-Box-Set! gref val)))
 
-(: make-gvect-ref-code ((CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gvec-refT))
+(: make-gvect-ref-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gvec-refT))
 (define ((make-gvect-ref-code cast) gref index)
   (If (Guarded-Proxy-Huh gref)
       (cast (Unguarded-Vect-Ref (Guarded-Proxy-Ref gref) index)
-            (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
+            (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))
+            (Quote 0))
       (Unguarded-Vect-Ref gref index)))
 
-(: make-gvect-set!-code ((CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gvec-setT))
+(: make-gvect-set!-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gvec-setT))
 (define ((make-gvect-set!-code cast) gref index val)
   (: index-exp CoC3-Expr)
   (define index-exp (if (integer? index) (Quote index) index))
@@ -1101,5 +1108,5 @@ form, to the shortest branch of the cast tree that is relevant.
       (Unguarded-Vect-Set!
        (Guarded-Proxy-Ref gref)
        index-exp
-       (cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
+       (cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref)) (Quote 0)))
       (Unguarded-Vect-Set! gref index-exp val)))

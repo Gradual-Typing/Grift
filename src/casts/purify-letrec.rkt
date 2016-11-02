@@ -188,7 +188,9 @@
     [(Tuple-Coercion-Num e) (recur e)]
     [(Tuple-Coercion-Item e i) (recur e)]
     [(Coerce-Tuple uid e1 e2) (recur-all e1 e2)]
+    [(Coerce-Tuple-In-Place uid e1 e2 e3) (recur-all e1 e2 e3)]
     [(Cast-Tuple uid e1 e2 e3 e4) (recur-all e1 e2 e3 e4)]
+    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5) (recur-all e1 e2 e3 e4 e5)]
     [(Type-Tuple-Huh e) (recur e)]
     [(Type-Tuple-num e) (recur e)]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
@@ -688,7 +690,11 @@
     [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (pl-expr e))]
     [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (pl-expr e) i)]
     [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (pl-expr e1) (pl-expr e2))]
+    [(Coerce-Tuple-In-Place uid e1 e2 e3)
+     (Coerce-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3))]
     [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (pl-expr e1) (pl-expr e2) (pl-expr e3) (pl-expr e4))]
+    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
+     (Cast-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3) (pl-expr e4) (pl-expr e5))]
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (pl-expr e))]
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]

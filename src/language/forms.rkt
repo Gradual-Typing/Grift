@@ -105,7 +105,9 @@ And a type constructor "name" expecting the types of field1 and field2
   (Create-tuple values)
   (Tuple-proj tuple index)
   (Coerce-Tuple cast value coercion)
+  (Coerce-Tuple-In-Place cast value coercion address)
   (Cast-Tuple cast value t1 t2 lbl)
+  (Cast-Tuple-In-Place cast value t1 t2 lbl address)
   ;; various imediates markers
   (Quote literal)    ;; immediate data in general
   ;; Node that references a piece of code identified by the UID value

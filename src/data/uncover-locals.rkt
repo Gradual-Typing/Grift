@@ -16,8 +16,7 @@
          "../errors.rkt"
          "../configuration.rkt"
          "../language/data1.rkt"
-         "../language/data2.rkt"
-         "../language/make-begin.rkt")
+         "../language/data2.rkt")
 
 ;; Only the pass is provided by this module
 (provide uncover-locals

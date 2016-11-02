@@ -248,8 +248,15 @@
                  (app uf-expr e1 fv1) (app uf-expr e2 fv2)
                  (app uf-expr e3 fv3) (app uf-expr e4 fv4))
      (values (Cast-Tuple uid e1 e2 e3 e4) (set-union fv1 fv2 fv3 fv4))]
+    [(Cast-Tuple-In-Place uid
+                 (app uf-expr e1 fv1) (app uf-expr e2 fv2)
+                 (app uf-expr e3 fv3) (app uf-expr e4 fv4)
+                 (app uf-expr e5 fv5))
+     (values (Cast-Tuple-In-Place uid e1 e2 e3 e4 e5) (set-union fv1 fv2 fv3 fv4 fv5))]
     [(Coerce-Tuple uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Coerce-Tuple uid e1 e2) (set-union fv1 fv2))]
+    [(Coerce-Tuple-In-Place uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
+     (values (Coerce-Tuple-In-Place uid e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Type-Tuple-Huh (app uf-expr e e-fvars)) (values (Type-Tuple-Huh e) e-fvars)]
     [(Type-Tuple-num (app uf-expr e e-fvars)) (values (Type-Tuple-num e) e-fvars)]
     [(Make-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))

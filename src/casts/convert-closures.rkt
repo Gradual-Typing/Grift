@@ -422,7 +422,11 @@
         [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
         [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
         [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+        [(Coerce-Tuple-In-Place uid e1 e2 e3)
+         (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
         [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+        [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
+         (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
         [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
         [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
         [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
@@ -480,9 +484,10 @@
   (define i*   (build-list (length arg*) (lambda ([i : Index]) i)))
   (: help (CoC6-Expr Integer -> CoC6-Expr))
   (define (help e i)
-    (App-Code cast (list e (Fn-Coercion-Arg crcn (Quote i)))))
+    (App-Code cast (list e (Fn-Coercion-Arg crcn (Quote i)) (Quote 0))))
   (App-Code cast (list (App-Closure (Closure-code fun) fun (map help arg* i*))
-                       (Fn-Coercion-Return crcn))))
+                       (Fn-Coercion-Return crcn)
+                       (Quote 0))))
 
 
 ;; Lookup a variables local access instruction

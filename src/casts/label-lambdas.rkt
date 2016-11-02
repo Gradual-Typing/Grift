@@ -243,7 +243,11 @@
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (ll-expr e))]
       [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (ll-expr e) i)]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (ll-expr e1) (ll-expr e2))]
+      [(Coerce-Tuple-In-Place uid e1 e2 e3)
+       (Coerce-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3))]
       [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4))]
+      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
+       (Cast-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4) (ll-expr e5))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (ll-expr e))]
       [(Type-Tuple-num e) (Type-Tuple-num (ll-expr e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (ll-expr t1) (ll-expr t2) (ll-expr lbl))]
