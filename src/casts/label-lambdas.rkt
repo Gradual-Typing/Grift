@@ -238,6 +238,8 @@
       [(MVect-Coercion e) (MVect-Coercion (ll-expr e))]
       [(Error (app ll-expr e)) (Error e)]
       [(Create-tuple e*) (Create-tuple (map ll-expr e*))]
+      [(Copy-Tuple n v)
+       (Copy-Tuple (ll-expr n) (ll-expr v))]
       [(Tuple-proj e i) (Tuple-proj (ll-expr e) i)]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (ll-expr e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (ll-expr e))]

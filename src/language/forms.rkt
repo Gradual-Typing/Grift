@@ -103,6 +103,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Gvector-ref vector offset)
   ;;
   (Create-tuple values)
+  (Copy-Tuple n v)
   (Tuple-proj tuple index)
   (Coerce-Tuple cast value coercion)
   (Coerce-Tuple-In-Place cast value coercion address)

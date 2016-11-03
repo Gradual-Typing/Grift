@@ -240,6 +240,8 @@
     [(Type-MRef-Of (app uf-expr e fv)) (values (Type-MRef-Of e) fv)]
     [(Error (app uf-expr e fv)) (values (Error e) fv)]
     [(Create-tuple (app uf-expr* e* e*-fvars)) (values (Create-tuple e*) e*-fvars)]
+    [(Copy-Tuple (app uf-expr n fv1) (app uf-expr v fv2))
+     (values (Copy-Tuple n v) (set-union fv1 fv2))]
     [(Tuple-proj (app uf-expr e e-fvars) i) (values (Tuple-proj e i) e-fvars)]
     [(Tuple-Coercion-Huh (app uf-expr e e-fvars)) (values (Tuple-Coercion-Huh e) e-fvars)]
     [(Tuple-Coercion-Num (app uf-expr e e-fvars)) (values (Tuple-Coercion-Num e) e-fvars)]

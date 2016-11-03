@@ -145,6 +145,7 @@
           (MVect-Coercion E)
           ;;
           (Create-tuple (Listof E))
+          (Copy-Tuple E E)
           (Tuple-proj E Index)
           (Tuple-Coercion-Huh E)
           (Tuple-Coercion-Num E)

@@ -145,6 +145,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (MVect-Coercion E)
           ;;
           (Create-tuple (Listof E))
+          (Copy-Tuple E E)
           (Tuple-proj E Index)
           (Tuple-Coercion-Huh E)
           (Tuple-Coercion-Num E)

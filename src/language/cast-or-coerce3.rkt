@@ -80,7 +80,7 @@
 	  (Letrec CoC3-Bnd* E)
 	  (Let CoC3-Bnd* E)
           (Var Uid)
-          ;; Controll Flow
+          ;; Control Flow
           (If E E E)
           (Switch E (Switch-Case* E) E)
           (Begin CoC3-Expr* E)
@@ -141,6 +141,7 @@
           (Error E)
           ;;
           (Create-tuple (Listof E))
+          (Copy-Tuple E E) ;; n v
           (Tuple-proj E Index)
           (Tuple-Coercion-Huh E)
           (Tuple-Coercion-Num E)

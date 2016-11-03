@@ -427,6 +427,8 @@
       [(Error (app recur e)) (Error e)]
       [(Create-tuple (app recur* e*))
        (Create-tuple e*)]
+      [(Copy-Tuple (app recur n) (app recur v))
+       (Copy-Tuple n v)]
       [(Tuple-proj e i) (Tuple-proj (recur e) i)]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]

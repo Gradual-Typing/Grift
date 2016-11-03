@@ -108,6 +108,20 @@ form, to the shortest branch of the cast tree that is relevant.
   (define (greatest-lower-bound-type-call t1 t2)
     (App-Code (Code-Label greatest-lower-bound-type-uid) (list t1 t2)))
 
+    ;; The runtime label for the runtime value copier
+  (define copy-value-uid (next-uid! "copy_value"))
+  
+  (: copy-value-call : CoC3-Expr CoC3-Expr -> CoC3-Expr)
+  (define copy-value-call (apply-code copy-value-uid))
+
+  (define gen-copy-value : CopyValue-Type
+    (gen-copy-value-code next-uid!))
+  
+  (define copy-value : CopyValue-Type
+    (cond
+      [(open-coded? 'copy-value) gen-copy-value]
+      [else copy-value-call]))
+
   (define gen-greatest-lower-bound-type : GreatestLowerBound-Type
     (gen-greatest-lower-bound-type-code next-uid! greatest-lower-bound-type-call
                                         greatest-lower-bound-type-uid))
@@ -121,7 +135,8 @@ form, to the shortest branch of the cast tree that is relevant.
   (define gen-interp-cast-code
     (make-cast-code next-uid! interp-cast-call interp-cast-uid
                     make-coercion compose-coercions
-                    greatest-lower-bound-type))
+                    greatest-lower-bound-type
+                    copy-value))
 
   (define interp-cast
     (cond
@@ -144,10 +159,15 @@ form, to the shortest branch of the cast tree that is relevant.
   
   (define bindings-needed-for-monotonic-refs
     (let ([glbt-t1    (next-uid! "type1")]
-          [glbt-t2    (next-uid! "type2")])
+          [glbt-t2    (next-uid! "type2")]
+          [cv-t       (next-uid! "type")]
+          [cv-v       (next-uid! "value")])
       `([,greatest-lower-bound-type-uid
          . ,(Code (list glbt-t1 glbt-t2)
-              (gen-greatest-lower-bound-type (Var glbt-t1) (Var glbt-t2)))])))
+              (gen-greatest-lower-bound-type (Var glbt-t1) (Var glbt-t2)))]
+        [,copy-value-uid
+         . ,(Code (list cv-t cv-v)
+              (gen-copy-value (Var cv-t) (Var cv-v)))])))
 
   (define bindings-needed-for-space-efficiency
     (cond
@@ -326,9 +346,10 @@ form, to the shortest branch of the cast tree that is relevant.
 (: make-cast-code :
    (String -> Uid) Cast-Type Uid Make-Coercion-Type
    Compose-Coercions-Type GreatestLowerBound-Type
+   CopyValue-Type
    ->
    Cast-Type)
-(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt) v c mono_type)
+(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt copy) v c mono_type)
   (define who 'make-cast-code)
   (debug who v c)
   (define-syntax-let$* let$* next-uid!)
@@ -396,16 +417,21 @@ form, to the shortest branch of the cast tree that is relevant.
                          (Begin
                            (list
                             (Mbox-rtti-set! a t3))
-                           (let$* ([c (mk-crcn t1 t3 (Quote ""))]
-                                   [vv (Mbox-val-ref val)]
-                                   ;; TODO: pass a deep copy of vv
-                                   [cv (cast vv c val)]
-                                   [t4 (Mbox-rtti-ref a)])
-                             (if$ (op=? t3 t4)
-                                  (Begin
-                                    (list (Mbox-val-set! val cv))
-                                    val)
-                                  val)))))))]
+                           (let$* ([vv (Mbox-val-ref val)]
+                                   [vv-c (copy vv t3)])
+                             (Begin
+                               (list
+                                (if$ (op=? vv vv-c)
+                                     (Quote 0)
+                                     (Mbox-val-set! val vv-c)))
+                               (let$* ([c (mk-crcn t1 t3 (Quote ""))]
+                                      [cv (cast vv-c c val)]
+                                      [t4 (Mbox-rtti-ref a)])
+                                     (if$ (op=? t3 t4)
+                                          (Begin
+                                            (list (Mbox-val-set! val cv))
+                                            val)
+                                          val)))))))))]
           [other (error 'interp-cast/mrefC "unmatched value ~a" other)])]
        [(tuple?$ crcn)
         (match crcn
@@ -769,8 +795,8 @@ form, to the shortest branch of the cast tree that is relevant.
            (begin
              ;; (debug val t1 c cv t2 type addr)
              (if$ (op=? t1 t2)
-                (Mbox-val-set! (Var addr) cv)
-                (Quote 0)))))
+                  (Mbox-val-set! (Var addr) cv)
+                  (Quote 0)))))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
            (if (or (Var? e) (Quote? e))

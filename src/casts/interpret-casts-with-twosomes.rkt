@@ -144,10 +144,17 @@ form, to the shortest branch of the cast tree that is relevant.
               CoC3-Expr "type1" "type2")]
             [(cast-uid) (next-uid! "interp_cast")]
             [(cast) (ann (apply-code cast-uid) Cast-With-MAddr-Type)]
+            [(cv-uid) (next-uid! "copy-value")]
+            [(cv) (ann (apply-code cv-uid) CopyValue-Type)]
+            [(b* make-cv)
+             (inline-or-bnd-cast
+              b* 'cv cv-uid
+              (gen-copy-value-code next-uid!)
+              CoC3-Expr "value" "type")]
             [(b* cast-mbox)
              (inline-or-bnd-cast
               b* 'cast-mbox "cast_mbox"
-              (make-cast-mbox-code next-uid! cast glbt)
+              (make-cast-mbox-code next-uid! cast glbt cv)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
             [(b* cast-gvec)
              (inline-or-bnd-cast
@@ -511,8 +518,11 @@ form, to the shortest branch of the cast tree that is relevant.
          (proxy-gvect val type1 type2 label))))
 
 ;; How to cast a Monotonic Reference to some other type
-(: make-cast-mbox-code : (String -> Uid) Cast-With-MAddr-Type GreatestLowerBound-Type -> Cast-Type)
-(define ((make-cast-mbox-code next-uid! cast glbt) v t1 t2 lbl)
+(: make-cast-mbox-code : (String -> Uid)
+   Cast-With-MAddr-Type
+   GreatestLowerBound-Type
+   CopyValue-Type -> Cast-Type)
+(define ((make-cast-mbox-code next-uid! cast glbt copy) v t1 t2 lbl)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([val v] [type1 t1] [type2 t2] [tag_mref (type-tag type2)])
     (if$ (op=? (Type DYN-TYPE) type2)
@@ -531,14 +541,19 @@ form, to the shortest branch of the cast tree that is relevant.
                                  (list
                                   (Mbox-rtti-set! a t3))
                                  (let$* ([vv (Mbox-val-ref val)]
-                                         ;; TODO: pass a deep copy of vv
-                                         [cv (cast vv t1 t3 (Quote "") val)]
-                                         [t4 (Mbox-rtti-ref a)])
-                                   (if$ (op=? t3 t4)
-                                        (Begin
-                                          (list (Mbox-val-set! val cv))
-                                          val)
-                                        val)))))))]
+                                         [vv-c (copy vv t3)])
+                                   (Begin
+                                     (list
+                                      (if$ (op=? vv vv-c)
+                                           (Quote 0)
+                                           (Mbox-val-set! val vv-c)))
+                                     (let$* ([cv (cast vv-c t1 t3 (Quote "") val)]
+                                             [t4 (Mbox-rtti-ref a)])
+                                       (if$ (op=? t3 t4)
+                                            (Begin
+                                              (list (Mbox-val-set! val cv))
+                                              val)
+                                            val)))))))))]
                 [other (error 'interp-cast/mref "unmatched value ~a" other)])
               (Blame lbl)))))
 

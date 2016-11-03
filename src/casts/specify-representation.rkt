@@ -1289,6 +1289,21 @@ but a static single assignment is implicitly maintained.
                    (map (lambda ([e : D0-Expr])
                           (cons "element" e))
                         e*))]
+        [(Copy-Tuple (app recur n) (app recur v))
+         (define i-u            (next-uid! "index"))
+         (define a              (next-uid! "_"))
+         (define va-u           (next-uid! "tuple-val-item"))
+         (define v1-u           (next-uid! "resulting_tuple"))
+         (define v1             (Var v1-u))
+         (define i              (Var i-u))
+         (Begin (list
+                 (Assign v1-u (Op 'Alloc (list n)))
+                 (Repeat i-u (Quote 0) n a UNIT-IMDT
+                         (Begin
+                           (list
+                            (Assign va-u (Op 'Array-ref (list v i))))
+                           (Op 'Array-set! (list v1 i (Var va-u))))))
+                v1)]
         [(Tuple-proj (app recur e) i)
          (Op 'Array-ref (list e (Quote i)))]
         [(Tuple-Coercion-Huh (app recur e))

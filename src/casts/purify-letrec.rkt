@@ -183,6 +183,7 @@
     [(MVect-Coercion e) (recur e)]
     [(Error e) (recur e)]
     [(Create-tuple e*) (recur* e*)]
+    [(Copy-Tuple n v) (recur-all n v)]
     [(Tuple-proj e i) (recur e)]
     [(Tuple-Coercion-Huh e) (recur e)]
     [(Tuple-Coercion-Num e) (recur e)]
@@ -415,6 +416,8 @@
     [(MVect-Coercion e) (MVect-Coercion (recur e))]
     [(Error (app recur e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (recur* e*))]
+    [(Copy-Tuple (app recur n) (app recur v))
+       (Copy-Tuple n v)]
     [(Tuple-proj e i) (Tuple-proj (recur e) i)]
     [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
     [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
@@ -690,6 +693,8 @@
     [(MVect-Coercion e) (MVect-Coercion (pl-expr e))]
     [(Error (app pl-expr e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (pl-expr* e*))]
+    [(Copy-Tuple n v)
+     (Copy-Tuple (pl-expr n) (pl-expr v))]
     [(Tuple-proj e i) (Tuple-proj (pl-expr e) i)]
     [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (pl-expr e))]
     [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (pl-expr e))]
