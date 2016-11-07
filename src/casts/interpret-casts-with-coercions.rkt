@@ -108,19 +108,19 @@ form, to the shortest branch of the cast tree that is relevant.
   (define (greatest-lower-bound-type-call t1 t2)
     (App-Code (Code-Label greatest-lower-bound-type-uid) (list t1 t2)))
 
-    ;; The runtime label for the runtime value copier
-  (define copy-value-uid (next-uid! "copy_value"))
+  ;; The runtime label for the runtime value copier
+  (define copy-value-in-monoref-uid (next-uid! "copy_value_in_monoref"))
   
-  (: copy-value-call : CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define copy-value-call (apply-code copy-value-uid))
+  (: copy-value-in-monoref-call : CoC3-Expr -> CoC3-Expr)
+  (define copy-value-in-monoref-call (apply-code copy-value-in-monoref-uid))
 
-  (define gen-copy-value : CopyValue-Type
-    (gen-copy-value-code next-uid!))
+  (define gen-copy-value-in-monoref : CopyValueInMonoRef-Type
+    (gen-copy-value-in-monoref-code next-uid!))
   
-  (define copy-value : CopyValue-Type
+  (define copy-value-in-monoref : CopyValueInMonoRef-Type
     (cond
-      [(open-coded? 'copy-value) gen-copy-value]
-      [else copy-value-call]))
+      [(open-coded? 'copy-value-in-monoref) gen-copy-value-in-monoref]
+      [else copy-value-in-monoref-call]))
 
   (define gen-greatest-lower-bound-type : GreatestLowerBound-Type
     (gen-greatest-lower-bound-type-code next-uid! greatest-lower-bound-type-call
@@ -136,7 +136,7 @@ form, to the shortest branch of the cast tree that is relevant.
     (make-cast-code next-uid! interp-cast-call interp-cast-uid
                     make-coercion compose-coercions
                     greatest-lower-bound-type
-                    copy-value))
+                    copy-value-in-monoref))
 
   (define interp-cast
     (cond
@@ -160,14 +160,13 @@ form, to the shortest branch of the cast tree that is relevant.
   (define bindings-needed-for-monotonic-refs
     (let ([glbt-t1    (next-uid! "type1")]
           [glbt-t2    (next-uid! "type2")]
-          [cv-t       (next-uid! "type")]
-          [cv-v       (next-uid! "value")])
+          [a          (next-uid! "mono-address")])
       `([,greatest-lower-bound-type-uid
          . ,(Code (list glbt-t1 glbt-t2)
               (gen-greatest-lower-bound-type (Var glbt-t1) (Var glbt-t2)))]
-        [,copy-value-uid
-         . ,(Code (list cv-t cv-v)
-              (gen-copy-value (Var cv-t) (Var cv-v)))])))
+        [,copy-value-in-monoref-uid
+         . ,(Code (list a)
+              (gen-copy-value-in-monoref (Var a)))])))
 
   (define bindings-needed-for-space-efficiency
     (cond
@@ -346,10 +345,10 @@ form, to the shortest branch of the cast tree that is relevant.
 (: make-cast-code :
    (String -> Uid) Cast-Type Uid Make-Coercion-Type
    Compose-Coercions-Type GreatestLowerBound-Type
-   CopyValue-Type
+   CopyValueInMonoRef-Type
    ->
    Cast-Type)
-(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt copy) v c mono_type)
+(define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt copy-val-monoref) v c mono_type)
   (define who 'make-cast-code)
   (debug who v c)
   (define-syntax-let$* let$* next-uid!)
@@ -417,21 +416,15 @@ form, to the shortest branch of the cast tree that is relevant.
                          (Begin
                            (list
                             (Mbox-rtti-set! a t3))
-                           (let$* ([vv (Mbox-val-ref val)]
-                                   [vv-c (copy vv t3)])
-                             (Begin
-                               (list
-                                (if$ (op=? vv vv-c)
-                                     (Quote 0)
-                                     (Mbox-val-set! val vv-c)))
-                               (let$* ([c (mk-crcn t1 t3 (Quote ""))]
-                                      [cv (cast vv-c c val)]
-                                      [t4 (Mbox-rtti-ref a)])
-                                     (if$ (op=? t3 t4)
-                                          (Begin
-                                            (list (Mbox-val-set! val cv))
-                                            val)
-                                          val)))))))))]
+                           (let$* ([vv (copy-val-monoref val)]
+                                   [c (mk-crcn t1 t3 (Quote ""))]
+                                   [cv (cast vv c val)]
+                                   [t4 (Mbox-rtti-ref a)])
+                             (if$ (op=? t3 t4)
+                                  (Begin
+                                    (list (Mbox-val-set! val cv))
+                                    val)
+                                  val)))))))]
           [other (error 'interp-cast/mrefC "unmatched value ~a" other)])]
        [(tuple?$ crcn)
         (match crcn

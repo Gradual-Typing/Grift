@@ -438,13 +438,21 @@
          (Error (Quote "can not compute the greatest lower bound for tuple types with inconsistent sizes")))]
    [else (Error (Quote "inconsistent types"))]))
 
-(define-type CopyValue-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type CopyValueInMonoRef-Type (CoC3-Expr -> CoC3-Expr))
 
-(: gen-copy-value-code : (String -> Uid) -> CopyValue-Type)
-(define ((gen-copy-value-code next-uid!) v t)
+(: gen-copy-value-in-monoref-code : (String -> Uid) -> CopyValueInMonoRef-Type)
+(define ((gen-copy-value-in-monoref-code next-uid!) a-var)
   (define-syntax-let$* let$* next-uid!)
-  (cond$
-   [(tupleT?$ t)
-    (let$* ([n (Type-Tuple-num t)])
-      (Copy-Tuple n v))]
-   [else v]))
+  (match a-var
+    [(Var a) (let$* ([t (Mbox-rtti-ref a)]
+                     [v (Mbox-val-ref (Var a))])
+               (cond$
+                [(tupleT?$ t)
+                 (let$* ([n (Type-Tuple-num t)]
+                         [cv (Copy-Tuple n v)])
+                   (Begin
+                     (list
+                      (Mbox-val-set! (Var a) cv))
+                     cv))]
+                [else v]))]
+    [other (error 'copy-value-in-monoref "unmatched value ~a" other)]))

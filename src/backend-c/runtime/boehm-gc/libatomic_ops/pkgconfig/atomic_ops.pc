@@ -1,4 +1,4 @@
-prefix=/Users/akuhlens/work/gradual/schml/src/backend-c/runtime/boehm-gc-install
+prefix=/home/deyaa/mono/Schml/src/backend-c/runtime/boehm-gc-install
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

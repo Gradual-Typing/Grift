@@ -1,7 +1,7 @@
-prefix=/Users/akuhlens/work/gradual/schml/src/backend-c/runtime/boehm-gc-install
+prefix=/home/deyaa/mono/Schml/src/backend-c/runtime/boehm-gc-install
 exec_prefix=${prefix}
-top_builddir=/Users/akuhlens/work/gradual/schml/src/backend-c/runtime/boehm-gc/libatomic_ops
-top_srcdir=/Users/akuhlens/work/gradual/schml/src/backend-c/runtime/boehm-gc/libatomic_ops
+top_builddir=/home/deyaa/mono/Schml/src/backend-c/runtime/boehm-gc/libatomic_ops
+top_srcdir=/home/deyaa/mono/Schml/src/backend-c/runtime/boehm-gc/libatomic_ops
 
 Name: The atomic_ops library (uninstalled)
 Description: Atomic memory update operations
