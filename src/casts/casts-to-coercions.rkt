@@ -27,7 +27,7 @@ should be able to compile programs this the twosome casts for future comparison.
 (define optimize-first-order-coercions? (make-parameter #t))
 
 ;; The entry point for this pass it is called by impose-casting semantics
-(: casts->coercions (Cast0-Lang . -> . Coercion-Lang))
+(: casts->coercions (Cast0.5-Lang . -> . Coercion-Lang))
 (define (casts->coercions prgm)
 
   (match-let ([(Prog (list name next type) exp) prgm])
@@ -79,6 +79,8 @@ should be able to compile programs this the twosome casts for future comparison.
     [(Cast (app c2c-expr exp) (Twosome t1 t2 lbl))
      (Cast exp (Coercion ((make-coercion lbl) t1 t2)))]
     ;; Everything else should be really boring
+    [(Observe (app c2c-expr e) t)
+     (Observe e t)]
     [(Lambda f* (app c2c-expr exp))
      (Lambda f* exp)]
     [(Letrec bnd* exp)
@@ -142,7 +144,8 @@ should be able to compile programs this the twosome casts for future comparison.
     [(Tuple-proj e i)
      (Tuple-proj (c2c-expr e) i)]
     [(Var id)    (Var id)]
-    [(Quote lit) (Quote lit)]))
+    [(Quote lit) (Quote lit)]
+    [(and noop (No-Op)) noop]))
 
 (: c2c-expr* (C0-Expr* -> Crcn-Expr*))
 (define (c2c-expr* e*) (map c2c-expr e*))

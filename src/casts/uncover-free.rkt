@@ -26,6 +26,8 @@
     (raise-pass-exn 'uncover-free "Free variables detect ~a" free*))
   (Prog m (Let-Static* tb* cb* new-exp)))
 
+(define mt-set : (Setof Uid) (set))
+
 (: uf-expr (CoC4-Expr -> (values CoC5-Expr (Setof Uid))))
 (define (uf-expr e)
   (match e
@@ -59,8 +61,9 @@
      (match-define (cons c*^ c*-fv) (foldr uf-case/pair acc c*))
      (values (Switch e c*^ d) (set-union e-fv c*-fv d-fv))]
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
-    [(Quote k) (values (Quote k) (set))]
-    [(Tag t) (values (Tag t) (set))]
+    [(and nop (No-Op)) (values nop mt-set)]
+    [(Quote k) (values (Quote k) mt-set)]
+    [(Tag t) (values (Tag t) mt-set)]
     ;; Observables Representation
     [(Blame (app uf-expr e f)) (values (Blame e) f)]
     [(Observe (app uf-expr e f) t) (values (Observe e t) f)]
@@ -81,7 +84,7 @@
     [(Begin (app uf-expr* e* fv1) (app uf-expr e fv2))
      (values (Begin e* e) (set-union fv1 fv2))]
     ;; Type Representation
-    [(Type t) (values (Type t) (set))]
+    [(Type t) (values (Type t) mt-set)]
     [(Type-Tag (app uf-expr e fv))
      (values (Type-Tag e) fv)]
     [(Type-GRef-Of (app uf-expr e f*))
@@ -100,7 +103,7 @@
     [(Type-GRef-Huh (app uf-expr e fv)) (values (Type-GRef-Huh e) fv)]
     [(Type-GVect-Huh (app uf-expr e fv)) (values (Type-GVect-Huh e) fv)]
     ;; Code Representation
-    [(Code-Label u) (values (Code-Label u) (set))]
+    [(Code-Label u) (values (Code-Label u) mt-set)]
     [(App-Code (app uf-expr e e-fv) (app uf-expr* e* e*-fv))
      (values (App-Code e e*) (set-union e-fv e*-fv))]
     [(App-Fn (app uf-expr e e-fv) (app uf-expr* e* e*-fv))
@@ -109,7 +112,7 @@
      (values (App-Fn-or-Proxy i e e*) (set-union e-fv e*-fv))]
     ;; Coercion Representation Stuff
     [(Quote-Coercion c)
-     (values (Quote-Coercion c) (set))]
+     (values (Quote-Coercion c) mt-set)]
     [(Id-Coercion-Huh (app uf-expr e fv))
      (values (Id-Coercion-Huh e) fv)]
     [(Fn-Coercion-Huh (app uf-expr e fv))
@@ -229,7 +232,7 @@
      (values (Mbox-val-set! e1 e2) (set-union fv1 fv2))]
     [(Mbox-val-ref (app uf-expr e fv)) (values (Mbox-val-ref e) fv)]
     [(Mbox-rtti-set! u (app uf-expr e fv)) (values (Mbox-rtti-set! u e) fv)]
-    [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) (set))]
+    [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) mt-set)]
     [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
      (values (Mvector e1 e2 t) (set-union fv1 fv2))]
     [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
@@ -238,7 +241,7 @@
      (values (Mvector-val-ref e1 e2) (set-union fv1 fv2))]
     [(Mvector-rtti-set! u (app uf-expr e fv))
      (values (Mvector-rtti-set! u e) fv)]
-    [(Mvector-rtti-ref u) (values (Mvector-rtti-ref u) (set))]
+    [(Mvector-rtti-ref u) (values (Mvector-rtti-ref u) mt-set)]
     [(Type-MVect (app uf-expr e fv)) (values (Type-MVect e) fv)]
     [(Type-MVect-Huh (app uf-expr e fv)) (values (Type-MVect-Huh e) fv)]
     [(Type-MVect-Of (app uf-expr e fv)) (values (Type-MVect-Of e) fv)]
@@ -286,7 +289,7 @@
     (let-values ([(e  fv1) (uf-expr e)]
                  [(e* fv2) (values (car a) (cdr a))])
       (cons (cons e e*) (set-union fv1 fv2))))
-  (define acc (cons '() (ann (set) (Setof Uid))))
+  (define acc (cons '() (ann mt-set (Setof Uid))))
   (define e.fv (foldr help acc e*))
   (values (car e.fv) (cdr e.fv)))
 
@@ -305,9 +308,9 @@
                (Listof (Pairof Uid CoC5-Lambda))
                (Setof Uid))))
 (define (uf-bnd-lambda* b*)
-  (for/fold ([bv   : (Setof Uid)      (set)]
+  (for/fold ([bv   : (Setof Uid)      mt-set]
              [bnd* : CoC5-Bnd-Lambda*   '()]
-             [fv   : (Setof Uid)      (set)])
+             [fv   : (Setof Uid)      mt-set])
             ([b    : CoC4-Bnd-Lambda     b*])
     (match-let ([(cons u (Lambda u* (Castable ctr? (app uf-expr e e-fv)))) b])
       (let* ([l-fv (set-subtract e-fv (list->set u*))]
@@ -322,7 +325,7 @@
 #|
 
 (if (null? b*)
-    (values (set) '() (set))
+    (values mt-set '() mt-set)
     (let ([a (car b*)] [d (cdr b*)]) ;; free the list
       (let-values ([(u* b* f*) (uf-bnd-lambda* d)])
         (match-let ([(cons u (app uf-lambda rhs rhs-f*)) a])
@@ -334,9 +337,9 @@
    (-> CoC4-Bnd-Data*
        (values (Setof Uid) CoC5-Bnd-Data* (Setof Uid))))
 (define (uf-bnd-data* b*)
-  (for/fold ([bv   : (Setof Uid)    (set)]
+  (for/fold ([bv   : (Setof Uid)    mt-set]
              [bnd* : CoC5-Bnd-Data*   '()]
-             [fv   : (Setof Uid)    (set)])
+             [fv   : (Setof Uid)    mt-set])
             ([b : CoC4-Bnd-Data        b*])
     (match-let ([(cons u (app uf-expr e e-fv)) b])
       (values (set-add bv u)

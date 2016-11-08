@@ -89,6 +89,7 @@
       [(Let b* e)    (ll-let b* e)]
       
       ;; And all the boring cases
+      [(and nop (No-Op)) nop]
       [(Op p exp*) (Op p (map ll-expr exp*))]
       [(Type-Tag e) (Type-Tag (ll-expr e))]
       [(Type-Fn-arg e i) (Type-Fn-arg (ll-expr e) (ll-expr i))]

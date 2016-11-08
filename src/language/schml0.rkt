@@ -1,8 +1,10 @@
 #lang typed/racket/base
 
-(require "forms.rkt")
+(require "forms.rkt"
+         "primitives.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt"
+                       "primitives.rkt"))
 
 #|-----------------------------------------------------------------------------+
 | Language/Schml-Syntax this is a program returned from schml/read
@@ -14,7 +16,12 @@
 #|-----------------------------------------------------------------------------+
 | Language/Schml0 this is the language returned by schml/syntax->schml0
 +-----------------------------------------------------------------------------|#
-(define-type Schml0-Lang (Prog (List String Natural) S0-Expr))
+(define-type Schml0-Lang
+  (Prog (List String Natural) (Listof S0-Top)))
+
+(define-type S0-Top
+  (U (Observe S0-Form (Option Schml-Type))
+     (Define Boolean Uid (Option Schml-Type) S0-Form)))
 
 (define-type (S0-Form E)
   (U (Lambda Schml-Fml* (Ann E (Option Schml-Type)))

@@ -7,6 +7,7 @@ This is a micro compiler that removes the cast language form.
          "../configuration.rkt"
          "./purify-letrec.rkt"
          "./hoist-types-and-coercions.rkt"
+         "define-to-let.rkt"
          "lower-function-casts.rkt"
          #;"lower-reference-casts.rkt"
          "interpret-casts-with-twosomes.rkt"
@@ -29,12 +30,13 @@ This is a micro compiler that removes the cast language form.
 
 (: impose-cast-semantics : Cast0-Lang -> Data0-Lang)
 (define (impose-cast-semantics c0)
+  (define c0.5 (define->let c0))
   (define c1
     (case (cast-representation)
       [(Type-Based)
-       (interpret-casts/twosomes (lower-function-casts c0))]
+       (interpret-casts/twosomes (lower-function-casts c0.5))]
       [(Coercions)
-       (interpret-casts/coercions (lower-function-casts (casts->coercions c0)))]
+       (interpret-casts/coercions (lower-function-casts (casts->coercions c0.5)))]
       #;
       [(Super-Coercions)
        (define c2 (casts->super-coercions c0))

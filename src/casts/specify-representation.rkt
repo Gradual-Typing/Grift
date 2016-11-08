@@ -13,8 +13,9 @@ but a static single assignment is implicitly maintained.
 | Target Grammar : Data0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../helpers.rkt"
+(require ;;"../helpers.rkt"
          "../errors.rkt"
+         (submod "../logging.rkt" typed)
          "../configuration.rkt"
          "../language/cast-or-coerce6.rkt"
          "../language/data0.rkt"
@@ -51,6 +52,7 @@ but a static single assignment is implicitly maintained.
 (define TYPE-ATOMIC-TAG                (Quote l:TYPE-ATOMIC-TAG))
 (define TYPE-DYN-RT-VALUE              (Quote l:TYPE-DYN-RT-VALUE))
 (define TYPE-INT-RT-VALUE              (Quote l:TYPE-INT-RT-VALUE))
+(define TYPE-FLOAT-RT-VALUE            (Quote l:TYPE-FLOAT-RT-VALUE))
 (define TYPE-BOOL-RT-VALUE             (Quote l:TYPE-BOOL-RT-VALUE))
 (define TYPE-UNIT-RT-VALUE             (Quote l:TYPE-UNIT-RT-VALUE))
 
@@ -224,22 +226,22 @@ but a static single assignment is implicitly maintained.
 (define HYBRID-PROXY-CLOS-INDEX        (Quote l:HYBRID-PROXY-CLOS-INDEX))
 
 (: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))
-(trace-define (specify-representation prgm)
-              (match-let ([(Prog (list name next type) (Let-Static* bndt* bnd-crcn* exp)) prgm])
-                (let* ([next       : (Boxof Nat) (box next)]
-                       [bnd-code*  : (Boxof D0-Bnd-Code*) (box '())]
-                       [exp        : D0-Expr (sr-expr next bnd-code* (hash) empty-index-map exp)]
-                       [init-type* : D0-Expr* (map (sr-bndt next) bndt*)]
-                       [type-id*   : Uid*     (map (inst car Uid Any) bndt*)]
-                       [init-crcn* : D0-Expr* (map (sr-bnd-coercion next) bnd-crcn*)]
-                       [crcn-id*   : Uid*     (map (inst car Uid Any) bnd-crcn*)]
-                       [next       : Nat (unbox next)]
-                       [bnd-code*  : D0-Bnd-Code* (unbox bnd-code*)])
-                  (Prog (list name next type)
-                    (GlobDecs (append type-id* crcn-id*)
-                      (Labels bnd-code*
-                        (Begin (append init-type* init-crcn*) exp)))))))
-
+(define (specify-representation prgm)
+  (match-let ([(Prog (list name next type) (Let-Static* bndt* bnd-crcn* exp)) prgm])
+    (let* ([next       : (Boxof Nat) (box next)]
+           [bnd-code*  : (Boxof D0-Bnd-Code*) (box '())]
+           [exp        : D0-Expr (sr-expr next bnd-code* (hash) empty-index-map exp)]
+           [init-type* : D0-Expr* (map (sr-bndt next) bndt*)]
+           [type-id*   : Uid*     (map (inst car Uid Any) bndt*)]
+           [init-crcn* : D0-Expr* (map (sr-bnd-coercion next) bnd-crcn*)]
+           [crcn-id*   : Uid*     (map (inst car Uid Any) bnd-crcn*)]
+           [next       : Nat (unbox next)]
+           [bnd-code*  : D0-Bnd-Code* (unbox bnd-code*)])
+      (debug (Prog (list name next type)
+                   (GlobDecs (append type-id* crcn-id*)
+                             (Labels bnd-code*
+                                     (Begin (append init-type* init-crcn*) exp))))))))
+              
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
 ;; closure must turn into memory loads.
@@ -322,15 +324,18 @@ but a static single assignment is implicitly maintained.
            (list (Assign val  e1)
                  (Assign type (sr-expr e2))
                  (Assign tag (Op 'binary-and `(,type-var ,TYPE-TAG-MASK))))
+           ;; TODO use a switch here!
            (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG))
-               (Begin
-                 (list (Assign imm (Op '%<< (list val-var DYN-IMDT-SHIFT))))
-                 (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
-                     (Op 'binary-or `(,imm-var ,DYN-INT-TAG))
-                     (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
-                         (Op 'binary-or `(,imm-var ,DYN-BOOL-TAG))
-                         (Op 'binary-or `(,imm-var ,DYN-UNIT-TAG)))))
-               (sr-alloc "dynamic_boxed" #b000 `(("" . ,val-var) ("" . ,type-var))))))]))
+               (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
+                   (Op 'binary-or `(,(Op '%<< (list val-var DYN-IMDT-SHIFT)) ,DYN-INT-TAG))
+                   (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
+                       (Op 'binary-or `(,(Op '%<< (list val-var DYN-IMDT-SHIFT)) ,DYN-BOOL-TAG))
+                       (If (Op '= `(,type-var ,TYPE-UNIT-RT-VALUE))
+                           (Op 'binary-or `(,(Op '%<< (list val-var DYN-IMDT-SHIFT)) ,DYN-UNIT-TAG))
+                           (sr-alloc "float_dynamic_boxed" l:DYN-BOXED-TAG
+                                     `(("" . ,val-var) ("" . ,type-var))))))
+               (sr-alloc "dynamic_boxed" l:DYN-BOXED-TAG
+                         `(("" . ,val-var) ("" . ,type-var))))))]))
   
   (: get-mk-tuple-type! (Uid -> (Code-Label Uid)))
   (define (get-mk-tuple-type! mk-glb)
@@ -854,12 +859,14 @@ but a static single assignment is implicitly maintained.
            [(uil-prim-value? p) (Op p e*)]
            [(uil-prim-effect? p) (Op p e*)]
            [else (error 'specify-representation/Op "~a" p)])]
+        [(and (No-Op) nop) nop]
         [(Quote k)
          (cond
            [(null? k)  UNIT-IMDT]
            [(boolean? k) (if k TRUE-IMDT FALSE-IMDT)]
            [(fixnum? k) (Quote k)]
            [(string? k) (Quote k)]
+           [(inexact-real? k) (Quote k)]
            [else (error 'specify-representation/quote "given ~a" k)])]
         ;; Closure Representation
         [(App-Closure (app recur e) (app recur e^) (app recur* e*))
@@ -902,7 +909,7 @@ but a static single assignment is implicitly maintained.
         [(Type-Fn-arg (app recur e1) (app recur e2))
          (define e2^
            (match e2
-             [(Quote (? number? k)) (Quote (+ l:TYPE-FN-FMLS-OFFSET k))]
+             [(Quote (? fixnum? k)) (Quote (+ l:TYPE-FN-FMLS-OFFSET k))]
              [otherwiths (Op '+ (list e2 TYPE-FN-FMLS-OFFSET))]))
          (Op 'Array-ref (list e1 e2^))]
         [(Type-GRef-Huh (app recur e))
@@ -1091,6 +1098,7 @@ but a static single assignment is implicitly maintained.
          (Begin
            (list (Assign tmp e)
                  (Assign tag (Op 'binary-and `(,tmpv ,DYN-TAG-MASK))))
+           ;; TODO this could be a switch
            (If (Op '= `(,tagv ,DYN-BOXED-TAG))
                (Op 'Array-ref (list tmpv DYN-TYPE-INDEX))
                (If (Op '= `(,tagv ,DYN-INT-TAG))
@@ -1116,6 +1124,7 @@ but a static single assignment is implicitly maintained.
                  (Op 'Exit  (list (Quote -1))))
            UNDEF-IMDT)]
         [(Observe (app recur e) t) (sr-observe next-uid! e t)]
+        [(and nop (No-Op)) nop]
         ;; References Representation
         [(Begin (app recur* e*) (app recur e))
          (Begin e* e)]
@@ -1518,8 +1527,7 @@ but a static single assignment is implicitly maintained.
                                           alloc-var
                                           (Op 'binary-or (list alloc-var (Quote tag))))])
             (Begin (append ass* (cons alloc-ass set*)) tag-return)))))
-  (logging sr-bnd (Vomit) "~a ~a ~a ==> ~a" name tag slots result)
-  result)
+  (debug off name tag slots result))
 
 (: sr-prim-type (Prim-Type -> D0-Expr))
 (define (sr-prim-type t)
@@ -1528,6 +1536,7 @@ but a static single assignment is implicitly maintained.
     [(Bool) TYPE-BOOL-RT-VALUE]
     [(Dyn)  TYPE-DYN-RT-VALUE]
     [(Unit) TYPE-UNIT-RT-VALUE]
+    [(Float) TYPE-FLOAT-RT-VALUE]
     [(Static-Id u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
@@ -1766,12 +1775,17 @@ but a static single assignment is implicitly maintained.
   (: generate-print (Uid Schml-Type -> D0-Expr))
   (define (generate-print id ty)
     (cond
-      [(Int? t) (Op 'Printf (list (Quote "Int : %d\n") (Var id)))]
-      [(Unit? t) (Op 'Printf (list (Quote "Unit : ()\n")))]
+      [(Int? t) (Op 'Printf (list (Quote "Int : %ld\n") (Var id)))]
+      ;; This is a fragile hack
+      ;; switch to typed ASTs
+      [(Float? t) (Begin (list (Op 'Print (list (Quote "Float : ")))
+                               (Op 'print-float (list (Var id))))
+                         (Op 'Print (list (Quote "\n"))))]
       [(Bool? t)
        (If (Var id)
            (Op 'Print (list (Quote "Bool : #t\n")))
            (Op 'Print (list (Quote "Bool : #f\n"))))]
+      [(Unit? t) (Op 'Print (list (Quote "Unit : ()\n")))]
       [(Fn? t) (Op 'Print (list (Quote "Function : ?\n")))]
       [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
       [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
@@ -1780,7 +1794,7 @@ but a static single assignment is implicitly maintained.
       [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
       [else (error 'sr-observe "printing other things")]))
   (let* ([res (uid! "result")])
-    (Begin (list (Assign res e) (generate-print res t)) (Success))))
+    (Begin (list (Assign res e)) (generate-print res t))))
 
 #;(TODO GET RID OF TAGS IN THE COMPILER)
 (: sr-tag (Tag-Symbol -> (Quote Integer)))

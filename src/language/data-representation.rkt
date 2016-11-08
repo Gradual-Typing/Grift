@@ -30,12 +30,14 @@
 ;;(define TYPE-IARRAY-TAG #b101)
 ;;(define TYPE-MU-TAG #b110)
 
+
 (define TYPE-ATOMIC-TAG #b111) ;; This should be TYPE-IMDT-TAG
 ;; Immediate types are tagged with #b111
-(define TYPE-DYN-RT-VALUE #b0111)
-(define TYPE-INT-RT-VALUE #b1111)
-(define TYPE-BOOL-RT-VALUE #b10111)
-(define TYPE-UNIT-RT-VALUE #b11111)
+(define TYPE-DYN-RT-VALUE   #b000111)
+(define TYPE-INT-RT-VALUE   #b001111)
+(define TYPE-BOOL-RT-VALUE  #b010111)
+(define TYPE-UNIT-RT-VALUE  #b011111)
+(define TYPE-FLOAT-RT-VALUE #b100111)
 
 ;; The representation of Dynamic Immediates
 (define DYN-TAG-MASK  #b111)
@@ -45,7 +47,7 @@
 (define DYN-UNIT-TAG  #b010)
 (define DYN-BOOL-TAG  #b111)
 
-;; Boxed Dynamics are just a cons cell
+;; Boxed Dynamics are just a pair of a value and type
 (define DYN-BOX-SIZE 2)
 (define DYN-VALUE-INDEX 0)
 (define DYN-TYPE-INDEX 1)

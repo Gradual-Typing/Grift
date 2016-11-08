@@ -48,7 +48,7 @@
       (U (If D1-Pred P P)
          (Switch D1-Value (Switch-Case* P) P)
          (Begin D1-Effect* P)
-         (Relop IxI->B-Prim D1-Value D1-Value))))
+         (Relop UIL-Pred-Prim D1-Value D1-Value))))
 
 (define-type D1-Effect
  (Rec E

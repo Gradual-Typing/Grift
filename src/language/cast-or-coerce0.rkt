@@ -1,7 +1,7 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast0 created by insert-casts                                       |
@@ -22,7 +22,9 @@
 
 (define-type CoC0-Expr
   (Rec E (U ;; Non-Terminals
-	  (Lambda Uid* E)
+          (Observe E Schml-Type)
+          No-Op
+          (Lambda Uid* E)
 	  (Letrec CoC0-Bnd* E)
 	  (Let CoC0-Bnd* E)
 	  (App E (Listof E))

@@ -27,7 +27,7 @@
       (Return D5-Value)
       (Return Success))))
 
-(define-type D5-Pred (Relop IxI->B-Prim D5-Trivial D5-Trivial))
+(define-type D5-Pred (Relop UIL-Pred-Prim D5-Trivial D5-Trivial))
 
 (define-type D5-Effect
  (Rec E

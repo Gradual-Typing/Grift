@@ -151,6 +151,7 @@
         [(Unit) (values UNIT-TYPE 0)]
         [(Int)  (values INT-TYPE  0)]
         [(Bool) (values BOOL-TYPE 0)]
+        [(Float) (values FLOAT-TYPE 0)]
         [(Fn ar (app recur* t* m) (app recur t n))
          (ti! (max m n) (Fn ar t* t))]
         [(GRef (app recur t n))
@@ -365,6 +366,7 @@
        (Blame e)]
       [(Observe (app recur e) t)
        (Observe e t)]
+      [(and nop (No-Op)) nop]
       [(Unguarded-Box (app recur exp))
        (Unguarded-Box exp)]
       [(Unguarded-Box-Ref (app recur exp))

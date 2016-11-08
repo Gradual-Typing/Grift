@@ -1,7 +1,7 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 
 #| ----------------------------------------------------------------------------+
 |Cast1                                                                         |
@@ -22,6 +22,8 @@
 	  (If E E E)
           (Switch E (Switch-Case* E) E)
           ;; Terminals
+          (Observe E Schml-Type)
+          No-Op
           (Begin CoC1-Expr* E)
           (Repeat Uid E E Uid E E)
 	  (Var Uid)

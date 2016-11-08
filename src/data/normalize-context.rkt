@@ -68,6 +68,8 @@
       [(Quote k) (Quote k)]
       [(Halt) (Halt)]
       [(Success) (Success)]
+      ;; FIXME: Come up with a more compelling intermediate language
+      [(No-Op) (Success)]
       ;; forms that don't quite work out because normalize
       ;; context is after specify
       ;; I could do
@@ -106,6 +108,7 @@
       [(Halt) (Halt)]
       [(Assign u (app nc-value v))
        (Begin (list (Assign u v)) (Quote UNIT-IMDT))]
+      [(No-Op) (error 'normalize-context "no-op in value context")]
       [other (error 'normalize-context "umatched ~a" other)]))
   (: nc-effect (-> D0-Expr D1-Effect))
   (define (nc-effect exp)
@@ -140,6 +143,7 @@
       [(Var i)  NO-OP]
       [(Code-Label i) NO-OP]
       [(Quote k) NO-OP]
+      [(No-Op) NO-OP]
       [other (error 'normalize-context "umatched ~a" other)]))
   (: nc-pred (-> D0-Expr D1-Pred))
   (define (nc-pred exp)
@@ -167,7 +171,8 @@
              [(list a b) (Relop p a b)]
              [other (error 'nc-pred-op)])
            (Relop '= (Quote TRUE-IMDT) (nc-value-op p val*)))]
-      [(app nc-value v) (Relop '= (Quote TRUE-IMDT) v)]))
+      [(app nc-value v) (Relop '= (Quote TRUE-IMDT) v)]
+      [(No-Op) (error 'nc-pred "no-op in pred context")]))
   (: nc-value* (-> D0-Expr* D1-Value*))
   (define (nc-value* exp*) (map nc-value exp*))
   (: nc-effect* (-> D0-Expr* D1-Effect*))
@@ -191,11 +196,11 @@
 (: nc-value-op (-> (U UIL-Prim UIL-Prim!) D1-Value* D1-Value))
 (define (nc-value-op p exp*)
   (cond
-   [(IntxInt->Bool-primitive? p)
-    (match exp*
-      [(list a b)
-       (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT)) ]
-      [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
+    [(uil-prim-pred? p)
+     (match exp*
+       [(list a b)
+        (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT)) ]
+       [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
    [(uil-prim-value? p) (Op p exp*)]
    [(uil-prim-effect? p) (Begin (list (Op p exp*)) (Quote UNIT-IMDT))]
    [else (error 'nc-value-op "primitive out of context ~v ~v" p exp*)]))

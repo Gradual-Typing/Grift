@@ -36,10 +36,10 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
   [((Prog name s*))
    (define who 'syntax->schml0)
    (define uc (make-unique-counter 0))
-   (define e
+   (define tl*
      (parameterize ([current-unique-counter uc])
        ((parse-top-level name top-level-env)  s*)))
-   (debug who (Prog (list name (unique-counter-next! uc)) e))]
+   (debug who (Prog (list name (unique-counter-next! uc)) tl*))]
   [(other) (error 'syntax->schml0 "unmatched: ~a" other)])
 
 (define (syntax->srcloc stx)
@@ -49,53 +49,86 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
           (syntax-position stx)
           (syntax-span stx)))
 
-
-;; String (Hashtable Symbol Uid) -> (Listof Syntax) -> Expr
+;; String (Hashtable Symbol Uid) -> (Listof Syntax) -> S0-Top*
 (define ((parse-top-level name env) stx*)
+  (debug 'parse-top-level name env stx*)
   (match stx*
-    [(list) NO-OP]
-    [(list s-final) ((parse-expr env) s-final)]
-    [(list s* ... s-final)
-     (define/match (expr/ann e)
-       [((Ann _ s)) (Ann (Expression e) s)]
-       [(other) (error 'expression "unmatched: ~a" other)])
-     (define e* (map (parse-expr env) s*))
-     (define ef ((parse-expr env) s-final))
-     (make-begin (map expr/ann e*) ef)]
+    [(list s* ...)
+     (define/match (observe/ann e)
+       [((Ann (Define _ _ _ _) s)) e]
+       [((Ann _ s)) (Ann (Observe e #f) s)]
+       [(other) (error 'parse-top-level/insert-observe
+                       "unmatched: ~a" other)])
+     (define rec-env (scan/check-define-scope name s*))
+     (debug rec-env (map observe/ann (map (parse-form (env-union env rec-env)) s*)))]
     [other (error 'parse-top-level "unmatched: ~a" other)]))
 
-(define ((parse-expr env) stx)
-  (debug off 'parse-expr stx env)
+;; String (U Syntax (Listof Syntax)) -> (Hashtable Symbol Uid)
+(define (scan/check-define-scope name stx)
+  (define who 'scan/check-define-scope)
+  (debug who name stx)
+  ;; syntax -> (Option (Pair id uid))
+  (define (match-ids stx)
+    (syntax-parse stx
+      #:datum-literals (define)
+      [(~or (define v:id . _) (define (v:id _ ...) . _))
+       (list (syntax-e #'v) (syntax->srcloc stx) (id->uid #'v))]
+      [_ #f]))
+  ;; Checks that x isn't already in xs signals an error if so
+  (define (check-unique x xs)
+    (match-define (list v s u) x)
+    ;; x? : (Option (List Symbol srcloc Uid))
+    (define x? (hash-ref xs v #f))
+    (when x?
+      (error 'schml "duplicate definitions: ~a\n  at:~a  and ~a"
+             v s (cadr x?)))
+    (hash-set xs v x))
+  (define (env-cons x env)
+    (match-define (list v _ u) x)
+    (hash-set env v (lexical-var u)))
+  ;; Check 
+  (define stx* (if (list? stx) stx (syntax->list stx)))
+  (define rec-vars (filter values (map match-ids stx*)))
+  ;; for the effects of the check
+  (debug who (foldl check-unique (hash) rec-vars))
+  ;; for the final value of the environment
+  (debug who (foldl env-cons (hash) rec-vars)))
+
+
+
+
+(define ((parse-form env) stx)
+  (debug 'parse-form stx env)
   (define src (syntax->srcloc stx))
   (define cf
     (syntax-parse stx
-      [var:id
-       (match (env-lookup env #'var)
-         [(lexical-var var) var]
-         [other (syntax-error 'parse-expr "needed variable" stx)])]
+      [var:id (Var ((env-get-lexical 'parse-form) env #'var))]
       [(var:id rest ...)
        (match (env-lookup env #'var)
          [(lexical-var var)
           (define var-src (quote-srcloc #'var))
-          (define as (map (parse-expr env) (syntax->list #'(rest ...))))
-          (App (Ann var var-src) as)]
+          (define as (map (parse-form env) (syntax->list #'(rest ...))))
+          (App (Ann (Var var) var-src) as)]
          [(core parse) (parse stx env)]
-         [other (error 'parse-expr "unmatched: ~a" other)])]
+         [other (error 'parse-form "unmatched: ~a" other)])]
       [(fst rest ...)
-       (define p ((parse-expr env) #'fst))
-       (define as (map (parse-expr env) (syntax->list #'(rest ...))))
+       (define p ((parse-form env) #'fst))
+       (define as (map (parse-form env) (syntax->list #'(rest ...))))
        (App p as)]
       [other
        (define dat (syntax->datum #'other))
-       (unless (datum? dat)
-         (syntax-error 'parse-expr "expected datum" #'other))
-       (Quote dat)]))
+       (unless (schml-literal? dat)
+         (syntax-error 'parse-form "expected datum" #'other))
+       (if (and (not (exact-integer? dat)) (real? dat))
+           (Quote (exact->inexact dat))
+           (Quote dat))]))
   (Ann cf src))
 
-(define (datum? x)
+#;(define (datum? x)
   (or (exact-integer? x)
       (boolean? x)
-      (null? x)))
+      (null? x)
+      (real? x)))
 
 (define-syntax syntax-error
   (syntax-rules ()
@@ -107,7 +140,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (let ([msg (format "~a\n\tin:~a\n\tin particular: ~a" message expr sub)])
        (error name msg))])) 
 
-(define (schml-core-form? x)
+#;(define (schml-core-form? x)
   (or (Lambda? x) (Letrec? x) (Let? x) (Var? x) (App? x)
       (Op? x) (Quote? x) (Ascribe? x)
       (Begin? x) (If? x) (Repeat? x)
@@ -128,9 +161,21 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
     (syntax-error 'environment "unbound variable" x))
   (hash-ref env (syntax->datum x) err))
 
-(define (env-extend env x u)
-  (hash-set env (syntax->datum x) (lexical-var (Var u))))
+(define ((env-get-lexical src) env x)
+  (match (env-lookup env x)
+    [(lexical-var var) var]
+    [other (error src "expected lexical variable for ~a: found ~a"
+                  x other)]))
 
+
+(define (env-extend env x u)
+  (hash-set env (syntax->datum x) (lexical-var u)))
+
+(define (env-cons k v e) (hash-set e k v))
+
+(define (env-union e1 e2)
+  (define k.v* (hash->list e2))
+  (foldl env-cons e1 (map car k.v*) (map cdr k.v*)))
 
 (define-syntax-class binding
   [pattern (var:id (~datum :) ty rhs)]
@@ -138,6 +183,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 (define (id->uid x)
   (next-uid! (symbol->string (syntax->datum x))))
+
 (define ((parse-optional-type env) x)
   (and (syntax? x) (syntax-e x) (parse-type x env)))
 
@@ -152,9 +198,9 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (define-values (new-env uids)
        (destruct-and-parse-bnds-lhs (syntax->list #'(bnd.var ...)) env))
      (define tys  (map (parse-optional-type env) (syntax->list #'(bnd.ty  ...))))
-     (define rhss (map (parse-expr env) (syntax->list #'(bnd.rhs ...))))
+     (define rhss (map (parse-form env) (syntax->list #'(bnd.rhs ...))))
      (Let (map Bnd uids tys rhss)
-       ((parse-expr new-env) #'body))]))
+      ((parse-form new-env) #'body))]))
 
 (define (parse-letrec-expression stx env)
   (syntax-parse stx
@@ -162,54 +208,79 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (define-values (new-env uids)
        (destruct-and-parse-bnds-lhs (syntax->list #'(bnd.var ...)) env))
      (define tys  (map (parse-optional-type env) (syntax->list #'(bnd.ty  ...))))
-     (define rhss (map (parse-expr new-env) (syntax->list #'(bnd.rhs ...))))
+     (define rhss (map (parse-form new-env) (syntax->list #'(bnd.rhs ...))))
      (Letrec (map Bnd uids tys rhss)
-       ((parse-expr new-env) #'body))]))
+       ((parse-form new-env) #'body))]))
+
 
 (module+ test
   (require "../language/forms-equal.rkt")
   (current-unique-counter (make-unique-counter 0))
   (check-forms=?
-   ((parse-expr top-level-env) #'(let ([x 1]) x))
+   ((parse-form top-level-env) #'(let ([x 1]) x))
    (Ann (Let (list (Bnd 'x #f (Ann (Quote 1) (quote-srcloc))))
           (Ann (Var 'x) (quote-srcloc)))
         (quote-srcloc)))
   (check-forms=?
-   ((parse-expr top-level-env) #'(letrec ([x x]) x))
+   ((parse-form top-level-env) #'(letrec ([x x]) x))
    (Ann (Letrec (list (Bnd 'x #f (Ann (Var 'x) (quote-srcloc))))
           (Ann (Var 'x) (quote-srcloc)))
         (quote-srcloc))))
+
+(define-splicing-syntax-class optional-colon-type
+  [pattern (~optional (~seq (~datum :) ty) #:defaults ([ty #'#f]))])
+
+(define-splicing-syntax-class optionally-annotated-id
+  [pattern (~seq id:id oa:optional-colon-type) #:with ty #'oa.ty])
 
 (define-syntax-class formal-parameter
   [pattern [var:id (~datum :) ty]]
   [pattern var:id #:with ty #'Dyn])
 
+(define (parse-define-form stx env)
+  (define (help rec? id ty? body)
+    (Define
+      rec?
+      ((env-get-lexical 'parse-define-form) env id)
+      ((parse-optional-type env) ty?)
+      ((parse-form env) body)))
+  (debug stx env)
+  (syntax-parse stx
+    [(_ v:optionally-annotated-id e:expr)
+     (help #f #'v.id #'v.ty #'e)]
+    [(_ (f:id f*:formal-parameter ...) r:optional-colon-type e:expr)
+     (if (syntax->datum #'r.ty)
+         (help #t #'f #f (syntax/loc stx (lambda (f* ...) : r.ty e)))
+         (help #t #'f #f (syntax/loc stx (lambda (f* ...) e))))]))
+
+(module+ test
+  (parse-define-form '(define x : Float #i9.8) (hash-set top-level-env 'x (lexical-var (Uid "x" 0)))))
+
 (define (parse-lambda-expression stx env)
   (syntax-parse stx
-    [(_ (fml:formal-parameter ...)
-        (~optional (~seq (~datum :) ty) #:defaults ([ty #'#f]))
-        body)
+    [(_ (fml:formal-parameter ...) r:optional-colon-type body:expr)
      (define-values (new-env uids)
        (destruct-and-parse-bnds-lhs (syntax->list #'(fml.var ...)) env))
      (define (pt s) (parse-type s env))
      (define tys  (map pt (syntax->list #'(fml.ty  ...))))
      (Lambda (map Fml uids tys)
-       (Ann ((parse-expr new-env) #'body)
-            ((parse-optional-type new-env) #'ty)))]))
+       (Ann ((parse-form new-env) #'body)
+            ((parse-optional-type new-env) #'r.ty)))]
+    [other (error 'parse-lambda "unmatched ~a" (syntax->datum stx))]))
 
 (module+ test
   (check-forms=?
-   ((parse-expr top-level-env) #'(lambda (x y) x))
+   ((parse-form top-level-env) #'(lambda (x y) x))
    (Ann (Lambda (list (Fml 'x (Dyn)) (Fml 'y (Dyn)))
           (Ann (Ann (Var 'x) (quote-srcloc)) #f))
         (quote-srcloc)))
   (check-forms=?
-   ((parse-expr top-level-env) #'(lambda ([x : Int]) x))
+   ((parse-form top-level-env) #'(lambda ([x : Int]) x))
    (Ann (Lambda (list (Fml 'x (Int)))
           (Ann (Ann (Var 'x) (quote-srcloc)) #f))
         (quote-srcloc)))
   (check-forms=?
-   ((parse-expr top-level-env) #'(lambda ([x : Int]) : Int x))
+   ((parse-form top-level-env) #'(lambda ([x : Int]) : Int x))
    (Ann (Lambda (list (Fml 'x (Int)))
           (Ann (Ann (Var 'x) (quote-srcloc)) (Int)))
         (quote-srcloc))))
@@ -219,7 +290,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
     [(op rands ...)
      (define o (syntax->datum #'op))
      (define r* (syntax->list #'(rands ...)))
-     (Op o (map (parse-expr env) r*))]))
+     (Op o (map (parse-form env) r*))]))
 
 (define (parse-ascription stx env)
   (syntax-parse stx
@@ -227,7 +298,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (define lbl (syntax->datum (attribute l)))
      (unless (or (not lbl) (string? lbl))
        (error 'parse-ascription "this doesn't work like I thought it would: ~a ~a" lbl #'l))
-     (Ascribe ((parse-expr env) #'expr) (parse-type #'ty env) lbl)]))
+     (Ascribe ((parse-form env) #'expr) (parse-type #'ty env) lbl)]))
 
 (module+ test
   (check-forms=? (parse-ascription #'(ann 3 Int) top-level-env)
@@ -239,8 +310,8 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 (define (parse-begin stx env)
   (syntax-parse stx
     [(_ expr* ... expr)
-     (Begin (map (parse-expr env) (syntax->list #'(expr* ...)))
-            ((parse-expr env) #'expr))]))
+     (Begin (map (parse-form env) (syntax->list #'(expr* ...)))
+            ((parse-form env) #'expr))]))
 
 (define (env-extend* env . bnds)
   (let loop ([env env] [b* bnds])
@@ -267,11 +338,11 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (unless (and (Uid? i) (Uid? a))
        (error 'crap))
      (define new-env (env-extend* env #'i.id i #'a.id a))
-     (define recur (parse-expr env))
+     (define recur (parse-form env))
      (Repeat i (recur #'i.start) (recur #'i.stop)
        (Ann a ((parse-optional-type env) #'a.type))
-       ((parse-expr env) #'a.init)
-       ((parse-expr new-env) #'M))]))
+       ((parse-form env) #'a.init)
+       ((parse-form new-env) #'M))]))
 
 (module+ test
   (parse-repeat #'(repeat (foo 0 10) (bar : Int 0) foo) top-level-env))
@@ -279,7 +350,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 (define (parse-switch stx env)
   (define-syntax-class switch-clause
     [pattern [(case*:integer ...+) rhs]])
-  (define recur (parse-expr env))
+  (define recur (parse-form env))
   (syntax-parse stx
     #:datum-literals (else)
     [(_ e c*:switch-clause ... [else default])
@@ -295,19 +366,19 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
     [(_ params ...)
      #:do [(define p* (syntax->list #'(params ...)))]
      #:when (= (length p*) arg-count)
-     (apply ctr (map (parse-expr env) p*))]))
+     (apply ctr (map (parse-form env) p*))]))
 
 (define ((parse-simple*-form sym ctr) stx env)
   (syntax-parse stx
     #:context sym
     [(_ params ...)
      #:do [(define p* (syntax->list #'(params ...)))]
-     (ctr (map (parse-expr env) p*))]))
+     (ctr (map (parse-form env) p*))]))
 
 (define (parse-tuple-proj stx env)
   (syntax-parse stx
     [(_ t i:integer)
-     (Tuple-proj ((parse-expr env) #'t) (syntax->datum #'i))]))
+     (Tuple-proj ((parse-form env) #'t) (syntax->datum #'i))]))
 
 
 (module+ test
@@ -329,7 +400,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (define (op s) (Op s '()))
      (define tmp (next-uid! "tmp_s2s0"))
      (begin (op 'timer-start)
-            (Let (list (Bnd tmp #f ((parse-expr env) #'exp)))
+            (Let (list (Bnd tmp #f ((parse-form env) #'exp)))
               (/src (begin (op 'timer-stop)
                            (op 'timer-report)
                            (Var tmp)))))]))
@@ -347,7 +418,7 @@ represents types in the schml abstract syntax tree.
     #:datum-literals (-> Ref Vect GRef GVect MRef MVect Tuple)
     [atm:id
      (match (env-lookup env #'atm)
-       [(lexical-var id) id]
+       ;;[(lexical-var id) id]
        [(core-atomic cf) cf]
        [other
         (error 'parse-type
@@ -410,11 +481,82 @@ represents types in the schml abstract syntax tree.
 
 (define top-level-env
   (make-immutable-hash
-   `((let    . ,(core parse-let-expression))
-     (letrec . ,(core parse-letrec-expression))
-     (lambda . ,(core parse-lambda-expression))
-     (if     . ,(core (parse-simple-form 'if If 3)))
-     (begin  . ,(core parse-begin))
+   `((define     . ,(core parse-define-form))
+     (let        . ,(core parse-let-expression))
+     (letrec     . ,(core parse-letrec-expression))
+     (lambda     . ,(core parse-lambda-expression))
+     (if         . ,(core (parse-simple-form 'if If 3)))
+     (begin      . ,(core parse-begin))     
+     (tuple      . ,(core (parse-simple*-form 'tuple Create-tuple)))
+     (tuple-proj . ,(core parse-tuple-proj))
+     (repeat     . ,(core parse-repeat))
+     (switch     . ,(core parse-switch))
+     (Int        . ,(core-atomic INT-TYPE))
+     (Bool       . ,(core-atomic BOOL-TYPE))
+     (Unit       . ,(core-atomic UNIT-TYPE))
+     (Dyn        . ,(core-atomic DYN-TYPE))
+     (Float      . ,(core-atomic FLOAT-TYPE))
+     (Tuple      . ,(core parse-tuple-type))
+     (GRef       . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
+     (GVect      . ,(core (make-parse-type-w/ctr 'GVect GVect)))
+     (MVect      . ,(core (make-parse-type-w/ctr 'MVect MVect)))
+     (MRef       . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
+     ,@(let ([parse-gbox
+              (core (parse-simple-form 'gbox Gbox 1))]
+             [parse-gbox-set!
+              (core (parse-simple-form 'gbox-set! Gbox-set! 2))]
+             [parse-gunbox
+              (core (parse-simple-form 'gunbox Gunbox 1))]
+             [parse-gvector
+              (core (parse-simple-form 'gvector Gvector 2))]
+             [parse-gvector-ref
+              (core (parse-simple-form 'gvector-ref Gvector-ref 2))]
+             [parse-gvector-set!
+              (core (parse-simple-form 'gvector-set! Gvector-set! 3))]
+             [parse-mbox
+              (core (parse-simple-form 'mbox MboxS 1))]
+             [parse-munbox
+              (core (parse-simple-form 'munbox Munbox 1))]
+             [parse-mbox-set!
+              (core (parse-simple-form 'mbox-set! Mbox-set! 2))]
+             [parse-mvector
+              (core (parse-simple-form 'mvector Mvector 2))]
+             [parse-mvector-ref
+              (core (parse-simple-form 'mvector-ref Mvector-ref 2))]
+             [parse-mvector-set!
+              (parse-simple-form 'mvector-set! Mvector-set! 3)])
+         `(,@(if #t
+                 `((Ref        . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
+                   (Vector     . ,(core (make-parse-type-w/ctr 'GVect GVect)))
+                   (vector       . ,parse-gvector)
+                   (vector-ref   . ,parse-gvector-ref)
+                   (vector-set!  . ,parse-gvector-set!)
+                   (box          . ,parse-gbox)
+                   (box-set!     . ,parse-gbox-set!)
+                   (unbox        . ,parse-gunbox))
+                 `((Ref        . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
+                   (Vector     . ,(core (make-parse-type-w/ctr 'MVect MVect)))
+                   (vector       . ,parse-mvector)
+                   (vector-ref   . ,parse-mvector-ref)
+                   (vector-set!  . ,parse-mvector-set!)
+                   (box          . ,parse-mbox)
+                   (box-set!     . ,parse-mbox-set!)
+                   (unbox        . ,parse-munbox)))
+           (gvector      . ,parse-gvector)
+           (gvector-ref  . ,parse-gvector-ref)
+           (gvector-set! . ,parse-gvector-set!)
+           (gbox         . ,parse-gbox)
+           (gbox-set!    . ,parse-gbox-set!)
+           (gunbox       . ,parse-gunbox)
+           (mvector      . ,parse-mvector)
+           (mvector-ref  . ,parse-mvector-ref)
+           (mvector-set! . ,parse-mvector-set!)
+           (mbox         . ,parse-mbox)
+           (mbox-set!    . ,parse-mbox-set!)
+           (munbox       . ,parse-munbox)))
+     (ann . ,(core parse-ascription))
+     (: . ,(core parse-ascription))
+     ;; Fixnum operations
      (* . ,core-parse-prim)
      (+ . ,core-parse-prim)
      (- . ,core-parse-prim)
@@ -431,50 +573,39 @@ represents types in the schml abstract syntax tree.
      (=  . ,core-parse-prim)
      (>  . ,core-parse-prim)
      (>= . ,core-parse-prim)
-     (tuple     . ,(core (parse-simple*-form 'tuple Create-tuple)))
-     (tuple-proj . ,(core parse-tuple-proj))
-     (repeat . ,(core parse-repeat))
-     (switch . ,(core parse-switch))
-     (Int    . ,(core-atomic INT-TYPE))
-     (Bool   . ,(core-atomic BOOL-TYPE))
-     (Unit   . ,(core-atomic UNIT-TYPE))
-     (Dyn    . ,(core-atomic DYN-TYPE))
-     (Tuple . ,(core parse-tuple-type))
-     (Ref   . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
-     (Vect  . ,(core (make-parse-type-w/ctr 'GVect GVect)))
-     (GRef   . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
-     (GVect  . ,(core (make-parse-type-w/ctr 'GVect GVect)))
-     (MVect  . ,(core (make-parse-type-w/ctr 'MVect MVect)))
-     (MRef   . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
-     ,@(let ([parse-gbox      (parse-simple-form 'gbox Gbox 1)]
-             [parse-gbox-set! (parse-simple-form 'gbox-set! Gbox-set! 2)]
-             [parse-gunbox    (parse-simple-form 'gunbox Gunbox 1)]
-             [parse-gvector
-              (parse-simple-form 'gvector Gvector 2)]
-             [parse-gvector-ref
-              (parse-simple-form 'gvector-ref Gvector-ref 2)]
-             [parse-gvector-set!
-              (parse-simple-form 'gvector-set! Gvector-set! 3)])
-         `((gvector   . ,(core parse-gvector))
-           (gvector-ref . ,(core parse-gvector-ref))
-           (gvector-set! . ,(core parse-gvector-set!))
-           (vector   . ,(core parse-gvector))
-           (vector-ref . ,(core parse-gvector-ref))
-           (vector-set! . ,(core parse-gvector-set!))
-           (gbox      . ,(core parse-gbox))
-           (gbox-set! . ,(core parse-gbox-set!))
-           (gunbox    . ,(core parse-gunbox))
-           (box       . ,(core parse-gbox))
-           (box-set!  . ,(core parse-gbox-set!))
-           (unbox    . ,(core parse-gunbox))))
-     (mbox . , (core (parse-simple-form 'mbox MboxS 1)))
-     (munbox . ,(core (parse-simple-form 'munbox Munbox 1)))
-     (mbox-set! . ,(core (parse-simple-form 'mbox-set! Mbox-set! 2)))
-     (mvector   . ,(core (parse-simple-form 'mvector Mvector 2)))
-     (mvector-ref . ,(core (parse-simple-form 'mvector-ref Mvector-ref 2)))
-     (mvector-set! . ,(parse-simple-form 'mvector-set! Mvector-set! 3))
-     (ann . ,(core parse-ascription))
-     (: . ,(core parse-ascription))
+     ;; Float operations
+     (fl+   . ,core-parse-prim)
+     (fl-   . ,core-parse-prim)
+     (fl*   . ,core-parse-prim)
+     (fl/   . ,core-parse-prim)
+     (flmodulo . ,core-parse-prim)
+     (flabs . ,core-parse-prim)
+     (fl<   . ,core-parse-prim)
+     (fl<=  . ,core-parse-prim)
+     (fl=   . ,core-parse-prim)
+     (fl>=  . ,core-parse-prim)
+     (fl>   . ,core-parse-prim)
+     (flmin . ,core-parse-prim)
+     (flmax . ,core-parse-prim)
+     (flround . ,core-parse-prim)
+     (flfloor . ,core-parse-prim)
+     (flceiling . ,core-parse-prim)
+     (fltruncate . ,core-parse-prim)
+     ;; Float operations (trig)
+     (flsin . ,core-parse-prim)
+     (flcos . ,core-parse-prim)
+     (fltan . ,core-parse-prim)
+     (flasin . ,core-parse-prim)
+     (flacos . ,core-parse-prim)
+     (flatan . ,core-parse-prim)
+     ;; Float operations (math)
+     (fllog . ,core-parse-prim)
+     (flexp . ,core-parse-prim)
+     (flsqrt . ,core-parse-prim)
+     (flexpt . ,core-parse-prim)
+     (float->int . ,core-parse-prim)
+     (int->float . ,core-parse-prim)
+     (read-float . ,core-parse-prim)
      (time . ,(core parse-time))
      (timer-start . ,core-parse-prim)
      (timer-stop . ,core-parse-prim)
@@ -483,7 +614,7 @@ represents types in the schml abstract syntax tree.
 
 
 (module+ test
-  (check-forms=? ((parse-expr top-level-env) #'(vector 0 2))
+  (check-forms=? ((parse-form top-level-env) #'(vector 0 2))
                  (Ann (Gvector (Ann (Quote 0) (quote-srcloc))
                                (Ann (Quote 2) (quote-srcloc)))
                       (quote-srcloc))))

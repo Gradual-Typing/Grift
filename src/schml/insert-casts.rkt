@@ -35,11 +35,16 @@
 
 (: insert-casts (Schml1-Lang -> Cast0-Lang))
 (define (insert-casts prgm)
-  (match-define (Prog (list name unique type) exp) prgm)
+  (match-define (Prog (list name unique type) tl*) prgm)
   (define uc (make-unique-counter unique))
-  (define e (parameterize ([current-unique-counter uc])
-              (ic-expr exp)))
-  (debug (Prog (list name (unique-counter-next! uc) type) e)))
+  (define new-tl*
+    (parameterize ([current-unique-counter uc])
+      (for/list ([tl (in-list tl*)])
+        (match tl
+          [(Define r? id t2 (and (Ann _ (cons s t1)) (app ic-expr e)))
+           (Define r? id t2 (mk-cast (mk-label "Define" s) e t1 t2))]
+          [(Observe e t) (Observe (ic-expr e) t)]))))
+  (debug (Prog (list name (unique-counter-next! uc) type) new-tl*)))
 
 (: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type -> C0-Expr))
 (define (mk-cast l-th e t1 t2)
@@ -353,8 +358,8 @@
   (syntax-rules ()
     [(_ pos src)
      (lambda ()
-       (format "Implicit cast in ~a on expression at ~a"
+       (format "Implicit cast in ~a on expression at ~a\n"
                pos (srcloc->string src)))]
     [(_ pos sup-src sub-src)
-     (mk-label (format "~a at ~a" pos (srcloc->string sup-src))
+     (mk-label (format "~a at ~a\n" pos (srcloc->string sup-src))
                sub-src)]))

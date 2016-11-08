@@ -1,7 +1,7 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 
 #|-----------------------------------------------------------------------------+
 | Language/Coercion created by cast->coercions
@@ -18,6 +18,8 @@
 (define-type Crcn-Expr
   (Rec E (U ;; Non-Terminals
           ;; replaced (Cast E Schml-Type Schml-Type Label) with next line
+          (Observe E Schml-Type)
+          No-Op
           (Cast E (Coercion Schml-Coercion))
           (Lambda Uid* E)
 	  (Letrec Crcn-Bnd* E)
