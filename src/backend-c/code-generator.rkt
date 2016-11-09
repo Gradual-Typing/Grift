@@ -10,19 +10,6 @@
          (for-syntax "runtime-location.rkt")
          "runtime-location.rkt")
 
-#;
-(begin-for-syntax
-  (unless (system (format "cc ~a -c -o ~a" runtime.c-path runtime.o-path))
-    (error 'schml/backend-c/code-generator "error compiling the runtime"))
-  (unless (parameterize ([current-directory boehm-gc-dir])
-            (and (system "make distclean")
-                 (system (format "./configure --prefix=~a" boehm-gc-install))
-                 (system "./make; make check; make install")))
-    (error 'schml/backend-c/code-generator "error compiling the boehm"))
-  (unless (system (format "cc ~a -c -o ~a" none-gc.c-path none-gc.o-path))
-    (error 'schml/backend-c/code-generator "error compiling the nonegc")))
-
-
 (provide (all-defined-out))
 
 (define (find-unused-path [suffix : String]) : Path
@@ -48,9 +35,10 @@
         (generate-c uil c-path)))
 
     ;; if clang-format is present and we keep c then clean up the file
-    (define clang-format? (find-executable-path "clang-format"))
-    (when (and clang-format? keep-c?)
-      (system* clang-format? "-i"(path->string c-path)))
+    (when keep-c?
+      (define clang-format? (find-executable-path "clang-format"))
+      (when clang-format?
+        (system* clang-format? "-i"(path->string c-path))))
 
     ;; Invoke the system cc compiler on the file
     (invoke-c-compiler c-path o-path)
@@ -80,8 +68,9 @@
 (define (cc/runtime out in flags #:runtime [rt runtime.o-path])
   (define gc
     (match (garbage-collector)
-      ['Boehm boehm-gc.a-path]
-      ['None  none-gc.o-path]))
+      ['Boehm (string-append (path->string boehm-gc.a-path)
+      	      		     " -pthreads")]
+      ['None  (path->string none-gc.o-path)]))
   (define cmd (format "clang -o ~a ~a ~a ~a ~a" out in rt gc flags))
   (when (trace? 'Vomit)
     (logf "System call: ~a" cmd))
