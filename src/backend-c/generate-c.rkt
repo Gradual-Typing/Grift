@@ -489,9 +489,13 @@
        (display "[")
        (emit-value o)
        (display "]"))]
-    [('print-float (list f))
+    [('print-float (list f p))
      (display "printf")
-     (emit-wrap (display "\"%lf\",") (display "imdt_to_float") (emit-wrap (emit-value f)))]
+     (emit-wrap (display "\"%.*lf\",")
+                (emit-value p)
+                (display ", ")
+                (display "imdt_to_float")
+                (emit-wrap (emit-value f)))]
     [('Printf (cons fmt exp*))
      (begin (display "printf")
             (emit-wrap

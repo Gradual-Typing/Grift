@@ -45,7 +45,8 @@
                  #:rt       (Option (U String Path))
                  #:log-level Log-Level
                  #:log-port  (Option (U String Path Output-Port))
-                 #:gc       GC)
+                 #:gc       GC
+                 #:ck-bounds Boolean)
                 Path))
 (define (compile target
                  #:output    [output    (output-path)]
@@ -58,7 +59,8 @@
                  #:rt        [rt        (runtime-path)]
                  #:log-level [log-level (schml-log-level)]
                  #:log-port  [log-port  (schml-log-port)]
-                 #:gc        [gc        (garbage-collector)])
+                 #:gc        [gc        (garbage-collector)]
+                 #:ck-bounds [ckbs      (bounds-checks?)])
   ;; convert all convience types to internal API
   (let* ([target  (if (string? target) (build-path target) target)]
          [output  (if (string? output) (build-path output) output)]
@@ -77,7 +79,8 @@
                    [c-flags     cc-opts]
                    [init-heap-kilobytes mem]
                    [runtime-path rt]
-                   [garbage-collector gc])
+                   [garbage-collector gc]
+                   [bounds-checks? ckbs])
       (define (compile-target) : Path (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
         (with-logging-to-port p compile-target log-level 'schml))
@@ -86,15 +89,6 @@
         [(output-port? log-port) (compile/log-port log-port)]
         [else
          (call-with-output-file log-port #:exists 'replace compile/log-port)]))))
-
-
-;; (: envoke-compiled-program
-;;    (->* () (#:exec-path (Option Path) #:config (Option Config)) Boolean))
-;; (define (envoke-compiled-program #:exec-path [path #f] #:config [config #f])
-;;   (cond
-;;     [config (system (path->string (Config-exec-path config)))]
-;;     [path   (system (path->string path))]
-;;     [else   (system (path->string target))]))
 
 ;; We are currently only supporting .schml files
 (: schml-path? :  Path -> Boolean)

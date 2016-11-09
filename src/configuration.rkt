@@ -16,6 +16,12 @@
 (: dynamic-operations? (Parameterof (U Boolean 'inline)))
 (define dynamic-operations? (make-parameter #t))
 
+;; Vector Behavior
+(define bounds-checks? : (Parameterof Boolean)
+  (make-parameter #t))
+(define reference-semantics : (Parameterof (U 'Monotonic 'Guarded))
+  (make-parameter 'Guarded))
+
 (: specialize-cast-code-generation? (Parameterof Boolean))
 (define specialize-cast-code-generation? (make-parameter #f))
 
@@ -31,6 +37,7 @@
 (define-type GC (U 'Boehm 'None))
 (define garbage-collector : (Parameterof GC)
   (make-parameter 'Boehm))
+
 
 
 ;; Interaction with the c compiler

@@ -45,188 +45,6 @@ but a static single assignment is implicitly maintained.
 (TODO Talk to jeremy about taging all heap values)
 |#
 
-
-;; (require (prefix-in l: "../language/data-representation.rkt"))
-
-;; (define TYPE-TAG-MASK                  (Quote l:TYPE-TAG-MASK))
-
-;; ;; unallocated types
-;; (define TYPE-ATOMIC-TAG                (Quote l:TYPE-ATOMIC-TAG))
-;; (define TYPE-DYN-RT-VALUE              (Quote l:TYPE-DYN-RT-VALUE))
-;; (define TYPE-INT-RT-VALUE              (Quote l:TYPE-INT-RT-VALUE))
-;; (define TYPE-FLOAT-RT-VALUE            (Quote l:TYPE-FLOAT-RT-VALUE))
-;; (define TYPE-BOOL-RT-VALUE             (Quote l:TYPE-BOOL-RT-VALUE))
-;; (define TYPE-UNIT-RT-VALUE             (Quote l:TYPE-UNIT-RT-VALUE))
-
-;; ;; function type representation
-;; (define TYPE-FN-TAG                    (Quote l:TYPE-FN-TAG))
-;; (define TYPE-FN-ARITY-INDEX            (Quote l:TYPE-FN-ARITY-INDEX))
-;; (define TYPE-FN-RETURN-INDEX           (Quote l:TYPE-FN-RETURN-INDEX))
-;; (define TYPE-FN-FMLS-OFFSET            (Quote l:TYPE-FN-FMLS-OFFSET))
-
-;; ;; guarded types representation
-;; (define TYPE-GREF-TAG                  (Quote l:TYPE-GREF-TAG))
-;; (define TYPE-GREF-SIZE                 (Quote l:TYPE-GREF-SIZE))
-;; (define TYPE-GREF-TYPE-INDEX           (Quote l:TYPE-GREF-TYPE-INDEX))
-
-;; (define TYPE-GVECT-TAG                 (Quote l:TYPE-GVECT-TAG))
-;; (define TYPE-GVECT-SIZE                (Quote l:TYPE-GVECT-SIZE))
-;; (define TYPE-GVECT-TYPE-INDEX          (Quote l:TYPE-GVECT-TYPE-INDEX))
-
-;; ;; monotonic types representation
-;; (define TYPE-MREF-TAG                  (Quote l:TYPE-MREF-TAG))
-;; (define TYPE-MREF-SIZE                 (Quote l:TYPE-MREF-SIZE))
-;; (define TYPE-MREF-TYPE-INDEX           (Quote l:TYPE-MREF-TYPE-INDEX))
-
-;; (define TYPE-MVECT-TAG                 (Quote l:TYPE-MVECT-TAG))
-;; (define TYPE-MVECT-SIZE                (Quote l:TYPE-MVECT-SIZE))
-;; (define TYPE-MVECT-TYPE-INDEX          (Quote l:TYPE-MVECT-TYPE-INDEX))
-
-;; ;; tuple type representation
-;; (define TYPE-TUPLE-TAG                 (Quote l:TYPE-TUPLE-TAG))
-;; (define TYPE-TUPLE-COUNT-INDEX         (Quote l:TYPE-TUPLE-COUNT-INDEX))
-;; (define TYPE-TUPLE-ELEMENTS-OFFSET     (Quote l:TYPE-TUPLE-ELEMENTS-OFFSET))
-
-
-;; (define COERCION-TAG-MASK              (Quote #b111)) ;; the same for primary and secondary tags
-
-;; ;; project coercion representation
-;; (define l:COERCION-PROJECT-TAG         #b000)
-;; (define COERCION-PROJECT-TAG           (Quote l:COERCION-PROJECT-TAG))
-;; (define COERCION-PROJECT-TYPE-INDEX    (Quote 0))
-;; (define COERCION-PROJECT-LABEL-INDEX   (Quote 1))
-
-;; ;; inject coercion representation
-;; (define l:COERCION-INJECT-TAG          #b001)
-;; (define COERCION-INJECT-TAG            (Quote l:COERCION-INJECT-TAG))
-;; (define COERCION-INJECT-TYPE-INDEX     (Quote 0))
-
-;; ;; sequence coercion representation
-;; (define l:COERCION-SEQUENCE-TAG        #b010)
-;; (define COERCION-SEQUENCE-TAG          (Quote l:COERCION-SEQUENCE-TAG))
-;; (define COERCION-SEQUENCE-FST-INDEX    (Quote 0))
-;; (define COERCION-SEQUENCE-SND-INDEX    (Quote 1))
-
-;; ;; identity coercion representation
-;; (define COERCION-IDENTITY-TAG          (Quote #b011))
-;; (define COERCION-IDENTITY-IMDT         COERCION-IDENTITY-TAG)
-
-;; ;; fail coercion representation
-;; (define l:COERCION-FAILED-TAG          #b110)
-;; (define COERCION-FAILED-TAG            (Quote l:COERCION-FAILED-TAG))
-;; (define COERCION-FAILED-LABEL-INDEX    (Quote 0))
-
-;; ;; mediating coercion representation
-;; (define COERCION-SECOND-TAG-SHIFT      (Quote l:COERCION-SECOND-TAG-SHIFT))
-;; (define l:COERCION-MEDIATING-TAG       #b100)
-;; (define COERCION-MEDIATING-TAG         (Quote l:COERCION-MEDIATING-TAG))
-
-;; ;; function coercion representation
-;; (define l:COERCION-FN-SECOND-TAG       #b001)
-;; (define COERCION-FN-SECOND-TAG         (Quote l:COERCION-FN-SECOND-TAG))
-;; (define COERCION-FN-ARITY-INDEX        (Quote l:COERCION-FN-ARITY-INDEX))
-;; (define COERCION-FN-RETURN-INDEX       (Quote l:COERCION-FN-RETURN-INDEX))
-;; (define COERCION-FN-FMLS-OFFSET        (Quote l:COERCION-FN-FMLS-OFFSET))
-
-;; ;; tuple coercion representation
-;; (define l:COERCION-TUPLE-SECOND-TAG #b010)
-;; (define COERCION-TUPLE-SECOND-TAG      (Quote l:COERCION-TUPLE-SECOND-TAG))
-;; (define COERCION-TUPLE-COUNT-INDEX     (Quote l:COERCION-TUPLE-COUNT-INDEX))
-;; (define COERCION-TUPLE-ELEMENTS-OFFSET (Quote l:COERCION-TUPLE-ELEMENTS-OFFSET))
-
-;; ;; monotonic coercion representation
-;; (define l:COERCION-MREF-SECOND-TAG     #b011)
-;; (define COERCION-MREF-SECOND-TAG       (Quote l:COERCION-MREF-SECOND-TAG))
-;; (define COERCION-MREF-TAG-INDEX        (Quote 0))
-;; (define COERCION-MREF-TYPE-INDEX       (Quote 1))
-
-
-;; ;; guarded coercion representation
-;; (define l:COERCION-REF-SECOND-TAG      #b000)
-;; (define COERCION-REF-SECOND-TAG        (Quote l:COERCION-REF-SECOND-TAG))
-;; (define COERCION-REF-TAG-INDEX         (Quote 0))
-;; (define COERCION-REF-READ-INDEX        (Quote 1))
-;; (define COERCION-REF-WRITE-INDEX       (Quote 2))
-
-;; ;; simple dynamic value representation
-;; (define DYN-TAG-MASK                   (Quote l:DYN-TAG-MASK))
-;; (define DYN-BOXED-TAG                  (Quote l:DYN-BOXED-TAG))
-;; (define DYN-INT-TAG                    (Quote l:DYN-INT-TAG))
-;; (define DYN-BOOL-TAG                   (Quote l:DYN-BOOL-TAG))
-;; (define DYN-UNIT-TAG                   (Quote l:DYN-UNIT-TAG))
-;; (define DYN-IMDT-SHIFT                 (Quote l:DYN-IMDT-SHIFT))
-
-;; ;; allocated dynamic value representation
-;; (define DYN-BOX-SIZE                   (Quote l:DYN-BOX-SIZE))
-;; (define DYN-VALUE-INDEX                (Quote l:DYN-VALUE-INDEX))
-;; (define DYN-TYPE-INDEX                 (Quote l:DYN-TYPE-INDEX))
-
-;; ;; bool value representation
-;; (define FALSE-IMDT                     (Quote l:FALSE-IMDT))
-;; (define TRUE-IMDT                      (Quote l:TRUE-IMDT))
-
-;; ;; unit representation
-;; (define UNIT-IMDT                      (Quote l:UNIT-IMDT))
-;; (define GREP-TAG-MASK                  (Quote l:GREP-TAG-MASK))
-
-;; ;; 0
-;; (define UNDEF-IMDT                     (Quote l:UNDEF-IMDT))
-
-;; ;; guarded values representation
-;; (define UGBOX-TAG                      (Quote l:UGBOX-TAG))
-;; (define UGBOX-SIZE                     (Quote l:UGBOX-SIZE))
-;; (define UGBOX-VALUE-INDEX              (Quote l:UGBOX-VALUE-INDEX))
-;; (define UGVECT-SIZE-INDEX              (Quote l:UGVECT-SIZE-INDEX))
-;; (define UGVECT-OFFSET                  (Quote l:UGVECT-OFFSET))
-
-;; (define GPROXY-TAG                     (Quote l:GPROXY-TAG))
-;; (define GPROXY/TWOSOME-SIZE            (Quote l:GPROXY/TWOSOME-SIZE))
-;; (define GPROXY/COERCION-SIZE           (Quote l:GPROXY/COERCION-SIZE))
-;; (define GPROXY-COERCION-INDEX          (Quote l:GPROXY-COERCION-INDEX))
-;; (define GPROXY-FOR-INDEX               (Quote l:GPROXY-FOR-INDEX))
-;; (define GPROXY-FROM-INDEX              (Quote l:GPROXY-FROM-INDEX))
-;; (define GPROXY-TO-INDEX                (Quote l:GPROXY-TO-INDEX))
-;; (define GPROXY-BLAMES-INDEX            (Quote l:GPROXY-BLAMES-INDEX))
-
-;; ;; monotonic values representation
-;; (define MBOX-SIZE                      (Quote l:MBOX-SIZE))
-;; (define MBOX-VALUE-INDEX               (Quote l:MBOX-VALUE-INDEX))
-;; (define MBOX-RTTI-INDEX                (Quote l:MBOX-RTTI-INDEX))
-;; (define MBOX-TAG                       (Quote l:MBOX-TAG))
-;; (define MVECT-SIZE-INDEX               (Quote l:MVECT-SIZE-INDEX))
-;; (define MVECT-SIZE                     (Quote l:MVECT-SIZE))
-;; (define MVECT-OFFSET                   (Quote l:MVECT-OFFSET))
-;; (define MVECT-RTTI-INDEX               (Quote l:MVECT-RTTI-INDEX))
-;; (define MVECT-TAG                      (Quote l:MVECT-TAG))
-;; (define CV-TAG-MASK                    (Quote l:CV-TAG-MASK))
-;; (define CASTEDVALUE-TAG                (Quote l:CASTEDVALUE-TAG))
-;; (define CASTEDVALUE/TWOSOME-SIZE       (Quote l:CASTEDVALUE/TWOSOME-SIZE))
-;; (define CASTEDVALUE/COERCION-SIZE      (Quote l:CASTEDVALUE/COERCION-SIZE))
-;; (define CASTEDVALUE-COERCION-INDEX     (Quote l:CASTEDVALUE-COERCION-INDEX))
-;; (define CASTEDVALUE-FOR-INDEX          (Quote l:CASTEDVALUE-FOR-INDEX))
-;; (define CASTEDVALUE-FROM-INDEX         (Quote l:CASTEDVALUE-FROM-INDEX))
-;; (define CASTEDVALUE-TO-INDEX           (Quote l:CASTEDVALUE-TO-INDEX))
-;; (define CASTEDVALUE-BLAMES-INDEX       (Quote l:CASTEDVALUE-BLAMES-INDEX))
-
-;; ;; function value representation
-;; (define CLOS-CODE-INDEX                (Quote l:CLOS-CODE-INDEX))
-;; (define CLOS-CSTR-INDEX                (Quote l:CLOS-CSTR-INDEX))
-;; (define CLOS-FVAR-OFFSET               (Quote l:CLOS-FVAR-OFFSET))
-;; (define l:FN-TAG-MASK                  #b111)
-;; (define FN-TAG-MASK                    (Quote l:FN-TAG-MASK))
-;; (define l:CLOSURE-VALUE-MASK           -8) ;; signed long compliment of fn tag mask
-;; (define CLOSURE-VALUE-MASK             (Quote l:CLOSURE-VALUE-MASK))
-;; (define l:FN-PROXY-TAG                 #b001)
-;; (define FN-PROXY-TAG                   (Quote l:FN-PROXY-TAG))
-;; (define l:FN-PROXY-CRCN-INDEX          1)
-;; (define l:FN-PROXY-CLOS-INDEX          0)
-;; (define FN-PROXY-CRCN-INDEX            (Quote l:FN-PROXY-CRCN-INDEX))
-;; (define FN-PROXY-CLOS-INDEX            (Quote l:FN-PROXY-CLOS-INDEX))
-;; (define l:HYBRID-PROXY-TAG             #b001)
-;; (define HYBRID-PROXY-TAG               (Quote l:HYBRID-PROXY-TAG))
-;; (define HYBRID-PROXY-CRCN-INDEX        (Quote l:HYBRID-PROXY-CRCN-INDEX))
-;; (define HYBRID-PROXY-CLOS-INDEX        (Quote l:HYBRID-PROXY-CLOS-INDEX))
-
 (: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))
 (define (specify-representation prgm)
   (match-let ([(Prog (list name next type) (Let-Static* bndt* bnd-crcn* exp)) prgm])
@@ -1282,15 +1100,17 @@ but a static single assignment is implicitly maintained.
            (list (Assign ind e2)
                  (Assign tmp1 e1))
            ;; TODO This duplicates the error exit code (fix this so it doesn't)
-           (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
-                   (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET))))
+           (if (bounds-checks?)
+               (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+                   (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                       (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET))))
+                       (Begin
+                         (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                         (Op 'Exit (list (Quote -1)))))
                    (Begin
                      (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
-               (Begin
-                 (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
-                 (Op 'Exit (list (Quote -1))))))]
+               (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET))))))]
         [(Unguarded-Vect-Set! (app recur e1) (app recur e2) (app recur e3))
          (define ind  (next-uid! "index"))
          (define tmp1 (next-uid! "ugvect"))
@@ -1298,18 +1118,19 @@ but a static single assignment is implicitly maintained.
          (define tmp1-var (Var tmp1))
          (define ind-var (Var ind))
          (Begin
-           (list (Assign ind e2))
-           (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-               (Begin
-                 (list (Assign tmp1 e1))
-                 (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
-                     (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET)) e3))
-                     (Begin
-                       (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
-                       (Op 'Exit (list (Quote -1))))))
-               (Begin
-                 `(,(Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
-                 (Op 'Exit (list (Quote -1))))))]
+           (list (Assign ind e2)
+                 (Assign tmp1 e1))
+           (if (bounds-checks?)
+               (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+                   (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                       (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET)) e3))
+                         (Begin
+                           (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                           (Op 'Exit (list (Quote -1)))))
+                   (Begin
+                     `(,(Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                     (Op 'Exit (list (Quote -1)))))
+               (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET)) e3))))]
         [(Guarded-Proxy-Huh (app recur e))
          (Op '= `(,(Op 'binary-and (list e GREP-TAG-MASK))
                   ,GPROXY-TAG))]
@@ -1372,15 +1193,17 @@ but a static single assignment is implicitly maintained.
          (Begin
            (list (Assign ind e2)
                  (Assign tmp1 e1))
-           (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
-                   (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))
+           (if (bounds-checks?)
+               (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+                   (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                       (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))
+                       (Begin
+                         (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                         (Op 'Exit (list (Quote -1)))))
                    (Begin
                      (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
-               (Begin
-                 (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
-                 (Op 'Exit (list (Quote -1))))))]
+               (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))))]
         [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3))
          (define ind  (next-uid! "index"))
          (define tmp1 (next-uid! "mvect"))
@@ -1391,15 +1214,17 @@ but a static single assignment is implicitly maintained.
            (list
             (Assign ind e2)
             (Assign tmp1 e1))
-           (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
-                   (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET)) e3))
+           (if (bounds-checks?)
+               (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
+                   (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+                       (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET)) e3))
+                       (Begin
+                         (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                         (Op 'Exit (list (Quote -1)))))
                    (Begin
-                     (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                     `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
-               (Begin
-                 `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
-                 (Op 'Exit (list (Quote -1))))))]
+               (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET)) e3))))]
 
         ;; [(Type-MVect e) (error)]
         ;; [(Type-MVect-Huh e) (error)]
@@ -1863,7 +1688,7 @@ but a static single assignment is implicitly maintained.
       ;; This is a fragile hack
       ;; switch to typed ASTs
       [(Float? t) (Begin (list (Op 'Print (list (Quote "Float : ")))
-                               (Op 'print-float (list (Var id))))
+                               (Op 'print-float (list (Var id) (Quote 9))))
                          (Op 'Print (list (Quote "\n"))))]
       [(Bool? t)
        (If (Var id)

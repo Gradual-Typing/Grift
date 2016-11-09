@@ -68,8 +68,12 @@
 (define (cc/runtime out in flags #:runtime [rt runtime.o-path])
   (define gc
     (match (garbage-collector)
-      ['Boehm (string-append (path->string boehm-gc.a-path)
-      	      		     " -pthreads")]
+      ['Boehm
+       (define gc-link-path (path->string boehm-gc.a-path))
+       (match (system-type 'os)
+         ['unix (string-append  gc-link-path " -pthreads")]
+         ['macosx gc-link-path]
+         ['windows (error 'unsupported-os)])]
       ['None  (path->string none-gc.o-path)]))
   (define cmd (format "clang -o ~a ~a ~a ~a ~a" out in rt gc flags))
   (when (trace? 'Vomit)
