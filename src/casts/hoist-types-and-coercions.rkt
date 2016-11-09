@@ -414,24 +414,6 @@
       [(Type-MRef (app recur e)) (Type-MRef e)]
       [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
       [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
-      [(CastedValue-Huh exp)
-       (CastedValue-Huh (recur exp))]
-      [(CastedValue (app recur e) r)
-       (match r
-         [(Twosome t1 t2 l)
-          (CastedValue e (Twosome (recur t1) (recur t2) (recur l)))]
-         [(Coercion c)
-          (CastedValue e (Coercion (recur c)))])]
-      [(CastedValue-Value exp)
-       (CastedValue-Value (recur exp))]
-      [(CastedValue-Source exp)
-       (CastedValue-Source (recur exp))]
-      [(CastedValue-Target exp)
-       (CastedValue-Target (recur exp))]
-      [(CastedValue-Blames exp)
-       (CastedValue-Blames (recur exp))]
-      [(CastedValue-Coercion exp)
-       (CastedValue-Coercion (recur exp))]
       [(Mvector (app recur e1) (app recur e2) (app type->imdt t))
        (Mvector e1 e2 t)]
       [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
@@ -447,12 +429,18 @@
       [(Error (app recur e)) (Error e)]
       [(Create-tuple (app recur* e*))
        (Create-tuple e*)]
+      [(Copy-Tuple (app recur n) (app recur v))
+       (Copy-Tuple n v)]
       [(Tuple-proj e i) (Tuple-proj (recur e) i)]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
       [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
+      [(Coerce-Tuple-In-Place uid e1 e2 e3)
+       (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
       [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
+      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
+       (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
       [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]

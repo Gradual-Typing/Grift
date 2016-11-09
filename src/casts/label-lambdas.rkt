@@ -226,24 +226,6 @@
       [(Type-MRef (app ll-expr e)) (Type-MRef e)]
       [(Type-MRef-Huh (app ll-expr e)) (Type-MRef-Huh e)]
       [(Type-MRef-Of (app ll-expr e)) (Type-MRef-Of e)]
-      [(CastedValue-Huh exp)
-       (CastedValue-Huh (ll-expr exp))]
-      [(CastedValue (app ll-expr e) r)
-       (match r
-         [(Twosome t1 t2 l)
-          (CastedValue e (Twosome (ll-expr t1) (ll-expr t2) (ll-expr l)))]
-         [(Coercion c)
-          (CastedValue e (Coercion (ll-expr c)))])]
-      [(CastedValue-Value exp)
-       (CastedValue-Value (ll-expr exp))]
-      [(CastedValue-Source exp)
-       (CastedValue-Source (ll-expr exp))]
-      [(CastedValue-Target exp)
-       (CastedValue-Target (ll-expr exp))]
-      [(CastedValue-Blames exp)
-       (CastedValue-Blames (ll-expr exp))]
-      [(CastedValue-Coercion exp)
-       (CastedValue-Coercion (ll-expr exp))]
       [(Mvector (app ll-expr e1) (app ll-expr e2) t) (Mvector e1 e2 t)]
       [(Mvector-val-set! (app ll-expr e1) (app ll-expr e2) (app ll-expr e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app ll-expr e1) (app ll-expr e2)) (Mvector-val-ref e1 e2)]
@@ -257,12 +239,18 @@
       [(MVect-Coercion e) (MVect-Coercion (ll-expr e))]
       [(Error (app ll-expr e)) (Error e)]
       [(Create-tuple e*) (Create-tuple (map ll-expr e*))]
+      [(Copy-Tuple n v)
+       (Copy-Tuple (ll-expr n) (ll-expr v))]
       [(Tuple-proj e i) (Tuple-proj (ll-expr e) i)]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (ll-expr e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (ll-expr e))]
       [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (ll-expr e) i)]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (ll-expr e1) (ll-expr e2))]
+      [(Coerce-Tuple-In-Place uid e1 e2 e3)
+       (Coerce-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3))]
       [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4))]
+      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
+       (Cast-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4) (ll-expr e5))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (ll-expr e))]
       [(Type-Tuple-num e) (Type-Tuple-num (ll-expr e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (ll-expr t1) (ll-expr t2) (ll-expr lbl))]

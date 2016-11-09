@@ -209,21 +209,22 @@
       [(Mbox-set!T (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
                    (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2))
                    t)
-       (cond
-         [(Dyn? e1-ty)
-          (let ([addr (next-uid! "addr")])
-            (Let `((,addr
-                    .
-                    ,(mk-cast (mk-label "mbox-set" e1-src) e1 e1-ty (MRef DYN-TYPE))))
-              (MBoxCastedSet! addr e2 t)))]
-         [(MRef? e1-ty) (match e1
-                          [(Var addr) (MBoxCastedSet! addr e2 t)]
-                          [else (let ([addr (next-uid! "mboxaddr")])
-                                  (Let `((,addr . ,e1))
-                                    (MBoxCastedSet! addr e2 t)))])]
-         [else (error 'insert-casts/Mbox-set!T
-                      "unexpected value for e1-ty: ~a"
-                      e1-ty)])]
+       (let ([e2 (mk-cast (mk-label "val" e2-src) e2 e2-ty t)])
+         (cond
+           [(Dyn? e1-ty)
+            (let ([addr (next-uid! "addr")])
+              (Let `((,addr
+                      .
+                      ,(mk-cast (mk-label "mbox-set" e1-src) e1 e1-ty (MRef DYN-TYPE))))
+                (MBoxCastedSet! addr e2 t)))]
+           [(MRef? e1-ty) (match e1
+                            [(Var addr) (MBoxCastedSet! addr e2 t)]
+                            [else (let ([addr (next-uid! "mboxaddr")])
+                                    (Let `((,addr . ,e1))
+                                      (MBoxCastedSet! addr e2 t)))])]
+           [else (error 'insert-casts/Mbox-set!T
+                        "unexpected value for e1-ty: ~a"
+                        e1-ty)]))]
       [(Mvector (app ic-expr e1) (app ic-expr e2) t) (Mvector e1 e2 t)]
       [(Mvector-ref (app ic-expr e1) (app ic-expr e2))
        (Mvector-ref e1 e2)]

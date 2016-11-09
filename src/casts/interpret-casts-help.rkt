@@ -414,53 +414,13 @@
 (: gen-greatest-lower-bound-type-code : (String -> Uid) GreatestLowerBound-Type Uid -> GreatestLowerBound-Type)
 (define ((gen-greatest-lower-bound-type-code next-uid! glbt glbt-uid) t1 t2)
   (define-syntax-let$* let$* next-uid!)
-  (: static-glbt (Schml-Type Schml-Type -> Schml-Type))
-  (define (static-glbt t1 t2)
-    (let ([t : CoC3-Expr (glbt (Type t1) (Type t2))])
-      (if (Type? t)
-          (Type-type t)
-          ;; This should always be possible if all the code is correct
-          (error 'greatest-lower-bound-type-fn-code/static-glbt))))
-  (: greatest-lower-bound-type-tuple-code GreatestLowerBound-Type)
-  (define (greatest-lower-bound-type-tuple-code t1 t2)
-    ;; This is suppose to be outside of the specializing code
-    ;; because we are defining the meta make function coercion
-    (cond
-      [(and (Type? t1) (Type? t2))
-       (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
-         (unless (and (STuple? t1) (STuple? t2))
-           (error 'greatest-lower-bound-type-tuple-code))
-         (let* ([t1-args (STuple-items t1)]
-                [t2-args (STuple-items t2)]
-                [e* (map static-glbt t2-args t1-args)])
-           (Type (STuple (STuple-num t2) e*))))]
-      [else (Make-Tuple-Type glbt-uid t1 t2)]))
-
-  (: greatest-lower-bound-type-fn-code GreatestLowerBound-Type)
-  (define (greatest-lower-bound-type-fn-code t1 t2)
-    ;; This is suppose to be outside of the specializing code
-    ;; because we are defining the meta make function coercion
-    (cond
-      [(and (Type? t1) (Type? t2))
-       (let* ([t1 (Type-type t1)] [t2 (Type-type t2)])
-         (unless (and (Fn? t1) (Fn? t2))
-           (error 'greatest-lower-bound-type-fn-code))
-         (let* ([t1-args (Fn-fmls t1)]
-                [t2-args (Fn-fmls t2)]
-                [t1-ret  (Fn-ret  t1)]
-                [t2-ret  (Fn-ret  t2)]
-                [arg* (map static-glbt t2-args t1-args)]
-                [ret  (static-glbt t1-ret t2-ret)])
-           (Type (Fn (Fn-arity t1) arg* ret))))]
-      [else (Make-Fn-Type glbt-uid t1 t2)]))
-  
   (cond$
    [(op=? t1 t2) t1]
    [(dyn?$ t1) t2]
    [(dyn?$ t2) t1]
    [(and$ (fnT?$ t1) (fnT?$ t2))
     (if$ (op=? (fnT-arity$ t1) (fnT-arity$ t2))
-         (greatest-lower-bound-type-fn-code t1 t2)
+         (Make-Fn-Type glbt-uid t1 t2)
          (Error (Quote "can not compute the greatest lower bound for function types with mismatch arities")))]
    [(and$ (gref?$ t1) (gref?$ t2))
     (let$* ([gr1_of (gref-of$ t1)]
@@ -474,6 +434,25 @@
       (gvect$ t))]
    [(and$ (tupleT?$ t1) (tupleT?$ t2))
     (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
-         (greatest-lower-bound-type-tuple-code t1 t2)
+         (Make-Tuple-Type glbt-uid t1 t2)
          (Error (Quote "can not compute the greatest lower bound for tuple types with inconsistent sizes")))]
    [else (Error (Quote "inconsistent types"))]))
+
+(define-type CopyValueInMonoRef-Type (CoC3-Expr -> CoC3-Expr))
+
+(: gen-copy-value-in-monoref-code : (String -> Uid) -> CopyValueInMonoRef-Type)
+(define ((gen-copy-value-in-monoref-code next-uid!) a-var)
+  (define-syntax-let$* let$* next-uid!)
+  (match a-var
+    [(Var a) (let$* ([t (Mbox-rtti-ref a)]
+                     [v (Mbox-val-ref (Var a))])
+               (cond$
+                [(tupleT?$ t)
+                 (let$* ([n (Type-Tuple-num t)]
+                         [cv (Copy-Tuple n v)])
+                   (Begin
+                     (list
+                      (Mbox-val-set! (Var a) cv))
+                     cv))]
+                [else v]))]
+    [other (error 'copy-value-in-monoref "unmatched value ~a" other)]))

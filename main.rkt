@@ -34,8 +34,9 @@
    [("-O") level
     "set the optimization level"
     (define l (string->number level))
+    #;
     (when (and (exact-nonnegative-integer? l) (<= 0 l 3))
-      (error 'schml "flag given incorrect input ~v" level))
+      (error 'schml "flag given incorrect input ~v" l))
     (c-flags (cons (format "-O~a" l) (c-flags)))]
    [("--open-coded-casts")
     "turn on cast specialization"

@@ -61,7 +61,7 @@
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p (app nc-value* v*))
        (if (uil-prim-effect? p)
-           (Begin (list (Op p v*)) (Quote UNIT-IMDT))
+           (Begin (list (Op p v*)) UNIT-IMDT)
            (nc-value-op p v*))]
       [(Var i)  (Var i)]
       [(Code-Label i) (Code-Label i)]
@@ -100,14 +100,14 @@
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p (app nc-value* v*))
        (if (uil-prim-effect? p)
-           (Begin (list (Op p v*)) (Quote UNIT-IMDT))
+           (Begin (list (Op p v*)) UNIT-IMDT)
            (nc-value-op p v*))]
       [(Var i)  (Var i)]
       [(Code-Label i) (Code-Label i)]
       [(Quote k) (Quote k)]
       [(Halt) (Halt)]
       [(Assign u (app nc-value v))
-       (Begin (list (Assign u v)) (Quote UNIT-IMDT))]
+       (Begin (list (Assign u v)) UNIT-IMDT)]
       [(No-Op) (error 'normalize-context "no-op in value context")]
       [other (error 'normalize-context "umatched ~a" other)]))
   (: nc-effect (-> D0-Expr D1-Effect))
@@ -163,18 +163,19 @@
           (Assign a (nc-value e3))
           (Repeat i (nc-value e1) (nc-value e2) #f #f
                   (Assign a (nc-value e4))))
-         (Relop '= (Quote TRUE-IMDT) (Var a)))]          
+         (Relop '= TRUE-IMDT (Var a)))]          
       [(Assign u e) (error 'nc-pred/unsuported/assign)]
       [(Op p (app nc-value* val*))
        (if (IntxInt->Bool-primitive? p)
            (match val*
              [(list a b) (Relop p a b)]
              [other (error 'nc-pred-op)])
-           (Relop '= (Quote TRUE-IMDT) (nc-value-op p val*)))]
-      [(app nc-value v) (Relop '= (Quote TRUE-IMDT) v)]
-      [(No-Op) (error 'nc-pred "no-op in pred context")]))
-  (: nc-value* (-> D0-Expr* D1-Value*))
-  (define (nc-value* exp*) (map nc-value exp*))
+           (Relop '= TRUE-IMDT (nc-value-op p val*)))]
+      [(No-Op) (error 'nc-pred "no-op in pred context")]
+      [(app nc-value v) (Relop '= TRUE-IMDT v)]))
+
+(: nc-value* (-> D0-Expr* D1-Value*))
+(define (nc-value* exp*) (map nc-value exp*))
   (: nc-effect* (-> D0-Expr* D1-Effect*))
   (define (nc-effect* exp*) (map nc-effect exp*))
   (: nc-bnd* (-> D0-Bnd* D1-Bnd*))
@@ -199,8 +200,8 @@
     [(uil-prim-pred? p)
      (match exp*
        [(list a b)
-        (If (Relop p a b) (Quote TRUE-IMDT) (Quote FALSE-IMDT)) ]
+        (If (Relop p a b) TRUE-IMDT FALSE-IMDT)]
        [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
-   [(uil-prim-value? p) (Op p exp*)]
-   [(uil-prim-effect? p) (Begin (list (Op p exp*)) (Quote UNIT-IMDT))]
+    [(uil-prim-value? p) (Op p exp*)]
+    [(uil-prim-effect? p) (Begin (list (Op p exp*)) UNIT-IMDT)]
    [else (error 'nc-value-op "primitive out of context ~v ~v" p exp*)]))
