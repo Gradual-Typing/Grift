@@ -75,7 +75,12 @@
          ['macosx gc-link-path]
          ['windows (error 'unsupported-os)])]
       ['None  (path->string none-gc.o-path)]))
-  (define cmd (format "clang -o ~a ~a ~a ~a ~a" out in rt gc flags))
+  (define rt-math
+    (match (system-type 'os)
+     ['unix "-lm"]
+     ['macosx ""]))
+  (define cmd
+    (format "clang -o ~a ~a ~a ~a ~a ~a" out in rt rt-math gc flags))
   (when (trace? 'Vomit)
     (logf "System call: ~a" cmd))
   (flush-output (current-log-port))
