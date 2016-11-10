@@ -12,6 +12,9 @@
 (define cast-representation : (Parameterof Cast-Representation)
   (make-parameter 'Coercions))
 
+(define program-must-be-statically-typed? : (Parameterof Boolean)
+  (make-parameter #f))
+
 ;; Optimizations options
 (: dynamic-operations? (Parameterof (U Boolean 'inline)))
 (define dynamic-operations? (make-parameter #t))
