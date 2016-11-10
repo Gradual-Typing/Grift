@@ -71,6 +71,9 @@
    [("-g" "--with-debug-symbols")
     "Invoke c compiler so that debugging symbols are retained."
     (c-flags (cons "-g" (c-flags)))]
+   [("--profile")
+    "Invoke c compiler with profiling flags"
+    (c-flags (cons "-pg" (c-flags)))]
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
