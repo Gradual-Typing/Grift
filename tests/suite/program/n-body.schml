@@ -16,46 +16,46 @@
            (vector-set! v 6 mass)
            v)))
 
-(define (set-body-x! [b : (Vector Float)] [v : Float])
+(define (set-body-x! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 0 v))
 
-(define (body-x [b : (Vector Float)])
+(define (body-x [b : (Vector Float)]) : Float
   (vector-ref b 0))
 
-(define (set-body-y! [b : (Vector Float)] [v : Float])
+(define (set-body-y! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 1 v))
 
-(define (body-y [b : (Vector Float)])
+(define (body-y [b : (Vector Float)]) : Float
   (vector-ref b 1))
 
-(define (set-body-z! [b : (Vector Float)] [v : Float])
+(define (set-body-z! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 2 v))
 
-(define (body-z [b : (Vector Float)])
+(define (body-z [b : (Vector Float)]) : Float
   (vector-ref b 2))
 
-(define (set-body-vx! [b : (Vector Float)] [v : Float])
+(define (set-body-vx! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 3 v))
 
-(define (body-vx [b : (Vector Float)])
+(define (body-vx [b : (Vector Float)]) : Float
   (vector-ref b 3))
 
-(define (set-body-vy! [b : (Vector Float)] [v : Float])
+(define (set-body-vy! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 4 v))
 
-(define (body-vy [b : (Vector Float)])
+(define (body-vy [b : (Vector Float)]) : Float
   (vector-ref b 4))
 
-(define (set-body-vz! [b : (Vector Float)] [v : Float])
+(define (set-body-vz! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 5 v))
 
-(define (body-vz [b : (Vector Float)])
+(define (body-vz [b : (Vector Float)]) : Float
   (vector-ref b 5))
 
-(define (set-body-mass! [b : (Vector Float)] [v : Float])
+(define (set-body-mass! [b : (Vector Float)] [v : Float]) : Unit
   (vector-set! b 6 v))
 
-(define (body-mass [b : (Vector Float)])
+(define (body-mass [b : (Vector Float)]) : Float
   (vector-ref b 6))
 
 (define *sun* : (Vector Float)

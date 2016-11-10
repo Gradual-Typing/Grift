@@ -24,6 +24,10 @@
       [("Coercions")  (cast-representation 'Coercions)]
       [("Hyper-Coercions") (error 'schml "Hyper-Coercions not yet supported")]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
+   #:once-each
+   [("--assert-statically-typed")
+    "Raise an error unless the program is statically typed"
+    (program-must-be-statically-typed?)]
    #:once-any
    [("--reference-semantics") semantics
     "Monotonic, Guarded (defualt Guarded)"
