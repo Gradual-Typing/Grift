@@ -1,8 +1,7 @@
 (define pi : Float #i3.141592653589793)
 (define days-per-year : Float #i365.24)
-(define solar-mass : Float
-  (fl* (fl* #i4 pi) pi))
-(define dt : Float #i0.01)
+(define solar-mass : Float (fl* (fl* #i4 pi) pi))
+(define dt : Float 0.01)
 
 (define (make-body [x : Float] [y : Float] [z : Float]
                    [vx : Float] [vy : Float] [vz : Float]
@@ -109,29 +108,29 @@
 
 (define *system-size* : Int 5)
 
+;; -------------------------------
+(define (offset-momentum) : Unit
+  (offset-momentum-loop 0 #i0.0 #i0.0 #i0.0))
 
+(define (offset-momentum-loop [i1 : Int] [px : Float]
+                              [py : Float] [pz : Float]) : Unit
+  (if (= i1 *system-size*)
+    (begin
+      (set-body-vx! (vector-ref *system* 0)
+		    (fl/ (fl- #i0.0 px) solar-mass))
+      (set-body-vy! (vector-ref *system* 0)
+		    (fl/ (fl- #i0.0 py) solar-mass))
+      (set-body-vz! (vector-ref *system* 0)
+		    (fl/ (fl- #i0.0 pz) solar-mass)))
+    (let ([j : (Vector Float) (vector-ref *system* i1)])
+      (offset-momentum-loop
+       (+ i1 1)
+       (fl+ px (fl* (body-vx j) (body-mass j)))
+       (fl+ py (fl* (body-vy j) (body-mass j)))
+       (fl+ pz (fl* (body-vz j) (body-mass j)))))))
 				 
 
-;; -------------------------------
-(define (offset-momentum) : Unit 
-  (letrec ([loop-i1
-            : (Int Float Float Float -> Unit)
-            (lambda ([i1 : Int] [px : Float] [py : Float] [pz : Float])
-              : Unit
-              (if (= i1 *system-size*)
-                  (begin
-                    (set-body-vx! (vector-ref *system* 0)
-                                  (fl/ (fl- #i0.0 px) solar-mass))
-                    (set-body-vy! (vector-ref *system* 0)
-                                  (fl/ (fl- #i0.0 py) solar-mass))
-                    (set-body-vz! (vector-ref *system* 0)
-                                  (fl/ (fl- #i0.0 pz) solar-mass)))
-                  (let ([j : (Vector Float) (vector-ref *system* i1)])
-                    (loop-i1 (+ i1 1)
-                             (fl+ px (fl* (body-vx j) (body-mass j)))
-                             (fl+ py (fl* (body-vy j) (body-mass j)))
-                             (fl+ pz (fl* (body-vz j) (body-mass j)))))))])
-    (loop-i1 0 #i0.0 #i0.0 #i0.0)))
+
 
 ;; -------------------------------
 (define (energy) : Float
@@ -167,50 +166,45 @@
     (loop-o 0 #i0.0)))
 
 ;; ;; -------------------------------
-(define (advance) : Unit
-  (letrec ([loop-o
-            : (Int -> Unit)
-            (lambda ([o : Int])
-              : Unit
-              (if (= o *system-size*)
-                  ()
-                  (let ([o1 (vector-ref *system* o)])
-                    (letrec  ([loop-i3
-                               : (Int Float Float Float -> Unit)
-                               (lambda ([i3 : Int] [vx : Float] [vy : Float] [vz : Float])
-                                 (if (< i3 *system-size*)
-                                     (let ([i1 (vector-ref *system* i3)])
-                                       (let ([dx (fl- (body-x o1) (body-x i1))]
-                                             [dy (fl- (body-y o1) (body-y i1))]
-                                             [dz (fl- (body-z o1) (body-z i1))]) 
-                                         (let ([dist2 (fl+ (fl+ (fl* dx dx) (fl* dy dy)) (fl* dz dz))])
-                                           (let ([mag (fl/ dt (fl* dist2 (flsqrt dist2)))])
-                                             (let ([dxmag (fl* dx mag)]
-                                                   [dymag (fl* dy mag)]
-                                                   [dzmag (fl* dz mag)]
-                                                   [om (body-mass o1)]
-                                                   [im (body-mass i1)])
-                                               (begin
-                                                 (set-body-vx! i1 (fl+ (body-vx i1) (fl* dxmag om)))
-                                                 (set-body-vy! i1 (fl+ (body-vy i1) (fl* dymag om)))
-                                                 (set-body-vz! i1 (fl+ (body-vz i1) (fl* dzmag om)))
-                                                 (loop-i3 (+ i3 1)
-                                                          (fl- vx (fl* dxmag im))
-                                                          (fl- vy (fl* dymag im))
-                                                          (fl- vz (fl* dzmag im))))))))) 
-                                     (begin (set-body-vx! o1 vx)
-                                            (set-body-vy! o1 vy)
-                                            (set-body-vz! o1 vz)
-                                            (set-body-x! o1 (fl+ (body-x o1) (fl* dt vx)))
-                                            (set-body-y! o1 (fl+ (body-y o1) (fl* dt vy)))
-                                            (set-body-z! o1 (fl+ (body-z o1) (fl* dt vz)))
-                                            ())))])
-                      (begin (loop-i3 (+ o 1) (body-vx o1) (body-vy o1) (body-vz o1))
-                             (loop-o (+ o 1)))))))])
-    (loop-o 0)))
 
-(begin (offset-momentum)
+(define vx : (Ref Float) (box #i0.0))
+(define vy : (Ref Float) (box #i0.0))
+(define vz : (Ref Float) (box #i0.0))
+(define (advance) : Unit
+  (repeat (o 0 *system-size*) (_ : Unit ())
+          (let ([o1 (vector-ref *system* o)])
+            (begin
+              (box-set! vx (body-vx o1))
+              (box-set! vy (body-vy o1))
+              (box-set! vz (body-vz o1))
+              (repeat (i3 (+ o 1) *system-size*) (_ : Unit ())
+               (let ([i1 (vector-ref *system* i3)])
+                 (let ([dx (fl- (body-x o1) (body-x i1))]
+                       [dy (fl- (body-y o1) (body-y i1))]
+                       [dz (fl- (body-z o1) (body-z i1))]) 
+                   (let ([dist2 (fl+ (fl+ (fl* dx dx) (fl* dy dy)) (fl* dz dz))])
+                     (let ([mag (fl/ dt (fl* dist2 (flsqrt dist2)))])
+                       (let ([dxmag (fl* dx mag)]
+                             [dymag (fl* dy mag)]
+                             [dzmag (fl* dz mag)]
+                             [om (body-mass o1)]
+                             [im (body-mass i1)])
+                         (begin
+                           (set-body-vx! i1 (fl+ (body-vx i1) (fl* dxmag om)))
+                           (set-body-vy! i1 (fl+ (body-vy i1) (fl* dymag om)))
+                           (set-body-vz! i1 (fl+ (body-vz i1) (fl* dzmag om)))
+                           (box-set! vx (fl- (unbox vx) (fl* dxmag im)))
+                           (box-set! vy (fl- (unbox vy) (fl* dymag im)))
+                           (box-set! vz (fl- (unbox vz) (fl* dzmag im))))))))))
+              (set-body-vx! o1 (unbox vx))
+              (set-body-vy! o1 (unbox vy))
+              (set-body-vz! o1 (unbox vz))
+              (set-body-x! o1 (fl+ (body-x o1) (fl* dt (unbox vx))))
+              (set-body-y! o1 (fl+ (body-y o1) (fl* dt (unbox vy))))
+              (set-body-z! o1 (fl+ (body-z o1) (fl* dt (unbox vz))))
+              ()))))
+
+(begin (offset-momentum) (energy))
+(begin (repeat (i 0 (read-int)) (a : Unit ()) (advance))
        (energy))
-(begin (repeat (i 0 (read-int)) (a : Unit ())
-               (begin (advance) ()))
-       (energy))
+
