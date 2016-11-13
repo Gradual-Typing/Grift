@@ -4,7 +4,7 @@ all:
 	raco make -v -j 4 main.rkt
 
 timed:
-	time raco make -v -j 4 main.rkt
+	time raco make main.rkt
 
 test: all
 	raco make -v tests/main.rkt

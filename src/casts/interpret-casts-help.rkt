@@ -14,16 +14,6 @@
 (: specialize-casts? (Parameterof Boolean))
 (define specialize-casts? (make-parameter #f))
 
-
-
-;; inline-guarded-branch
-;; Parameter determining if the code generated for gbox-set! and gunbox
-;; performs the first check to see if the gref is a unguarded reference
-;; or delegates the entire operation to the runtime.
-;; This is only used for the twosome representation
-(: inline-guarded-branch? (Parameterof Boolean))
-(define inline-guarded-branch? (make-parameter #f))
-
 (define-type Function-Proxy-Rep (U 'Data 'Hybrid 'Functional))
 (: function-cast-representation (Parameterof Function-Proxy-Rep))
 (define function-cast-representation
