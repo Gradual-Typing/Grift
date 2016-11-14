@@ -24,9 +24,12 @@
   (make-parameter #t))
 (define reference-semantics : (Parameterof (U 'Monotonic 'Guarded))
   (make-parameter 'Guarded))
+(: inline-guarded-branch? (Parameterof Boolean))
+(define inline-guarded-branch? (make-parameter #t))
 
+;; Cast behavior 
 (: specialize-cast-code-generation? (Parameterof Boolean))
-(define specialize-cast-code-generation? (make-parameter #f))
+(define specialize-cast-code-generation? (make-parameter #t))
 
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof (Option Path))

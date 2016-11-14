@@ -134,37 +134,34 @@
 
 ;; -------------------------------
 (define (energy) : Float
-  (letrec ([loop-o
-            : (Int Float -> Float)
-            (lambda ([o : Int] [e : Float])
-              : Float
-              (if (= o *system-size*)
-                  e
-                  (let([o1 : (Vector Float) (vector-ref *system* o)])
-                    (let ([e : Float
-                             (fl+ e (fl* (fl* 0.5 (vector-ref o1 6))
-                                         (fl+ (fl+ (fl* (vector-ref o1 3) (vector-ref o1 3))
-                                                   (fl* (vector-ref o1 4) (vector-ref o1 4)))
-                                              (fl* (vector-ref o1 5) (vector-ref o1 5)))))])
-                      (letrec ([loop-i2
-                                : (Int Float -> Float)
-                                (lambda ([i2 : Int] [e : Float])
-                                  : Float
-                                  (if (= i2 *system-size*)
-                                      (loop-o (+ o 1) e)
-                                      (let ([i1 : (Vector Float) (vector-ref *system* i2)])
-                                        (let ([dx : Float (fl- (vector-ref o1 0) (vector-ref i1 0))]
-                                              [dy : Float (fl- (vector-ref o1 1) (vector-ref i1 1))]
-                                              [dz : Float (fl- (vector-ref o1 2) (vector-ref i1 2))])
-                                          (let ([dist : Float (flsqrt (fl+ (fl+ (fl* dx dx) (fl* dy dy))
-                                                                           (fl* dz dz)))])
-                                            (let ([e : Float (fl- e (fl/ (fl* (vector-ref o1 6)
-                                                                              (vector-ref i1 6))
-                                                                         dist))])
-                                              (loop-i2 (+ i2 1) e)))))))])
-                        (loop-i2 (+ o 1) e))))))])
-    (loop-o 0 #i0.0)))
+  (energy-loop-o 0 #i0.0))
 
+(define (energy-loop-o [o : Int] [e : Float])
+  : Float
+  (if (= o *system-size*)
+      e
+      (let([o1 : (Vector Float) (vector-ref *system* o)])
+        (let ([sqs : Float (fl+ (fl+ (fl* (vector-ref o1 3) (vector-ref o1 3))
+                                     (fl* (vector-ref o1 4) (vector-ref o1 4)))
+                                (fl* (vector-ref o1 5) (vector-ref o1 5)))])
+          (let ([e : Float (fl+ e (fl* (fl* 0.5 (vector-ref o1 6)) sqs))])
+            (energy-loop-i o o1 (+ o 1) e))))))
+
+
+(define (energy-loop-i [o : Int] [o1 : (Vector Float)] [i : Int]  [e : Float])
+  : Float
+  (if (= i *system-size*)
+      (energy-loop-o (+ o 1) e)
+      (let ([i1 : (Vector Float) (vector-ref *system* i)])
+        (let ([dx : Float (fl- (vector-ref o1 0) (vector-ref i1 0))]
+              [dy : Float (fl- (vector-ref o1 1) (vector-ref i1 1))]
+              [dz : Float (fl- (vector-ref o1 2) (vector-ref i1 2))])
+          (let ([dist : Float (flsqrt (fl+ (fl+ (fl* dx dx) (fl* dy dy))
+                                           (fl* dz dz)))])
+            (let ([e : Float (fl- e (fl/ (fl* (vector-ref o1 6)
+                                              (vector-ref i1 6))
+                                         dist))])
+              (energy-loop-i o o1 (+ i 1) e)))))))
 ;; ;; -------------------------------
 
 
@@ -174,27 +171,31 @@
 (define (advance-loop-o [o : Int]) : Unit
   (if (= o *system-size*)
       ()
-      (let ([o1 (vector-ref *system* o)])
+      (let ([o1 : (Vector Float) (vector-ref *system* o)])
 	(begin
-	  (advance-loop-i (+ o 1) (vector-ref o1 3) (vector-ref o1 4) (vector-ref o1 5)
+	  (advance-loop-i (+ o 1)
+                          (vector-ref o1 3)
+                          (vector-ref o1 4)
+                          (vector-ref o1 5)
                           o1)
 	  (advance-loop-o (+ o 1))))))
 
 (define (advance-loop-i [i3 : Int] [vx : Float]
                         [vy : Float] [vz : Float]
-                        [o1 : (Vector Float)]) : Unit
+                        [o1 : (Vector Float)])
+  : Unit
   (if (< i3 *system-size*)
-      (let ([i1 (vector-ref *system* i3)])
-	(let ([dx (fl- (vector-ref o1 0) (vector-ref i1 0))]
-	      [dy (fl- (vector-ref o1 1) (vector-ref i1 1))]
-	      [dz (fl- (vector-ref o1 2) (vector-ref i1 2))]) 
-	  (let ([dist2 (fl+ (fl+ (fl* dx dx) (fl* dy dy)) (fl* dz dz))])
-	    (let ([mag (fl/ dt (fl* dist2 (flsqrt dist2)))])
-	      (let ([dxmag (fl* dx mag)]
-		    [dymag (fl* dy mag)]
-		    [dzmag (fl* dz mag)]
-		    [om (vector-ref o1 6)]
-		    [im (vector-ref i1 6)])
+      (let ([i1 : (Vector Float) (vector-ref *system* i3)])
+	(let ([dx : Float (fl- (vector-ref o1 0) (vector-ref i1 0))]
+	      [dy : Float (fl- (vector-ref o1 1) (vector-ref i1 1))]
+	      [dz : Float (fl- (vector-ref o1 2) (vector-ref i1 2))]) 
+	  (let ([dist2 : Float (fl+ (fl+ (fl* dx dx) (fl* dy dy)) (fl* dz dz))])
+	    (let ([mag : Float (fl/ dt (fl* dist2 (flsqrt dist2)))])
+	      (let ([dxmag : Float (fl* dx mag)]
+		    [dymag : Float (fl* dy mag)]
+		    [dzmag : Float (fl* dz mag)]
+		    [om : Float (vector-ref o1 6)]
+		    [im : Float (vector-ref i1 6)])
 		(begin
 		  (vector-set! i1 3 (fl+ (vector-ref i1 3) (fl* dxmag om)))
 		  (vector-set! i1 4 (fl+ (vector-ref i1 4) (fl* dymag om)))

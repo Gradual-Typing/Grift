@@ -14,7 +14,7 @@ Correct output N = 1000 is
 -0.169087605
 |#
 
-(declare (standard-bindings)(extended-bindings)(block)(not safe))
+(declare (standard-bindings)(extended-bindings)(block) (safe))
 
 (define-macro (unless test . body)
   `(if (not ,test)
@@ -42,22 +42,22 @@ Correct output N = 1000 is
 (define *solar-mass* (* 4 *pi* *pi*))
 
 (define (make-body x y z vx vy vz mass)
-  (f64vector x y z vx vy vz mass))
+  (vector x y z vx vy vz mass))
 
-(define (body-x body)           (f64vector-ref  body 0))
-(define (body-x-set! body val)  (f64vector-set! body 0 val))
-(define (body-y body)           (f64vector-ref  body 1))
-(define (body-y-set! body val)  (f64vector-set! body 1 val))
-(define (body-z body)           (f64vector-ref  body 2))
-(define (body-z-set! body val)  (f64vector-set! body 2 val))
-(define (body-vx body)          (f64vector-ref  body 3))
-(define (body-vx-set! body val) (f64vector-set! body 3 val))
-(define (body-vy body)          (f64vector-ref  body 4))
-(define (body-vy-set! body val) (f64vector-set! body 4 val))
-(define (body-vz body)          (f64vector-ref  body 5))
-(define (body-vz-set! body val) (f64vector-set! body 5 val))
+(define (body-x body)           (vector-ref  body 0))
+(define (body-x-set! body val)  (vector-set! body 0 val))
+(define (body-y body)           (vector-ref  body 1))
+(define (body-y-set! body val)  (vector-set! body 1 val))
+(define (body-z body)           (vector-ref  body 2))
+(define (body-z-set! body val)  (vector-set! body 2 val))
+(define (body-vx body)          (vector-ref  body 3))
+(define (body-vx-set! body val) (vector-set! body 3 val))
+(define (body-vy body)          (vector-ref  body 4))
+(define (body-vy-set! body val) (vector-set! body 4 val))
+(define (body-vz body)          (vector-ref  body 5))
+(define (body-vz-set! body val) (vector-set! body 5 val))
 ;; mass is immutable
-(define (body-mass body) (f64vector-ref body 6))
+(define (body-mass body) (vector-ref body 6))
 
 
 (define *sun*
@@ -170,7 +170,7 @@ Correct output N = 1000 is
 ;; -------------------------------
 (define (main . args)
   (let ((n (if (fx< (length args) 1)
-               1
+               50000000
                (string->number (car args))))
         (system (list *sun* *jupiter* *saturn* *uranus* *neptune*)))
     (offset-momentum system)
