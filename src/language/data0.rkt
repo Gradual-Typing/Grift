@@ -24,6 +24,7 @@
             (Switch E (Switch-Case* E) E)
 	    (Begin D0-Expr* E)
             (Repeat Uid E E Uid E E)
+            Break-Repeat
 	    (Var Uid)
 	    (Code-Label Uid)
 	    (Quote D0-Literal)

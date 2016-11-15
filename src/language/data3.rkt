@@ -50,6 +50,7 @@
          (Switch D3-Trivial (Switch-Case* E) E)
          (Begin D3-Effect* No-Op)
          (Repeat Uid D3-Trivial D3-Trivial #f #f E)
+         Break-Repeat
          (App-Code D3-Trivial D3-Trivial*)
          (UIL-Op! D3-Trivial)
          (Assign Uid D3-Value)

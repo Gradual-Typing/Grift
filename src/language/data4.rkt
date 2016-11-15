@@ -42,6 +42,7 @@
          (Repeat Uid D4-Trivial D4-Trivial #f #f E)
          (UIL-Op! D4-Trivial)
          (Assign Uid D4-Value)
+         Break-Repeat
          No-Op)))
 
 (define-type D4-Value

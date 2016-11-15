@@ -31,6 +31,7 @@ form, to the shortest branch of the cast tree that is relevant.
  "../configuration.rkt"
  "../language/cast-or-coerce1.rkt"
  "../language/cast-or-coerce3.rkt"
+ "../language/data-representation.rkt"
  "./interpret-casts-help.rkt")
 
 (provide
@@ -351,6 +352,11 @@ form, to the shortest branch of the cast tree that is relevant.
 (define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt copy-val-monoref) v c mono_type)
   (define who 'make-cast-code)
   (debug who v c)
+  ;; schml: /home/deyaa/mono/Schml/src/casts/interpret-casts-with-coercions.rkt:354:2:
+  ;; who='make-cast-code
+  ;; v=(Var (Uid "r0" 0))
+  ;; c=(Quote-Coercion (MonoVect (STuple 3 (list #0=(Int) #1=(Dyn) (MVect (STuple 3 (list #0# #0# #1#)))))))
+
   (define-syntax-let$* let$* next-uid!)
   ;; apply-cast is normally specified in terms of inspecting the
   ;; value. But in a world were value reflection on values is limited
@@ -426,6 +432,48 @@ form, to the shortest branch of the cast tree that is relevant.
                                     val)
                                   val)))))))]
           [other (error 'interp-cast/mrefC "unmatched value ~a" other)])]
+       [(mvectC?$ crcn)
+        (match val
+          [(Var a)
+           (let$* ([t2 (mvectC-type$ crcn)])
+             (if$ (dyn?$ t2)
+                  val
+                  (let$* ([t1 (Mvector-rtti-ref a)]
+                          [t3 (glbt t1 t2)])
+                    (if$ (op=? t1 t3)
+                         val
+                         (Begin
+                           (list
+                            (Mvector-rtti-set! a t3)
+                            (let$* ([c (mk-crcn t1 t3 (Quote ""))]
+                                    [vn (Mvector-size val)])
+                              (let* ([i-u (next-uid! "index")]
+                                     [i (Var i-u)]
+                                     [x (next-uid! "_")])
+                                (cond$
+                                 [(tupleT?$ t3)
+                                  (let$* ([n (Type-Tuple-num t3)])
+                                    (Repeat i-u (Quote 0) vn x UNIT-IMDT
+                                            (let$* ([vi (Mvector-val-ref val i)]
+                                                    [cvi (Copy-Tuple n vi)])
+                                              (Begin
+                                                (list
+                                                 (Mvector-val-set! val i cvi))
+                                                (let$* ([ccvi (cast cvi c val)]
+                                                        [t4 (Mvector-rtti-ref a)])
+                                                  (if$ (op=? t3 t4)
+                                                       (Mvector-val-set! val i ccvi)
+                                                       (Break-Repeat)))))))]
+                                 [else
+                                  (Repeat i-u (Quote 0) vn x UNIT-IMDT
+                                          (let$* ([vi (Mvector-val-ref val i)]
+                                                  [cvi (cast vi c val)]
+                                                  [t4 (Mvector-rtti-ref a)])
+                                            (if$ (op=? t3 t4)
+                                                 (Mvector-val-set! val i cvi)
+                                                 (Break-Repeat))))]))))
+                           val)))))]
+          [other (error 'interp-cast/mvectC "unmatched value ~a" other)])]
        [(tuple?$ crcn)
         (match crcn
           [(not (Quote-Coercion _)) (If (Op '= (list (Quote 0) mono_type))
@@ -521,6 +569,9 @@ form, to the shortest branch of the cast tree that is relevant.
      [(and$ (mref?$ t1) (mref?$ t2))
       (let$* ([t (mref-of$ t2)])
         (mrefC$ t))]
+     [(and$ (mvect?$ t1) (mvect?$ t2))
+      (let$* ([t (mvect-of$ t2)])
+        (mvectC$ t))]
      [(and$ (tupleT?$ t1) (tupleT?$ t2))
       (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
            (if (and (Type? t1) (Type? t2))
@@ -783,12 +834,21 @@ form, to the shortest branch of the cast tree that is relevant.
          (define-syntax-let$* let$* next-uid!)
          (let$* ([t1 (Mbox-rtti-ref addr)]
                  [c (mk-coercion type t1 (Quote ""))]
-                 [cv (interp-cast val c (Var addr))]
+                 ;; TODO: copy the value first
+                 [cv (cond$
+                      [(tupleT?$ t1)
+                       (let$* ([n (Type-Tuple-num t1)]
+                               [ctv (Copy-Tuple n val)])
+                         (Begin
+                           (list
+                            (Mbox-val-set! (Var addr) ctv))
+                           ctv))]
+                      [else val])]
+                 [ccv (interp-cast cv c (Var addr))]
                  [t2 (Mbox-rtti-ref addr)])
            (begin
-             ;; (debug val t1 c cv t2 type addr)
              (if$ (op=? t1 t2)
-                  (Mbox-val-set! (Var addr) cv)
+                  (Mbox-val-set! (Var addr) ccv)
                   (Quote 0)))))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
@@ -801,8 +861,39 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Mvector-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
        (Mvector-val-set! e1 e2 e3)]
-      ;; [(MVectCastedRef u i t) (error)]
-      ;; [(MVectCastedSet! u i e t) (error)]
+      [(MVectCastedRef addr (app recur i) t)
+       (let ([t1 (next-uid! "t1")]
+             [t2 (next-uid! "t2")]
+             [c  (next-uid! "crcn")])
+         (Let (list
+               (cons t1 (Mvector-rtti-ref addr))
+               (cons t2 (Type t)))
+           (Let (list (cons c (mk-coercion (Var t1) (Var t2) (Quote ""))))
+             (interp-cast (Mvector-val-ref (Var addr) i) (Var c) (Quote 0)))))]
+      [(MVectCastedSet! addr (app recur i) (app recur e) t)
+       (: mvect-set! (Uid
+                      CoC3-Expr
+                      (U (Quote Cast-Literal) (Var Uid))
+                      (Var Uid) ->
+                      CoC3-Expr))
+       (define (mvect-set! addr i val type)
+         (define-syntax-let$* let$* next-uid!)
+         (let$* ([t1 (Mvector-rtti-ref addr)]
+                 [c (mk-coercion type t1 (Quote ""))]
+                 ;; TODO: copy the values first
+                 [cv (interp-cast val c (Var addr))]
+                 [t2 (Mvector-rtti-ref addr)])
+           (begin
+             (if$ (op=? t1 t2)
+                  (Mvector-val-set! (Var addr) i cv)
+                  (Quote 0)))))
+       (let ([t1 (next-uid! "t1")])
+         (Let (list (cons t1 (Type t)))
+           (if (or (Var? e) (Quote? e))
+               (mvect-set! addr i e (Var t1))
+               (let ([val (next-uid! "write_cv")])
+                 (Let (list (cons val e))
+                   (mvect-set! addr i (Var val) (Var t1)))))))]
       
       ;; The translation of the dynamic operation 
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)

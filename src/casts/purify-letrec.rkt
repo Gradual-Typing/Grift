@@ -89,6 +89,7 @@
      (and (recur-all e d) (recur* (map (inst cdr Any L0-Expr) c*)))]
     [(Begin e* e)  (and (recur e) (recur* e*))]
     [(Repeat i e1 e2 a e3 e4) (recur-all e1 e2 e3 e4)]
+    [(Break-Repeat) #f]
     [(App-Code e e*) (and (recur e) (recur* e*))]
     [(Lambda f* (Castable c e)) (recur e)]
     [(Fn-Caster e) (recur e)]
@@ -171,6 +172,7 @@
     [(Type-MRef-Huh e) (recur e)]
     [(Type-MRef-Of e) (recur e)]
     [(Mvector e1 e2 t) (recur-all e1 e2)]
+    [(Mvector-size e) (recur e)]
     [(Mvector-val-set! e1 e2 e3) (recur-all e1 e2 e3)]
     [(Mvector-val-ref e1 e2) (recur-all e1 e2)]
     [(Mvector-rtti-set! u e) (recur e)]
@@ -350,6 +352,7 @@
      (Begin e* e)]
     [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))
      (Repeat i e1 e2 a e3 e4)]
+    [(Break-Repeat) (Break-Repeat)]
     [(Op p (app recur* e*))
      (Op p e*)]
     [(Blame (app recur e))
@@ -404,6 +407,7 @@
     [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
     [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
     [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
+    [(Mvector-size (app recur e)) (Mvector-size e)]
     [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
     [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
     [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
@@ -625,6 +629,7 @@
      (Begin e* e)]
     [(Repeat i (app pl-expr e1) (app pl-expr e2) a (app pl-expr e3) (app pl-expr e4))
      (Repeat i e1 e2 a e3 e4)]
+    [(Break-Repeat) (Break-Repeat)]
     [(Op p (app pl-expr* e*))
      (Op p e*)]
     [(Quote k)
@@ -681,6 +686,7 @@
     [(Type-MRef-Huh (app pl-expr e)) (Type-MRef-Huh e)]
     [(Type-MRef-Of (app pl-expr e)) (Type-MRef-Of e)]
     [(Mvector (app pl-expr e1) (app pl-expr e2) t) (Mvector e1 e2 t)]
+    [(Mvector-size (app pl-expr e)) (Mvector-size e)]
     [(Mvector-val-set! (app pl-expr e1) (app pl-expr e2) (app pl-expr e3)) (Mvector-val-set! e1 e2 e3)]
     [(Mvector-val-ref (app pl-expr e1) (app pl-expr e2)) (Mvector-val-ref e1 e2)]
     [(Mvector-rtti-set! u (app pl-expr e)) (Mvector-rtti-set! u e)]

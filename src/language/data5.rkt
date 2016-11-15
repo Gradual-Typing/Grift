@@ -34,6 +34,7 @@
       (U 
        (Repeat Uid D5-Trivial D5-Trivial #f #f (Begin D5-Effect* No-Op))
        (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
+       Break-Repeat
        (Switch D5-Trivial
                (Switch-Case* (Begin D5-Effect* No-Op))
                (Begin D5-Effect* No-Op))

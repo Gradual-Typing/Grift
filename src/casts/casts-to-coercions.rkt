@@ -65,6 +65,7 @@ should be able to compile programs this the twosome casts for future comparison.
       [((GVect t1) (GVect t2))
        (Ref (recur t1 t2) (recur t2 t1))]
       [((MRef _) (MRef t2)) (MonoRef t2)]
+      [((MVect _) (MVect t2)) (MonoVect t2)]
       [((STuple n1 t1*) (STuple n2 t2*)) #:when (= n1 n2)
        (CTuple n1 (map recur t1* t2*))]
       [(_ _) (Failed lbl)]))
@@ -112,10 +113,8 @@ should be able to compile programs this the twosome casts for future comparison.
     [(Mbox e t) (Mbox (c2c-expr e) t)]
     [(Munbox e) (Munbox (c2c-expr e))]
     [(Mbox-set! e1 e2) (Mbox-set! (c2c-expr e1) (c2c-expr e2))]
-    [(MBoxCastedRef u t)
-     (MBoxCastedRef u t)]
-    [(MBoxCastedSet! u (app c2c-expr e) t)
-     (MBoxCastedSet! u e t)]
+    [(MBoxCastedRef u t) (MBoxCastedRef u t)]
+    [(MBoxCastedSet! u (app c2c-expr e) t) (MBoxCastedSet! u e t)]
     [(Mvector e1 e2 t) (Mvector (c2c-expr e1) (c2c-expr e2) t)]
     [(Mvector-ref e1 e2) (Mvector-ref (c2c-expr e1) (c2c-expr e2))]
     [(Mvector-set! e1 e2 e3)

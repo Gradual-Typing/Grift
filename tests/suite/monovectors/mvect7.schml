@@ -1,0 +1,5 @@
+(let ([r0 (gvector 1 1)])
+  (let ([r1 (: r0 (GVect Dyn))])
+    (let ([r2 (: r1 (GVect Int))])
+      (let ([r3 (: r2 Dyn)])
+        (gvector-ref r3 0)))))

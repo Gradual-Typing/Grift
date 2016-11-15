@@ -94,6 +94,7 @@
           (Repeat i (nc-value e1) (nc-value e2) #f #f
                   (Assign a (nc-value e4))))
          (Var a))]
+      [(Break-Repeat) (Begin (list (Break-Repeat)) UNIT-IMDT)]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p (app nc-value* v*))
@@ -130,6 +131,7 @@
           (Repeat i (nc-value e1) (nc-value e2) #f #f
                   (Assign a (nc-value e4))))
          NO-OP)]
+      [(Break-Repeat) (Break-Repeat)]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p exp*)
@@ -159,7 +161,8 @@
           (Assign a (nc-value e3))
           (Repeat i (nc-value e1) (nc-value e2) #f #f
                   (Assign a (nc-value e4))))
-         (Relop '= TRUE-IMDT (Var a)))]          
+         (Relop '= TRUE-IMDT (Var a)))]
+      [(Break-Repeat) (error 'nc-pred/unsuported/break-repeat)]
       [(Assign u e) (error 'nc-pred/unsuported/assign)]
       [(Op p (app nc-value* val*))
        (if (IntxInt->Bool-primitive? p)

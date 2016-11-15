@@ -88,6 +88,7 @@
           (Switch E (Switch-Case* E) E)
           (Begin CoC4-Expr* E)
           (Repeat Uid E E Uid E E)
+          Break-Repeat
           ;;Primitives
           (Op Schml-Primitive (Listof E))
           (Quote Cast-Literal)
@@ -132,6 +133,7 @@
           (Type-MRef-Of E)
           (Error E)
           (Mvector E E Prim-Type)
+          (Mvector-size E)
           (Mvector-val-ref E E)
           (Mvector-val-set! E E E)
           (Mvector-rtti-ref Uid)

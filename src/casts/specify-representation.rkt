@@ -82,8 +82,8 @@ but a static single assignment is implicitly maintained.
 
   (: mk-fn-type-code-label? (Boxof (Option (Code-Label Uid))))
   (define mk-fn-type-code-label? (box #f))
-
-  (: mk-tuple-type-code-label? (Boxof (Option (Code-Label Uid))))
+ 
+ (: mk-tuple-type-code-label? (Boxof (Option (Code-Label Uid))))
   (define mk-tuple-type-code-label? (box #f))
 
   (: mk-fn-coercion-code-label? (Boxof (Option (Code-Label Uid))))
@@ -478,9 +478,9 @@ but a static single assignment is implicitly maintained.
                         (Assign va-u (Op 'Array-ref (list v i)))
                         (Assign ca-u (sr-tagged-array-ref c COERCION-MEDIATING-TAG
                                                           (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
-                        (Assign t1-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX)))
+                        (Assign t1-u (Op 'Array-ref (list mono MONO-RTTI-INDEX)))
                         (Assign new-va-u (App-Code cast-l `(,(Var va-u) ,(Var ca-u) ,mono)))
-                        (Assign t2-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX))))
+                        (Assign t2-u (Op 'Array-ref (list mono MONO-RTTI-INDEX))))
                        (If (Op '= (list t1 t2))
                            (Op 'Array-set! (list v i (Var new-va-u)))
                            (Quote 0)))))
@@ -531,9 +531,9 @@ but a static single assignment is implicitly maintained.
                         (Assign va-u (Op 'Array-ref (list v i)))
                         (Assign t1a-u (sr-tagged-array-ref t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
                         (Assign t2a-u (sr-tagged-array-ref t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-                        (Assign t1m-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX)))
+                        (Assign t1m-u (Op 'Array-ref (list mono MONO-RTTI-INDEX)))
                         (Assign new-va-u (App-Code cast-l `(,va ,(Var t1a-u) ,(Var t2a-u) ,l ,mono)))
-                        (Assign t2m-u (Op 'Array-ref (list mono MBOX-RTTI-INDEX))))
+                        (Assign t2m-u (Op 'Array-ref (list mono MONO-RTTI-INDEX))))
                        (If (Op '= (list (Var t1m-u) (Var t2m-u)))
                            (Op 'Array-set! (list v i (Var new-va-u)))
                            (Quote 0)))))
@@ -1052,6 +1052,7 @@ but a static single assignment is implicitly maintained.
          (Begin e* e)]
         [(Repeat i (app recur e1) (app recur e2) u (app recur e3) e4)
          (Repeat i e1 e2 u e3 (recur/env e4 (extend (extend env u (Var u)) i (Var i)) cenv))]
+        [(Break-Repeat) (Break-Repeat)]
         ;; Guarded
         [(Unguarded-Box (app recur e))
          (sr-alloc "unguarded_box" l:UGBOX-TAG (list (cons "init_value" e)))]
@@ -1141,15 +1142,15 @@ but a static single assignment is implicitly maintained.
         [(Guarded-Proxy-Coercion (app recur e))
          ((untag-deref-gproxy GPROXY-COERCION-INDEX) e)]
         [(Mbox (app recur e) (app sr-prim-type t))
-         (sr-alloc "mbox" l:MBOX-TAG (list (cons "init_value" e) (cons "init_type" t)))]
+         (sr-alloc "mbox" l:MBOX-TAG (list (cons "init_type" t) (cons "init_value" e)))]
         [(Mbox-val-set! (app recur e1) (app recur e2))
          (Op 'Array-set! (list e1 MBOX-VALUE-INDEX e2))]
         [(Mbox-val-ref (app recur e))
          (Op 'Array-ref (list e MBOX-VALUE-INDEX))]
         [(Mbox-rtti-set! u (app recur e))
-         (Op 'Array-set! (list (Var u) MBOX-RTTI-INDEX e))]
+         (Op 'Array-set! (list (Var u) MONO-RTTI-INDEX e))]
         [(Mbox-rtti-ref u)
-         (Op 'Array-ref (list (Var u) MBOX-RTTI-INDEX))]
+         (Op 'Array-ref (list (Var u) MONO-RTTI-INDEX))]
         [(Mvector (app recur e1) (app recur e2) (app sr-prim-type t))
          (define tmp1     (next-uid! "mvect1"))
          (define tmp2     (next-uid! "mvect2"))
@@ -1165,14 +1166,16 @@ but a static single assignment is implicitly maintained.
                  (Assign tmp4 (Op '+ (list (Var tmp1) MVECT-OFFSET)))
                  (Assign tmp3 (Op 'Alloc (list (Var tmp4))))
                  (Op 'Array-set! (list (Var tmp3) MVECT-SIZE-INDEX (Var tmp1)))
-                 (Op 'Array-set! (list (Var tmp3) MVECT-RTTI-INDEX (Var rtti)))
+                 (Op 'Array-set! (list (Var tmp3) MONO-RTTI-INDEX (Var rtti)))
                  (Repeat i MVECT-OFFSET (Var tmp4) a UNIT-IMDT
                          (Op 'Array-set! (list (Var tmp3) (Var i) (Var tmp2)))))
                 (Var tmp3))]
+        [(Mvector-size (app recur e))
+         (Op 'Array-ref (list e MVECT-SIZE-INDEX))]
         [(Mvector-rtti-set! u (app recur e))
-         (Op 'Array-set! (list (Var u) MVECT-RTTI-INDEX e))]
+         (Op 'Array-set! (list (Var u) MONO-RTTI-INDEX e))]
         [(Mvector-rtti-ref u)
-         (Op 'Array-ref (list (Var u) MVECT-RTTI-INDEX))]
+         (Op 'Array-ref (list (Var u) MONO-RTTI-INDEX))]
         [(Mvector-val-ref (app recur e1) (app recur e2))
          (define ind  (next-uid! "index"))
          (define tmp1 (next-uid! "mvect"))
@@ -1183,7 +1186,7 @@ but a static single assignment is implicitly maintained.
            (list (Assign ind e2)
                  (Assign tmp1 e1))
            (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var MVECT-SIZE-INDEX))))
                    (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))
                    (Begin
                      (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
@@ -1202,7 +1205,7 @@ but a static single assignment is implicitly maintained.
             (Assign ind e2)
             (Assign tmp1 e1))
            (If (Op '>= (list ind-var zro)) ;; vectors indices starts from 0
-               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
+               (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var MVECT-SIZE-INDEX))))
                    (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET)) e3))
                    (Begin
                      (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
@@ -1210,14 +1213,35 @@ but a static single assignment is implicitly maintained.
                (Begin
                  `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
                  (Op 'Exit (list (Quote -1))))))]
-
-        ;; [(Type-MVect e) (error)]
-        ;; [(Type-MVect-Huh e) (error)]
-        ;; [(Type-MVect-Of e) (error)]
-        ;; [(MVect-Coercion-Huh e) (error)]
-        ;; [(MVect-Coercion-Type e) (error)]
-        ;; [(MVect-Coercion e) (error)]
-        
+        [(Type-MVect (app recur e))
+         (sr-alloc "MVectT" l:TYPE-MVECT-TAG `(("type" . ,e)))]
+        [(Type-MVect-Huh (app recur e))
+         (sr-check-tag=? e TYPE-TAG-MASK TYPE-MVECT-TAG)]
+        [(Type-MVect-Of (app recur e))
+         (define arg : D0-Expr
+           (Op 'binary-xor (list e TYPE-MVECT-TAG)))
+         (Op 'Array-ref (list arg TYPE-MVECT-TYPE-INDEX))]
+        [(MVect-Coercion-Huh (app recur e))
+         (define tmp (next-uid! "crcn_tmp"))
+         (define tag (next-uid! "crcn_tag"))
+         (define tmp-var (Var tmp))
+         (define tag-var (Var tag))
+         (Begin
+           (list
+            (Assign tmp (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MVECT-TAG-INDEX))
+            (Assign tag (Op 'binary-and `(,tmp-var ,COERCION-TAG-MASK))))
+           (Op '= (list tag-var COERCION-MVECT-SECOND-TAG)))]
+        [(MVect-Coercion-Type (app recur e))
+         (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MVECT-TYPE-INDEX)]
+        [(MVect-Coercion (app recur t))
+         (define st-u    (next-uid! "second-tagged"))
+         (Begin
+           (list
+            (Assign st-u (Op '+ (list (Op '%<< (list (Quote 0) COERCION-SECOND-TAG-SHIFT))
+                                      COERCION-MVECT-SECOND-TAG))))
+           (sr-alloc "mvect-coercion" l:COERCION-MEDIATING-TAG
+                     `(("tag" . ,(Var st-u))
+                       ("type" . ,t))))]
         [(MRef-Coercion-Huh (app recur e))
          (define tmp (next-uid! "crcn_tmp"))
          (define tag (next-uid! "crcn_tag"))
@@ -1496,6 +1520,9 @@ but a static single assignment is implicitly maintained.
       [(MRef t)
        (sr-alloc "MRefT" l:TYPE-MREF-TAG
                  `(("type" . ,(sr-prim-type t))))]
+      [(MVect t)
+       (sr-alloc "MVectT" l:TYPE-MVECT-TAG
+                 `(("type" . ,(sr-prim-type t))))]
       [(Fn a f* r)
        (sr-alloc "Fun_Type" l:TYPE-FN-TAG
                  `(("arity" . ,(Quote a))
@@ -1575,6 +1602,14 @@ but a static single assignment is implicitly maintained.
          (list (Assign st-u (Op '+ (list (Op '%<< (list (Quote 0) COERCION-SECOND-TAG-SHIFT))
                                          COERCION-MREF-SECOND-TAG))))
          (sr-alloc "mref-coercion" l:COERCION-MEDIATING-TAG
+                   `(("tag" . ,(Var st-u))
+                     ("type" . ,t))))]
+      [(MonoVect (app sr-prim-type t))
+       (define st-u    (next-uid! "second-tagged"))
+       (Begin
+         (list (Assign st-u (Op '+ (list (Op '%<< (list (Quote 0) COERCION-SECOND-TAG-SHIFT))
+                                         COERCION-MVECT-SECOND-TAG))))
+         (sr-alloc "mvect-coercion" l:COERCION-MEDIATING-TAG
                    `(("tag" . ,(Var st-u))
                      ("type" . ,t))))]
       [(CTuple l a*)
@@ -1679,6 +1714,7 @@ but a static single assignment is implicitly maintained.
       [(GRef? t) (Op 'Print (list (Quote "GReference : ?\n")))]
       [(GVect? t) (Op 'Print (list (Quote "GVector : ?\n")))]
       [(MRef? t) (Op 'Print (list (Quote "MReference : ?\n")))]
+      [(MVect? t) (Op 'Print (list (Quote "MVector : ?\n")))]
       [(STuple? t) (Op 'Print (list (Quote "Tuple : ?\n")))]
       [(Dyn? t) (Op 'Print (list (Quote "Dynamic : ?\n")))]
       [else (error 'sr-observe "printing other things")]))
@@ -1698,6 +1734,7 @@ but a static single assignment is implicitly maintained.
     [(GVect)  TYPE-GVECT-TAG]
     [(Boxed)  DYN-BOXED-TAG]
     [(MRef)   TYPE-MREF-TAG]
+    [(MVect)  TYPE-MVECT-TAG]
     [(STuple) TYPE-TUPLE-TAG]))
 
 

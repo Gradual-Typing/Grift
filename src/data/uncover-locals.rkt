@@ -34,7 +34,7 @@
 (: uncover-locals (-> Data1-Lang Data2-Lang))
 (define (uncover-locals prgm)
   (match-let ([(Prog (list name count type) (GlobDecs d* (Labels bnd-code* tail))) prgm])
-    (let* ([gd-set(list->set d*)]
+    (let* ([gd-set (list->set d*)]
            [bnd-code* : D2-Bnd-Code* (ul-bnd-code* gd-set bnd-code*)]
            [body : D2-Body (ul-body gd-set tail)])
       (Prog (list name count type) (GlobDecs d* (Labels bnd-code* body))))))

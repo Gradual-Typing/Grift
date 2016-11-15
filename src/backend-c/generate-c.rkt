@@ -365,7 +365,8 @@
             (display "}\n"))]
     [(Op p exp*)
      (emit-op p exp*)]
-    [(Halt) (display C-EXIT)] ;; FIXME: fix that
+    [(Halt) (display C-EXIT)]
+    [(Break-Repeat) (display "break;")];; FIXME: fix that
     [(Assign uid exp)
      (begin (display (uid->string uid))
             (display " = ")

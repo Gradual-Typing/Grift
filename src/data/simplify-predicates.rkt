@@ -96,6 +96,7 @@
        (list (Repeat i t1 t2 #f #f (Begin (sp-effect e) NO-OP)))]
       [(Op p t*) (list (Op p (sp-trivial* t*)))]
       [(and e (or (Halt) (No-Op))) (list e)]
+      [(and v (Break-Repeat)) (list v)]
       [other (error 'simplify-predicates/effect "~a" other)]))
   (: sp-effect* (D4-Effect* -> D5-Effect*))
   (define (sp-effect* effect*) (append* (map sp-effect effect*)))

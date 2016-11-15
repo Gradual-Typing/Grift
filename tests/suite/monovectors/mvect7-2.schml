@@ -1,0 +1,5 @@
+(let ([r0 (mvector 1 1)])
+  (let ([r1 (: r0 (MVect Dyn))])
+    (let ([r2 (: r1 (MVect Int))])
+     (begin (mvector-set! r0 0 42)
+            (mvector-ref r2 0)))))

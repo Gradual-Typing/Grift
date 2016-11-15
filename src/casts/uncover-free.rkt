@@ -45,6 +45,7 @@
      (values (Labels b* e) fv)]
     [(Repeat i (app uf-expr e1 f1) (app uf-expr e2 f2) a (app uf-expr e3 f3) (app uf-expr e4 f4))
      (values (Repeat i e1 e2 a e3 e4) (set-subtract (set-union f1 f2 f3 f4) (set i a)))]
+    [(Break-Repeat) (values (Break-Repeat) (set))]
     [(If (app uf-expr t t-fv) (app uf-expr c c-fv) (app uf-expr a a-fv))
      (values (If t c a) (set-union t-fv c-fv a-fv))]
     [(Switch (app uf-expr e e-fv) c* (app uf-expr d d-fv))
@@ -213,6 +214,7 @@
     [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) (set))]
     [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
      (values (Mvector e1 e2 t) (set-union fv1 fv2))]
+    [(Mvector-size (app uf-expr e fv)) (values (Mvector-size e) fv)]
     [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
      (values (Mvector-val-set! e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2))

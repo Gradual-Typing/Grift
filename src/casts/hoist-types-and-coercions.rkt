@@ -205,6 +205,8 @@
          (ci! (max m n) (Ref r w))]
         [(MonoRef (app ti! t))
          (ci! 0 (MonoRef t))]
+        [(MonoVect (app ti! t))
+         (ci! 0 (MonoVect t))]
         [(CTuple i (app recur* a* m))
          (ci! m (CTuple i a*))]
         [other (error 'hoist-types/coercion "unmatched ~a" other)]))
@@ -358,6 +360,7 @@
        (Begin e* e)]
       [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))
        (Repeat i e1 e2 a e3 e4)]
+      [(Break-Repeat) (Break-Repeat)]
       [(Op p (app recur* e*))
        (Op p e*)]
       [(Quote k) (Quote k)]
@@ -414,6 +417,7 @@
       [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
       [(Mvector (app recur e1) (app recur e2) (app type->imdt t))
        (Mvector e1 e2 t)]
+      [(Mvector-size (app recur e)) (Mvector-size e)]
       [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
