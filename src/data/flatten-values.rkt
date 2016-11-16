@@ -145,6 +145,7 @@ becuse it is actually more of a stmt contexts itself.
          (Assign u (App-Code t t*)))]
       [(Op p t*) (Op p (fv-trivial* t*))]
       [(No-Op) NO-OP]
+      [(Break-Repeat) (Break-Repeat)]
       [other (error 'remove-complex-opera/effect "~a" other)]))
 
   (: fv-effect* (D3-Effect* -> D4-Effect*))

@@ -80,6 +80,10 @@
   (COERCION-MREF-SECOND-TAG       #b011)
   (COERCION-MREF-TAG-INDEX        0)
   (COERCION-MREF-TYPE-INDEX       1)
+  ;; monotonic vector coercion representation
+  (COERCION-MVECT-SECOND-TAG      #b100)
+  (COERCION-MVECT-TAG-INDEX       0)
+  (COERCION-MVECT-TYPE-INDEX      1)
   ;; guarded coercion representation
   (COERCION-REF-SECOND-TAG        #b000)
   (COERCION-REF-TAG-INDEX         0)
@@ -120,13 +124,12 @@
   (GPROXY-TO-INDEX                2)
   (GPROXY-BLAMES-INDEX            3)
   ;; monotonic values representation
+  (MONO-RTTI-INDEX                0)
   (MBOX-SIZE                      2)
-  (MBOX-VALUE-INDEX               0)
-  (MBOX-RTTI-INDEX                1)
+  (MBOX-VALUE-INDEX               1)
   (MBOX-TAG                       #b000)
-  (MVECT-SIZE-INDEX               0)
+  (MVECT-SIZE-INDEX               1)
   (MVECT-OFFSET                   2)
-  (MVECT-RTTI-INDEX               1)
   (MVECT-TAG                      #b000)
   ;; function value representation
   (CLOS-CODE-INDEX                0)

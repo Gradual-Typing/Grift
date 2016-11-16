@@ -154,6 +154,7 @@
           [(GVect? v) (Tag 'GVect)]
           [(Fn? v) (Tag 'Fn)]
           [(MRef? v) (Tag 'MRef)]
+          [(MVect? v) (Tag 'MVect)]
           [(STuple? v) (Tag 'STuple)]
           [else (error 'interpret-casts/type-tag
                        "Unexpected ~a" v)]))
@@ -195,11 +196,12 @@
   (fnC?$             Fn?             Fn-Coercion-Huh)
   (ref?$             Ref?            Ref-Coercion-Huh)
   (mrefC?$           MonoRef?        MRef-Coercion-Huh)
+  (mvectC?$          MonoVect?       MVect-Coercion-Huh)
   (tuple?$           CTuple?         Tuple-Coercion-Huh)
   (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh?))
 
 (define (mediating-crcn? x)
-  (or (CTuple? x) (Ref? x) (Fn? x) (MonoRef? x)))
+  (or (CTuple? x) (Ref? x) (Fn? x) (MonoRef? x) (MonoVect? x)))
 
 (define-syntax-rule
   (define-smart-access (name check kuote compile-time run-time) ...)
@@ -215,16 +217,17 @@
     ...))
 
 (define-smart-access
-  (seq-fst$    Sequence?  Quote-Coercion Sequence-fst  Sequence-Coercion-Fst)
-  (seq-snd$    Sequence?  Quote-Coercion Sequence-snd  Sequence-Coercion-Snd)
-  (prj-type$   Project?   Type           Project-type  Project-Coercion-Type)
-  (prj-label$  Project?   Quote          Project-label Project-Coercion-Label)
-  (inj-type$   Inject?    Type           Inject-type   Inject-Coercion-Type)
-  (ref-read$   Ref?       Quote-Coercion Ref-read      Ref-Coercion-Read)
-  (ref-write$  Ref?       Quote-Coercion Ref-write     Ref-Coercion-Write)
-  (mrefC-type$ MonoRef?   Type           MonoRef-type  MRef-Coercion-Type)
-  (tuple-num$  CTuple?    Quote          CTuple-num    Tuple-Coercion-Num)
-  (fail-label$ Failed?    Quote          Failed-label  Failed-Coercion-Label))
+  (seq-fst$     Sequence?  Quote-Coercion Sequence-fst  Sequence-Coercion-Fst)
+  (seq-snd$     Sequence?  Quote-Coercion Sequence-snd  Sequence-Coercion-Snd)
+  (prj-type$    Project?   Type           Project-type  Project-Coercion-Type)
+  (prj-label$   Project?   Quote          Project-label Project-Coercion-Label)
+  (inj-type$    Inject?    Type           Inject-type   Inject-Coercion-Type)
+  (ref-read$    Ref?       Quote-Coercion Ref-read      Ref-Coercion-Read)
+  (ref-write$   Ref?       Quote-Coercion Ref-write     Ref-Coercion-Write)
+  (mrefC-type$  MonoRef?   Type           MonoRef-type  MRef-Coercion-Type)
+  (mvectC-type$ MonoVect?  Type           MonoVect-type MVect-Coercion-Type)
+  (tuple-num$   CTuple?    Quote          CTuple-num    Tuple-Coercion-Num)
+  (fail-label$  Failed?    Quote          Failed-label  Failed-Coercion-Label))
 
 (: tuple-crcn-arg$ (CoC3-Expr Index -> CoC3-Expr))
 (define (tuple-crcn-arg$ x i)
@@ -263,6 +266,13 @@
       (let ([t (Type-type type)])
         (Quote-Coercion (MonoRef t)))
       (MRef-Coercion type)))
+
+(: mvectC$ (CoC3-Expr -> CoC3-Expr))
+(define (mvectC$ type)
+  (if (Type? type)
+      (let ([t (Type-type type)])
+        (Quote-Coercion (MonoVect t)))
+      (MVect-Coercion type)))
 
 (: inj$ (CoC3-Expr -> CoC3-Expr))
 (define (inj$ type)
@@ -309,6 +319,7 @@
   (gvect?$  GVect?  Type-GVect-Huh)
   (gref?$   GRef?   Type-GRef-Huh)
   (mref?$   MRef?   Type-MRef-Huh)
+  (mvect?$  MVect?  Type-MVect-Huh)
   (tupleT?$ STuple? Type-Tuple-Huh))
 
 (: fnT-arity$ (CoC3-Expr -> CoC3-Expr))
@@ -356,6 +367,15 @@
             (Type (MRef-arg x))
             (error 'mref-of$ "given ~a" x)))))
 
+(: mvect-of$ (CoC3-Expr -> CoC3-Expr))
+(define (mvect-of$ x)
+  (if (not (Type? x))
+      (Type-MVect-Of x)
+      (let ([x (Type-type x)])
+        (if (MVect? x)
+            (Type (MVect-arg x))
+            (error 'mvect-of$ "given ~a" x)))))
+
 ;; building types, I do not think we will ever need to build them in
 ;; compile time, but monotonic references need to build them in runtime
 (define-syntax-rule
@@ -370,9 +390,8 @@
 (define-smart-type
   (gref$  GRef  Type-GRef  type)
   (gvect$ GVect Type-GVect type)
-  (mref$  MRef  Type-MRef  type))
-
-(define-type GreatestLowerBound-Type (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
+  (mref$  MRef  Type-MRef  type)
+  (mvect$ MVect Type-MVect type))
 
 (: bnd-non-vars
    (((String -> Uid) CoC3-Expr*) (#:names (Option (Listof String)))
@@ -401,6 +420,8 @@
 (define ((apply-code u) . a*)
   (App-Code (Code-Label u) a*))
 
+(define-type GreatestLowerBound-Type (CoC3-Trivial CoC3-Trivial -> CoC3-Expr))
+
 (: gen-greatest-lower-bound-type-code : (String -> Uid) GreatestLowerBound-Type Uid -> GreatestLowerBound-Type)
 (define ((gen-greatest-lower-bound-type-code next-uid! glbt glbt-uid) t1 t2)
   (define-syntax-let$* let$* next-uid!)
@@ -422,6 +443,16 @@
             [gr2_of (gvect-of$ t2)]
             [t  (glbt gr1_of gr2_of)])
       (gvect$ t))]
+   [(and$ (mref?$ t1) (mref?$ t2))
+    (let$* ([gr1_of (mref-of$ t1)]
+            [gr2_of (mref-of$ t2)]
+            [t  (glbt gr1_of gr2_of)])
+      (mref$ t))]
+   [(and$ (mvect?$ t1) (mvect?$ t2))
+    (let$* ([gr1_of (mvect-of$ t1)]
+            [gr2_of (mvect-of$ t2)]
+            [t  (glbt gr1_of gr2_of)])
+      (mvect$ t))]
    [(and$ (tupleT?$ t1) (tupleT?$ t2))
     (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
          (Make-Tuple-Type glbt-uid t1 t2)
@@ -442,7 +473,7 @@
                          [cv (Copy-Tuple n v)])
                    (Begin
                      (list
-                      (Mbox-val-set! (Var a) cv))
+                      (Mbox-val-set! a-var cv))
                      cv))]
                 [else v]))]
     [other (error 'copy-value-in-monoref "unmatched value ~a" other)]))

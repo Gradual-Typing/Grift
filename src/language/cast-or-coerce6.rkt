@@ -100,6 +100,7 @@
           (Switch E (Switch-Case* E) E)
           (Begin CoC6-Expr* E)
           (Repeat Uid E E Uid E E)
+          Break-Repeat
           ;;Primitives
           (Op Schml-Primitive (Listof E))
           No-Op
@@ -145,6 +146,7 @@
           (Type-MRef-Of E)
           (Error E)
           (Mvector E E Prim-Type)
+          (Mvector-size E)
           (Mvector-val-ref E E)
           (Mvector-val-set! E E E)
           (Mvector-rtti-ref Uid)

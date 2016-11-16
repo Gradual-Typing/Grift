@@ -1,0 +1,10 @@
+(let ((mre : Dyn #f))
+ (let ((dynref : (MVect Dyn) (mvector 2 mre)))
+  (let ((boolref : (MVect Bool) dynref)
+        (intref  : (MVect Int)  dynref))
+   (begin
+    (if (mvector-ref boolref 0)
+        (mvector-set! intref 0 6)
+        (mvector-set! intref 0 7))
+    (mvector-set! intref 0 (* (mvector-ref intref 0) 6))
+    (: (mvector-ref dynref 0) Int)))))

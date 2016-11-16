@@ -85,6 +85,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (MBoxCastedSet! addr v type)
   (MvectorS value constructor)
   (Mvector value constructor type)
+  (Mvector-size value)
   (Mvector-set! vector index value)
   (Mvector-set!T vector index value type)
   (Mvector-ref vector index)
@@ -190,6 +191,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Benchmarking tools language forms
   ;; low cost repetition
   (Repeat var start end acc init body)
+  (Break-Repeat)
   ;; TODO figue out an appropriate comment about all forms here
   (Halt)
   (Success)
@@ -695,6 +697,7 @@ Dyn
   (Ref-Coercion-Read expression)
   (Ref-Coercion-Write ref)
   (MonoRef type) ;; Monotonic Reference Coercion
+  (MonoVect type)
   (MRef-Coercion type)
   (MRef-Coercion-Type expression)
   (MVect-Coercion expression)
@@ -737,7 +740,7 @@ Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef 'STuple))
+(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef 'MVect 'STuple))
 
 (define-type Schml-Coercion
   (Rec C (U Identity
@@ -748,6 +751,7 @@ Dyn
             (Fn Index (Listof C) C)
             (Ref C C)
             (MonoRef Schml-Type)
+            (MonoVect Schml-Type)
             (CTuple Index (Listof C)))))
 
 (define IDENTITY : Identity (Identity))
@@ -779,6 +783,7 @@ Dyn
      (Failed Blame-Label)
      (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
      (MonoRef Prim-Type)
+     (MonoVect Prim-Type)
      (CTuple Index (Listof Immediate-Coercion))
      (Ref Immediate-Coercion Immediate-Coercion)))
 
@@ -808,6 +813,7 @@ Dyn
             (Fn Index (Listof C) C)
             (Ref C C)
             (MonoRef Prim-Type)
+            (MonoVect Prim-Type)
             (CTuple Index (Listof C)))))
 
 (define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))

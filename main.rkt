@@ -1,11 +1,22 @@
 #lang racket/base
 
-(require "src/compile.rkt" racket/cmdline racket/match)
+(require "src/compile.rkt"
+	 racket/cmdline
+	 racket/match
+	 racket/runtime-path
+	 racket/system)
 
 (provide (all-from-out "src/compile.rkt"))
 
+(define-runtime-path this-dir ".")
+(define (print-version-info)
+ (unless (system "git rev-parse --verify HEAD" #:set-pwd? this-dir)
+   (error 'schml "This should not be used for non-development versions"))
+ (system "git status" #:set-pwd? this-dir))
+
 (module+ main
   (define recursive-parameter (make-parameter #f))
+  (define schml-did-something? (make-parameter #f))
   (command-line
    #:program "schml"
    #:once-any
@@ -28,6 +39,10 @@
    [("--assert-statically-typed")
     "Raise an error unless the program is statically typed"
     (program-must-be-statically-typed?)]
+   [("--version")
+    "Output schml compiler version info"
+    (schml-did-something? #t)
+    (print-version-info)]
    #:once-any
    [("--reference-semantics") semantics
     "Monotonic, Guarded (defualt Guarded)"
@@ -45,6 +60,9 @@
    [("--keep-c") name
     "keep the c intermediate representation"
     (c-path (build-path name))]
+   ["--c-flag" flag
+     "pass extra c flag to the C compiler"
+    (c-flags (cons flag (c-flags)))]
    [("-O") level
     "set the optimization level"
     (define l (string->number level))
@@ -75,14 +93,21 @@
    [("-g" "--with-debug-symbols")
     "Invoke c compiler so that debugging symbols are retained."
     (c-flags (cons "-g" (c-flags)))]
+   [("--profile")
+    "Invoke c compiler with profiling flags"
+    (c-flags (cons "-pg" (c-flags)))]
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
-   #:args (target)
-   (cond
-     [(string->path target) =>
-      (λ (path)
-        (cond
-          [(recursive-parameter) (compile-directory path)]
-          [else (compile path)]))]
-     [else (error 'schml "invalid target path: ~v" target)])))
+   #:args args
+   (match args
+     [(list)
+      (cond
+       [(not (schml-did-something?))
+        (error 'schml "no input given")])]
+     [(list (app string->path (and (not #f) path)))
+      (cond
+       [(recursive-parameter) (compile-directory path)]
+       [else (compile path)])]
+     [else (error 'schml "invalid arguments ~a" args)])
+     (void)))

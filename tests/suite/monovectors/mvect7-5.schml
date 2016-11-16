@@ -1,0 +1,6 @@
+(let ([r0 (mvector 1 42)])
+  (let ([r1 (: r0 (MVect Dyn))])
+    (let ([r2 (: r1 (MVect Int))])
+      (let ([r3 (: r2 Dyn)])
+        (: (mvector-ref r3 0) Int "wrong")))))
+        
