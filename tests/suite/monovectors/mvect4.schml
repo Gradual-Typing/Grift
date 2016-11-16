@@ -1,0 +1,3 @@
+(let ([r (mvector 2 2)])
+  (begin (mvector-set! r 0 4)
+         (mvector-ref r 0)))

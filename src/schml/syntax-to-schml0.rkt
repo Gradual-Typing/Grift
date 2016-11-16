@@ -148,8 +148,8 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
       ;; (Ctr 'Gbox (list arg)) (Ctr 'Gvector (list arg1 arg2))
       (Gbox? x) (Gunbox? x) (Gbox-set!? x)
       (Gvector? x) (Gvector-ref? x) (Gvector-set!? x)
-      (Mbox? x) (Munbox? x) (Mbox-set!? x)
-      (Mvector? x) (Mvector-ref? x) (Mvector-set!? x)))
+      (MboxS? x) (Munbox? x) (Mbox-set!? x)
+      (MvectorS? x) (Mvector-ref? x) (Mvector-set!? x)))
 
 (struct lexical-var  (symbol))
 (struct core (parser))
@@ -520,11 +520,11 @@ represents types in the schml abstract syntax tree.
              [parse-mbox-set!
               (core (parse-simple-form 'mbox-set! Mbox-set! 2))]
              [parse-mvector
-              (core (parse-simple-form 'mvector Mvector 2))]
+              (core (parse-simple-form 'mvector MvectorS 2))]
              [parse-mvector-ref
               (core (parse-simple-form 'mvector-ref Mvector-ref 2))]
              [parse-mvector-set!
-              (parse-simple-form 'mvector-set! Mvector-set! 3)])
+              (core (parse-simple-form 'mvector-set! Mvector-set! 3))])
          `(,@(match (reference-semantics)
                ['Guarded
                 `((Ref        . ,(core (make-parse-type-w/ctr 'GRef  GRef)))

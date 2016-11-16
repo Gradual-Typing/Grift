@@ -1,7 +1,8 @@
 #lang typed/racket
 
 (require "./configuration.rkt"
-         "./helpers.rkt"
+         ;; "./helpers.rkt"
+         (submod "./logging.rkt" typed)
          (submod "./schml/reduce-to-cast-calculus.rkt" typed)
          "./casts/impose-cast-semantics.rkt"
          "./data/convert-representation.rkt"

@@ -58,6 +58,7 @@
       [(and v  (Var i))        (Return v)]
       [(and d  (Quote k))      (Return d)]
       [(and h  (Halt))         (Return h)]
+      [(and h  (Break-Repeat)) (Return h)]
       [(and s  (Success))      (Return s)]
       [other (error 'remove-complex-opera "unmatched ~a" other)]))
   (: rco-pred (D2-Pred -> D3-Pred))
@@ -78,6 +79,7 @@
       ;; Is this line correct?
       [(Assign i v) (Assign i (rco-value v))]
       [(and h (Halt)) h]
+      [(and h (Break-Repeat)) h]
       [(If t c a) (If (rco-pred t) (rco-effect c) (rco-effect a))]
       [(Switch e c* d)
        (define-values (s* t) (trivialize-value e))
@@ -125,7 +127,8 @@
       [(and cl (Code-Label i)) cl]
       [(and v  (Var i))        v]
       [(and d  (Quote k))      d]
-      [(and h  (Halt))         h]))
+      [(and h  (Halt))         h]
+      [(and h  (Break-Repeat)) h]))
   (: trivialize-value (D2-Value -> (Values D3-Effect* D3-Trivial)))
   (define (trivialize-value value)
     (match value
@@ -161,7 +164,8 @@
        (values (list (Assign u (Halt))) (Var u))]
       [(and c (Code-Label _)) (values '() c)]
       [(and v (Var _)) (values '() v)]
-      [(and d (Quote _)) (values '() d)]))
+      [(and d (Quote _)) (values '() d)]
+      [(and d (Break-Repeat)) (values '() d)]))
   (: trivialize-value* (D2-Value* -> (Values D3-Effect* D3-Trivial*)))
   (define (trivialize-value* value*)
     (: trv : D2-Value (Pair D3-Effect* D3-Trivial*)

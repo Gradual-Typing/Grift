@@ -32,6 +32,7 @@ form, to the shortest branch of the cast tree that is relevant.
  "../configuration.rkt"
  "../language/cast-or-coerce1.rkt"
  "../language/cast-or-coerce3.rkt"
+ "../language/data-representation.rkt"
  "./interpret-casts-help.rkt")
 
 (provide
@@ -156,6 +157,11 @@ form, to the shortest branch of the cast tree that is relevant.
               b* 'cast-mbox "cast_mbox"
               (make-cast-mbox-code next-uid! cast glbt cv)
               CoC3-Expr "value" "type1" "type2" "blame_info")]
+            [(b* cast-mvect)
+             (inline-or-bnd-cast
+              b* 'cast-mvect "cast_mvect"
+              (make-cast-mvect-code next-uid! cast glbt)
+              CoC3-Expr "value" "type1" "type2" "blame_info")]
             [(b* cast-gvec)
              (inline-or-bnd-cast
               b* 'cast-gvec "cast_gvec"
@@ -175,7 +181,7 @@ form, to the shortest branch of the cast tree that is relevant.
              (inline-or-bnd-cast
               b* 'cast-ground "cast_ground"
               (make-cast-ground-code next-uid! cast-uid cast-fn cast-gbox
-                                     cast-gvec cast-tuple cast-mbox)
+                                     cast-gvec cast-tuple cast-mbox cast-mvect)
               CoC3-Expr "value" "type1" "type2" "blame_info" "mono_address")]
             [(b* cast-undyned)
              (inline-or-bnd-cast
@@ -421,10 +427,10 @@ form, to the shortest branch of the cast tree that is relevant.
      [else (cast-ground v type1 type2 lbl mono-address)])))
 
 (: make-cast-ground-code :
-   (String -> Uid) Uid Cast-Type Cast-Type Cast-Type Cast-Type Cast-Type -> Cast-With-MAddr-Type)
+   (String -> Uid) Uid Cast-Type Cast-Type Cast-Type Cast-Type Cast-Type Cast-Type -> Cast-With-MAddr-Type)
 (define ((make-cast-ground-code next-uid! cast-u cast-fn cast-gref
                                 cast-gvect cast-tuple
-                                cast-mref) v t1 t2 lbl mono-address)
+                                cast-mref cast-mvect) v t1 t2 lbl mono-address)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([value v] [type1 t1] [type2 t2])
     (cond$
@@ -455,8 +461,8 @@ form, to the shortest branch of the cast tree that is relevant.
           (cast-gvect value type1 type2 lbl)]
          [(op=? (Tag 'MRef) tag1)
           (cast-mref value type1 type2 lbl)]
-         ;; [(op=? (Tag 'MVect) tag1)
-         ;;  (cast-mvec value type1 type2 lbl)]
+         [(op=? (Tag 'MVect) tag1)
+          (cast-mvect value type1 type2 lbl)]
          [(op=? (Tag 'STuple) tag1)
           (If (Op '= (list (Quote 0) mono-address))
               (cast-tuple value type1 type2 lbl)
@@ -552,6 +558,58 @@ form, to the shortest branch of the cast tree that is relevant.
                                           val)
                                         val)))))))]
                 [other (error 'interp-cast/mref "unmatched value ~a" other)])
+              (Blame lbl)))))
+
+(: make-cast-mvect-code : (String -> Uid)
+   Cast-With-MAddr-Type
+   GreatestLowerBound-Type -> Cast-Type)
+(define ((make-cast-mvect-code next-uid! cast glbt) v t1 t2 lbl)
+  (define-syntax-let$* let$* next-uid!)
+  (let$* ([val v] [type1 t1] [type2 t2] [tag_mvect (type-tag type2)])
+    (if$ (op=? (Type DYN-TYPE) type2)
+         (Dyn-make val type1)
+         (if$ (op=? tag_mvect (Tag 'MVect))
+              (match val
+                [(Var a)
+                 (let$* ([t2 (mvect-of$ type2)])
+                   (if$ (dyn?$ t2)
+                        val
+                        (let$* ([t1 (Mvector-rtti-ref a)]
+                                [t3 (glbt t1 t2)])
+                          (if$ (op=? t1 t3)
+                               val
+                               (Begin
+                                 (list
+                                  (Mvector-rtti-set! a t3)
+                                  (let* ([i-u (next-uid! "index")]
+                                         [i (Var i-u)]
+                                         [x (next-uid! "_")])
+                                    (let$* ([vn (Mvector-size val)])
+                                      (cond$
+                                       [(tupleT?$ t3)
+                                        (let$* ([n (Type-Tuple-num t3)])
+                                          (Repeat i-u (Quote 0) vn x UNIT-IMDT
+                                                  (let$* ([vi (Mvector-val-ref val i)]
+                                                          [cvi (Copy-Tuple n vi)])
+                                                    (Begin
+                                                      (list
+                                                       (Mvector-val-set! val i cvi))
+                                                      (let$* ([ccvi (cast cvi t1 t3 (Quote "") val)]
+                                                              [t4 (Mvector-rtti-ref a)])
+                                                        (if$ (op=? t3 t4)
+                                                             (Mvector-val-set! val i ccvi)
+                                                             (Break-Repeat)))))))]
+                                       [else
+                                        ;; TODO: checking if t3=t4 is unneeded in this case, prove it!
+                                        (Repeat i-u (Quote 0) vn x UNIT-IMDT
+                                                (let$* ([vi (Mvector-val-ref val i)]
+                                                        [cvi (cast vi t1 t3 (Quote "") val)]
+                                                        [t4 (Mvector-rtti-ref a)])
+                                                  (if$ (op=? t3 t4)
+                                                       (Mvector-val-set! val i cvi)
+                                                       (Break-Repeat))))]))))
+                                 val)))))]
+                [other (error 'interp-cast/mvect "unmatched value ~a" other)])
               (Blame lbl)))))
 
 ;; How to Cast a Function to some other type
@@ -696,6 +754,8 @@ form, to the shortest branch of the cast tree that is relevant.
                      (Twosome (Type-GRef-Of type1) (Type-GRef-Of type2) label))]
      [(and$ (Type-MRef-Huh type1) (Type-MRef-Huh type2))
       (error "support mrefs in the simple interpreter")]
+     [(and$ (Type-MVect-Huh type1) (Type-MVect-Huh type2))
+      (error "support mvects in the simple interpreter")]
      [(and$ (Type-Tuple-Huh type1)
             (and$ (Type-Tuple-Huh type2)
                   (op<=? (type-tuple-num type2)
@@ -821,8 +881,36 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Mvector-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
        (Mvector-val-set! e1 e2 e3)]
-      ;; [(MVectCastedRef u i t) (error)]
-      ;; [(MVectCastedSet! u i e t) (error)]
+      [(MVectCastedRef addr (app recur i) t)
+       (let ([t1 (next-uid! "t1")]
+             [t2 (next-uid! "t2")])
+         (Let (list
+               (cons t1 (Mvector-rtti-ref addr))
+               (cons t2 (Type t)))
+           (interp-cast (Mvector-val-ref (Var addr) i) (Var t1) (Var t2) (Quote "") (Quote 0))))]
+      [(MVectCastedSet! addr (app recur i) (app recur e) t)
+       (: mvect-set! (Uid
+                      CoC3-Expr
+                      (U (Quote Cast-Literal) (Var Uid))
+                      (Var Uid) ->
+                      CoC3-Expr))
+       (define (mvect-set! addr i val type)
+         (define-syntax-let$* let$* next-uid!)
+         (let$* ([t1 (Mvector-rtti-ref addr)]
+                 ;; TODO: copy the values first
+                 [cv (interp-cast val type t1 (Quote "") (Var addr))]
+                 [t2 (Mvector-rtti-ref addr)])
+           (begin
+             (if$ (op=? t1 t2)
+                  (Mvector-val-set! (Var addr) i cv)
+                  (Quote 0)))))
+       (let ([t1 (next-uid! "t1")])
+         (Let (list (cons t1 (Type t)))
+           (if (or (Var? e) (Quote? e))
+               (mvect-set! addr i e (Var t1))
+               (let ([val (next-uid! "write_cv")])
+                 (Let (list (cons val e))
+                   (mvect-set! addr i (Var val) (Var t1)))))))]
       
       ;; The translation of the dynamic operation 
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)

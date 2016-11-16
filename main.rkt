@@ -60,6 +60,9 @@
    [("--keep-c") name
     "keep the c intermediate representation"
     (c-path (build-path name))]
+   ["--c-flag" flag
+     "pass extra c flag to the C compiler"
+    (c-flags (cons flag (c-flags)))]
    [("-O") level
     "set the optimization level"
     (define l (string->number level))

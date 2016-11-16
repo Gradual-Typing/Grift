@@ -1,0 +1,2 @@
+(let ([r (mvector 3 3)])
+  (mvector-ref r 2))

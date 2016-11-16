@@ -56,6 +56,7 @@
          (Switch D1-Value (Switch-Case* E) E)
          (Begin D1-Effect* No-Op)
          (Repeat Uid D1-Value D1-Value #f #f E)
+         Break-Repeat
          (App-Code D1-Value D1-Value*)
          (UIL-Op! D1-Value)
          (Assign Uid D1-Value)
