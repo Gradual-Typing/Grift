@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <math.h>
 #define GC_INITIAL_HEAP_SIZE 1048576
-#include "../../../../../src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
+#include "../../../../src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
 /* void *alloc_ptr; */
 /* long free_ptr; */
 /* long limit; */
@@ -64,10 +64,10 @@ typedef struct{
 
 
   
-const double pi = 3.141592653589793;
-const double days_per_year = 365.24;
-const double solar_mass    = 4.0 * pi * pi;
-const double dt            = 0.01;
+double pi = 3.141592653589793;
+double days_per_year = 365.24;
+double solar_mass    = 39.47841760435743; //4.0 * pi * pi;
+double dt            = 0.01;
 body* sun;
 body* jupiter;
 body* saturn;
@@ -313,7 +313,10 @@ int main(int argc, char* argv[]){
   if (argc > 1) {
     iters = atoi(argv[1]);
   } else {
-    iters = 50000000;
+    if (!scanf("%lu", &iters)){
+      fputs("invalid input", stderr);
+      exit(-1);
+    } 
   }
   
   //timer_started = gettimeofday(&timer_start_time, NULL);

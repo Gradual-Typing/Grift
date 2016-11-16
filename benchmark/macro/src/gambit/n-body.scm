@@ -170,7 +170,7 @@ Correct output N = 1000 is
 ;; -------------------------------
 (define (main . args)
   (let ((n (if (fx< (length args) 1)
-               50000000
+               (read)
                (string->number (car args))))
         (system (list *sun* *jupiter* *saturn* *uranus* *neptune*)))
     (offset-momentum system)
