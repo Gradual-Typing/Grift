@@ -11,13 +11,14 @@
 +-------------------------------------------------------------------------------+
 |Input Grammar: Cast0-Lang                                                      |
 +------------------------------------------------------------------------------|#
-(require "../helpers.rkt"
-         "../errors.rkt"
-         "../language/lambda0.rkt"
-         "../language/lambda1.rkt"
-         racket/match
-         racket/list
-         racket/set)
+(require 
+ (submod  "../logging.rkt" typed)
+ "../errors.rkt"
+ "../language/lambda0.rkt"
+ "../language/lambda1.rkt"
+ racket/match
+ racket/list
+ racket/set)
 
 ;; Only the pass is provided by this module
 (provide
@@ -72,7 +73,7 @@
          (and (recur e) (recur* e*))
          #f)]
     ;; Constant data is simple
-    [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _)) #t]
+    [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _) (No-Op)) #t]
     ;; All other forms are simple if their constituents are simple
     [(Letrec bnd* expr)
      (and (recur expr) (recur* (map (inst cdr Uid L0-Expr) bnd*)))]
@@ -201,27 +202,58 @@
     [(Mediating-Coercion-Huh? e) (recur e)]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
 
-(: replace-ref-lam (L1-Lambda (Setof Uid) -> L1-Lambda))
-(define (replace-ref-lam expr v*)
+;; A specialized version of replace-ref that knows it takes and recieves
+;; lambda forms. Since recursive references are always initialized
+;; by the time a lambda on the rhs of a letrec is found recursive
+;; reference are always allowed.
+(: replace-ref-lam (L1-Lambda (Setof Uid) (Setof Uid) -> L1-Lambda))
+(define (replace-ref-lam expr c* l*)
   (match-let ([(Lambda f* (Castable ctr? e)) expr])
-    (Lambda f* (Castable ctr? (replace-ref e v*)))))
+    (Lambda f* (Castable ctr? (replace-ref e c* l* 'ok)))))
 
-(: replace-ref (L1-Expr (Setof Uid) -> L1-Expr))
-(define (replace-ref expr v*)
+(: replace-ref (L1-Expr (Setof Uid) (Setof Uid) (U 'ok 'error Uid) -> L1-Expr))
+;; takes an expression, the uids that refer to complex bindings, the uids that
+;; refer to lambda bindings, and a mode flag.
+;; If the mode is ok the all references to complex bindings are replaced with
+;; unboxing of the complex binding, and all lambda references are allowed.
+;; If the mode is error then all references to complex or lambda bindings result
+;; in a compile time error.
+;; If the mode is a Uid then all references to complex or lambda bindings first
+;; check to ensure that the letrec has finished initializing then retrieve the
+;; referenced value.
+(define (replace-ref expr c* l* uid-inited)
   (define (recur [e : L1-Expr])
-    (replace-ref e v*))
+    (replace-ref e c* l* uid-inited))
   (define (recur* [e* : L1-Expr*])
     (map recur e*))
   (match expr
-    ;;
-    [(Var x)
-     ;; TODO this is broken place checks to make sure it is not
-     ;; possible to get ahold of uninitialized references.
-     (if (set-member? v* x)
-         (Unguarded-Box-Ref (Var x))
-         (Var x))]
+    ;; TODO this is currently less efficient than it should be. We could fix this
+    ;; by implementing the algorithim in "fixing letrec" ie a flow sensitive
+    ;; conservative approximation of when it is ok to reference recursive values.
+    [(and v (Var x))
+     (cond
+       [(set-member? c* x)
+        (cond
+          [(eq? uid-inited 'ok) (Unguarded-Box-Ref (Var x))] 
+          ;; TODO the following error should be more precise and indicates
+          ;; we should retain source locations for expressions throughout the compiler.
+          [(eq? uid-inited 'error)
+           (error 'purify-letrec "reference to uninitalized binding: ~a" x)]
+          [else (If (Unguarded-Box-Ref (Var uid-inited))
+                    (Unguarded-Box-Ref v)
+                    (Blame (Quote (format "reference to uninitalized binding: ~a" x))))])]
+       [(set-member? l* x)
+        (cond
+          [(eq? uid-inited 'ok) v]
+          [(eq? uid-inited 'error) 
+           (error 'purify-letrec "reference to uninitalized binding: ~a" x)]
+          [else (If (Unguarded-Box-Ref (Var uid-inited))
+                    v
+                    (Blame (Quote (format "reference to unintialized binding: ~a" x))))])]
+       [else v])]
     ;; Every other case is just a boring flow agnostic tree traversal
-    [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _)) expr]
+    [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
+    [(or (Code-Label _) (Tag _) (No-Op)) expr]
     [(Lambda f* (Castable ctr e)) (Lambda f* (Castable ctr (recur e)))]
     ;; TODO examine this code and ensure it isn't just doing
     ;; wasted computation we are using unique identifiers
@@ -450,7 +482,17 @@
   (match expr
     ;; The only-interesting case
     [(Letrec bnd* (app pl-expr expr))
+     (define who 'purify-letrec/pl-expr/letrec-matched)
+     (define who-return 'purify-letrec/pl-expr/letrec-match-returns)
+     (debug who (Letrec bnd* expr))
      (define bound-uid* (list->set (map (inst car Uid L0-Expr) bnd*)))
+     ;; TODO casted lambdas are never invoked by there cast
+     ;; if we could determine which lambdas are the result of calling
+     ;; the cast runtime procedure then we wouldn't have to take a
+     ;; performance hit on these.
+     ;; One simple way of doing this would be to purify-letrec before
+     ;; lowering casts then implement the "fixing letrec" algorithm.
+     (: lambda* L1-Bnd-Lambda*)
      (define-values (simple* complex* lambda*)
        (for/fold ([s* : L1-Bnd* '()]
                   [c* : L1-Bnd* '()]
@@ -464,35 +506,57 @@
               [(simple? expr bound-uid* 0 #f)
                (values `([,i . ,expr] . ,s*) c* l*)]
               [else (values s* `([,i . ,expr] . ,c*) l*)])])))
-
      (define t* : Uid* (map (lambda (x) (next-uid! "tmp")) complex*))
      (define c* : Uid* (map (inst car Uid Any) complex*))
+     (define l* : Uid* (map (inst car Uid Any) lambda*))
+     (define i  : Uid  (next-uid! "letrec_initialized"))
      (define setofc* : (Setof Uid) (list->set c*))
-     (define expr^ : L1-Expr 
-       (if (null? complex*) expr (replace-ref expr setofc*)))
+     (define setofl* : (Setof Uid) (list->set l*))
+     ;; Don't traverse expression unless there is work to be done
+     ;; Any replaced references do not need validity checks because
+     ;; the body of a letrec always runs after everything is initialized. 
+     (define expr^ : L1-Expr
+       (if (null? complex*)
+           expr 
+           (replace-ref expr setofc* setofl* 'ok)))
      (define simple-bnd* : L1-Bnd* simple*)
-     (define complex-bnd*
-       (for/list : (Listof L1-Bnd) ([c : Uid c*])
-         (cons c (Unguarded-Box (Quote 0)))))
-     (define lambda-bnd*
+
+     (define (bnd-unitialized-box [c : Uid]) : L1-Bnd
+       (cons c (Unguarded-Box (Quote 0))))
+     
+     (define complex-bnd* : L1-Bnd* 
+       (if (null? complex*)
+           '()
+           (cons (ann (cons i (Unguarded-Box (Quote #f))) L1-Bnd)
+                 (map bnd-unitialized-box c*))))
+     ;; Don't traverse lambdas unless there is work to be done
+     (define lambda-bnd* : L1-Bnd-Lambda*
        (cond
          [(null? complex*) lambda*]
          [else
-          (for/list : (Listof L1-Bnd-Lambda)
-                    ([b : L1-Bnd-Lambda lambda*])
+          (define (make-lambda-bnd [b : L1-Bnd-Lambda])
             (match-define (cons i e) b)
-            (cons i (replace-ref-lam e setofc*)))]))
+            ;; references to complex values in lambda bindings is unchecked because
+            ;; by the time a function in applied the letrec intialization
+            ;; must have completed.
+            (cons i (replace-ref-lam e setofc* setofl*)))
+          (map make-lambda-bnd lambda*)]))
+     
      (define temp-bnd* : L1-Bnd*
        (map (lambda ([t : Uid] [c : L1-Bnd])
               : L1-Bnd
               (match-define (cons _ e) c)
-              (cons t (replace-ref e setofc*)))
+              (cons t (replace-ref e setofc* setofl* i)))
             t* complex*))
+     (define (make-move [c : Uid] [t : Uid]) : L1-Expr
+       (Unguarded-Box-Set! (Var c) (Var t)))
      (define set-complex* : L1-Expr*
-       (map (lambda ([c : Uid] [t : Uid])
-              (Unguarded-Box-Set! (Var c) (Var t)))
-            c* t*))
-     (let* ([let-tmps : L1-Expr
+       (let ([move* (map make-move c* t*)])
+         (if (null? complex*)
+             '()
+             (append move* (list (Unguarded-Box-Set! (Var i) (Quote #t)))))))
+     (define return
+       (let* ([let-tmps : L1-Expr
                       (cond
                         [(null? temp-bnd*) expr^]
                         [else (Let temp-bnd* (Begin set-complex* expr^))])]
@@ -506,8 +570,10 @@
                            [else (Let complex-bnd* let-lambdas)])])
        (cond
          [(null? simple*) let-complex]
-         [else (Let simple* let-complex)]))]
-    [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _)) expr]
+         [else (Let simple* let-complex)])))
+         (debug who-return return)]
+    [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
+    [(or  (Code-Label _) (Tag _) (No-Op)) expr]
     [(Code-Label u)
      (Code-Label u)]
     [(Labels (app pl-expr-bnd-code* b*) (app pl-expr e))
@@ -632,6 +698,7 @@
     [(Break-Repeat) (Break-Repeat)]
     [(Op p (app pl-expr* e*))
      (Op p e*)]
+    [(and nop (No-Op)) nop]
     [(Quote k)
      (Quote k)]
     [(Blame (app pl-expr e))

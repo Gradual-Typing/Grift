@@ -12,12 +12,24 @@
 (define cast-representation : (Parameterof Cast-Representation)
   (make-parameter 'Coercions))
 
+(define program-must-be-statically-typed? : (Parameterof Boolean)
+  (make-parameter #f))
+
 ;; Optimizations options
 (: dynamic-operations? (Parameterof (U Boolean 'inline)))
 (define dynamic-operations? (make-parameter #t))
 
+;; Vector Behavior
+(define bounds-checks? : (Parameterof Boolean)
+  (make-parameter #t))
+(define reference-semantics : (Parameterof (U 'Monotonic 'Guarded))
+  (make-parameter 'Guarded))
+(: inline-guarded-branch? (Parameterof Boolean))
+(define inline-guarded-branch? (make-parameter #t))
+
+;; Cast behavior 
 (: specialize-cast-code-generation? (Parameterof Boolean))
-(define specialize-cast-code-generation? (make-parameter #f))
+(define specialize-cast-code-generation? (make-parameter #t))
 
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof (Option Path))
@@ -31,6 +43,7 @@
 (define-type GC (U 'Boehm 'None))
 (define garbage-collector : (Parameterof GC)
   (make-parameter 'Boehm))
+
 
 
 ;; Interaction with the c compiler

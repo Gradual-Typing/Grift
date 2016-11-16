@@ -267,6 +267,7 @@
            [((cons l r)) (cons l (recur r))])
          (Switch (recur e) (map recur-case c*) (recur d))]
         [(Op p (app recur* e*)) (Op p e*)]
+        [(and nop (No-Op)) nop]
         [(Quote k) (Quote k)]
         [(Tag t)   (Tag t)]
         ;; Observables Representation

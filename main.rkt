@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require "src/compile.rkt" racket/cmdline)
+(require "src/compile.rkt" racket/cmdline racket/match)
 
 (provide (all-from-out "src/compile.rkt"))
 
@@ -25,18 +25,36 @@
       [("Hyper-Coercions") (error 'schml "Hyper-Coercions not yet supported")]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
+   [("--assert-statically-typed")
+    "Raise an error unless the program is statically typed"
+    (program-must-be-statically-typed?)]
+   #:once-any
+   [("--reference-semantics") semantics
+    "Monotonic, Guarded (defualt Guarded)"
+    (match semantics
+      ["Monotonic" (reference-semantics 'Monotonic)]
+      ["Guarded"   (reference-semantics 'Guarded)]
+      [other (error 'reference-semantics "flag provided: ~v" other)])]
+   [("--monotonic-references")
+    "vectors and references default to monotonic semantics"
+    (reference-semantics 'Monotonic)]
+   #:once-each
    [("-o") output-str
     "specify output path for executable"
     (output-path (string->path output-str))]
    [("--keep-c") name
     "keep the c intermediate representation"
     (c-path (build-path name))]
+   ["--c-flag" flag
+     "pass extra c flag to the C compiler"
+    (c-flags (cons flag (c-flags)))]
    [("-O") level
     "set the optimization level"
     (define l (string->number level))
-    (when (and (exact-nonnegative-integer? l) (<= 0 l 3))
-      (error 'schml "flag given incorrect input ~v" level))
     (c-flags (cons (format "-O~a" l) (c-flags)))]
+   [("--disable-bounds-checks")
+    "code genererated won't check if indices are in bounds"
+    (bounds-checks? #f)]
    [("--open-coded-casts")
     "turn on cast specialization"
     (specialize-cast-code-generation? #t)]

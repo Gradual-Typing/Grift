@@ -334,8 +334,7 @@ form, to the shortest branch of the cast tree that is relevant.
      prgm-exp))
   
   (Prog (list prgm-name (unique-counter-next! unique-counter) prgm-type)
-    (Labels gradual-runtime-bindings
-      (Observe  exp-with-lowered-gradual-operations prgm-type))))
+    (Labels gradual-runtime-bindings exp-with-lowered-gradual-operations)))
 
 ;; These templates are used to build the code that performs
 ;; casting at runtime. The templates are a little over
@@ -959,6 +958,8 @@ form, to the shortest branch of the cast tree that is relevant.
        (Ref-Coercion-Write (recur e))]
       [(Quote-Coercion c)
        (Quote-Coercion c)]
+      [(Observe e t) (Observe (recur e) t)]
+      [(and noop (No-Op)) noop]
       [(Code-Label u)
        (Code-Label u)]
       [(Labels c* e)

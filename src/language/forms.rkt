@@ -39,6 +39,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Top level wrapper for combining compiler
   ;; state, meta-information, and the program AST
   (Prog annotation expression)
+  (Define rec? id type expression)
   ;; Top Level Forms
   (Expression e)
   ;; Annotations that may be added to other AST nodes
@@ -262,6 +263,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-forms
   (Unit)
   (Int)
+  (Float)
   (Bool)
   (Dyn)
   (Fn arity fmls ret)
@@ -284,6 +286,7 @@ And a type constructor "name" expecting the types of field1 and field2
 ;;Constants for the types
 (define UNIT-TYPE (Unit))
 (define INT-TYPE (Int))
+(define FLOAT-TYPE (Float))
 (define BOOL-TYPE (Bool))
 (define DYN-TYPE (Dyn))
 (define REF-DYN-TYPE (GRef DYN-TYPE))
@@ -300,11 +303,6 @@ And a type constructor "name" expecting the types of field1 and field2
 (define BOTTOM-TYPE (Bottom-Type))
 (define VOID-TYPE (Void-Type))
 |#
-(define INTxINT-TYPE (list INT-TYPE INT-TYPE))
-(define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
-(define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
-(define ->UNIT-TYPE (Fn 0 '() UNIT-TYPE))
-(define ->INT-TYPE (Fn 0 '() INT-TYPE))
 
 ;; Are two types consistent at the top of the types?
 (: shallow-consistent? (Any Any -> Boolean))
@@ -367,99 +365,13 @@ And a type constructor "name" expecting the types of field1 and field2
 | Types shared by the Schml language family
 +-----------------------------------------------------------------------------|#
 
-(define-type Schml-Primitive (U Schml-Prim Schml-Prim!))
-
-#;(: schml-primitive? (-> Any Boolean : Schml-Primitive))
-#;
-(define (schml-primitive? x)
-  (or (schml-prim? x) (schml-prim!? x)))
-
-(define-predicate schml-primitive? Schml-Primitive)
-
-(define-type Schml-Prim
-  (U IntxInt->Int-Primitive
-     IntxInt->Bool-Primitive
-     ->Int-Primitive))
-
-(define-predicate schml-prim? Schml-Prim)
-
-#;(: schml-prim? (Any -> Boolean : Schml-Prim))
-#;
-(define (schml-prim? x)
-  (or (IntxInt->Int-primitive? x)
-      (IntxInt->Bool-primitive? x)))
-
-(define-type Schml-Prim!
-  (U Timer-Primitive))
-
-(define-predicate schml-prim!? Schml-Prim!)
-#;(: schml-prim!? (Any -> Boolean : Schml-Prim!))
-#;
-(define (schml-prim!? x)
-  (or (timer-primitive? x)))
-
-(define-type IntxInt->Int-Primitive (U '* '+ '-
-                                       'binary-and 'binary-or 'binary-xor
-                                       '%/ '%>> '%<< '%%))
-
-(define-type IxI->I-Prim IntxInt->Int-Primitive)
-
-(define-predicate IntxInt->Int-primitive? IntxInt->Int-Primitive)
-
-(define-type ->Int-Primitive (U 'read-int))
-(define-type ->I-Prim ->Int-Primitive)
-
-(define-predicate ->Int-primitive? ->Int-Primitive)
-
-
-#;(: IntxInt->Int-primitive? (-> Any Boolean : IntxInt->Int-Primitive))
-#;
-(define (IntxInt->Int-primitive? x)
-  
-  #;(memq x '(* + - binary-and binary-or binary-xor %/ %>> %<<))
-  )
-
-
-(define-type IntxInt->Bool-Primitive (U '< '<= '= '> '>=))
-(define-type IxI->B-Prim IntxInt->Bool-Primitive)
-(define-predicate IntxInt->Bool-primitive? IntxInt->Bool-Primitive)
-
-#;(: IntxInt->Bool-primitive? (Any -> Boolean : IntxInt->Bool-Primitive))
-#;
-(define (IntxInt->Bool-primitive? x)
-  (memq x '(< <= = > >=))
-  #;                     
-  (or (eq? '< x)
-      (eq? '<= x)
-      (eq? '= x)
-      (eq? '> x)
-      (eq? '>= x)))
-
-#|
-(define-type IntxNon0->Int-Primitives '/)
-(define-type Ix!0->I IntxNon0->Int-Primitives)
-(define-predicate IntxNon0->Int-Prim? IntxNon0->Int-Primitives)
-
-(define-type IntxNibble->Int-Primitives (U '<< '>>))
-(define-type IxN->I IntxNibble->Int-Primitives)
-(define-predicate IntxNibble->Int-Prim? IntxNibble->Int-Primitives)
-|#
-
-(define-type Timer-Primitive (U 'timer-start 'timer-stop 'timer-report))
-
-(: timer-primitive? (Any -> Boolean : Timer-Primitive))
-(define (timer-primitive? x)
-  (or (eq? 'timer-start  x)
-      (eq? 'timer-stop   x)
-      (eq? 'timer-report x)))
-
 #| Literals of the schml languages
 Only Integers and Booleans in the schml language are first
 class literal constants
 |#
 
 (define-type Schml-Literal
-  (U Integer Boolean Null))
+  (U Integer Boolean Null Real))
 
 #;(: platform-integer? (Any -> Boolean : Integer))
 #;
@@ -470,7 +382,8 @@ class literal constants
 (define (schml-literal? x)
   (or (exact-integer? x)
       (boolean? x)
-      (null? x)))
+      (null? x)
+      (real? x)))
 
 (: schml-literal->type (Schml-Literal -> (U Bool Int Unit)))
 (define (schml-literal->type x)
@@ -481,13 +394,14 @@ class literal constants
     [else (error 'language/schml-literal->type "~a" x)]))
 
 ;; Types in the schml languages
-(define-type  Base-Type (U Int Bool Unit))
+(define-type  Base-Type (U Int Bool Unit Float))
 
 (: base-type? (Any -> Boolean : Base-Type))
 (define (base-type? x)
   (or (Int? x)
       (Bool? x)
-      (Unit? x)))
+      (Unit? x)
+      (Float? x)))
 
 (define-type+ Schml-Type ([Schml-Type* Listof]
 			  [Schml-Type? Option])
@@ -513,7 +427,7 @@ class literal constants
      (MRef  Schml-Type)
      (MVect Schml-Type)))
 
-(define-type Atomic-Schml-Type (U Unit Int Bool Dyn))
+(define-type Atomic-Schml-Type (U Unit Int Bool Dyn Float))
 
 (: schml-type? (Any -> Boolean : Schml-Type))
 (define (schml-type? x)
@@ -565,6 +479,8 @@ class literal constants
   (define (both-bool? t g) (and (Bool? t) (Bool? g)))
   (: both-int? ConsistentT)
   (define (both-int? t g) (and (Int? t) (Int? g)))
+  (: both-float? ConsistentT)
+  (define (both-float? t g) (and (Float? t) (Float? g)))
   (: consistent-fns? ConsistentT)
   (define (consistent-fns? t g)
     (and (Fn? t) (Fn? g)
@@ -597,6 +513,7 @@ class literal constants
       (both-unit? t g)
       (both-bool? t g)
       (both-int? t g)
+      (both-float? t g)
       (consistent-fns? t g)
       (consistent-tuples? t g)
       (consistent-grefs? t g)
@@ -726,37 +643,6 @@ Dyn
 (define meet+ (move+ down))
 
 
-(module* test racket
-  (require (submod ".."))
-  (require rackunit)
-
-  (define dynxdyn->dyn (Fn 2 (list (Dyn) (Dyn)) (Dyn)))
-  
-  (check-equal? (join INTxINT->INT-TYPE dynxdyn->dyn)
-                INTxINT->INT-TYPE)
-  (check-equal? (join+ (list (Fn 2 (list (Int) (Int)) (Dyn))
-                             (Fn 2 (list (Dyn) (Int)) (Int))
-                             dynxdyn->dyn))
-                INTxINT->INT-TYPE)
-
-  (check-equal? (meet INTxINT->INT-TYPE dynxdyn->dyn)
-                dynxdyn->dyn)
-  (check-equal? (meet+ (list (Fn 2 (list (Int) (Int)) (Dyn))
-                             (Fn 2 (list (Dyn) (Int)) (Int))
-                             dynxdyn->dyn))
-                dynxdyn->dyn)
-
-  (check-equal? (meet (Fn 1 (list (Bool)) (Int))
-                      (Fn 1 (list (Int)) (Int)))
-                (Bottom (Bool) (Int)))
-
-  (check-equal? (join (Fn 1 (list (Bool)) (Int))
-                      (Fn 1 (list (Int)) (Int)))
-                (Bottom (Bool) (Int)))
-  
-)
-
-
 (define-forms
   (Coercion coercion)
   (Twosome type1 type2 lbl)
@@ -872,7 +758,7 @@ Dyn
 
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 
-(define-type Data-Literal (U Integer String))
+(define-type Data-Literal (U Integer String Inexact-Real))
 
 #|------------------------------------------------------------------------------
   Compact Types and Coercions are a compile time hash-consing of types

@@ -68,6 +68,8 @@
       [(Quote k) (Quote k)]
       [(Halt) (Halt)]
       [(Success) (Success)]
+      ;; FIXME: Come up with a more compelling intermediate language
+      [(No-Op) (Success)]
       ;; forms that don't quite work out because normalize
       ;; context is after specify
       ;; I could do
@@ -107,6 +109,7 @@
       [(Halt) (Halt)]
       [(Assign u (app nc-value v))
        (Begin (list (Assign u v)) UNIT-IMDT)]
+      [(No-Op) (error 'normalize-context "no-op in value context")]
       [other (error 'normalize-context "umatched ~a" other)]))
   (: nc-effect (-> D0-Expr D1-Effect))
   (define (nc-effect exp)
@@ -142,6 +145,7 @@
       [(Var i)  NO-OP]
       [(Code-Label i) NO-OP]
       [(Quote k) NO-OP]
+      [(No-Op) NO-OP]
       [other (error 'normalize-context "umatched ~a" other)]))
   (: nc-pred (-> D0-Expr D1-Pred))
   (define (nc-pred exp)
@@ -170,9 +174,11 @@
              [(list a b) (Relop p a b)]
              [other (error 'nc-pred-op)])
            (Relop '= TRUE-IMDT (nc-value-op p val*)))]
+      [(No-Op) (error 'nc-pred "no-op in pred context")]
       [(app nc-value v) (Relop '= TRUE-IMDT v)]))
-  (: nc-value* (-> D0-Expr* D1-Value*))
-  (define (nc-value* exp*) (map nc-value exp*))
+
+(: nc-value* (-> D0-Expr* D1-Value*))
+(define (nc-value* exp*) (map nc-value exp*))
   (: nc-effect* (-> D0-Expr* D1-Effect*))
   (define (nc-effect* exp*) (map nc-effect exp*))
   (: nc-bnd* (-> D0-Bnd* D1-Bnd*))
@@ -194,11 +200,11 @@
 (: nc-value-op (-> (U UIL-Prim UIL-Prim!) D1-Value* D1-Value))
 (define (nc-value-op p exp*)
   (cond
-   [(IntxInt->Bool-primitive? p)
-    (match exp*
-      [(list a b)
-       (If (Relop p a b) TRUE-IMDT FALSE-IMDT) ]
-      [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
-   [(uil-prim-value? p) (Op p exp*)]
-   [(uil-prim-effect? p) (Begin (list (Op p exp*)) UNIT-IMDT)]
+    [(uil-prim-pred? p)
+     (match exp*
+       [(list a b)
+        (If (Relop p a b) TRUE-IMDT FALSE-IMDT)]
+       [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
+    [(uil-prim-value? p) (Op p exp*)]
+    [(uil-prim-effect? p) (Begin (list (Op p exp*)) UNIT-IMDT)]
    [else (error 'nc-value-op "primitive out of context ~v ~v" p exp*)]))

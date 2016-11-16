@@ -283,6 +283,8 @@ T?l $ (_  ; )  = what here
        (build-application exp exp*)]
       ;; Just Recursion Cases Follow
       ;; Should be pretty boring
+      [(Observe (app recur e) t) (Observe e t)]
+      [(and noop (No-Op)) noop]
       [(Letrec (app recur-in-bnd* bnd*) (app recur exp))
         (Letrec bnd* exp)]
       [(Let (app recur-in-bnd* bnd*) (app recur exp))

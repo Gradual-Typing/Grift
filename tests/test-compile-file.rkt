@@ -13,7 +13,7 @@
 
 (provide (all-defined-out))
 
-(define-check (check-io th input output error)
+(define-check (check-io run-thunk input output error)
   (define outp (open-output-string 'current-output-string))
   (define errp (open-output-string 'current-error-string))
   (define old-cop (current-output-port))
@@ -26,13 +26,21 @@
                    [current-error-port errp])
       (with-handlers ([exn:break? abort]
                       [exn:fail? print-exn]
-                      [exn:schml? print-exn])
-        (parameterize-break #t (th)))))
+                      [exn:schml? print-exn]) 
+        (parameterize-break #t (run-thunk)))))
   (define out (get-output-string outp))
   (define err (get-output-string errp))
   (unless (and (regexp-match? output out)
                (regexp-match? error  err))
-    (fail-check (format "umatched io:\nstandard out=~v\nerror out=~v\n" out err)))
+    (fail-check
+     (string-append
+      (format "umatched io:\n")
+      (format "stdio:\n")
+      (format "\texpected=\n~a\n" output)
+      (format "\trecieved=\n~a\n" out)
+      (format "stderr:\n")
+      (format "\texpected=\n~a\n" error)
+      (format "\trecieved=\n~a\n" err))))
   returns)
 
 (define (maybe-file->regexp-match? path default)

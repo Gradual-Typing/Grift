@@ -6,6 +6,7 @@
          racket/function
          racket/file
          racket/format
+         racket/system
          ;;"../src/helpers.rkt"
          (except-in "./test-compile.rkt" debug)
          "./paths.rkt"
@@ -104,12 +105,13 @@
       #:before print-path
       (check-io
        (thunk*
-        (compile
-         p
-         #:output  tmp-exe
-         #:keep-c  (path-replace-suffix tmp-exe ".c")
-         #:keep-s  (path-replace-suffix tmp-exe ".s")
-         #:cast   cast))
+        (system*
+         (compile
+          p
+          #:output  tmp-exe
+          #:keep-c  (path-replace-suffix tmp-exe ".c")
+          #:keep-s  (path-replace-suffix tmp-exe ".s")
+          #:cast   cast)))
        input out-rx err-rx)))))
 
 

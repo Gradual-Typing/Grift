@@ -15,11 +15,13 @@
   ;; types
   (TYPE-TAG-MASK                  #b111)  
   ;; unallocated types
-  (TYPE-ATOMIC-TAG                #b111)
-  (TYPE-DYN-RT-VALUE              #b0111)
-  (TYPE-INT-RT-VALUE              #b1111)
-  (TYPE-BOOL-RT-VALUE             #b10111)
-  (TYPE-UNIT-RT-VALUE             #b11111)
+  (TYPE-ATOMIC-TAG #b111) ;; This should be TYPE-IMDT-TAG
+  ;; Immediate types are tagged with #b111
+  (TYPE-DYN-RT-VALUE   #b000111)
+  (TYPE-INT-RT-VALUE   #b001111)
+  (TYPE-BOOL-RT-VALUE  #b010111)
+  (TYPE-UNIT-RT-VALUE  #b011111)
+  (TYPE-FLOAT-RT-VALUE #b100111)
   ;; function type representation
   (TYPE-FN-TAG                    #b000)
   (TYPE-FN-ARITY-INDEX            0)
@@ -141,3 +143,4 @@
   (HYBRID-PROXY-TAG               #b001)
   (HYBRID-PROXY-CRCN-INDEX        2)
   (HYBRID-PROXY-CLOS-INDEX        1))
+

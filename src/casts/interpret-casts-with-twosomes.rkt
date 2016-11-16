@@ -360,8 +360,7 @@ form, to the shortest branch of the cast tree that is relevant.
      prgm-exp))
 
   (Prog (list prgm-name (unique-counter-next! unique-counter) prgm-type)
-    (Labels gradual-runtime-bindings
-      (Observe  exp-with-lowered-gradual-operations prgm-type)))
+    (Labels gradual-runtime-bindings exp-with-lowered-gradual-operations))
   #;
   (let* ([exp (ic-expr interp-uid interp compose prgm-exp)]
          [next (unbox next-unique-number)]
@@ -442,6 +441,10 @@ form, to the shortest branch of the cast tree that is relevant.
      [(op=? type1 (Type BOOL-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
            (Dyn-make value (Type BOOL-TYPE))
+           (Blame lbl))]
+     [(op=? type1 (Type FLOAT-TYPE))
+      (if$ (op=? (Type DYN-TYPE) type2)
+           (Dyn-make value (Type FLOAT-TYPE))
            (Blame lbl))]
      [(op=? type1 (Type UNIT-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
@@ -958,6 +961,8 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; for apply here but it is currently postponed until
       ;; closure conversion.
       [(App-Fn e e*) (App-Fn (recur e) (map recur e*))]
+      [(Observe e t) (Observe (recur e) t)]
+      [(and noop (No-Op)) noop]
       [(Code-Label u)
        (Code-Label u)]
       [(Labels c* e)

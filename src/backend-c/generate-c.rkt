@@ -47,6 +47,7 @@
         [runtime (format "\"~a\"" runtime.h-path)])
     (list timer runtime)))
 
+;; TODO consider if this in needed (runtime.h provides this declaration)
 (: C-DECLARATIONS (Listof String))
 (define C-DECLARATIONS
   '("int64_t read_int();"))
@@ -75,6 +76,8 @@
     ['Boehm (display "GC_INIT();\n")]
     ['None (printf "nonegc_init(~a);\n" (* (init-heap-kilobytes) 1024))]))
 
+
+;; TODO make these C Macros
 (define-values (timer-start timer-stop timer-report timer-boiler-plate)
   (cond
    [(timer-uses-process-time?)
@@ -146,8 +149,9 @@
        (format "#define GC_INITIAL_HEAP_SIZE ~a\n" (* (init-heap-kilobytes) 1024))
        (format "#include \"~a\"\n" boehm-gc.h-path)))]
     ['None (printf "#include \"~a\"" none-gc.h-path)])
-  (newline)
-  (for ([d : String C-DECLARATIONS])
+  ;; TODO remove this and C-DECLATIONS definition if this works
+  #;(newline)
+  #;(for ([d : String C-DECLARATIONS])
     (display d)
     (newline))
   (newline)
@@ -308,7 +312,8 @@
     [(App-Code v v*)       (emit-function-call v v*)]
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
-    [(Quote k)        (print k)]
+    [(Quote (? inexact-real? f))  (printf "float_to_imdt(~a)" f)]
+    [(Quote k)            (print k)]
     ;; TODO Consider changing how Halt is handled
     [(Halt)           (display "exit(-1),-1")]
     [(Code-Label i)  (begin
@@ -373,58 +378,146 @@
             (emit-value exp))]
     [(No-Op) (display " 0 ")]))
 
+(define-type Emitter (-> Void))
+(define-type Caster  (Emitter -> Void))
+
+(: emit-easy-op :
+   (Listof D5-Value) (U 'infix-op 'function 'identity) String
+   (Listof Caster) (Listof Caster) -> Void)
+(define (emit-easy-op args type op arg-cast return-cast)
+  (define (expr-th)
+    (match* (type args arg-cast)
+      [('infix-op (list e1 e2) (list c1 c2))
+       (c1 (thunk (emit-value e1)))
+       (display #\space) (display op) (display #\space)
+       (c2 (thunk (emit-value e2)))]
+      [('function e*  c*)
+       (define e.c* (map (inst cons D5-Value Caster) e* c*))
+       (: emit-e.c : ((Pair D5-Value Caster) -> Void))
+       (define/match (emit-e.c e.c)
+         [((cons e c)) (c (thunk (emit-value e)))])
+       (display op) (sequence emit-e.c e.c* display "(" "" "," "" ")")]
+      [('identity (list e) (list c))
+       (c (thunk (emit-value e)))]
+      [(other wi se) (error 'emit-easy-op/expr-th "unmatched ~v" other)]))
+  (emit-wrap
+   (if (pair? return-cast)
+       ((car return-cast) expr-th)
+       (expr-th))))
+
+(: float->imdt Caster)
+(define (float->imdt th) (display "float_to_imdt")(emit-wrap (th)))
+(: imdt->float Caster)
+(define (imdt->float th) (display "imdt_to_float")(emit-wrap (th)))
+
+(: no-cast Caster)
+(define (no-cast th) (th))
+(define imdt->int   no-cast)
+(define int->imdt   no-cast)
+(define bool->imdt  no-cast)
+(: imdt->string Caster)
+(define (imdt->string th) (display "(char*)") (th))
+(define-type  IMPL (List (U 'function 'infix-op 'identity) String (Listof Caster) (Listof Caster)))
+(define prim-impl : (HashTable Symbol IMPL)
+  ;; TODO If we keep types we could drop these type casts at primitives and
+  ;; possibly generate cleaner more understandable code.
+  ;; A possible intermediate step would be to generate this table from
+  ;; a operator giving type information
+  (make-immutable-hash
+   `((+          infix-op "+"     (,imdt->int ,imdt->int) (,int->imdt))
+     (-          infix-op "-"     (,imdt->int ,imdt->int) (,int->imdt))
+     (*          infix-op "*"     (,imdt->int ,imdt->int) (,int->imdt))
+     (%<<        infix-op "<<"    (,imdt->int ,imdt->int) (,int->imdt))
+     (%>>        infix-op ">>"    (,imdt->int ,imdt->int) (,int->imdt))
+     (%/         infix-op "/"     (,imdt->int ,imdt->int) (,int->imdt))
+     (%%         infix-op "%"     (,imdt->int ,imdt->int) (,int->imdt))
+     (binary-and infix-op "&"     (,imdt->int ,imdt->int) (,int->imdt))
+     (binary-or  infix-op "|"     (,imdt->int ,imdt->int) (,int->imdt))
+     (binary-xor infix-op "^"     (,imdt->int ,imdt->int) (,int->imdt))
+     (<          infix-op "<"     (,imdt->int ,imdt->int) (,bool->imdt))
+     (<=         infix-op "<="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (=          infix-op "=="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (>          infix-op ">"     (,imdt->int ,imdt->int) (,bool->imdt))
+     (>=         infix-op ">="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (fl+        infix-op "+"     (,imdt->float ,imdt->float) (,float->imdt))
+     (fl-        infix-op "-"     (,imdt->float ,imdt->float) (,float->imdt))
+     (fl*        infix-op "*"     (,imdt->float ,imdt->float) (,float->imdt))
+     (fl/        infix-op "/"     (,imdt->float ,imdt->float) (,float->imdt))
+     (flmodulo   function "fmod"  (,imdt->float ,imdt->float) (,float->imdt))
+     (fl<        infix-op "<"     (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl<=       infix-op "<="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl=        infix-op "=="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl>        infix-op ">"     (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl>=       infix-op ">="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (flabs      function "fabs"  (,imdt->float) (,float->imdt))
+     (flfloor    function "floor" (,imdt->float) (,float->imdt))
+     (flceiling  function "ceil"  (,imdt->float) (,float->imdt))
+     (flcos      function "cos"   (,imdt->float) (,float->imdt))
+     (fltan      function "tan"   (,imdt->float) (,float->imdt))
+     (flasin     function "asin"  (,imdt->float) (,float->imdt))
+     (flacos     function "acos"  (,imdt->float) (,float->imdt))
+     (flatan     function "atan"  (,imdt->float) (,float->imdt))
+     (flatan2    function "atan2" (,imdt->float ,imdt->float) (,float->imdt)) 
+     (fllog      function "log"   (,imdt->float) (,float->imdt))
+     (flexp      function "exp"   (,imdt->float) (,float->imdt))
+     (flsqrt     function "sqrt"  (,imdt->float) (,float->imdt))
+     (Print      function "printf"  (,imdt->string) ())
+     (Exit       function "exit"  (,no-cast) ())
+     (int->float identity "none"  (,imdt->float) ())
+     (read-int   function "read_int"   () (,int->imdt))
+     (read-float function "read_float" () (,float->imdt)))))
+(define (easy-p? [s : Symbol]) : Boolean
+  (if (hash-ref prim-impl s #f) #t #f))
+(define (easy-p->impl [s : Symbol]) : IMPL
+  (define (err) (error 'easy-p->impl))
+  (hash-ref prim-impl s err))
+
 (: emit-op (-> Symbol D5-Value* Void))
 (define (emit-op p exp*)
   (match* (p exp*)
-    ;;[('Exit '()) (display C-EXIT)]
-    [('Array-set! (list a o v)) (begin
-                                  (emit-wrap (display "(int64_t*)")
-                                             (emit-value a))
-                                  (display "[")
-                                  (emit-value o)
-                                  (display "] = ")
-                                  (emit-value v))]
-    [('Array-ref (list a o)) (begin
-                               (emit-wrap (display "(int64_t*)")
-                                          (emit-value a))
-                               (display "[")
-                               (emit-value o)
-                               (display "]"))]
-    [('Printf (cons fmt exp*)) (begin (display "printf")
-                                      (emit-wrap
-                                       (emit-value fmt)
-                                       (unless (null? exp*)
-                                         (display ", ")
-                                         (sequence emit-value exp* display "" "(void *)" "," "" ""))))]
-    [('Print (list exp)) (begin (display "puts") (emit-wrap (emit-cast->string (emit-value exp))))]
+    [('Array-set! (list a o v))
+     (begin
+       (emit-wrap (display "(int64_t*)")
+                  (emit-value a))
+       (display "[")
+       (emit-value o)
+       (display "] = ")
+       (emit-value v))]
+    [('Array-ref (list a o))
+     (begin
+       (emit-wrap (display "(int64_t*)")
+                  (emit-value a))
+       (display "[")
+       (emit-value o)
+       (display "]"))]
+    [('print-float (list f p))
+     (display "printf")
+     (emit-wrap (display "\"%.*lf\",")
+                (emit-value p)
+                (display ", ")
+                (display "imdt_to_float")
+                (emit-wrap (emit-value f)))]
+    [('Printf (cons fmt exp*))
+     (begin (display "printf")
+            (emit-wrap
+             (emit-value fmt)
+             (unless (null? exp*)
+               (display ", ")
+               (sequence emit-value exp* display "" "(void *)" "," "" ""))))]
     [('Alloc (list exp))
+     ;; TODO this could be implemented in the C Code as a layer of macros
      (match (garbage-collector)
        ['Boehm (display "GC_MALLOC(8 * ")
                (emit-value exp)
                (display ")")]
        ['None (display "nonegc_malloc(8 * ")
               (emit-value exp)
-              (display ")")])]
-    [('Exit (list exp)) (begin (display "exit") (emit-wrap (emit-value exp)))]
+              (display ")")])]    
     [('timer-start (list)) (display timer-start)]
     [('timer-stop  (list)) (display timer-stop)]
     [('timer-report (list)) (display timer-report)]
-    [('read-int (list)) (display "read_int()")]
-    [(p (list exp1 exp2))
-     (emit-wrap
-      (emit-value exp1)
-      (case p
-        [(+ - * < <= > >=) (display #\space) (display p) (display #\space)]
-        [(=) (display " == ")]
-        [(%>>) (display " >> ")]
-        [(%<<) (display " << ")]
-        [(%/) (display " / ")]
-        [(%%) (display " % ")]
-        [(binary-and) (display " & ")]
-        [(binary-or)  (display " | ")]
-        [(binary-xor) (display " ^ ")]
-        [else (error 'backend-c-emit-op)])
-      (emit-value exp2))]
+    [((? easy-p? (app easy-p->impl (list t s a* r))) e*)
+     (emit-easy-op e* t s a* r)]
     [(other wise) (error 'backend-c/generate-c/emit-op "unmatched value")]))
 
 

@@ -1,13 +1,17 @@
 #lang typed/racket/base
-(require "forms.rkt")
-(provide (all-from-out "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
+(provide (all-from-out "forms.rkt" "primitives.rkt")
          (all-defined-out))
 #|-----------------------------------------------------------------------------+
 | Language/Schml1 created by type-check
 +-----------------------------------------------------------------------------|#
 
 (define-type Schml1-Lang
-  (Prog (List String Natural Schml-Type) S1-Expr))
+  (Prog (List String Natural Schml-Type) (Listof S1-Top)))
+
+(define-type S1-Top
+  (U (Define Boolean Uid Schml-Type S1-Expr)
+     (Observe S1-Expr Schml-Type)))
 
 (define-type S1-Expr
   ;; This slightly complicated formulation of lambda's Structure allows me

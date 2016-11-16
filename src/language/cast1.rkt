@@ -12,6 +12,7 @@
 
 (define-type C1-Expr
   (Rec E (U ;; Non-Terminals
+          (Observe E Schml-Type)
 	  (Lambda Uid* (Castable (Option Uid) E))
 	  (Letrec C1-Bnd* E)
 	  (Let C1-Bnd* E)

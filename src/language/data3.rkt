@@ -42,7 +42,7 @@
       (U (If D3-Pred P P)
          (Switch D3-Trivial (Switch-Case* P) P)
          (Begin D3-Effect* P)
-         (Relop IxI->B-Prim D3-Trivial D3-Trivial))))
+         (Relop UIL-Pred-Prim D3-Trivial D3-Trivial))))
 
 (define-type D3-Effect
  (Rec E

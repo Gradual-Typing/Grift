@@ -78,8 +78,7 @@ becuse it is actually more of a stmt contexts itself.
        (let ([t (fv-pred t)])
          (match-let ([(cons c* c) (fv-value c)]
                      [(cons a* a) (fv-value a)]
-                     [id (local-next-uid! "ifValue"
-                          )])
+                     [id (local-next-uid! "ifValue")])
            (let* ([ca : D4-Effect (Assign id c)]
                   [aa : D4-Effect (Assign id a)]
                   [cb : D4-Effect (make-begin (snoc c* ca) NO-OP)]

@@ -1,8 +1,8 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 
 #|------------------------------------------------------------------------------
 Cast-or-Coerce3.1-Lang is the product of hoist-types
@@ -161,7 +161,8 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Type-Tuple-item E Index)
           (Make-Tuple-Coercion Uid E E E)
           (Compose-Tuple-Coercion Uid E E)
-          (Mediating-Coercion-Huh? E))))
+          (Mediating-Coercion-Huh? E)
+          No-Op)))
 
 (define-type CoC3.1-Code (Code Uid* CoC3.1-Expr))
 (define-type CoC3.1-Expr* (Listof CoC3.1-Expr))

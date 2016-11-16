@@ -1,8 +1,8 @@
 #lang typed/racket/base
 
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 
 (define-type Bnd-Type (Pairof Uid Compact-Type))
 (define-type Bnd-Type* (Listof Bnd-Type))
@@ -16,6 +16,7 @@
 
 (define-type L0-Expr
   (Rec E (U ;; Code Labels
+          No-Op
           (Code-Label Uid)
           (Labels L0-Bnd-Code* E)
           (App-Code E (Listof E))

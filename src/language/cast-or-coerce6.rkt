@@ -1,8 +1,8 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 #|-----------------------------------------------------------------------------+
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
@@ -103,6 +103,7 @@
           Break-Repeat
           ;;Primitives
           (Op Schml-Primitive (Listof E))
+          No-Op
           (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
 	  ;;(Cast E (Twosome Schml-Type Schml-Type Blame-Label))

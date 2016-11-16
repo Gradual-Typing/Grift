@@ -39,6 +39,7 @@ Provide comments about where to find definitions of types and data
 ;; Only the pass is provided by this module
 (provide type-check)
 
+#;
 (module* typed typed/racket/base
   (require "../language/schml0.rkt"
            "../language/schml1.rkt")
@@ -50,13 +51,91 @@ Provide comments about where to find definitions of types and data
 
 (: type-check (Schml0-Lang -> Schml1-Lang))
 (define (type-check prgm)
-  (match-define (Prog (list n c) e) prgm)
-  (define-values (new-exp type) (tc-expr e (hash)))
-  (debug (Prog (list n c type) new-exp)))
+  (match-define (Prog (list n c) top-level*) prgm)
+  (debug (Prog (list n c INT-TYPE) (tc-top* top-level*))))
+
+(: tc-top* (->* (S0-Top*) (Env) -> S1-Top*))
+(define (tc-top* t* [env (hash)])
+  (match t*
+    [(cons (Ann (Define #f i t? e) s) t*-rest)
+     (define-values (new-e e-type) (tc-expr e env))
+     (debug t? e-type)
+     (define i-type
+       (cond
+         [(not t?) e-type]
+         [(consistent? t? e-type) t?]
+         [else (error 'static-type-error "~a: inconsistent typed ~a and ~a"
+                      (srcloc->string s) t? e-type)]))
+     (cons (Define #f i i-type new-e)
+           (tc-top* t*-rest (hash-set env i i-type)))]
+    [(and t* (cons (Ann (Define #t _ _ _) _) _))
+     ;; Type check all consecutive recursive defines in a single recursive
+     ;; environment. 
+     (let loop ([t* t*] [env env] [d* '()])
+       ;; This makes a two pass sweep of consequtive recursive bindings
+       ;; The first pass "infers" and accumulates the recursive environment
+       ;; The second pass does the actual type-checking
+       (match t*
+         ;; Scan through then next consective recusive bindings in t*
+         ;; infer their types and accumulate them in reverse.
+         [(cons (Ann (Define #t id ty? e) s) t*-rest)
+          (define-values (ty new-e)
+            (infer-recursive-binding-type ty? e))
+          (loop t*-rest
+                (hash-set env id ty)
+                (cons (Ann (Define #t id ty new-e) s) d*))]
+         ;; Type-check each scanned top level form
+         ;; reversing the scanned forms again and typechecking the
+         ;; rest with the new environment. 
+         [t*
+          (foldl (lambda (d t*)
+                   (match-define (Ann (Define #t id id-type expr) src) d)
+                   (define-values (new-expr expr-type) (tc-expr expr env))
+                   (debug id-type expr-type)
+                   (unless (consistent? id-type expr-type)
+                     (error 'static-type-error "~a: inconsistent typed ~a and ~a"
+                            (srcloc->string src) id-type expr-type))
+                   (cons (Define #t id id-type new-expr) t*))
+                 (tc-top* t* env)
+                 d*)]))]
+    [(cons (Ann (Observe expr #f) src) t*-rest)
+     (define-values (new-expr type) (tc-expr expr env))
+     (cons (Observe new-expr type) (tc-top* t*-rest env))]
+    [(list) '()]
+    [other (error 'tc-top* "unhandled case: ~a" other)]))
+
 
 (define (env-extend* e x* v*) 
   (for/fold ([e e]) ([x (in-list x*)] [v (in-list v*)])
     (hash-set e x v)))
+
+(define (infer-recursive-binding-type id-type? rhs)
+  ;; Normally a binding construct assumes that the lack of type
+  ;; annotation means to infer the type of the rhs, but recursive
+  ;; binding constructs cannot be trivially infered.
+  ;; We have arbitrarily made the following decisions.
+  ;; (following inline comments)
+  (cond
+    ;; If the binding specifies a type always believe it.
+    [id-type? (values id-type? rhs)]
+    [else
+     (match rhs
+       [(Ann (Lambda (and f* (list (Fml _ t*) ...))
+                     (Ann b return-type?))
+             s)
+        (cond
+          ;; If the user doesn't specify a binding type
+          ;; use the type of the lambda.
+          [return-type?
+           (define id-type (Fn (length t*) t* return-type?))
+           (values id-type rhs)]
+          [else
+           ;; Function without return-type annotatin gets dyn return.
+           (define id-type (Fn (length t*) t* DYN-TYPE))
+           (define rhs     (Ann (Lambda f* (Ann b DYN-TYPE)) s))
+           (values id-type rhs)])]
+       [rhs (values Dyn rhs)])]))
+
 
 ;;; Procedures that are used to throw errors
 ;; The error that occurs when a variable is not found. It is an internal
@@ -145,7 +224,8 @@ The type rules for core forms that have interesting type rules
 (define (const-type-rule c)
   (cond
     [(boolean? c) BOOL-TYPE]
-    [(integer? c) INT-TYPE]
+    [(exact-integer? c) INT-TYPE]
+    [(inexact-real? c) FLOAT-TYPE]
     [(null? c) UNIT-TYPE]))
 
 ;; The type of an application is the return type of the applied
@@ -328,38 +408,19 @@ The type rules for core forms that have interesting type rules
     [(Dyn) DYN-TYPE]
     [(MVect t) t]
     [otherwise (error 'type-check/mvector-val-type)]))
-
+                      
 ;;; Procedures that destructure and restructure the ast
 (: tc-expr (-> S0-Expr Env (values S1-Expr Schml-Type)))
 (define (tc-expr exp env)
+  (debug 'tc-expr exp env)
   (: env-extend/bnd (S1-Bnd Env . -> . Env))
   (define (env-extend/bnd b env)
     (match-let ([(Bnd i t _) b]) (hash-set env i t)))
   (define (letrec-infer-bnd-type bnd)
     (match-define (Bnd id id-type? rhs) bnd)
-    ;; Normally a binding construct assumes that the lack of type
-    ;; annotation means to infer the type of the rhs, but recursive
-    ;; binding constructs cannot be trivially infered.
-    ;; We have arbitrarily made the following decisions.
-    ;; (following inline comments)
-    (cond
-      ;; If the binding specifies a type always believe it.
-      [id-type? bnd]
-      [else
-       (match rhs
-         [(Ann (Lambda (and f* (list (Fml _ t*) ...))
-                 (Ann b return-type?)) s)
-          (cond
-            ;; If the user doesn't specify a binding type
-            ;; use the type of the lambda.
-            [return-type?
-             (define id-type (Fn (length t*) t* return-type?))
-             (Bnd id id-type rhs)]
-            [else
-             ;; Function without return-type annotatin gets dyn return.
-             (define id-type (Fn (length t*) t* DYN-TYPE))
-             (define rhs     (Ann (Lambda f* (Ann b DYN-TYPE)) s))
-             (Bnd id id-type rhs)])])]))
+    (define-values (id-type new-rhs)
+      (infer-recursive-binding-type id-type? rhs))
+    (Bnd id id-type new-rhs))
   (: recur (-> S0-Expr* (values S1-Expr* Schml-Type*)))
   (define (map-recur e*)
     (for/lists (e* t*) ([e e*])
@@ -404,7 +465,9 @@ The type rules for core forms that have interesting type rules
                  (list (cons l* (app recur r* t*)) ...)
                  (app recur d dt))
          (values (Switch e (map cons l* r*) d) (switch-type-rule et t* dt))]
-	[(and e (Var id)) (values e (hash-ref env id (lookup-failed src id)))]
+	[(and e (Var id))
+         (debug e env id src (hash-ref env id #f))
+         (values e (hash-ref env id (lookup-failed src id)))]
 	[(and e (Quote lit)) (values e (const-type-rule lit))]
         [(Repeat index
                  (app recur start ty-start)

@@ -1,8 +1,8 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 #|-----------------------------------------------------------------------------+
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
@@ -11,7 +11,10 @@
   (Prog (List String Natural Schml-Type) CoC3-Expr))
 
 (define-type CoC3-Expr
-  (Rec E (U ;; Code Labels
+  (Rec E (U 
+          (Observe E Schml-Type)
+          No-Op
+          ;; Code Labels
           (Code-Label Uid)
           (Labels CoC3-Bnd-Code* E)
           (App-Code E (Listof E))

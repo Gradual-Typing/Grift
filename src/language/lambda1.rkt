@@ -1,9 +1,10 @@
 #lang typed/racket/base
 
 (require "forms.rkt"
+         "primitives.rkt"
          "lambda0.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt" "lambda0.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt" "lambda0.rkt"))
 
 (define-type Lambda1-Lang
   (Prog (List String Natural Schml-Type)
@@ -159,7 +160,8 @@
           (Type-Tuple-item E Index)
           (Make-Tuple-Coercion Uid E E E)
           (Compose-Tuple-Coercion Uid E E)
-          (Mediating-Coercion-Huh? E))))
+          (Mediating-Coercion-Huh? E)
+          No-Op)))
 
 (define-type L1-Code (Code Uid* L1-Expr))
 (define-type L1-Expr* (Listof L1-Expr))

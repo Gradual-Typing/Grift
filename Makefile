@@ -1,12 +1,13 @@
 all:
+	racket -v
 	cd src/backend-c/runtime/; make
-	raco make -v -j 3 main.rkt
+	raco make -v -j 4 main.rkt
 
 timed:
-	time raco make -v -j 3 main.rkt
+	time raco make main.rkt
 
 test: all
-	raco make -v -j 4 tests/main.rkt
+	raco make -v tests/main.rkt
 	racket tests/main.rkt	
 
 clean:

@@ -32,7 +32,7 @@
       (U (If D4-Pred P P)
          (Switch D4-Trivial (Switch-Case* P) P)
          (Begin D4-Effect* P)
-         (Relop IxI->B-Prim D4-Trivial D4-Trivial))))
+         (Relop UIL-Pred-Prim D4-Trivial D4-Trivial))))
 
 (define-type D4-Effect
  (Rec E

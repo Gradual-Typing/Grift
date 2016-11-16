@@ -1,7 +1,7 @@
 #lang typed/racket/base
-(require "forms.rkt")
+(require "forms.rkt" "primitives.rkt")
 (provide (all-defined-out)
-         (all-from-out "forms.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt"))
 
 #|-----------------------------------------------------------------------------+
 | Language/Cast0 created by insert-casts                                       |
@@ -17,11 +17,22 @@
 | applications of the cast interpreter function.
 +-----------------------------------------------------------------------------|#
 
-(define-type Cast0-Lang (Prog (List String Natural Schml-Type) C0-Expr))
+(define-type Cast0-Lang
+  (Prog (List String Natural Schml-Type) C0-Top*))
+
+(define-type C0-Top* (Listof C0-Top))
+
+(define-type C0-Top
+  (U (Define Boolean Uid Schml-Type C0-Expr)
+     (Observe C0-Expr Schml-Type)))
+
+(define-type Cast0.5-Lang
+  (Prog (List String Natural Schml-Type) C0-Expr))
 
 (define-type C0-Expr
   (Rec E (U ;; Non-Terminals
-	  (Lambda Uid* E)
+          (Observe E Schml-Type)
+          (Lambda Uid* E)
 	  (Letrec C0-Bnd* E)
 	  (Let C0-Bnd* E)
 	  (App E (Listof E))
@@ -59,7 +70,8 @@
           (Tuple-proj E Index)
 	  ;; Terminals
 	  (Var Uid)
-	  (Quote Cast-Literal))))
+	  (Quote Cast-Literal)
+          No-Op)))
 
 (define-type C0-Expr* (Listof C0-Expr))
 (define-type C0-Bnd   (Pair Uid C0-Expr))
