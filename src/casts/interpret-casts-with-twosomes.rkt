@@ -865,10 +865,19 @@ form, to the shortest branch of the cast tree that is relevant.
        (define (mbox-set! addr val type)
          (define-syntax-let$* let$* next-uid!)
          (let$* ([t1 (Mbox-rtti-ref addr)]
-                 [cv (interp-cast val type t1 (Quote "") (Var addr))]
+                 [cv (cond$
+                      [(tupleT?$ t1)
+                       (let$* ([n (Type-Tuple-num t1)]
+                               [ctv (Copy-Tuple n val)])
+                         (Begin
+                           (list
+                            (Mbox-val-set! (Var addr) ctv))
+                           ctv))]
+                      [else val])]
+                 [ccv (interp-cast cv type t1 (Quote "") (Var addr))]
                  [t2 (Mbox-rtti-ref addr)])
            (if$ (op=? t1 t2)
-                (Mbox-val-set! (Var addr) cv)
+                (Mbox-val-set! (Var addr) ccv)
                 (Quote 0))))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
@@ -896,14 +905,25 @@ form, to the shortest branch of the cast tree that is relevant.
                       CoC3-Expr))
        (define (mvect-set! addr i val type)
          (define-syntax-let$* let$* next-uid!)
-         (let$* ([t1 (Mvector-rtti-ref addr)]
-                 ;; TODO: copy the values first
-                 [cv (interp-cast val type t1 (Quote "") (Var addr))]
-                 [t2 (Mvector-rtti-ref addr)])
-           (begin
-             (if$ (op=? t1 t2)
-                  (Mvector-val-set! (Var addr) i cv)
-                  (Quote 0)))))
+         (let$* ([t1 (Mvector-rtti-ref addr)])
+           (cond$
+            [(tupleT?$ t1)
+             (let$* ([n (Type-Tuple-num t1)]
+                     [cvi (Copy-Tuple n val)])
+               (Begin
+                 (list
+                  (Mvector-val-set! (Var addr) i cvi))
+                 (let$* ([ccvi (interp-cast cvi type t1 (Quote "") (Var addr))]
+                         [t2 (Mvector-rtti-ref addr)])
+                   (if$ (op=? t1 t2)
+                        (Mvector-val-set! (Var addr) i ccvi)
+                        (Quote 0)))))]
+            [else
+             (let$* ([cvi (interp-cast val type t1 (Quote "") (Var addr))]
+                     [t2 (Mvector-rtti-ref addr)])
+               (if$ (op=? t1 t2)
+                    (Mvector-val-set! (Var addr) i cvi)
+                    (Quote 0)))])))
        (let ([t1 (next-uid! "t1")])
          (Let (list (cons t1 (Type t)))
            (if (or (Var? e) (Quote? e))
