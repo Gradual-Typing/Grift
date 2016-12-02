@@ -1,0 +1,37 @@
+(let ([iters : Int (read-int)])
+  (let ([a : (Vect Int) (vector iters 1)])
+    (letrec ([sort : ((Vect Int) Int Int -> ())
+                   (lambda ([a : (Vect Int)] [p : Int] [r : Int]) : ()
+                           (let ([ad : (Vect Dyn) a])
+                             (if (< p r)
+                                 (let ([q : Int (partition ad p r)])
+                                   (begin
+                                     (sort ad p (- q 1))
+                                     (sort ad (+ q 1) r)))
+                                 ())))]
+             [partition : ((Vect Int) Int Int -> Int)
+                        (lambda ([a : (Vect Int)] [p : Int] [r : Int]) : Int
+                                (let ([i : (Ref Int) (box (- p 1))]
+                                      [x : Int (vector-ref a r)])
+                                  (begin
+                                    (repeat (j p r) (_ ())
+                                            (if (<= (vector-ref a j) x)
+                                                (begin
+                                                  (box-set! i (+ (unbox i) 1))
+                                                  (swap a (unbox i) j))
+                                                ()))
+                                    (swap a (+ (unbox i) 1) r)
+                                    (+ (unbox i) 1))))]
+             [swap : ((Vect Int) Int Int -> ())
+                   (lambda ([a : (Vect Int)] [i : Int] [j : Int]) : ()
+                           (if (= i j)
+                               ()
+                               (let ([t : Int (vector-ref a i)])
+                                 (begin
+                                   (vector-set! a i (vector-ref a j))
+                                   (vector-set! a j t)))))])
+      (begin
+        (repeat (i 0 size) (_ ())
+                (vector-set! a i (read-int)))
+        (time (sort a 0 (- iters 1)))
+        (vector-ref a (- iters 1))))))

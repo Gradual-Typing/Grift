@@ -3,53 +3,8 @@
 #include<stdint.h>
 #include <sys/time.h>
 #include <inttypes.h>
-
-void *alloc_ptr;
-long free_ptr;
-long limit;
-unsigned long allocd_mem;
-
-struct timeval timer_start_time;
-struct timeval timer_stop_time;
-struct timeval timer_result_time;
-int timer_started = 1;
-int timer_stopped = 1;
-
-
-void timer_report() {
-
-  // some very minor error checking
-  if (timer_started) {
-    printf("error starting timer");
-    exit(-1);
-  }
-  if (timer_stopped) {
-    printf("error stopping timer");
-    exit(-1);
-  }
-
-  double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);
-  double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);
-  printf("time (sec): %lf\n", t2 - t1);
-}
-
-long alloc(int n) {
-  long result = free_ptr;
-  long newFree = result + n;
-  allocd_mem += n;
-  if (newFree >= limit) {
-    puts("Requesting more memory\n");
-    free_ptr = (long)(posix_memalign(&alloc_ptr, 8, 9999999999), alloc_ptr);
-    if (!free_ptr) {
-      fputs("couldn't allocate any more memory", stderr);
-    }
-    limit = free_ptr + 9999999999;
-    return alloc(n);
-  }
-  free_ptr = newFree;
-  return result;
-}
-
+#define GC_INITIAL_HEAP_SIZE 1048576
+#include "gc.h"
 
 int sort(int64_t sort_clos, int64_t *a, int64_t p, int64_t r){
   int64_t tmp_closure1;
@@ -222,44 +177,40 @@ int64_t swap(int64_t swap_clos, int64_t *a, int64_t i, int64_t j){
   return 0;
 }
 
-int main(int argc, char *argv[]){
+int main(){
   int64_t swap_clos;
   int64_t partition_clos;
   int64_t sort_clos;
   int64_t tmp_value_sort1;
-  int64_t LEN = strtol(argv[1], (char **)NULL, 10);
+  int64_t LEN = 0;
+  int64_t num=0;
+  scanf("%ld", &LEN);
+
+  GC_INIT();
   
-  free_ptr = (long)(posix_memalign(&alloc_ptr, 8, 9999999999), alloc_ptr);
-  limit = free_ptr + 9999999999;
-  allocd_mem = 0;
-  
-  int64_t *x = malloc(sizeof(int64_t)*(1+LEN));
+  int64_t *x = (int64_t*) GC_MALLOC(sizeof(int64_t)*(1+LEN));
   x[0]=LEN;
   for (int64_t i = 1; i <= LEN; ++i){
-    x[i] = LEN - i;
+    scanf("%ld", &num);
+    x[i] = num;
   }
 
-  sort_clos = alloc(8 * 3);
-  partition_clos = alloc(8 * 2);
-  swap_clos = alloc(8 * 1);
+  sort_clos = GC_MALLOC(8 * 3);
+  partition_clos = GC_MALLOC(8 * 2);
+  swap_clos = GC_MALLOC(8 * 1);
   ((long *)sort_clos)[0] = ((long)sort);
   ((long *)sort_clos)[1] = partition_clos;
   ((long *)sort_clos)[2] = sort_clos;
   ((long *)partition_clos)[0] = ((long)partition);
   ((long *)partition_clos)[1] = swap_clos;
   ((long *)swap_clos)[0] = ((long)swap);
-
-  timer_started = gettimeofday(&timer_start_time, NULL);
+  
   // sort(sort_clos,x,0,9999);
   tmp_value_sort1 = ((long *)sort_clos)[0];
-  (((int64_t (*)(int64_t, int64_t*, int64_t, int64_t))tmp_value_sort1)(
-								       sort_clos, x, 0, LEN - 1));
-  timer_stopped = gettimeofday(&timer_stop_time, NULL);
+  (((int64_t (*)(int64_t, int64_t*, int64_t, int64_t))tmp_value_sort1)(sort_clos, x, 0, LEN - 1));
   
   for (int64_t i=1; i<=LEN; i++)
     printf ("%ld ",x[i]);
-
-  timer_report();
   
   return 0;
 }

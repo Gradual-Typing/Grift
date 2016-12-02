@@ -528,7 +528,7 @@ represents types in the schml abstract syntax tree.
          `(,@(match (reference-semantics)
                ['Guarded
                 `((Ref        . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
-                  (Vector     . ,(core (make-parse-type-w/ctr 'GVect GVect)))
+                  (Vect     . ,(core (make-parse-type-w/ctr 'GVect GVect)))
                   (vector       . ,parse-gvector)
                   (vector-ref   . ,parse-gvector-ref)
                   (vector-set!  . ,parse-gvector-set!)
@@ -537,7 +537,7 @@ represents types in the schml abstract syntax tree.
                   (unbox        . ,parse-gunbox))]
                ['Monotonic
                 `((Ref        . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
-                  (Vector     . ,(core (make-parse-type-w/ctr 'MVect MVect)))
+                  (Vect     . ,(core (make-parse-type-w/ctr 'MVect MVect)))
                   (vector       . ,parse-mvector)
                   (vector-ref   . ,parse-mvector-ref)
                   (vector-set!  . ,parse-mvector-set!)
