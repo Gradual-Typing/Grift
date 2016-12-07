@@ -3,62 +3,19 @@
 #include<stdint.h>
 #include <sys/time.h>
 #include <inttypes.h>
+#define GC_INITIAL_HEAP_SIZE 1048576
+#include "gc.h"
 
-void *alloc_ptr;
-long free_ptr;
-long limit;
-unsigned long allocd_mem;
-
-struct timeval timer_start_time;
-struct timeval timer_stop_time;
-struct timeval timer_result_time;
-int timer_started = 1;
-int timer_stopped = 1;
 int64_t ar,ac,bc,br;
-
-
-void timer_report() {
-
-  // some very minor error checking
-  if (timer_started) {
-    printf("error starting timer");
-    exit(-1);
-  }
-  if (timer_stopped) {
-    printf("error stopping timer");
-    exit(-1);
-  }
-
-  double t1 = timer_start_time.tv_sec + (timer_start_time.tv_usec / 1000000.0);
-  double t2 = timer_stop_time.tv_sec + (timer_stop_time.tv_usec / 1000000.0);
-  printf("time (sec): %lf\n", t2 - t1);
-}
-
-long alloc(int n) {
-  long result = free_ptr;
-  long newFree = result + n;
-  allocd_mem += n;
-  if (newFree >= limit) {
-    puts("Requesting more memory\n");
-    free_ptr = (long)(posix_memalign(&alloc_ptr, 8, 9999999999), alloc_ptr);
-    if (!free_ptr) {
-      fputs("couldn't allocate any more memory", stderr);
-    }
-    limit = free_ptr + 9999999999;
-    return alloc(n);
-  }
-  free_ptr = newFree;
-  return result;
-}
 
 int64_t** create (int64_t l1, int64_t l2){
   int64_t tmp_value;
   int64_t *t;
   int64_t *xi;
-  int64_t **x = malloc(sizeof(int64_t)*(1+l1));
+  int64_t **x = GC_MALLOC(sizeof(int64_t)*(1+l1));
   ((long *)x)[0] = l1+1;
   for (int i=1;i<=l1;++i){
-    t = malloc(sizeof(int64_t*)*(1+l2));
+    t = GC_MALLOC(sizeof(int64_t*)*(1+l2));
     t[0]=l2+1;
     for (int j=1;j<=l2;++j){
       t[j]=0;
@@ -66,7 +23,7 @@ int64_t** create (int64_t l1, int64_t l2){
     x[i]=t;
   }
   for (int i=1;i<=l1;++i){
-    xi = malloc(sizeof(int64_t)*(1+l2));
+    xi = GC_MALLOC(sizeof(int64_t)*(1+l2));
     xi[0]=l2+1;
     for (int j=1;j<=l2;++j){
       xi[j]=0;
@@ -105,10 +62,10 @@ int64_t** mult(int64_t **x, int64_t x1,
 	       int64_t **y, int64_t y1, int64_t y2){
   int64_t *t,*ri;
   int64_t tmp_value;
-  int64_t **r = malloc(sizeof(int64_t)*(1+ar));
+  int64_t **r = GC_MALLOC(sizeof(int64_t)*(1+ar));
   ((long *)r)[0] = ar+1;
   for (int i=1;i<=ar;++i){
-    t = malloc(sizeof(int64_t*)*(1+bc));
+    t = GC_MALLOC(sizeof(int64_t*)*(1+bc));
     t[0]=bc+1;
     for (int j=1;j<=bc;++j){
       t[j]=0;
@@ -117,7 +74,7 @@ int64_t** mult(int64_t **x, int64_t x1,
   }
 
   for (int i=1;i<=x1;++i){
-    ri = malloc(sizeof(int64_t)*(1+y2));
+    ri = GC_MALLOC(sizeof(int64_t)*(1+y2));
     ri[0]=y2+1;
     for (int j=1;j<=y2;++j){
       ri[j]=0;
@@ -215,26 +172,23 @@ int64_t** mult(int64_t **x, int64_t x1,
   return r;
 }
 
-int main(int argc, char *argv[]){
-  int64_t size = strtol(argv[1], (char **)NULL, 10);
+int main(){
+  int64_t size = 0;
+  scanf("%ld", &size);
   ar=size;ac=size;br=size;bc=size;
+
+  GC_INIT();
 
   int64_t **a = create (ar,ac);
   int64_t **b = create (br,bc);
-
-  timer_started = gettimeofday(&timer_start_time, NULL);
   
   int64_t **r = mult(a, ar, b, br, bc);
   int64_t rf = ((long *)((long *)r)[ar])[ac];
   printf ("%ld ",rf);
   
-  timer_stopped = gettimeofday(&timer_stop_time, NULL);
-  
   /* for (int i=1;i<=ar;++i) */
   /*     for (int j=1;j<=bc;++j) */
   /* 	printf ("%ld ",r[i][j]); */
-
-  timer_report();
   
   return 0;
 }

@@ -1,5 +1,5 @@
 (let ([size : Dyn (read-int)])
-  (let ([a : Dyn (gvector size 1)])
+  (let ([a : Dyn (vector size 1)])
     (letrec ([sort : Dyn
                    (lambda ([a : Dyn] [p : Dyn] [r : Dyn])
                      (if (< p r)
@@ -10,27 +10,27 @@
                          ()))]
              [partition : Dyn
                         (lambda ([a : Dyn] [p : Dyn] [r : Dyn])
-                          (let ([i : Dyn (gbox (- p 1))]
-                                [x : Dyn (gvector-ref a r)])
+                          (let ([i : Dyn (box (- p 1))]
+                                [x : Dyn (vector-ref a r)])
                             (begin
                               (repeat (j p r) (_ ())
-                                      (if (<= (gvector-ref a j) x)
+                                      (if (<= (vector-ref a j) x)
                                           (begin
-                                            (gbox-set! i (+ (gunbox i) 1))
-                                            (swap a (gunbox i) j))
+                                            (box-set! i (+ (unbox i) 1))
+                                            (swap a (unbox i) j))
                                           ()))
-                              (swap a (+ (gunbox i) 1) r)
-                              (+ (gunbox i) 1))))]
+                              (swap a (+ (unbox i) 1) r)
+                              (+ (unbox i) 1))))]
              [swap : Dyn
                    (lambda ([a : Dyn] [i : Dyn] [j : Dyn])
                      (if (= i j)
                          ()
-                         (let ([t : Dyn (gvector-ref a i)])
+                         (let ([t : Dyn (vector-ref a i)])
                            (begin
-                             (gvector-set! a i (gvector-ref a j))
-                             (gvector-set! a j t)))))])
+                             (vector-set! a i (vector-ref a j))
+                             (vector-set! a j t)))))])
       (begin
         (repeat (i 0 size) (_ ())
-                (gvector-set! a i (- size i)))
+                (vector-set! a i (read-int)))
         (time (sort a 0 (- size 1)))
-        (gvector-ref a (- size 1))))))
+        (vector-ref a (- size 1))))))

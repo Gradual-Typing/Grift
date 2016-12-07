@@ -22,6 +22,7 @@
 ;; Vector Behavior
 (define bounds-checks? : (Parameterof Boolean)
   (make-parameter #t))
+(define-type Ref-Semantics (U 'Monotonic 'Guarded))
 (define reference-semantics : (Parameterof (U 'Monotonic 'Guarded))
   (make-parameter 'Guarded))
 (: inline-guarded-branch? (Parameterof Boolean))

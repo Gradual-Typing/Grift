@@ -260,7 +260,7 @@
     ;; their shouldn't be binding overlaps
     [(Letrec b* e)
      (define (recur-bnd-lambda [b : L1-Bnd-Lambda])
-       (match-let ([(cons i (Lambda i* (Castable c? e))) e])
+       (match-let ([(cons i (Lambda i* (Castable c? e))) b])
          (cons i (Lambda i* (Castable c? (recur e))))))
      (Letrec (map recur-bnd-lambda b*) (recur e))]
     [(Let b* e)

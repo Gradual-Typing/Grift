@@ -1,11 +1,11 @@
 #!/usr/bin/gsi -:d0
 
 (declare
-  (standard-bindings)
-  (fixnum))
+ (standard-bindings)
+ (fixnum))
 
-(define (main arg)
-  (let ([size (string->number arg)])
+(define (main)
+  (let ([size (string->number (read-line))])
     (let ([ar size]
 	  [ac size]
 	  [br size]
@@ -31,34 +31,33 @@
 			   (let ([r (make-vector ar (make-vector bc 0))])
 			     (begin
 			       (let loop1 ([i 0])
-				      (if (< i x1)
-					  (begin
-					    (let ([ri (make-vector y2 0)])
-					      (begin
-						(let loop2 ([j 0])
-						  (if (< j y2)
-						      (begin
-							(let loop3 ([k 0])
-							  (if (< k y1)
-							      (begin
-								(vector-set! ri j
-										(+ (vector-ref ri j)
-										   (* (vector-ref (vector-ref x i) k)
-										      (vector-ref (vector-ref y k) j))))
-								(loop3 (+ k 1)))))
-							(loop2 (+ j 1)))))
-						(vector-set! r i ri)))
-					    (loop1 (+ i 1)))))
+				 (if (< i x1)
+				     (begin
+				       (let ([ri (make-vector y2 0)])
+					 (begin
+					   (let loop2 ([j 0])
+					     (if (< j y2)
+						 (begin
+						   (let loop3 ([k 0])
+						     (if (< k y1)
+							 (begin
+							   (vector-set! ri j
+									(+ (vector-ref ri j)
+									   (* (vector-ref (vector-ref x i) k)
+									      (vector-ref (vector-ref y k) j))))
+							   (loop3 (+ k 1)))))
+						   (loop2 (+ j 1)))))
+					   (vector-set! r i ri)))
+				       (loop1 (+ i 1)))))
 			       r)))])
 	    (let ([a (create ar ac)]
 		  [b (create br bc)]
 		  [bx (box 0)])
 	      (begin
-		(time (set-box! bx
-				(vector-ref
-				 (vector-ref (mult a ar ac b br bc)
-						(- ar 1))
-				 (- ac 1)))
-		      (current-output-port))
+		(set-box! bx
+			  (vector-ref
+			   (vector-ref (mult a ar ac b br bc)
+				       (- ar 1))
+			   (- ac 1)))
 		(pretty-print (unbox bx)))))
 	  (pretty-print "wrong dimensions")))))
