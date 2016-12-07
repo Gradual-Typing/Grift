@@ -1,33 +1,53 @@
+# must be defined before shared.mk include
+ROOT_DIR:=.
+OTHER_LANGS:=c racket gambit
+LANGS:=$(OTHER_LANGS) schml
+MADE_CLEAN:=$(LANGS)
+AUTO_DIRS:=
+CLEANED:=lattice stats *.log
+include shared.mk
+
+CONFIGS:=$(OTHER_LANGS) $(addprefix schml/, $(SCHML_CONFIGS))
+ALL_BINS:=$(foreach CONFIG, $(CONFIGS), $(addprefix $(CONFIG)/, $(BINS)))
+ALL_ERRS:=$(foreach CONFIG, $(CONFIGS), $(addprefix $(CONFIG)/, $(ERRS)))
+
+#
+
+.PHONY: all
 all: setup run analyze
 
-setup.lock: clean
-	(cd c       && make)
-	(cd racket  && make)
-	(cd gambit  && make)
-	(cd static  && make)
-	(cd dynamic && make)
-	touch setup.lock
+.PHONY: setup
+setup: $(ALL_BINS)
+	$(MAKE) -C schml/partial generate setup
 
-setup: setup.lock
+.PHONY: run
+run: $(ALL_ERRS)
+	$(MAKE) -C schml/partial run
 
-run.lock:
-	sh run.sh
-	touch run.lock
+c/%:
+	$(MAKE) -C c $*
 
-run: run.lock
+schml/%:
+	$(MAKE) -C schml $*
 
-analyze.txt: 
-	racket analyze.rkt >> analyze.txt
+racket/%:
+	$(MAKE) -C racket $*
 
-analyze: analyze.txt
-	cat analyze.txt
+gambit/%:
+	$(MAKE) -C gambit $*
 
-clean:
-	(cd c       && make clean)
-	(cd racket  && make clean)
-	(cd gambit  && make clean)
-	(cd static  && make clean)
-	(cd dynamic && make clean)
-	rm -rf compiled
-	rm -rf *.lock *.txt *.tex *.log *.dat *~
+.PHONY: analyze
+analyze: stats lattice
+
+stats:
+	racket analyze.rkt --assert-runs $(RUNS)
+
+lattice:
+	racket lattice-analysis.rkt --assert-runs $(RUNS)
+
+
+
+
+
+
 

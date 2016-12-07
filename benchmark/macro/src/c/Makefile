@@ -1,24 +1,19 @@
+ROOT_DIR=..
 SCHMLDIR=../../../..
 LIBGC=$(SCHMLDIR)/src/backend-c/runtime/boehm-gc-install/lib/libgc.a
-LIBS=$(LIBGC) -pthread -lm 
-CC=clang
-OPTS=-O3
+COMPILE_LIBRARIES=$(LIBGC) -pthread -lm 
+COMPILE_VERSION=clang --version
+COMPILE=clang
+COMPILE_OPTIONS=-O3
+CLEANED:=src/*~ log bin out
+MADE_CLEAN:=
+SRC_EXT=c
 
-all: bin/n-body
+include ../shared.mk
 
-bin:
-	mkdir bin
+all: $(BINS) $(OUTS) ;
 
-logs:
-	mkdir logs
-	$(CC) --version >> logs/compile.log
-	echo options >> logs/compile.log
-	echo $(OPTS) >> logs/compile.log
-	echo libraries >> logs/compile.log
-	echo $(LIBS) >> logs/compile.log
 
-bin/%: bin logs
-	$(CC) $*.c $(OPTS) $(LIBS) -o $@
 
-clean:
-	rm -rf *.o *~ bin logs
+
+

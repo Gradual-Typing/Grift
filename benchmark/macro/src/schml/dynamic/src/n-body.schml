@@ -16,43 +16,43 @@
            (vector-set! v 6 mass)
            v)))
 
-(define (set-body-x! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-x! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 0 v))
 
 (define (body-x [b : Dyn]) : Dyn
   (vector-ref b 0))
 
-(define (set-body-y! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-y! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 1 v))
 
 (define (body-y [b : Dyn]) : Dyn
   (vector-ref b 1))
 
-(define (set-body-z! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-z! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 2 v))
 
 (define (body-z [b : Dyn]) : Dyn
   (vector-ref b 2))
 
-(define (set-body-vx! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-vx! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 3 v))
 
 (define (body-vx [b : Dyn]) : Dyn
   (vector-ref b 3))
 
-(define (set-body-vy! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-vy! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 4 v))
 
 (define (body-vy [b : Dyn]) : Dyn
   (vector-ref b 4))
 
-(define (set-body-vz! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-vz! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 5 v))
 
 (define (body-vz [b : Dyn]) : Dyn
   (vector-ref b 5))
 
-(define (set-body-mass! [b : Dyn] [v : Dyn]) : Unit
+(define (set-body-mass! [b : Dyn] [v : Dyn]) : Dyn
   (vector-set! b 6 v))
 
 (define (body-mass [b : Dyn]) : Dyn
@@ -109,11 +109,11 @@
 (define *system-size* : Dyn 5)
 
 ;; -------------------------------
-(define (offset-momentum) : Unit
+(define (offset-momentum) : Dyn
   (offset-momentum-loop 0 #i0.0 #i0.0 #i0.0))
 
 (define (offset-momentum-loop [i1 : Dyn] [px : Dyn]
-                              [py : Dyn] [pz : Dyn]) : Unit
+                              [py : Dyn] [pz : Dyn]) : Dyn
   (if (= i1 *system-size*)
     (begin
       (vector-set! (vector-ref *system* 0) 3
@@ -165,10 +165,10 @@
 ;; ;; -------------------------------
 
 
-(define (advance) : Unit
+(define (advance) : Dyn
   (advance-loop-o 0))
 
-(define (advance-loop-o [o : Dyn]) : Unit
+(define (advance-loop-o [o : Dyn]) : Dyn
   (if (= o *system-size*)
       ()
       (let ([o1 : Dyn (vector-ref *system* o)])
@@ -183,7 +183,7 @@
 (define (advance-loop-i [i3 : Dyn] [vx : Dyn]
                         [vy : Dyn] [vz : Dyn]
                         [o1 : Dyn])
-  : Unit
+  : Dyn
   (if (< i3 *system-size*)
       (let ([i1 : Dyn (vector-ref *system* i3)])
 	(let ([dx : Dyn (fl- (vector-ref o1 0) (vector-ref i1 0))]
@@ -214,6 +214,6 @@
 	     ())))
 
 (begin (offset-momentum) (: (energy) Float))
-(begin (repeat (i 0 (read-int)) (a : Unit ()) (advance))
+(begin (repeat (i 0 (read-int)) (a : Dyn ()) (advance))
        (: (energy) Float))
 

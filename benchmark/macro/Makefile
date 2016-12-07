@@ -1,17 +1,33 @@
-tmp=$(shell date +%Y_%m_%d_%H_%M_%S)
+SRC:=src
+WORK:=$(shell date +%Y_%m_%d_%H_%M_%S)
+TEST:=test
 
-run:
-	(cd src && make setup && make run && make analyze)
-	cp -r src $(tmp)
-	(cd src && make clean)
-	tar -acf $(tmp).tbz $(tmp)
+.PHONY: all
+all: $(WORK) $(WORK)/make.log $(WORK).tgz
 
-clean:
-	(cd src && make clean)
-	rm -rf *~
-
+.PHONY: test
 test:
-	(cd src && make setup && make test && make clean)
+	$(MAKE) clean
+	$(MAKE) -C $(SRC) clean
+	cp -r $(SRC) $(TEST)
+	(export RUNS=1; export LATTICE_SIZE=2; $(MAKE) -C $(TEST) | tee $(TEST)/test.log)
 
 
+.PHONY: quick
+quick:
+	(export RUNS=3; export LATTICE_SIZE=10; $(MAKE) all)
 
+.PHONY: clean
+clean:
+	rm -rf $(TEST) Makefile~
+
+$(WORK):
+	$(MAKE) -C $(SRC) clean
+	cp -r $(SRC) $(WORK)
+
+%/make.log:
+	$(MAKE) -C $* | tee $*/make.log
+
+%.tgz: 
+	echo archived on `date -Iseconds` >> $*/archive.log
+	tar -acf $*.tbz $*
