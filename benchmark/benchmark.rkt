@@ -51,15 +51,15 @@
     ;; config 02: no gc, guarded references, type-based and close coded
     ;; config 03: no gc, guarded references, coercions and open coded
     ;; config 04: no gc, guarded references, type-based and open coded
-    ;; config 05: no gc, monotonic references, type-based and open coded
+    ;; config 05: no gc, monotonic references, type-based and close coded
     ;; config 06: no gc, monotonic references, type-based and close coded
     ;; config 07: no gc, monotonic references, coercions and open coded
     ;; config 08: no gc, monotonic references, type-based and open coded
-    ;; config 09: no gc, guarded references, coercions, and close coded
+    ;; config 09: boehm, guarded references, coercions, and close coded
     ;; config 10: boehm, guarded references, type-based and close coded
     ;; config 11: boehm, guarded references, coercions and open coded
     ;; config 12: boehm, guarded references, type-based and open coded
-    ;; config 13: boehm, monotonic references, type-based and open coded
+    ;; config 13: boehm, monotonic references, coercions and close coded
     ;; config 14: boehm, monotonic references, type-based and close coded
     ;; config 15: boehm, monotonic references, coercions and open coded
     ;; config 16: boehm, monotonic references, type-based and open coded
