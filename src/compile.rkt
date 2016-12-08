@@ -47,7 +47,8 @@
                  #:log-level Log-Level
                  #:log-port  (Option (U String Path Output-Port))
                  #:gc       GC
-                 #:ck-bounds Boolean)
+                 #:ck-bounds Boolean
+                 #:ref       Ref-Semantics)
                 Path))
 (define (compile target
                  #:output    [output    (output-path)]
@@ -61,7 +62,8 @@
                  #:log-level [log-level (schml-log-level)]
                  #:log-port  [log-port  (schml-log-port)]
                  #:gc        [gc        (garbage-collector)]
-                 #:ck-bounds [ckbs      (bounds-checks?)])
+                 #:ck-bounds [ckbs      (bounds-checks?)]
+                 #:ref       [rs        (reference-semantics)])
   ;; convert all convience types to internal API
   (let* ([target  (if (string? target) (build-path target) target)]
          [output  (if (string? output) (build-path output) output)]
@@ -81,7 +83,8 @@
                    [init-heap-kilobytes mem]
                    [runtime-path rt]
                    [garbage-collector gc]
-                   [bounds-checks? ckbs])
+                   [bounds-checks? ckbs]
+                   [reference-semantics rs])
       (define (compile-target) : Path (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
         (with-logging-to-port p compile-target log-level 'schml))

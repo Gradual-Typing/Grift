@@ -4,40 +4,40 @@
 	[br : Int size]
 	[bc : Int size])
     (if (= ac br)
-	(letrec ([create : (Int Int -> (GVect (GVect Int)))
-                         (lambda ([l1 : Int] [l2 : Int]) : (GVect (GVect Int))
-                           (let ([x : (GVect (GVect Int))
-                                    (gvector l1 (gvector l2 0))])
+	(letrec ([create : (Int Int -> (Vect (Vect Int)))
+                         (lambda ([l1 : Int] [l2 : Int]) : (Vect (Vect Int))
+                           (let ([x : (Vect (Vect Int))
+                                    (vector l1 (vector l2 0))])
                              (begin
                                (repeat (i 0 l1) (_ ())
-                                       (let ([xi : (GVect Int) (gvector l2 0)])
+                                       (let ([xi : (Vect Int) (vector l2 0)])
                                          (begin
                                            (repeat (j 0 l2) (_ ())
-                                                   (gvector-set! xi j (+ j i)))
-                                           (gvector-set! x i xi))))
+                                                   (vector-set! xi j (+ j i)))
+                                           (vector-set! x i xi))))
                                x)))]
-                 [mult : ((GVect (GVect Int)) Int (GVect (GVect Int)) Int Int -> (GVect (GVect Int)))
-                       (lambda ([x : (GVect (GVect Int))]
+                 [mult : ((Vect (Vect Int)) Int (Vect (Vect Int)) Int Int -> (Vect (Vect Int)))
+                       (lambda ([x : (Vect (Vect Int))]
                                 [x1 : Int]
-                                [y : (GVect (GVect Int))]
-                                [y1 : Int] [y2 : Int]) : (GVect (GVect Int))
-                         (let ([r : (GVect (GVect Int)) (gvector ar (gvector bc 0))])
+                                [y : (Vect (Vect Int))]
+                                [y1 : Int] [y2 : Int]) : (Vect (Vect Int))
+                         (let ([r : (Vect (Vect Int)) (vector ar (vector bc 0))])
                            (begin
                              (repeat (i 0 x1) (_ ())
-                                     (let ([ri : (GVect Dyn) (gvector y2 0)])
+                                     (let ([ri : (Vect Dyn) (vector y2 0)])
                                        (begin
                                          (repeat (j 0 y2) (_ ())
                                                  (repeat (k 0 y1) (_ ())
-                                                         (gvector-set! ri j
-                                                                       (+ (gvector-ref ri j)
-                                                                          (* (gvector-ref (gvector-ref x i) k)
-                                                                             (gvector-ref (gvector-ref y k) j))))))
-                                         (gvector-set! r i ri))))
+                                                         (vector-set! ri j
+                                                                       (+ (vector-ref ri j)
+                                                                          (* (vector-ref (vector-ref x i) k)
+                                                                             (vector-ref (vector-ref y k) j))))))
+                                         (vector-set! r i ri))))
                              r)))])
-	  (let ([a : (GVect (GVect Int)) (create ar ac)]
-		[b : (GVect (GVect Int)) (create br bc)]
-		[bx : (GRef Int) (gbox 0)])
+	  (let ([a : (Vect (Vect Int)) (create ar ac)]
+		[b : (Vect (Vect Int)) (create br bc)]
+		[bx : (Ref Int) (box 0)])
 	    (begin
-	      (time (gbox-set! bx (gvector-ref (gvector-ref (mult a ar b br bc) (- ar 1)) (- ac 1))))
-	      (gunbox bx))))
+	      (time (box-set! bx (vector-ref (vector-ref (mult a ar b br bc) (- ar 1)) (- ac 1))))
+	      (unbox bx))))
 	0)))

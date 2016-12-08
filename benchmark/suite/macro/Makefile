@@ -6,7 +6,7 @@ clean:
 	rm -rf lattice/
 
 test:
-	./lattice.sh 5 5
+	./lattice.sh 5 5 16
 
 c:
 	gcc -O3 src/c/n-body.c -o bin/c/n-body ${LIBGC}
