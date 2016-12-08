@@ -69,7 +69,7 @@
      (define c (debug (Cast e (Twosome t1 t2 (l-th)))))
      (add-cast! src c)
      c]))
-     
+
 
 (: ic-expr (S1-Expr . -> . C0-Expr))
 (define (ic-expr exp^)
@@ -86,7 +86,7 @@
          (Lambda fml* body))]
       [(Let bnd* (and (Ann _ (cons src type^)) body))
        (Let (map ic-bnd bnd*)
-            (mk-cast src (mk-label "let" src) (ic-expr body) type^ type))]
+         (mk-cast src (mk-label "let" src) (ic-expr body) type^ type))]
       [(Letrec bnd* (and (Ann _ (cons src type^)) body))
        (Letrec (map ic-bnd bnd*)
          (mk-cast src (mk-label "letrec" src) (ic-expr body) type^ type))]
@@ -234,7 +234,7 @@
             [(Var addr) (MBoxCastedRef addr t)]
             [else (let ([addr (next-uid! "addr")])
                     (Let `((,addr . ,e))
-                         (MBoxCastedRef addr t)))])]
+                      (MBoxCastedRef addr t)))])]
          [else (error 'insert-casts/MunboxT
                       "unexpected value for e-ty: ~a"
                       e-ty)])]
@@ -283,11 +283,9 @@
                       .
                       ,(mk-cast e-src (mk-label "mvector-ref" e-src) e e-ty (MVect DYN-TYPE))))
                 (MVectCastedRef addr i t)))]
-           [(MVect? e-ty) (match e
-                            [(Var addr) (MVectCastedRef addr i t)]
-                            [else (let ([addr (next-uid! "addr")])
-                                    (Let `((,addr . ,e))
-                                      (MVectCastedRef addr i t)))])]
+           [(MVect? e-ty) (let ([addr (next-uid! "addr")])
+                            (Let `((,addr . ,e))
+                              (MVectCastedRef addr i t)))]
            [else (error 'insert-casts/Mvector-refT
                         "unexpected value for e type: ~a"
                         e-ty)]))]
@@ -308,11 +306,9 @@
                       ,(mk-cast e1-src (mk-label "mvector-set" e1-src) e1 e1-ty (MVect DYN-TYPE))))
                 (MVectCastedSet! addr i (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE) t)))]
            [(MVect? e1-ty) (let ([e2c (mk-cast e2-src lbl2 e2 e2-ty (MVect-arg e1-ty))])
-                             (match e1
-                               [(Var addr) (MVectCastedSet! addr i e2c t)]
-                               [else (let ([addr (next-uid! "mvectoraddr")])
-                                       (Let `((,addr . ,e1))
-                                         (MVectCastedSet! addr i e2c t)))]))]
+                             (let ([addr (next-uid! "mvectoraddr")])
+                               (Let `((,addr . ,e1))
+                                 (MVectCastedSet! addr i e2c t))))]
            [else (error 'insert-casts/Mvector-set!T
                         "unexpected value for e1 type: ~a"
                         e1-ty)]))]
