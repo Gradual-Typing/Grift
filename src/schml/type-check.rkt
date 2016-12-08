@@ -316,7 +316,7 @@ The type rules for core forms that have interesting type rules
 (: mbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
 (define (mbox-set!-type-rule box-ty val-ty)
   (match box-ty
-    [(Dyn) DYN-TYPE]
+    [(Dyn) UNIT-TYPE]
     [(MRef m) (if (consistent? m val-ty)
                   UNIT-TYPE
                   (error 'type-check/todo))]
@@ -395,7 +395,7 @@ The type rules for core forms that have interesting type rules
 (define (mvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
-        [(Dyn) DYN-TYPE]
+        [(Dyn) UNIT-TYPE]
         [(MVect g) (if (consistent? g val-ty)
                        UNIT-TYPE
                        (error 'type-check/todo))]
