@@ -38,7 +38,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
    (define uc (make-unique-counter 0))
    (define tl*
      (parameterize ([current-unique-counter uc])
-       ((parse-top-level name top-level-env)  s*)))
+       ((parse-top-level name (make-top-level-env))  s*)))
    (debug who (Prog (list name (unique-counter-next! uc)) tl*))]
   [(other) (error 'syntax->schml0 "unmatched: ~a" other)])
 
@@ -217,12 +217,12 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
   (require "../language/forms-equal.rkt")
   (current-unique-counter (make-unique-counter 0))
   (check-forms=?
-   ((parse-form top-level-env) #'(let ([x 1]) x))
+   ((parse-form (make-top-level-env)) #'(let ([x 1]) x))
    (Ann (Let (list (Bnd 'x #f (Ann (Quote 1) (quote-srcloc))))
           (Ann (Var 'x) (quote-srcloc)))
         (quote-srcloc)))
   (check-forms=?
-   ((parse-form top-level-env) #'(letrec ([x x]) x))
+   ((parse-form (make-top-level-env)) #'(letrec ([x x]) x))
    (Ann (Letrec (list (Bnd 'x #f (Ann (Var 'x) (quote-srcloc))))
           (Ann (Var 'x) (quote-srcloc)))
         (quote-srcloc))))
@@ -254,7 +254,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
          (help #t #'f #f (syntax/loc stx (lambda (f* ...) e))))]))
 
 (module+ test
-  (parse-define-form '(define x : Float #i9.8) (hash-set top-level-env 'x (lexical-var (Uid "x" 0)))))
+  (parse-define-form '(define x : Float #i9.8) (hash-set (make-top-level-env) 'x (lexical-var (Uid "x" 0)))))
 
 (define (parse-lambda-expression stx env)
   (syntax-parse stx
@@ -270,17 +270,17 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 (module+ test
   (check-forms=?
-   ((parse-form top-level-env) #'(lambda (x y) x))
+   ((parse-form (make-top-level-env)) #'(lambda (x y) x))
    (Ann (Lambda (list (Fml 'x (Dyn)) (Fml 'y (Dyn)))
           (Ann (Ann (Var 'x) (quote-srcloc)) #f))
         (quote-srcloc)))
   (check-forms=?
-   ((parse-form top-level-env) #'(lambda ([x : Int]) x))
+   ((parse-form (make-top-level-env)) #'(lambda ([x : Int]) x))
    (Ann (Lambda (list (Fml 'x (Int)))
           (Ann (Ann (Var 'x) (quote-srcloc)) #f))
         (quote-srcloc)))
   (check-forms=?
-   ((parse-form top-level-env) #'(lambda ([x : Int]) : Int x))
+   ((parse-form (make-top-level-env)) #'(lambda ([x : Int]) : Int x))
    (Ann (Lambda (list (Fml 'x (Int)))
           (Ann (Ann (Var 'x) (quote-srcloc)) (Int)))
         (quote-srcloc))))
@@ -301,10 +301,10 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (Ascribe ((parse-form env) #'expr) (parse-type #'ty env) lbl)]))
 
 (module+ test
-  (check-forms=? (parse-ascription #'(ann 3 Int) top-level-env)
+  (check-forms=? (parse-ascription #'(ann 3 Int) (make-top-level-env))
                  (Ascribe (Ann (Quote 3) (quote-srcloc)) (Int) #f))
   
-  (check-forms=? (parse-ascription #'(ann #f Int "Bad") top-level-env)
+  (check-forms=? (parse-ascription #'(ann #f Int "Bad") (make-top-level-env))
                  (Ascribe (Ann (Quote #f) (quote-srcloc)) (Int)  "Bad")))
 
 (define (parse-begin stx env)
@@ -345,7 +345,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
        ((parse-form new-env) #'M))]))
 
 (module+ test
-  (parse-repeat #'(repeat (foo 0 10) (bar : Int 0) foo) top-level-env))
+  (parse-repeat #'(repeat (foo 0 10) (bar : Int 0) foo) (make-top-level-env)))
 
 (define (parse-switch stx env)
   (define-syntax-class switch-clause
@@ -383,7 +383,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 (module+ test
   (define parse-tuple (parse-simple*-form 'tuple Create-tuple))
-  (check-forms=? (parse-tuple #'(tuple 0 1 2) top-level-env)
+  (check-forms=? (parse-tuple #'(tuple 0 1 2) (make-top-level-env))
                  (Create-tuple
                   (list (Ann (Quote 0) (quote-srcloc))
                         (Ann (Quote 1) (quote-srcloc))
@@ -412,7 +412,7 @@ represents types in the schml abstract syntax tree.
 |#
 ;|#
 
-(define (parse-type stx [env top-level-env])
+(define (parse-type stx [env (make-top-level-env)])
   (define (recur s) (parse-type s env))
   (syntax-parse stx
     #:datum-literals (-> Ref Vect GRef GVect MRef MVect Tuple)
@@ -479,7 +479,7 @@ represents types in the schml abstract syntax tree.
 
 (define core-parse-prim (core parse-op))
 
-(define top-level-env
+(define (make-top-level-env)
   (make-immutable-hash
    `((define     . ,(core parse-define-form))
      (let        . ,(core parse-let-expression))
@@ -527,8 +527,8 @@ represents types in the schml abstract syntax tree.
               (core (parse-simple-form 'mvector-set! Mvector-set! 3))])
          `(,@(match (reference-semantics)
                ['Guarded
-                `((Ref        . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
-                  (Vect     . ,(core (make-parse-type-w/ctr 'GVect GVect)))
+                `((Ref          . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
+                  (Vect         . ,(core (make-parse-type-w/ctr 'GVect GVect)))
                   (vector       . ,parse-gvector)
                   (vector-ref   . ,parse-gvector-ref)
                   (vector-set!  . ,parse-gvector-set!)
@@ -536,8 +536,8 @@ represents types in the schml abstract syntax tree.
                   (box-set!     . ,parse-gbox-set!)
                   (unbox        . ,parse-gunbox))]
                ['Monotonic
-                `((Ref        . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
-                  (Vect     . ,(core (make-parse-type-w/ctr 'MVect MVect)))
+                `((Ref          . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
+                  (Vect         . ,(core (make-parse-type-w/ctr 'MVect MVect)))
                   (vector       . ,parse-mvector)
                   (vector-ref   . ,parse-mvector-ref)
                   (vector-set!  . ,parse-mvector-set!)
@@ -617,7 +617,7 @@ represents types in the schml abstract syntax tree.
 
 
 (module+ test
-  (check-forms=? ((parse-form top-level-env) #'(vector 0 2))
+  (check-forms=? ((parse-form (make-top-level-env)) #'(vector 0 2))
                  (Ann (Gvector (Ann (Quote 0) (quote-srcloc))
                                (Ann (Quote 2) (quote-srcloc)))
                       (quote-srcloc))))
