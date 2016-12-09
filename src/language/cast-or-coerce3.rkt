@@ -160,7 +160,7 @@
           (Type-Tuple-item E Index)
           (Make-Tuple-Coercion Uid E E E)
           (Compose-Tuple-Coercion Uid E E)
-          (Mediating-Coercion-Huh? E))))
+          (Mediating-Coercion-Huh E))))
 
 (define-type CoC3-Code (Code Uid* CoC3-Expr))
 

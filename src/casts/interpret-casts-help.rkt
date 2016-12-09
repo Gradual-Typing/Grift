@@ -198,7 +198,7 @@
   (mrefC?$           MonoRef?        MRef-Coercion-Huh)
   (mvectC?$          MonoVect?       MVect-Coercion-Huh)
   (tuple?$           CTuple?         Tuple-Coercion-Huh)
-  (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh?))
+  (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh))
 
 (define (mediating-crcn? x)
   (or (CTuple? x) (Ref? x) (Fn? x) (MonoRef? x) (MonoVect? x)))

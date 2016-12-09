@@ -1451,7 +1451,7 @@ but a static single assignment is implicitly maintained.
                (let ([u (next-uid! "tuple_coercion1")])
                  (Begin (list (Assign u c1))
                         (invoke-comp mk-tuple-crcn (Var u) c2)))))]
-        [(Mediating-Coercion-Huh? (app recur e))
+        [(Mediating-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK COERCION-MEDIATING-TAG)]
         [other (error 'specify-representation "unmatched ~a" other)]))
 

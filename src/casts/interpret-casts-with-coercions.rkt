@@ -351,10 +351,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt copy-val-monoref) v c mono_type)
   (define who 'make-cast-code)
   (debug who v c)
-  ;; schml: /home/deyaa/mono/Schml/src/casts/interpret-casts-with-coercions.rkt:354:2:
-  ;; who='make-cast-code
-  ;; v=(Var (Uid "r0" 0))
-  ;; c=(Quote-Coercion (MonoVect (STuple 3 (list #0=(Int) #1=(Dyn) (MVect (STuple 3 (list #0# #0# #1#)))))))
 
   (define-syntax-let$* let$* next-uid!)
   ;; apply-cast is normally specified in terms of inspecting the

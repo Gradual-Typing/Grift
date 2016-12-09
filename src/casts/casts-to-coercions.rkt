@@ -12,11 +12,12 @@ should be able to compile programs this the twosome casts for future comparison.
 |Input Grammar Cast0-Language                                                   |
 |Output Grammar Coercion-Language                                                  |
 +------------------------------------------------------------------------------|#
-(require "../helpers.rkt"
-         "../errors.rkt"
-         "../configuration.rkt"
-         "../language/cast0.rkt"
-         "../language/coercion.rkt")
+(require
+ (submod  "../logging.rkt" typed)
+ "../errors.rkt"
+ "../configuration.rkt"
+ "../language/cast0.rkt"
+ "../language/coercion.rkt")
 
 (provide casts->coercions
          make-coercion
@@ -36,12 +37,12 @@ should be able to compile programs this the twosome casts for future comparison.
 
 (: make-coercion (->* (String) (Boolean) (Schml-Type Schml-Type -> Schml-Coercion)))
 (define ((make-coercion lbl
-                      [space-efficient-normal-form?
-                       (and (space-efficient?)
-                            (not (optimize-first-order-coercions?)))])
+                        [space-efficient-normal-form?
+                         (and (space-efficient?)
+                              (not (optimize-first-order-coercions?)))])
          t1 t2)
   (define recur (make-coercion lbl (space-efficient?)))
-  (logging make-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
+  ;; (logging make-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
   (define result : Schml-Coercion
     (match* (t1 t2)
       [(t        t) IDENTITY]
@@ -69,12 +70,13 @@ should be able to compile programs this the twosome casts for future comparison.
       [((STuple n1 t1*) (STuple n2 t2*)) #:when (= n1 n2)
        (CTuple n1 (map recur t1* t2*))]
       [(_ _) (Failed lbl)]))
-  (logging make-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
+  ;; (logging make-coercion () "t1 ~a\n\tt2 ~a\n\tresult ~a\n" t1 t2 result)
   result)
 
 ;; Fold through the expression converting casts to coercions
 (: c2c-expr (C0-Expr -> Crcn-Expr))
 (define (c2c-expr exp)
+  (debug 'casts-to-coercions/c2c-expr exp)
   (match exp
     ;; The only Interesting Case
     [(Cast (app c2c-expr exp) (Twosome t1 t2 lbl))

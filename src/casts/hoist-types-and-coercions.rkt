@@ -449,7 +449,7 @@
       [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
-      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
+      [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
       [(? string? x) (error 'hoist-types/string)]
       [other (error 'hoist-types/expr "unmatched ~a" other)]))
   ;; Recur through other type containing ast forms

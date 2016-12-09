@@ -257,7 +257,7 @@
       [(Type-Tuple-num e) (Type-Tuple-num (ll-expr e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (ll-expr t1) (ll-expr t2) (ll-expr lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (ll-expr e1) (ll-expr e2))]
-      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (ll-expr e))]
+      [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (ll-expr e))]
       [other (error 'll-expr "~a" other)]))
 
 ;; recur through a code binding
