@@ -4,18 +4,9 @@
  (fixnum)
  (standard-bindings))
 
-(define (readlines p sep)
-  (let loop ((line (read-line p sep))
-	     (result '()))
-    (if (eof-object? line)
-	(let ([a (reverse (cdr result))])
-	  (cons (car a) (list->vector (cdr a))))
-	(loop (read-line p sep) (cons (string->number line) result)))))
-
 (define (main)
-  (let* ([a (readlines (current-input-port) #\ )]
-	 [size (car a)]
-	 [arr (cdr a)])
+  (let* ([size (read)]
+	 [arr (make-vector size 0)])
     (letrec ([sort (lambda (a p r)
 		     (if (< p r)
 			 (let ([q (partition a p r)])
@@ -49,5 +40,10 @@
 			     0))))]
 	     [init (lambda (n a) (if (= n 0) a (begin (vector-set! a (- 10000 n) n) (init (- n 1) a))))])
       (begin
+	(let loop ([i 0])
+	  (if (< i size)
+	      (begin
+	        (vector-set! arr i (read))
+		(loop (+ i 1)))))
 	(sort arr 0 (- size 1))
 	(pretty-print (vector-ref arr (- size 1)))))))

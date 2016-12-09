@@ -42,143 +42,38 @@
     (debug fl)
     (define file-name (file-name-from-path fl))
 
-    (define (renaming-output-files suffix)
-      (define out-file (path-replace-suffix file-name suffix))
-      (define c-file (path-add-suffix out-file #".c"))
-      (values (build-path compile-dir out-file) (build-path c-dir c-file)))
+    (define (guarded-compile fl i cast ref opened?)
+      (let* ([o (path-replace-extension
+                 file-name
+                 (string-append ".o" (number->string i)))]
+             [f (build-path compile-dir o)]
+             ;; [c (build-path c-dir (path-add-extension o ".c"))]
+             )
+        (parameterize ([specialize-cast-code-generation? opened?])
+          (if (not (file-exists? f))
+              (begin
+                (display f)
+                (display "\n")
+                (compile fl #:output f #:cast cast #:ref ref))
+              (void)))))
 
-    ;; config 01: no gc, guarded references, coercions, and close coded
-    ;; config 02: no gc, guarded references, type-based and close coded
-    ;; config 03: no gc, guarded references, coercions and open coded
-    ;; config 04: no gc, guarded references, type-based and open coded
-    ;; config 05: no gc, monotonic references, type-based and close coded
-    ;; config 06: no gc, monotonic references, type-based and close coded
-    ;; config 07: no gc, monotonic references, coercions and open coded
-    ;; config 08: no gc, monotonic references, type-based and open coded
-    ;; config 09: boehm, guarded references, coercions, and close coded
-    ;; config 10: boehm, guarded references, type-based and close coded
-    ;; config 11: boehm, guarded references, coercions and open coded
-    ;; config 12: boehm, guarded references, type-based and open coded
-    ;; config 13: boehm, monotonic references, coercions and close coded
-    ;; config 14: boehm, monotonic references, type-based and close coded
-    ;; config 15: boehm, monotonic references, coercions and open coded
-    ;; config 16: boehm, monotonic references, type-based and open coded
-    (define-values (nogc-guarded-coercion-closecoded-f-o nogc-guarded-coercion-closecoded-f-c) (renaming-output-files #".o1"))
-    (define-values (nogc-guarded-twosome-closecoded-f-o nogc-guarded-twosome-closecoded-f-c)   (renaming-output-files #".o2"))
-    (define-values (nogc-guarded-coercion-opencoded-f-o nogc-guarded-coercion-opencoded-f-c) (renaming-output-files #".o3"))
-    (define-values (nogc-guarded-twosome-opencoded-f-o nogc-guarded-twosome-opencoded-f-c)   (renaming-output-files #".o4"))
-    (define-values (nogc-mono-coercion-closecoded-f-o nogc-mono-coercion-closecoded-f-c) (renaming-output-files #".o5"))
-    (define-values (nogc-mono-twosome-closecoded-f-o nogc-mono-twosome-closecoded-f-c)   (renaming-output-files #".o6"))
-    (define-values (nogc-mono-coercion-opencoded-f-o nogc-mono-coercion-opencoded-f-c) (renaming-output-files #".o7"))
-    (define-values (nogc-mono-twosome-opencoded-f-o nogc-mono-twosome-opencoded-f-c)   (renaming-output-files #".o8"))
-    (define-values (boehm-guarded-coercion-closecoded-f-o boehm-guarded-coercion-closecoded-f-c) (renaming-output-files #".o9"))
-    (define-values (boehm-guarded-twosome-closecoded-f-o boehm-guarded-twosome-closecoded-f-c)   (renaming-output-files #".o10"))
-    (define-values (boehm-guarded-coercion-opencoded-f-o boehm-guarded-coercion-opencoded-f-c) (renaming-output-files #".o11"))
-    (define-values (boehm-guarded-twosome-opencoded-f-o boehm-guarded-twosome-opencoded-f-c)   (renaming-output-files #".o12"))
-    (define-values (boehm-mono-coercion-closecoded-f-o boehm-mono-coercion-closecoded-f-c) (renaming-output-files #".o13"))
-    (define-values (boehm-mono-twosome-closecoded-f-o boehm-mono-twosome-closecoded-f-c)   (renaming-output-files #".o14"))
-    (define-values (boehm-mono-coercion-opencoded-f-o boehm-mono-coercion-opencoded-f-c) (renaming-output-files #".o15"))
-    (define-values (boehm-mono-twosome-opencoded-f-o boehm-mono-twosome-opencoded-f-c)   (renaming-output-files #".o16"))
-    (compile fl
-             #:output nogc-guarded-coercion-closecoded-f-o
-             #:keep-c nogc-guarded-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Guarded
-             #:gc     'None)
-    (compile fl
-             #:output nogc-guarded-twosome-closecoded-f-o
-             #:keep-c nogc-guarded-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Guarded
-             #:gc     'None)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output nogc-guarded-coercion-opencoded-f-o
-               #:keep-c nogc-guarded-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Guarded
-               #:gc     'None)
-      (compile fl
-               #:output nogc-guarded-twosome-opencoded-f-o
-               #:keep-c nogc-guarded-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Guarded
-               #:gc     'None))
-    (compile fl
-             #:output nogc-mono-coercion-closecoded-f-o
-             #:keep-c nogc-mono-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Monotonic
-             #:gc     'None)
-    (compile fl
-             #:output nogc-mono-twosome-closecoded-f-o
-             #:keep-c nogc-mono-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Monotonic
-             #:gc     'None)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output nogc-mono-coercion-opencoded-f-o
-               #:keep-c nogc-mono-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Monotonic
-               #:gc     'None)
-      (compile fl
-               #:output nogc-mono-twosome-opencoded-f-o
-               #:keep-c nogc-mono-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Monotonic
-               #:gc     'None))
-    (compile fl
-             #:output boehm-guarded-coercion-closecoded-f-o
-             #:keep-c boehm-guarded-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Guarded
-             #:gc     'Boehm)
-    (compile fl
-             #:output boehm-guarded-twosome-closecoded-f-o
-             #:keep-c boehm-guarded-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Guarded
-             #:gc     'Boehm)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output boehm-guarded-coercion-opencoded-f-o
-               #:keep-c boehm-guarded-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Guarded
-               #:gc     'Boehm)
-      (compile fl
-               #:output boehm-guarded-twosome-opencoded-f-o
-               #:keep-c boehm-guarded-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Guarded
-               #:gc     'Boehm))
-    (compile fl
-             #:output boehm-mono-coercion-closecoded-f-o
-             #:keep-c boehm-mono-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Monotonic
-             #:gc     'Boehm)
-    (compile fl
-             #:output boehm-mono-twosome-closecoded-f-o
-             #:keep-c boehm-mono-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Monotonic
-             #:gc     'Boehm)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output boehm-mono-coercion-opencoded-f-o
-               #:keep-c boehm-mono-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Monotonic
-               #:gc     'Boehm)
-      (compile fl
-               #:output boehm-mono-twosome-opencoded-f-o
-               #:keep-c boehm-mono-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Monotonic
-               #:gc     'Boehm))))
+    ;; config 01: guarded references,   coercions,  close coded
+    ;; config 02: guarded references,   type-based, close coded
+    ;; config 03: guarded references,   coercions,  open coded
+    ;; config 04: guarded references,   type-based, open coded
+    ;; config 05: monotonic references, coercions,  close coded
+    ;; config 06: monotonic references, type-based, close coded
+    ;; config 07: monotonic references, coercions,  open coded
+    ;; config 08: monotonic references, type-based, open coded
+    (guarded-compile fl 1 'Coercions 'Guarded #f)
+    (guarded-compile fl 2 'Type-Based 'Guarded #f)
+    (guarded-compile fl 3 'Coercions 'Guarded #t)
+    (guarded-compile fl 4 'Type-Based 'Guarded #t)
+    (guarded-compile fl 5 'Coercions 'Monotonic #f)
+    (guarded-compile fl 6 'Type-Based 'Monotonic #f)
+    (guarded-compile fl 7 'Coercions 'Monotonic #t)
+    (guarded-compile fl 8 'Type-Based 'Monotonic #t)
+    ))
 
 (module+ main
   (c-flags (cons "-O3" (c-flags)))
@@ -187,14 +82,7 @@
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
-   #:args (directory ;; memory-limit
-                     )
-
-   ;; set the default memory limit for the compiler
-   ;; (init-heap-kilobytes
-   ;;  (or (string->number memory-limit)
-   ;;      (error 'command-line
-   ;;             "couldn't parse ~a as a number" memory-limit)))
+   #:args (directory)
    (compile-directory
     (or (string->path directory)
         (error 'benchmark-main "could parse ~v as a path" directory)))))
