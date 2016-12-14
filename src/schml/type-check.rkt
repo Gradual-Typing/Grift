@@ -220,13 +220,10 @@ The type rules for core forms that have interesting type rules
     [else switch-t]))
 
 ;; The type of literal constants are staticly known
-(: const-type-rule (Schml-Literal . -> . (U Bool Int Unit)))
+(: const-type-rule (Schml-Literal . -> . Schml-Base-Type))
 (define (const-type-rule c)
-  (cond
-    [(boolean? c) BOOL-TYPE]
-    [(exact-integer? c) INT-TYPE]
-    [(inexact-real? c) FLOAT-TYPE]
-    [(null? c) UNIT-TYPE]))
+  (define who 'type-check/const-type-rule)
+  (schml-literal->base-type c))
 
 ;; The type of an application is the return type of the applied
 ;; procedure given that the arguments are consistent with the

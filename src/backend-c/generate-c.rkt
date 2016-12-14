@@ -313,6 +313,10 @@
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Quote (? inexact-real? f))  (printf "float_to_imdt(~a)" f)]
+    [(Quote (? char? c))
+     (if (<= 0 (char->integer c) 255)
+         (printf "'\\x~a'" (number->string (char->integer c) 16))
+         (error 'generate-c/quote-char "currently only supports ASCII"))]
     [(Quote k)            (print k)]
     ;; TODO Consider changing how Halt is handled
     [(Halt)           (display "exit(-1),-1")]
@@ -415,9 +419,12 @@
 (define imdt->int   no-cast)
 (define int->imdt   no-cast)
 (define bool->imdt  no-cast)
+(define char->imdt  no-cast)
+(define imdt->char  no-cast)
 (: imdt->string Caster)
 (define (imdt->string th) (display "(char*)") (th))
-(define-type  IMPL (List (U 'function 'infix-op 'identity) String (Listof Caster) (Listof Caster)))
+(define-type  IMPL
+  (List (U 'function 'infix-op 'identity) String (Listof Caster) (Listof Caster)))
 (define prim-impl : (HashTable Symbol IMPL)
   ;; TODO If we keep types we could drop these type casts at primitives and
   ;; possibly generate cleaner more understandable code.
@@ -465,7 +472,13 @@
      (Exit       function "exit"  (,no-cast) ())
      (int->float identity "none"  (,imdt->float) ())
      (read-int   function "read_int"   () (,int->imdt))
-     (read-float function "read_float" () (,float->imdt)))))
+     (read-float function "read_float" () (,float->imdt))
+     (read-char  function "read_ascii_char" () (,char->imdt))
+     (print-char function "print_ascii_char" (,imdt->char) ())
+     (display-char function "display_ascii_char" (,imdt->char) ())
+     (int->char  identity "none"  (,imdt->char) ())
+     (char->int  identity "none"  (,char->imdt) ()))))
+
 (define (easy-p? [s : Symbol]) : Boolean
   (if (hash-ref prim-impl s #f) #t #f))
 (define (easy-p->impl [s : Symbol]) : IMPL

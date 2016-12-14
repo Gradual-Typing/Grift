@@ -18,12 +18,18 @@
      ->Float-Primitive
      Int->Float-Primitive
      Float->Int-Primitive
-     FloatxFloat->Bool-Primitive))
+     FloatxFloat->Bool-Primitive
+     Char->Int-Primitive
+     Int->Char-Primitive 
+     ->Char-Primitive))
 
 (define-predicate schml-prim? Schml-Prim)
 
 (define-type Schml-Prim!
-  (U Timer-Primitive))
+  (U Timer-Primitive
+     Char->Unit-Primitive
+     Int->Unit-Primitive
+     Float->Unit-Primitive))
 
 (define-predicate schml-prim!? Schml-Prim!)
 #;(: schml-prim!? (Any -> Boolean : Schml-Prim!))
@@ -40,6 +46,7 @@
 (define-predicate IntxInt->Int-primitive? IntxInt->Int-Primitive)
 
 (define-type ->Int-Primitive (U 'read-int))
+(define-type Int->Unit-Primitive (U 'print-int))
 (define-type ->I-Prim ->Int-Primitive)
 
 (define-predicate ->Int-primitive? ->Int-Primitive)
@@ -53,13 +60,19 @@
 (define-type Float->Float-Primitive
   (U 'flabs 'flround 'flfloor 'flceiling 'fltruncate
      'flsin 'flcos 'fltan 'flasin 'flacos 'flatan
-     'fllog 'flexp 'flsqrt))
+     'fllog 'flexp 'flsqrt
+     'flmin 'flmax))
+(define-type Float->Unit-Primitive (U 'print-float))
 (define-type ->Float-Primitive    (U 'read-float))
 (define-type Int->Float-Primitive (U 'int->float))
 (define-type Float->Int-Primitive (U 'float->int))
 (define-type FloatxFloat->Bool-Primitive
   (U 'fl< 'fl<= 'fl= 'fl>= 'fl>))
 
+(define-type ->Char-Primitive (U 'read-char))
+(define-type Int->Char-Primitive (U 'int->char))
+(define-type Char->Int-Primitive (U 'char->int))
+(define-type Char->Unit-Primitive (U 'print-char 'display-char))
 
 (define-predicate FloatxFloat->Float-primitive? FloatxFloat->Float-Primitive)
 (define-predicate Float->Float-primitive? Float->Float-Primitive)
@@ -93,25 +106,89 @@
 
 (define ->UNIT-TYPE (Fn 0 '() UNIT-TYPE))
 
+
+
+(define ->CHAR-TYPE (Fn 0 '() CHAR-TYPE))
+(define INT->CHAR-TYPE (Fn 1 (list INT-TYPE) CHAR-TYPE))
+(define CHAR->INT-TYPE (Fn 1 (list CHAR-TYPE) INT-TYPE))
+
+
+(define INT->UNIT-TYPE (Fn 1 (list INT-TYPE) UNIT-TYPE))
+(define CHAR->UNIT-TYPE (Fn 1 (list CHAR-TYPE) UNIT-TYPE))
+(define FLOAT->UNIT-TYPE (Fn 1 (list FLOAT-TYPE) UNIT-TYPE))
+
+(define schml-primitive-type-table
+  : (HashTable Schml-Primitive (Fn Index (Listof Base-Type) Base-Type))
+  (make-immutable-hash
+   `((char->int  . ,CHAR->INT-TYPE)
+     (int->char  . ,INT->CHAR-TYPE)
+     (print-char . ,CHAR->UNIT-TYPE)
+     (display-char . ,CHAR->UNIT-TYPE)
+     (read-char  . ,->CHAR-TYPE)
+     ;; Fixnum operations
+     (* . ,INTxINT->INT-TYPE)
+     (+ . ,INTxINT->INT-TYPE)
+     (- . ,INTxINT->INT-TYPE)
+     (%/ . ,INTxINT->INT-TYPE)
+     (%% . ,INTxINT->INT-TYPE)
+     (%>> . ,INTxINT->INT-TYPE)
+     (%<< . ,INTxINT->INT-TYPE)
+     (binary-and . ,INTxINT->INT-TYPE)
+     (binary-or  . ,INTxINT->INT-TYPE)
+     (binary-xor . ,INTxINT->INT-TYPE)
+     (read-int . ,->INT-TYPE)
+     (print-int . ,INT->UNIT-TYPE)
+     (<  . ,INTxINT->BOOL-TYPE)
+     (<= . ,INTxINT->BOOL-TYPE)
+     (=  . ,INTxINT->BOOL-TYPE)
+     (>  . ,INTxINT->BOOL-TYPE)
+     (>= . ,INTxINT->BOOL-TYPE)
+     ;; Float operations
+     (fl+   . ,FLOATxFLOAT->FLOAT-TYPE)
+     (fl-   . ,FLOATxFLOAT->FLOAT-TYPE)
+     (fl*   . ,FLOATxFLOAT->FLOAT-TYPE)
+     (fl/   . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flmodulo . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flabs . ,FLOAT->FLOAT-TYPE)
+     (fl<   . ,FLOATxFLOAT->BOOL-TYPE)
+     (fl<=  . ,FLOATxFLOAT->BOOL-TYPE)
+     (fl=   . ,FLOATxFLOAT->BOOL-TYPE)
+     (fl>=  . ,FLOATxFLOAT->BOOL-TYPE)
+     (fl>   . ,FLOATxFLOAT->BOOL-TYPE)
+     (flmin . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flmax . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flround . ,FLOAT->FLOAT-TYPE)
+     (flfloor . ,FLOAT->FLOAT-TYPE)
+     (flceiling . ,FLOAT->FLOAT-TYPE)
+     (fltruncate . ,FLOAT->FLOAT-TYPE)
+     ;; Float operations (trig)
+     (flsin . ,FLOAT->FLOAT-TYPE)
+     (flcos .  ,FLOAT->FLOAT-TYPE)
+     (fltan .  ,FLOAT->FLOAT-TYPE)
+     (flasin . ,FLOAT->FLOAT-TYPE)
+     (flacos . ,FLOAT->FLOAT-TYPE)
+     (flatan . ,FLOAT->FLOAT-TYPE)
+     ;; Float operations (math)
+     (fllog  . ,FLOAT->FLOAT-TYPE)
+     (flexp  . ,FLOAT->FLOAT-TYPE)
+     (flsqrt . ,FLOAT->FLOAT-TYPE)
+     (flexpt . ,FLOATxFLOAT->FLOAT-TYPE)
+     (float->int . ,FLOAT->INT-TYPE)
+     (int->float . ,INT->FLOAT-TYPE)
+     (read-float . ,->FLOAT-TYPE)
+     (print-float . ,FLOAT->UNIT-TYPE) 
+     (timer-start . ,->UNIT-TYPE)
+     (timer-stop . ,->UNIT-TYPE)
+     (timer-report . ,->UNIT-TYPE))))
+
+
 (: schml-primitive->type
-   (-> Schml-Primitive (Fn Index
-                           (Listof (U Float Int Bool))
-                           (U Int Bool Unit Float))))
+   (-> Schml-Primitive (Fn Index (Listof Base-Type) Base-Type)))
 (define (schml-primitive->type p)
-  (cond
-    [(IntxInt->Bool-primitive? p)       INTxINT->BOOL-TYPE]
-    [(IntxInt->Int-primitive? p)        INTxINT->INT-TYPE]
-    [(->Int-primitive? p)               ->INT-TYPE]
-    [(FloatxFloat->Bool-primitive? p)   FLOATxFLOAT->BOOL-TYPE]
-    [(FloatxFloat->Float-primitive? p)  FLOATxFLOAT->FLOAT-TYPE]
-    [(Float->Float-primitive? p)        FLOAT->FLOAT-TYPE]
-    [(Float->Int-primitive? p)          FLOAT->INT-TYPE]
-    [(Int->Float-primitive? p)          INT->FLOAT-TYPE]
-    [(->Float-primitive? p)             ->FLOAT-TYPE]
-    [(timer-primitive? p)               ->UNIT-TYPE]
-    ;; if the all cases are not covered p have members and fail
-    ;; to type-check. 
-    [else p]))
+  (define (err) (error 'schml-primitive->type "invalid: ~a" p))
+  (hash-ref schml-primitive-type-table p err))
+
+
 
 
 #|-----------------------------------------------------------------------------
@@ -126,7 +203,8 @@ We are going to UIL
 (define-type UIL-Expr-Prim
   (U ->Float-Primitive Float->Float-Primitive Float->Int-Primitive
      FloatxFloat->Float-Primitive
-     Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim))
+     Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim
+     ->Char-Primitive Char->Int-Primitive Int->Char-Primitive))
 
 (define-type UIL-Pred-Prim (U FloatxFloat->Bool-Primitive
                               IntxInt->Bool-Primitive))
@@ -135,7 +213,8 @@ We are going to UIL
 
 (define-type Array-Prim (U 'Alloc 'Array-ref))
 (define-type Array-Prim! 'Array-set!)
-(define-type Print-Prim! (U 'Printf 'Print 'print-float))
+(define-type Print-Prim! (U 'Printf 'Print 'print-float
+                            'print-int 'print-char 'display-char))
 (define-type Bottom-Prim (U 'Exit))
 
 (define-type (UIL-Op E) (Op UIL-Prim (Listof E)))

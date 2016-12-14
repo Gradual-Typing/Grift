@@ -148,7 +148,8 @@
   (if (Type? o)
       (let ([v (Type-type o)])
         (cond
-          [(or (Dyn? v) (Int? v) (Bool? v) (Unit? v) (Float? v))
+          [(or (Dyn? v) (Int? v) (Bool? v) (Unit? v)
+               (Character? v)(Float? v))
            (Tag 'Atomic)]
           [(GRef? v) (Tag 'GRef)]
           [(GVect? v) (Tag 'GVect)]

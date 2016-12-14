@@ -559,6 +559,11 @@ represents types in the schml abstract syntax tree.
            (munbox       . ,parse-munbox)))
      (ann . ,(core parse-ascription))
      (: . ,(core parse-ascription))
+     ;; Char operations
+     (char->int  . ,core-parse-prim)
+     (int->char  . ,core-parse-prim)
+     (print-char . ,core-parse-prim)
+     (read-char  . ,core-parse-prim)
      ;; Fixnum operations
      (* . ,core-parse-prim)
      (+ . ,core-parse-prim)

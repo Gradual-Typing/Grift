@@ -30,17 +30,15 @@
 (define-type D5-Pred (Relop UIL-Pred-Prim D5-Trivial D5-Trivial))
 
 (define-type D5-Effect
- (Rec E
-      (U 
-       (Repeat Uid D5-Trivial D5-Trivial #f #f (Begin D5-Effect* No-Op))
-       (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
-       Break-Repeat
-       (Switch D5-Trivial
-               (Switch-Case* (Begin D5-Effect* No-Op))
-               (Begin D5-Effect* No-Op))
-       (UIL-Op! D5-Trivial)
-         (Assign Uid D5-Value)
-         No-Op)))
+  (U (Repeat Uid D5-Trivial D5-Trivial #f #f (Begin D5-Effect* No-Op))
+     (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
+     Break-Repeat
+     (Switch D5-Trivial
+             (Switch-Case* (Begin D5-Effect* No-Op))
+             (Begin D5-Effect* No-Op))
+     (UIL-Op! D5-Trivial)
+     (Assign Uid D5-Value)
+     No-Op))
 
 (define-type D5-Value
   (U D5-Trivial

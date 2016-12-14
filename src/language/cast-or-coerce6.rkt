@@ -70,7 +70,7 @@
           (Failed-Coercion-Huh E)
           (Failed-Coercion-Label E)
           ;;Type operations
-          (Type Prim-Type)
+          (Type Immediate-Type)
           (Type-Dyn-Huh E)
           (Type-Fn-Huh E)
           (Type-Fn-arity E)
@@ -129,7 +129,7 @@
           (Guarded-Proxy-Blames E)
           (Guarded-Proxy-Coercion E)
           ;; Monotonic references
-          (Mbox E Prim-Type)
+          (Mbox E Immediate-Type)
           (Mbox-val-set! E E)
           (Mbox-val-ref E)
           (Mbox-rtti-set! Uid E)
@@ -145,7 +145,7 @@
           (Type-MRef-Huh E)
           (Type-MRef-Of E)
           (Error E)
-          (Mvector E E Prim-Type)
+          (Mvector E E Immediate-Type)
           (Mvector-size E)
           (Mvector-val-ref E E)
           (Mvector-val-set! E E E)
