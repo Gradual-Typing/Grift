@@ -162,7 +162,7 @@
           (Type-Tuple-item E Index)
           (Make-Tuple-Coercion Uid E E E)
           (Compose-Tuple-Coercion Uid E E)
-          (Mediating-Coercion-Huh? E))))
+          (Mediating-Coercion-Huh E))))
 
 (define-type L0-Code (Code Uid* L0-Expr))
 (define-type L0-Expr* (Listof L0-Expr))

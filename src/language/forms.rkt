@@ -696,7 +696,7 @@ Dyn
   (Tuple-Coercion-Item c indx)
   (Make-Tuple-Coercion make-uid t1 t2 lbl)
   (Compose-Tuple-Coercion Uid c1 c2)
-  (Mediating-Coercion-Huh? c)
+  (Mediating-Coercion-Huh c)
   ;; Guarded Reference Coercion
   ;; "Proxy a Guarded Reference's Reads and writes"
   (Ref read write)

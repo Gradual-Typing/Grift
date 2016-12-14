@@ -10,7 +10,8 @@
   (call-with-output-file path #:exists 'replace #:mode 'text
     (lambda (file-port)
       (define print-without-quote 1)
-      (pretty-print prog file-port print-without-quote))))
+      (pretty-print prog file-port print-without-quote)
+      (pretty-print prog (current-output-port) print-without-quote))))
 
 (define (make-timing-loop
          #:letrec-bnds    [letrec-bnds '()]

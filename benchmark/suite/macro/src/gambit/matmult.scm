@@ -5,7 +5,7 @@
  (fixnum))
 
 (define (main)
-  (let ([size (string->number (read-line))])
+  (let ([size (read)])
     (let ([ar size]
 	  [ac size]
 	  [br size]

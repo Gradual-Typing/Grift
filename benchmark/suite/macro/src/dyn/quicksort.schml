@@ -13,7 +13,7 @@
                           (let ([i : Dyn (box (- p 1))]
                                 [x : Dyn (vector-ref a r)])
                             (begin
-                              (repeat (j p r) (_ ())
+                              (repeat (j p r) (_ : Dyn ())
                                       (if (<= (vector-ref a j) x)
                                           (begin
                                             (box-set! i (+ (unbox i) 1))
@@ -30,7 +30,7 @@
                              (vector-set! a i (vector-ref a j))
                              (vector-set! a j t)))))])
       (begin
-        (repeat (i 0 size) (_ ())
+        (repeat (i 0 size) (_ : Dyn ())
                 (vector-set! a i (read-int)))
         (time (sort a 0 (- size 1)))
-        (vector-ref a (- size 1))))))
+        (: (vector-ref a (- size 1)) Int)))))

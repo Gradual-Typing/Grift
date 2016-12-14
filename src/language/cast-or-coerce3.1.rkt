@@ -161,7 +161,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Type-Tuple-item E Index)
           (Make-Tuple-Coercion Uid E E E)
           (Compose-Tuple-Coercion Uid E E)
-          (Mediating-Coercion-Huh? E)
+          (Mediating-Coercion-Huh E)
           No-Op)))
 
 (define-type CoC3.1-Code (Code Uid* CoC3.1-Expr))

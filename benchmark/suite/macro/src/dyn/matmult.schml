@@ -9,10 +9,10 @@
                            (let ([x : Dyn
                                     (vector l1 (vector l2 0))])
                              (begin
-                               (repeat (i 0 l1) (_ ())
+                               (repeat (i 0 l1) (_ : Dyn ())
                                        (let ([xi : Dyn (vector l2 0)])
                                          (begin
-                                           (repeat (j 0 l2) (_ ())
+                                           (repeat (j 0 l2) (_ : Dyn ())
                                                    (vector-set! xi j (+ j i)))
                                            (vector-set! x i xi))))
                                x)))]
@@ -23,11 +23,11 @@
                                 [y1 : Dyn] [y2 : Dyn]) : Dyn
                          (let ([r : Dyn (vector ar (vector bc 0))])
                            (begin
-                             (repeat (i 0 x1) (_ ())
+                             (repeat (i 0 x1) (_ : Dyn ())
                                      (let ([ri : Dyn (vector y2 0)])
                                        (begin
-                                         (repeat (j 0 y2) (_ ())
-                                                 (repeat (k 0 y1) (_ ())
+                                         (repeat (j 0 y2) (_ : Dyn ())
+                                                 (repeat (k 0 y1) (_ : Dyn ())
                                                          (vector-set! ri j
                                                                        (+ (vector-ref ri j)
                                                                           (* (vector-ref (vector-ref x i) k)
@@ -39,5 +39,5 @@
 		[bx : Dyn (box 0)])
 	    (begin
 	      (time (box-set! bx (vector-ref (vector-ref (mult a ar b br bc) (- ar 1)) (- ac 1))))
-	      (unbox bx))))
+	      (: (unbox bx) Int))))
 	0)))

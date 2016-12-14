@@ -1071,7 +1071,7 @@ a static single assignment form.
                (let ([u (next-uid! "tuple_coercion1")])
                  (Let `((,u . ,c1))
                       (invoke-comp mk-tuple-crcn (Var u) c2)))))]
-        [(Mediating-Coercion-Huh? (app recur e))
+        [(Mediating-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK MEDIATING-COERCION-TAG)]
         [other (error 'specify-representation "unmatched ~a" other)]))
     

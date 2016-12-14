@@ -199,7 +199,7 @@
     [(Type-Tuple-num e) (recur e)]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
     [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
-    [(Mediating-Coercion-Huh? e) (recur e)]
+    [(Mediating-Coercion-Huh e) (recur e)]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
 
 ;; A specialized version of replace-ref that knows it takes and recieves
@@ -455,6 +455,12 @@
     [(Copy-Tuple (app recur n) (app recur v))
        (Copy-Tuple n v)]
     [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+    [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+    [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+    [(Make-Tuple-Coercion uid t1 t2 lbl)
+     (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+    [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
+    [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
     [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
     [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
      (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
@@ -782,7 +788,7 @@
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]
     [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (pl-expr e1) (pl-expr e2))]
-    [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (pl-expr e))]
+    [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (pl-expr e))]
     [other (error 'purify-letrec/expr "unmatched ~a" other)]))
 
 #|
