@@ -6,63 +6,63 @@
 
 (define (make-body [x : Float] [y : Float] [z : Float]
                    [vx : Float] [vy : Float] [vz : Float]
-                   [mass : Float]) : (Vector Float)
-  (let ([v : (Vector Float) (vector 7 #i0.0)])
-    (begin (vector-set! v 0 x)
-           (vector-set! v 1 y)
-           (vector-set! v 2 z)
-           (vector-set! v 3 vx)
-           (vector-set! v 4 vy)
-           (vector-set! v 5 vz)
-           (vector-set! v 6 mass)
-           v)))
+                   [mass : Float]) : (Vect Float)
+                   (let ([v : (Vect Float) (vector 7 #i0.0)])
+                     (begin (vector-set! v 0 x)
+                            (vector-set! v 1 y)
+                            (vector-set! v 2 z)
+                            (vector-set! v 3 vx)
+                            (vector-set! v 4 vy)
+                            (vector-set! v 5 vz)
+                            (vector-set! v 6 mass)
+                            v)))
 
-(define (set-body-x! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-x! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 0 v))
 
-(define (body-x [b : (Vector Float)]) : Float
+(define (body-x [b : (Vect Float)]) : Float
   (vector-ref b 0))
 
-(define (set-body-y! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-y! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 1 v))
 
-(define (body-y [b : (Vector Float)]) : Float
+(define (body-y [b : (Vect Float)]) : Float
   (vector-ref b 1))
 
-(define (set-body-z! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-z! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 2 v))
 
-(define (body-z [b : (Vector Float)]) : Float
+(define (body-z [b : (Vect Float)]) : Float
   (vector-ref b 2))
 
-(define (set-body-vx! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-vx! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 3 v))
 
-(define (body-vx [b : (Vector Float)]) : Float
+(define (body-vx [b : (Vect Float)]) : Float
   (vector-ref b 3))
 
-(define (set-body-vy! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-vy! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 4 v))
 
-(define (body-vy [b : (Vector Float)]) : Float
+(define (body-vy [b : (Vect Float)]) : Float
   (vector-ref b 4))
 
-(define (set-body-vz! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-vz! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 5 v))
 
-(define (body-vz [b : (Vector Float)]) : Float
+(define (body-vz [b : (Vect Float)]) : Float
   (vector-ref b 5))
 
-(define (set-body-mass! [b : (Vector Float)] [v : Float]) : Unit
+(define (set-body-mass! [b : (Vect Float)] [v : Float]) : Unit
   (vector-set! b 6 v))
 
-(define (body-mass [b : (Vector Float)]) : Float
+(define (body-mass [b : (Vect Float)]) : Float
   (vector-ref b 6))
 
-(define *sun* : (Vector Float)
+(define *sun* : (Vect Float)
   (make-body #i0.0 #i0.0 #i0.0 #i0.0 #i0.0 #i0.0 solar-mass))
 
-(define *jupiter* : (Vector Float)
+(define *jupiter* : (Vect Float)
   (make-body #i4.84143144246472090
              #i-1.16032004402742839
              #i-1.03622044471123109e-1
@@ -71,7 +71,7 @@
              (fl* #i-6.90460016972063023e-5 days-per-year)
              (fl* #i9.54791938424326609e-4 solar-mass)))
 
-(define *saturn* : (Vector Float)
+(define *saturn* : (Vect Float)
   (make-body #i8.34336671824457987
              #i4.12479856412430479
              #i-4.03523417114321381e-1
@@ -80,7 +80,7 @@
              (fl* #i2.30417297573763929e-5 days-per-year)
              (fl* #i2.85885980666130812e-4 solar-mass)))
 
-(define *uranus* : (Vector Float)
+(define *uranus* : (Vect Float)
   (make-body #i1.28943695621391310e1
              #i-1.51111514016986312e1
              #i-2.23307578892655734e-1
@@ -89,7 +89,7 @@
              (fl* #i-2.96589568540237556e-05 days-per-year)
              (fl* #i4.36624404335156298e-05 solar-mass)))
 
-(define *neptune* : (Vector Float)
+(define *neptune* : (Vect Float)
   (make-body #i1.53796971148509165e+01
              #i-2.59193146099879641e+01
              #i1.79258772950371181e-01
@@ -98,19 +98,19 @@
              (fl* #i-9.51592254519715870e-05 days-per-year)
              (fl* #i5.15138902046611451e-05 solar-mass)))
 
-(define *system* : (Vector (Vector Float))
-  (let ([v : (Vector (Vector Float)) (vector 5 (vector 0 #i0.0))])
-   (begin (vector-set! v 0 *sun*)
-     	  (vector-set! v 1 *jupiter*)
-	  (vector-set! v 2 *saturn*)
-	  (vector-set! v 3 *uranus*)
-	  (vector-set! v 4 *neptune*)
-	  v)))
+(define *system* : (Vect (Vect Float))
+  (let ([v : (Vect (Vect Float)) (vector 5 (vector 0 #i0.0))])
+    (begin (vector-set! v 0 *sun*)
+           (vector-set! v 1 *jupiter*)
+           (vector-set! v 2 *saturn*)
+           (vector-set! v 3 *uranus*)
+           (vector-set! v 4 *neptune*)
+           v)))
 
 (define *system-size* : Int 5)
 
 
-				 
+
 
 ;; -------------------------------
 (define (offset-momentum) : Unit 
@@ -126,7 +126,7 @@
                                   (fl/ (fl- #i0.0 py) solar-mass))
                     (set-body-vz! (vector-ref *system* 0)
                                   (fl/ (fl- #i0.0 pz) solar-mass)))
-                  (let ([j : (Vector Float) (vector-ref *system* i1)])
+                  (let ([j : (Vect Float) (vector-ref *system* i1)])
                     (loop-i1 (+ i1 1)
                              (fl+ px (fl* (body-vx j) (body-mass j)))
                              (fl+ py (fl* (body-vy j) (body-mass j)))
@@ -141,7 +141,7 @@
               : Float
               (if (= o *system-size*)
                   e
-                  (let([o1 : (Vector Float) (vector-ref *system* o)])
+                  (let([o1 : (Vect Float) (vector-ref *system* o)])
                     (let ([e : Float
                              (fl+ e (fl* (fl* 0.5 (body-mass o1))
                                          (fl+ (fl+ (fl* (body-vx o1) (body-vx o1))
@@ -153,7 +153,7 @@
                                   : Float
                                   (if (= i2 *system-size*)
                                       (loop-o (+ o 1) e)
-                                      (let ([i1 : (Vector Float) (vector-ref *system* i2)])
+                                      (let ([i1 : (Vect Float) (vector-ref *system* i2)])
                                         (let ([dx : Float (fl- (body-x o1) (body-x i1))]
                                               [dy : Float (fl- (body-y o1) (body-y i1))]
                                               [dz : Float (fl- (body-z o1) (body-z i1))])
@@ -209,8 +209,9 @@
                              (loop-o (+ o 1)))))))])
     (loop-o 0)))
 
-(begin (offset-momentum)
-       (energy))
-(begin (repeat (i 0 (read-int)) (a : Unit ())
-               (begin (advance) ()))
-       (energy))
+(begin
+  (offset-momentum)
+  (energy)
+  (begin (repeat (i 0 (read-int)) (a : Unit ())
+           (begin (advance) ()))
+         (energy)))

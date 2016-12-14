@@ -36,6 +36,7 @@
 ;; These keys are what are iterated over to control the benchmark
 (define tests               '(fn-app ref-read-write))
 (define compilers           '(Type-Based Coercions))
+(define refs                '(Guarded Monotonic))
 (define hand-coded?         '(#f #t))
 (define overhead-test-repetitions
   (make-parameter
@@ -54,31 +55,43 @@
     (define src-code (generate n))
     (write-source schml-path src-code)
     
-    (define type-based-path (configuration->src-path test n 'Type-Based #f))
-    (compile schml-path #:cast 'Type-Based #:keep-c type-based-path)
+    (define type-based-path (configuration->src-path test n 'Type-Based 'Guarded #f))
+    (compile schml-path #:cast 'Type-Based #:ref 'Guarded #:keep-c type-based-path)
     
-    (define type-based-c-path (configuration->src-path test n 'Type-Based #t))
+    (define type-based-c-path (configuration->src-path test n 'Type-Based 'Guarded #t))
     (copy-file type-based-path type-based-c-path copy-over-it)
     
-    (define coercions-path (configuration->src-path test n 'Coercions #f))
-    (compile schml-path #:cast 'Coercions #:keep-c coercions-path)
+    (define coercions-path (configuration->src-path test n 'Coercions 'Guarded #f))
+    (compile schml-path #:cast 'Coercions #:ref 'Guarded #:keep-c coercions-path)
     
-    (define coercions-c-path (configuration->src-path test n 'Coercions #t))
-    (copy-file coercions-path coercions-c-path copy-over-it)))
+    (define coercions-c-path (configuration->src-path test n 'Coercions 'Guarded #t))
+    (copy-file coercions-path coercions-c-path copy-over-it)
 
-(define (configuration->string test reps compiler hand-coded?)
+    (define type-based-mono-path (configuration->src-path test n 'Type-Based 'Monotonic #f))
+    (compile schml-path #:cast 'Type-Based #:ref 'Monotonic #:keep-c type-based-mono-path)
+    
+    (define type-based-mono-c-path (configuration->src-path test n 'Type-Based 'Monotonic #t))
+    (copy-file type-based-mono-path type-based-mono-c-path copy-over-it)
+    
+    (define coercions-mono-path (configuration->src-path test n 'Coercions 'Monotonic #f))
+    (compile schml-path #:cast 'Coercions #:ref 'Monotonic #:keep-c coercions-mono-path)
+    
+    (define coercions-mono-c-path (configuration->src-path test n 'Coercions 'Monotonic #t))
+    (copy-file coercions-mono-path coercions-mono-c-path copy-over-it)))
+
+(define (configuration->string test reps compiler ref hand-coded?)
   (define hand-coded-str (if hand-coded? ".byHand" ""))
-  (format "~a-x~a.~a~a" test reps compiler hand-coded-str))
+  (format "~a-x~a.~a~a~a" test reps compiler ref hand-coded-str))
 
-(define (configuration->src-path test reps compiler hand-coded?)
-  (define name (configuration->string test reps compiler hand-coded?))
+(define (configuration->src-path test reps compiler ref hand-coded?)
+  (define name (configuration->string test reps compiler ref hand-coded?))
   (build-path src-dir (string-append name ".c")))
 
 (define (configuration->schml-src-path test reps)
   (build-path tmp-dir (format "~a-x~a.schml" test reps)))
 
-(define (configuration->exe-path test reps compiler hand-coded?)
-  (define name (configuration->string test reps compiler hand-coded?))
+(define (configuration->exe-path test reps compiler ref hand-coded?)
+  (define name (configuration->string test reps compiler ref hand-coded?))
   (build-path exe-dir name))
 
 (define (generate-fn-app-test-src n)
@@ -135,14 +148,14 @@
                 [redn (string->symbol (format "r~a" n))]
                 [wrtn (string->symbol (format "w~a" n))])
             (loop (sub1 n)
-                  `([,boxn : (GVect Int) (gvector 10000 iters)] . ,bnd*)
+                  `([,boxn : (Vect Int) (vector 10000 iters)] . ,bnd*)
                   (lambda (i acc)
                     `(let ([j (%% ,i 10000)])
-                       (let ([,redn (gvector-ref ,boxn j)])
+                       (let ([,redn (vector-ref ,boxn j)])
                          (let ([,wrtn ,(test i acc)])
-                           (begin (gvector-set! ,boxn j ,wrtn) ,redn)))))
+                           (begin (vector-set! ,boxn j ,wrtn) ,redn)))))
                   (lambda (acc) `(+ (repeat [i 0 10000] [sum 0]
-                                      (+ (gvector-ref ,boxn i) sum))
+                                      (+ (vector-ref ,boxn i) sum))
                                     ,acc)))))))
     (make-timing-loop
      #:let-bnds     bnd*
@@ -158,8 +171,9 @@
   (for* ([t tests]
          [n (overhead-test-repetitions)]
          [c compilers]
+         [r refs]
          [hc? hand-coded?])
-    (define src-path (configuration->src-path t n c hc?))
+    (define src-path (configuration->src-path t n c r hc?))
     (unless (file-exists? src-path)
       (error 'src-path "no source file found at ~a" src-path))
     (cond
@@ -168,7 +182,7 @@
        (cond
          [(not (> (file-or-directory-modify-seconds src-path)
                   (file-or-directory-modify-seconds
-                   (configuration->src-path t n c #f))))
+                   (configuration->src-path t n c r #f))))
           (error 'src-path "hand coded version not updated: ~v" src-path)])])))
 
 (define (run-static-benchmarks
@@ -178,7 +192,7 @@
   (check-src-files-ready-to-run-benchmarks)
   (run-benchmarks
    tests
-   `(,(overhead-test-repetitions) ,compilers ,hand-coded?)
+   `(,(overhead-test-repetitions) ,compilers ,refs ,hand-coded?)
    (run-benchmark iterations)
    #:build build-benchmark
    #:extract-time (parse-output iterations epsilon)
@@ -195,75 +209,12 @@
          [epsilon    (epsilon-parameter)])
   (define brss (benchmark-results-stats results))
   (pretty-print brss)
-  #;
-  (define brs-no-overhead
-    (for*/fold ([brs-no '()])
-               ([t tests]
-                [c compilers]
-                [d dynamic-operations?])
-      (cond
-        [(dynamic-function-app-skip? t c d) brs-no]
-        [(or (eq? 'CallOverhead t) (eq? 'RefOverhead t)) brs-no]
-        [else
-         (define overhead-key (if (eq? 'Call t) 'CallOverhead 'RefOverhead))
-         (define mean-overhead
-           (car (benchmark-results-stats-ref brss overhead-key (list c d))))
-         (define br-wo (benchmark-results-ref brs t (list c d)))
-         (define (subtract-overhead x) (- x mean-overhead))
-         (define br-no
-           (benchmark-result t (list c d) (map subtract-overhead br-wo)))
-         (cons br-no brs-no)])))
-  #;(define brs-no-stats (benchmark-results-stats brs-no-overhead))
 
-  #;
-  (define date-str
-    (parameterize ([date-display-format 'iso-8601])
-      (date->string (current-date))))
-  
-  #;(define tex-file (build-path data-dir (string-append date-str "-dynamic" ".tex")))
-  #;(define log-file (build-path data-dir (string-append date-str "-dynamic" ".txt")))
-
-  #;
-  (define (new-command name output)
-    (format "newcommand{~a}{~a}\n" name output))
-  #;
-  (define (stat->tex s)
-    (match-define (list name (list c d?) mean sdev) s)
-    (define stat-name (configuration->string name c d?))
-    (string-append
-     (new-command (format "dyn~aMeanNS" stat-name)
-                  (format "~a ns" (~r mean #:precision '(= 0))))
-     (new-command (format "dyn~aSdevNS" stat-name)
-                  (format "~a ns" (~r sdev #:precision '(= 0))))))
-
-  #;
-  (define (stat->string s)
-    (match-define (list name (list c d?) mean sdev) s)
-    (format "dynamic ~a (ns) mean: ~a sdev: ~a\n"
-            (configuration->string name c d?)
-            (~r mean #:precision '(= 0))
-            (~r sdev #:precision '(= 0))))
-  
-  #;
-  (call-with-output-file tex-file #:exists 'replace
-    (lambda (tex)
-      (display (new-command "dynIterations" (number->string iterations)) tex)
-      (display (new-command "dynRuns" (number->string number-of-runs)) tex)
-      (display (new-command "dynEpsilon" (number->string epsilon))  tex)
-      (call-with-output-file log-file #:exists 'replace
-        (lambda (log)
-          (display (string-append "Iterations:" (number->string iterations) "\n") log)
-          (display (string-append "Runs:      " (number->string number-of-runs) "\n") log)
-          (display (string-append "Epsilon:   " (number->string epsilon) "\n") log)
-          (for ([stat brs-no-stats])
-            (display (stat->tex stat) tex)
-            (display (stat->string stat) log))))))
-  #;(pretty-print brs-no-stats)
   )
 
-(define (build-benchmark test reps compiler hand-coded?)
-  (define out-path (configuration->exe-path test reps compiler hand-coded?))
-  (define src-path (configuration->src-path test reps compiler hand-coded?))
+(define (build-benchmark test reps compiler ref hand-coded?)
+  (define out-path (configuration->exe-path test reps compiler ref hand-coded?))
+  (define src-path (configuration->src-path test reps compiler ref hand-coded?))
   (cc/runtime (path->string out-path) (path->string src-path) "-O3 -w"))
 
 (define ((run-benchmark iterations) test reps compiler hand-coded?)
@@ -314,58 +265,62 @@
   (pretty-print result-stats)
 
   (define mean-no-overhead
-    (for*/list ([t tests] [c compilers] [hc hand-coded?])
-
-      #;
-      (define-values repsXruntime*(overhead-reps* runtime*)
-        (for/lists (n* r*)
-                   ([n (overhead-test-repetitions)]
-                    #:when #t
-                    [r (benchmark-results-ref results t (list n c hc))])
-          (values n r)))
+    (for*/list ([t tests] [c compilers] [r refs] [hc hand-coded?])
 
       (define overhead-runtime*
-        (benchmark-results-ref results t (list 0 c hc)))
+        (benchmark-results-ref results t (list 0 c r hc)))
 
       (define overhead-mean (mean overhead-runtime*))
       (define overhead-sdev (stddev overhead-runtime*))
       
       (define unit-runtime*
-        (benchmark-results-ref results t (list 1 c hc)))
+        (benchmark-results-ref results t (list 1 c r hc)))
 
       (define unit-mean (mean unit-runtime*))
       (define unit-sdev (stddev unit-runtime*))
 
-      (debug (list t c hc) overhead-mean overhead-sdev unit-mean unit-sdev)
-      (benchmark-result t (list c hc) (list (- unit-mean overhead-mean)))))
+      (debug (list t c r hc) overhead-mean overhead-sdev unit-mean unit-sdev)
+      (benchmark-result t (list c r hc) (list (- unit-mean overhead-mean)))))
   
   (pretty-print mean-no-overhead)
   (define (results-ref test attributes)
     (benchmark-results-ref  mean-no-overhead test attributes))
   
-  (match-define (list mean-ref-rw-twosomes #;sdev-ref-rw-twosomes)
-    (results-ref 'ref-read-write '(Type-Based #f)))
+  (match-define (list mean-ref-rw-guarded-twosomes #;sdev-ref-rw-twosomes)
+    (results-ref 'ref-read-write '(Type-Based Guarded #f)))
   
-  (match-define (list mean-ref-rw-twosomes-hc #;sdev-ref-rw-twosomes-hc)
-    (results-ref 'ref-read-write '(Type-Based #t)))
+  (match-define (list mean-ref-rw-guarded-twosomes-hc #;sdev-ref-rw-twosomes-hc)
+    (results-ref 'ref-read-write '(Type-Based Guarded #t)))
   
-  (match-define (list mean-ref-rw-coercions #;sdev-ref-rw-coercions)
-    (results-ref 'ref-read-write '(Coercions #f)))
+  (match-define (list mean-ref-rw-guarded-coercions #;sdev-ref-rw-coercions)
+    (results-ref 'ref-read-write '(Coercions Guarded #f)))
 
-  (match-define (list mean-ref-rw-coercions-hc #;sdev-ref-rw-coercions-hc)
-    (results-ref 'ref-read-write '(Coercions #t)))
+  (match-define (list mean-ref-rw-guarded-coercions-hc #;sdev-ref-rw-coercions-hc)
+    (results-ref 'ref-read-write '(Coercions Guarded #t)))
+
+  (match-define (list mean-ref-rw-mono-twosomes #;sdev-ref-rw-twosomes)
+    (results-ref 'ref-read-write '(Type-Based Monotonic #f)))
+  
+  (match-define (list mean-ref-rw-mono-twosomes-hc #;sdev-ref-rw-twosomes-hc)
+    (results-ref 'ref-read-write '(Type-Based Monotonic #t)))
+  
+  (match-define (list mean-ref-rw-mono-coercions #;sdev-ref-rw-coercions)
+    (results-ref 'ref-read-write '(Coercions Monotonic #f)))
+
+  (match-define (list mean-ref-rw-mono-coercions-hc #;sdev-ref-rw-coercions-hc)
+    (results-ref 'ref-read-write '(Coercions Monotonic #t)))
 
   (match-define (list mean-fn-app-twosomes #;sdev-fn-app-twosomes)
-    (results-ref 'fn-app '(Type-Based #f)))
+    (results-ref 'fn-app '(Type-Based Guarded #f)))
 
   (match-define (list mean-fn-app-twosomes-hc #;sdev-fn-app-twosomes-hc)
-    (results-ref 'fn-app '(Type-Based #t)))
+    (results-ref 'fn-app '(Type-Based Guarded #t)))
 
   (match-define (list mean-fn-app-coercions #;sdev-fn-app-coercions)
-    (results-ref 'fn-app '(Coercions #f)))
+    (results-ref 'fn-app '(Coercions Guarded #f)))
 
   (match-define (list mean-fn-app-coercions-hc #;sdev-fn-app-coercions-hc)
-    (results-ref 'fn-app '(Coercions #t)))
+    (results-ref 'fn-app '(Coercions Guarded #t)))
 
   (define (fmt x) (format "~a ns" (~r x #:precision '(= 2))))
   (with-output-to-file (build-path data-dir "results.tex")  
@@ -373,17 +328,29 @@
     (lambda ()
       (display
        (string-append
-        (new-command "staticRefTypeBasedMeanNano"
-                     (fmt mean-ref-rw-twosomes))
+        (new-command "staticRefTypeBasedGuardedMeanNano"
+                     (fmt mean-ref-rw-guarded-twosomes))
         
-        (new-command "staticRefTypeBasedHandCodedMeanNano"
-                     (fmt mean-ref-rw-twosomes-hc))
+        (new-command "staticRefTypeBasedGuardedHandCodedMeanNano"
+                     (fmt mean-ref-rw-guarded-twosomes-hc))
         
-        (new-command "staticRefCoercionsMeanNano"
-                     (fmt mean-ref-rw-coercions))
+        (new-command "staticRefCoercionsGuardedMeanNano"
+                     (fmt mean-ref-rw-guarded-coercions))
         
-        (new-command "staticRefCoercionsHandCodedMeanNano"
-                     (fmt mean-ref-rw-coercions-hc))
+        (new-command "staticRefCoercionsGuardedHandCodedMeanNano"
+                     (fmt mean-ref-rw-guarded-coercions-hc))
+
+        (new-command "staticRefTypeBasedMonoMeanNano"
+                     (fmt mean-ref-rw-mono-twosomes))
+        
+        (new-command "staticRefTypeBasedMonoHandCodedMeanNano"
+                     (fmt mean-ref-rw-mono-twosomes-hc))
+        
+        (new-command "staticRefCoercionsMonoMeanNano"
+                     (fmt mean-ref-rw-mono-coercions))
+        
+        (new-command "staticRefCoercionsMonoHandCodedMeanNano"
+                     (fmt mean-ref-rw-mono-coercions-hc))
 
         (new-command "staticFnAppTypeBasedMeanNano"
                      (fmt mean-fn-app-twosomes))
@@ -425,115 +392,16 @@
                       mean-fn-app-coercions
                       mean-fn-app-coercions-hc)
         (fmt-block "Guarded Reference Read and Write"
-                   mean-ref-rw-twosomes
-                   mean-ref-rw-twosomes-hc
-                   mean-ref-rw-coercions
-                   mean-ref-rw-coercions-hc)
+                   mean-ref-rw-guarded-twosomes
+                   mean-ref-rw-guarded-twosomes-hc
+                   mean-ref-rw-guarded-coercions
+                   mean-ref-rw-guarded-coercions-hc)
+        (fmt-block "Monotonic Reference Read and Write"
+                   mean-ref-rw-mono-twosomes
+                   mean-ref-rw-mono-twosomes-hc
+                   mean-ref-rw-mono-coercions
+                   mean-ref-rw-mono-coercions-hc)
         "\\end{tabular}\n")))))
-
-
-;;  ;; (define ref-write-read-test
-;;  ;;  (make-reference-wr-timing-loop '(GRef Int) '(GRef Dyn) 0 0))
-
-;; (define ref-write-read-src-file
-;;   (write-source "fully-static-ref-write-read" ref-write-read-test))
-
-;; (define-values (ref-write-read-twosomes ref-write-read-coercions)
-;;   (values
-;;    (compile&run/iteration-time
-;;     #:base-name     "fully-static-ref-write-read-twosomes"
-;;     #:src-file      ref-write-read-src-file
-;;     #:runs          runs
-;;     #:iterations    iters
-;;     #:cast-repr     'Twosomes
-;;     #:function-repr 'Functional
-;;     #:output-regexp spec)
-;;    (compile&run/iteration-time
-;;     #:base-name     "fully-static-ref-write-read-coercions"
-;;     #:src-file      ref-write-read-src-file
-;;     #:runs          runs
-;;     #:iterations    iters
-;;     #:cast-repr     'Coercions
-;;     #:function-repr 'Hybrid
-;;     #:output-regexp spec)))
-
-;; (define fn-app-twosomes-c-src
-;;   (build-path src-dir "fully-static-fn-app-twosomes.c"))
-;; (define fn-app-coercions-c-src
-;;   (build-path src-dir "fully-static-fn-app-coercions.c"))
-;; (define ref-write-read-twosomes-c-src
-;;   (build-path src-dir "fully-static-ref-write-read-twosomes.c"))
-;; (define ref-write-read-coercions-c-src
-;;   (build-path src-dir "fully-static-ref-write-read-coercions.c"))
-
-;; (unless (and
-;;          (file-exists? fn-app-twosomes-c-src)
-;;          (file-exists? fn-app-coercions-c-src)
-;;          (file-exists? ref-write-read-twosomes-c-src)
-;;          (file-exists? ref-write-read-coercions-c-src)
-;;          (begin
-;;            (display "Use existing files? [#t/#f]:")
-;;            (read)))
-;;   (copy-file (build-path tmp-dir "fully-static-fn-app-twosomes.c")
-;;              fn-app-twosomes-c-src
-;;              #t)
-;;   (copy-file (build-path tmp-dir "fully-static-fn-app-coercions.c")
-;;              fn-app-coercions-c-src
-;;              #t)
-;;   (copy-file (build-path tmp-dir "fully-static-ref-write-read-twosomes.c")
-;;              ref-write-read-twosomes-c-src
-;;              #t)
-;;   (copy-file (build-path tmp-dir "fully-static-ref-write-read-coercions.c")
-;;              ref-write-read-coercions-c-src
-;;              #t)
-;;   (begin
-;;     (display "Edit files and press any key to run tests")
-;;     (read)))
-
-;; (define-values (fn-app-twosomes-c fn-app-coercions-c)
-;;   (values
-;;    (compile-c/run #:base-name "fully-static-fn-app-twosomes-c"
-;;                   #:src-file  fn-app-twosomes-c-src
-;;                   #:runs      runs
-;;                   #:iters     iters
-;;                   #:out-rx    spec)
-;;    (compile-c/run #:base-name "fully-static-fn-app-coercions-c"
-;;                   #:src-file  fn-app-coercions-c-src
-;;                   #:runs      runs
-;;                   #:iters     iters
-;;                   #:out-rx    spec)))
-
-;; (define-values (ref-write-read-twosomes-c ref-write-read-coercions-c)
-;;   (values
-;;    (compile-c/run #:base-name "ref-write-read-twosomes-c"
-;;                   #:src-file  ref-write-read-twosomes-c-src
-;;                   #:runs      runs
-;;                   #:iters     iters
-;;                   #:out-rx    spec)
-;;    (compile-c/run #:base-name "ref-write-read-coercions-c"
-;;                   #:src-file  ref-write-read-coercions-c-src
-;;                   #:runs      runs
-;;                   #:iters     iters
-;;                   #:out-rx    spec)))
-
-
-
-;; (define-values (results)
-;;   (list (list "Function Application" 
-;;               (list "Type-Based"
-;;                     fn-app-twosomes
-;;                     fn-app-twosomes-c)
-;;               (list "Coercions"
-;;                     fn-app-coercions
-;;                     fn-app-coercions-c))
-;;         (list "Reference Read and Write"
-;;               (list "Type-Based"
-;;                     ref-write-read-twosomes
-;;                     ref-write-read-twosomes-c)
-;;               (list "Coercions"
-;;                     ref-write-read-coercions
-;;                     ref-write-read-coercions-c))))
-
 
 
 (module+ main
