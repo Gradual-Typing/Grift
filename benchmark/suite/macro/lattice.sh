@@ -308,7 +308,7 @@ main()
 	printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
 	racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
 	printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
-	chezscheme_ver=$(scheme --version)
+	chezscheme_ver=$(scheme --version 2>&1)
 	printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
 	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
 	printf "nsamples\t:%s\n" "$nsamples" >> "$PARAMS_LOG"

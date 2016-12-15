@@ -8,7 +8,7 @@ get_racket_runtime()
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
     
-    local benchmark_path="${TMP_DIR}/rkt/${benchmark}"
+    local benchmark_path="${TMP_DIR}/racket/${benchmark}"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
@@ -149,7 +149,7 @@ get_slowdown()
     local benchmark_args="$1";  shift
     local disk_aux_name="$1";   shift
     
-    local benchmark_path="${TMP_DIR}/gambit/${benchmark}"
+    local benchmark_path="${TMP_DIR}/${system}/${benchmark}"
     local cache_file="${benchmark_path}${disk_aux_name}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
