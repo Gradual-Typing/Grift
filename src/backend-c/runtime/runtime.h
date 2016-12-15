@@ -30,5 +30,18 @@ typedef union {
 #define imdt_to_float(x) (((imdt)(x)).f)
 #define float_to_imdt(x) (((imdt)(x)).i)
 
+/*
+print_ascii_char
+prints out the character literal for a character
+*/
+void print_ascii_char(int64_t);
+
+/*
+display_char
+print a character to stdout
+*/
+void display_ascii_char(int64_t);
+
+int64_t read_ascii_char();
 
 #endif

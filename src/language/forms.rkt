@@ -265,6 +265,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Int)
   (Float)
   (Bool)
+  (Character)
   (Dyn)
   (Fn arity fmls ret)
   (MRef  arg)
@@ -273,21 +274,12 @@ And a type constructor "name" expecting the types of field1 and field2
   (GVect arg)
   (STuple num items))
 
-;; TODO I am unsure of if these are being used
-;; find out and act appropriately
-#;
-(define-forms
-  (String-Ptr)
-  (Any-Value)
-  (Any-Type)
-  (Void-Type)
-  (Bottom-Type))
-
 ;;Constants for the types
 (define UNIT-TYPE (Unit))
 (define INT-TYPE (Int))
 (define FLOAT-TYPE (Float))
 (define BOOL-TYPE (Bool))
+(define CHAR-TYPE (Character))
 (define DYN-TYPE (Dyn))
 (define REF-DYN-TYPE (GRef DYN-TYPE))
 
@@ -354,6 +346,9 @@ And a type constructor "name" expecting the types of field1 and field2
         (and (MVect? t) (completely-static-type? (MVect-arg t)))))
   (or (Int? t)
       (Bool? t)
+      (Character? t)
+      (Float? t)
+      (Unit? t)
       (fn-completely-static? t)
       (tuple-completely-static? t)
       (ref-completely-static? t)))
@@ -371,7 +366,7 @@ class literal constants
 |#
 
 (define-type Schml-Literal
-  (U Integer Boolean Null Real))
+  (U Integer Boolean Null Real Char))
 
 #;(: platform-integer? (Any -> Boolean : Integer))
 #;
@@ -381,25 +376,29 @@ class literal constants
 (: schml-literal? (Any -> Boolean : Schml-Literal))
 (define (schml-literal? x)
   (or (exact-integer? x)
+      (char? x)
       (boolean? x)
       (null? x)
       (real? x)))
 
-(: schml-literal->type (Schml-Literal -> (U Bool Int Unit)))
-(define (schml-literal->type x)
+(: schml-literal->base-type (Schml-Literal -> Base-Type))
+(define (schml-literal->base-type x)
   (cond
+    [(char? x) CHAR-TYPE]
     [(boolean? x) BOOL-TYPE]
-    [(integer? x) INT-TYPE]
+    [(exact-integer? x) INT-TYPE]
+    [(inexact-real? x) FLOAT-TYPE]
     [(null? x)    UNIT-TYPE]
     [else (error 'language/schml-literal->type "~a" x)]))
 
 ;; Types in the schml languages
-(define-type  Base-Type (U Int Bool Unit Float))
+(define-type  Base-Type (U Int Bool Unit Character Float))
 
 (: base-type? (Any -> Boolean : Base-Type))
 (define (base-type? x)
   (or (Int? x)
       (Bool? x)
+      (Character? x)
       (Unit? x)
       (Float? x)))
 
@@ -427,12 +426,15 @@ class literal constants
      (MRef  Schml-Type)
      (MVect Schml-Type)))
 
-(define-type Atomic-Schml-Type (U Unit Int Bool Dyn Float))
+(define-type Atomic-Type (U Base-Type Dyn))
+
+(: atomic-type? : Any -> Boolean : Atomic-Type)
+(define (atomic-type? x)
+  (or (Dyn? x) (base-type? x)))
 
 (: schml-type? (Any -> Boolean : Schml-Type))
 (define (schml-type? x)
-  (or (Dyn? x)
-      (base-type? x)
+  (or (atomic-type? x)
       (schml-fn? x)
       (schml-ref? x)
       (schml-tuple? x)))
@@ -469,6 +471,8 @@ class literal constants
 (define-type+ Schml-Fml ([Schml-Fml* Listof])
   (Fml Uid Schml-Type))
 
+
+
 (define-type ConsistentT (Schml-Type Schml-Type -> Boolean))
 (: consistent? ConsistentT)
 (define (consistent? t g)
@@ -479,6 +483,8 @@ class literal constants
   (define (both-bool? t g) (and (Bool? t) (Bool? g)))
   (: both-int? ConsistentT)
   (define (both-int? t g) (and (Int? t) (Int? g)))
+  (: both-char? ConsistentT)
+  (define (both-char? t g) (and (Character? t) (Character? g)))
   (: both-float? ConsistentT)
   (define (both-float? t g) (and (Float? t) (Float? g)))
   (: consistent-fns? ConsistentT)
@@ -513,6 +519,7 @@ class literal constants
       (both-unit? t g)
       (both-bool? t g)
       (both-int? t g)
+      (both-char? t g)
       (both-float? t g)
       (consistent-fns? t g)
       (consistent-tuples? t g)
@@ -740,7 +747,9 @@ Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Unit 'Fn 'Atomic 'Boxed 'GRef 'GVect 'MRef 'MVect 'STuple))
+(define-type Tag-Symbol (U 'Int 'Bool 'Char 'Unit
+                           'Fn 'Atomic 'Boxed 'GRef
+                           'GVect 'MRef 'MVect 'STuple))
 
 (define-type Schml-Coercion
   (Rec C (U Identity
@@ -758,7 +767,14 @@ Dyn
 
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 
-(define-type Data-Literal (U Integer String Inexact-Real))
+(define-type Data-Literal (U Integer Inexact-Real Char String))
+
+(: data-literal? : Any -> Boolean : Data-Literal)
+(define (data-literal? x)
+  (or (exact-integer? x)
+      (inexact-real? x)
+      (char? x)
+      (string? x)))
 
 #|------------------------------------------------------------------------------
   Compact Types and Coercions are a compile time hash-consing of types
@@ -768,28 +784,28 @@ Dyn
 ;; Represents the shallow tree structure of types where all subtrees
 ;; of the type are either and atomic type or a identifier for a type.
 (define-type Compact-Type
-  (U (Fn Index (Listof Prim-Type) Prim-Type)
-     (STuple Index (Listof Prim-Type))
-     (GRef Prim-Type) (MRef Prim-Type)
-     (GVect Prim-Type) (MVect Prim-Type)))
+  (U (Fn Index (Listof Immediate-Type) Immediate-Type)
+     (STuple Index (Listof Immediate-Type))
+     (GRef Immediate-Type) (MRef Immediate-Type)
+     (GVect Immediate-Type) (MVect Immediate-Type)))
 
 ;; Represent the shallow tree structure of coercions where all
 ;; subtrees of the type are either atomic types, the identity coercion
 ;; or coercion identifiers.
 (define-type Compact-Coercion
-  (U (Project Prim-Type Blame-Label)
-     (Inject Prim-Type)
+  (U (Project Immediate-Type Blame-Label)
+     (Inject Immediate-Type)
      (Sequence Immediate-Coercion Immediate-Coercion)
      (Failed Blame-Label)
      (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
-     (MonoRef Prim-Type)
-     (MonoVect Prim-Type)
+     (MonoRef Immediate-Type)
+     (MonoVect Immediate-Type)
      (CTuple Index (Listof Immediate-Coercion))
      (Ref Immediate-Coercion Immediate-Coercion)))
 
 ;; TODO (andre) a more descriptive name for this would be
 ;; Immediate-Type
-(define-type Prim-Type (U Atomic-Schml-Type (Static-Id Uid)))
+(define-type Immediate-Type (U Atomic-Type (Static-Id Uid)))
 
 ;; A type representing coercions that have already been
 ;; allocated at runntime or are small enought to fit into
@@ -804,19 +820,19 @@ Dyn
 ;; the impact of this optimization.
 (define-type Immediate-Coercion (U Identity (Static-Id Uid)))
  
-(define-type Coercion/Prim-Type
+(define-type Coercion/Immediate-Type
   (Rec C (U Identity
             (Failed Blame-Label)
-            (Project Prim-Type Blame-Label)
-            (Inject Prim-Type)
+            (Project Immediate-Type Blame-Label)
+            (Inject Immediate-Type)
             (Sequence C C)
             (Fn Index (Listof C) C)
             (Ref C C)
-            (MonoRef Prim-Type)
-            (MonoVect Prim-Type)
+            (MonoRef Immediate-Type)
+            (MonoVect Immediate-Type)
             (CTuple Index (Listof C)))))
 
-(define-type Coercion/Prim-Type* (Listof Coercion/Prim-Type))
+(define-type Coercion/Immediate-Type* (Listof Coercion/Immediate-Type))
 
 #;(define-type (Map-Expr E1 E2)
   (case->

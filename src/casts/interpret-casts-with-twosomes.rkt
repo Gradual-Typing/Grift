@@ -635,6 +635,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
     (if$ (op=? (Type DYN-TYPE) type2)
          (Dyn-make value type1)
+         ;; Todo Reformat this code
          (if #f #;(and (Type? t1) (Type? t2))
              (let ([t1t (Type-type t1)]
                    [t2t (Type-type t2)])
@@ -688,6 +689,8 @@ form, to the shortest branch of the cast tree that is relevant.
       (cast-undyned (Dyn-immediate val) (Type BOOL-TYPE) t2 lbl mono-address)]
      [(op=? (Tag 'Unit) tag)
       (cast-undyned (Quote '()) (Type UNIT-TYPE) t2 lbl mono-address)]
+     [(op=? (Tag 'Char) tag)
+      (cast-undyned (Dyn-immediate val) (Type CHAR-TYPE) t2 lbl mono-address)]
      [(op=? (Tag 'Boxed) tag)
       (cast-undyned (Dyn-value val) (Dyn-type val) t2 lbl mono-address)]
      [else (Blame (Quote "Unexpected value in cast tree"))])))

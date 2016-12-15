@@ -69,7 +69,16 @@
       [(Begin (app sp-effect* e*) (app sp-pred pe* p))
        (values (append e* pe*) p)]
       [(Relop p (app sp-trivial t1) (app sp-trivial t2))
-       (values '() (Relop p t1 t2))]))
+       (values '() (Relop p t1 t2))]
+      [(Switch (app sp-trivial e) c* (app sp-pred d* d))
+       (define u (local-next-uid! "tmp_sp"))
+       (define (recur-sc* [rhs : D4-Pred])
+         (define-values (e* e) (sp-pred rhs))
+         (Begin (snoc e* (Assign u (If e TRUE-IMDT FALSE-IMDT))) NO-OP))
+       (define c*^ (map-switch-case* recur-sc* c*))
+       (define d^  (Begin (snoc d* (Assign u (If d TRUE-IMDT FALSE-IMDT))) NO-OP))
+       (values (list (Switch e c*^ d^)) (Relop '= (Var u) TRUE-IMDT))]
+      [o (error 'simplify-predicates/sp-pred "invalid: ~a" o)]))
   (: sp-value (D4-Value -> D5-Value))
   (define (sp-value v)
     (match v
