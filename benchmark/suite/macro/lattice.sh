@@ -114,9 +114,9 @@ gen_output()
     local logfile3="${DATA_DIR}/${name}${disk_aux_name}${c2}.log"
     local logfile4="${DATA_DIR}/${name}${disk_aux_name}${c2}.csv"
 
-    get_c_slowdown $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
+    get_slowdown c $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
     local cr_t="$RETURN"
-    get_gambit_slowdown $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
+    get_slowdown gambit $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
     local gr_t="$RETURN"
 
     compute_typed_untyped_ratio "$c1" "$name" "$benchmark_args" "$disk_aux_name"

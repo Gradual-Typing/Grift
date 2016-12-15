@@ -19,6 +19,27 @@ get_racket_runtime()
     fi
 }
 
+# $1 - benchmark filename without extension
+# $2 - space-separated benchmark arguments
+# $3 - disk aux name
+# $RETURN - the runtime for the racket benchmark
+get_chezscheme_runtime()
+{
+    local benchmark="$1";      shift
+    local benchmark_args="$1"; shift
+    local disk_aux_name="$1";  shift
+    
+    local benchmark_path="${TMP_DIR}/chezscheme/${benchmark}"
+    local cache_file="${benchmark_path}${disk_aux_name}.runtime"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+	echo "(compile-program \"${benchmark_path}.ss\")" | scheme -q
+	avg "${TMP_DIR}/chezscheme/./${benchmark}.so" "$benchmark_args"
+	echo "$RETURN" > "$cache_file"
+    fi
+}
+
 # $1 - benchmark file path without extension
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
@@ -114,40 +135,15 @@ get_schml_slowdown()
     fi
 }
 
-# $1 - baseline system
-# $2 - benchmark filename without extension
-# $3 - space-separated benchmark arguments
-# $4 - disk aux name
+# $1 - system
+# $2 - baseline system
+# $3 - benchmark filename without extension
+# $4 - space-separated benchmark arguments
+# $5 - disk aux name
 # $RETURN - the slowdown factor for the C benchmark
-get_c_slowdown()
+get_slowdown()
 {
-    local baseline_system="$1"; shift
-    local benchmark="$1";       shift
-    local benchmark_args="$1";  shift
-    local disk_aux_name="$1";   shift
-    
-    local benchmark_path="${TMP_DIR}/c/${benchmark}"
-    local cache_file="${benchmark_path}${disk_aux_name}.slowdown_${baseline_system}"
-    if [ -f $cache_file ]; then
-        RETURN=$(cat "$cache_file")
-    else
-	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
-	local baseline="$RETURN";
-	get_c_runtime "$benchmark" "$benchmark_args" "$disk_aux_name"
-	local ct="$RETURN"
-	local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
-	echo "$RETURN" > "$cache_file"
-    fi
-}
-
-# $1 - baseline system
-# $2 - benchmark filename without extension
-# $3 - space-separated benchmark arguments
-# $4 - disk aux name
-# $RETURN - the slowdown factor for the C benchmark
-get_gambit_slowdown()
-{
+    local system="$1";          shift
     local baseline_system="$1"; shift
     local benchmark="$1";       shift
     local benchmark_args="$1";  shift
@@ -160,7 +156,7 @@ get_gambit_slowdown()
     else
 	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
 	local baseline="$RETURN";
-	get_gambit_runtime "$benchmark" "$benchmark_args" "$disk_aux_name"
+	"get_${system}_runtime" "$benchmark" "$benchmark_args" "$disk_aux_name"
 	local ct="$RETURN"
 	local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
 	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')

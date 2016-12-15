@@ -1,12 +1,9 @@
 LIBGC=../../../src/backend-c/runtime/boehm-gc-install/lib/libgc.a
 
 all:
-	./lattice.sh
+	./lattice.sh 300 5 fresh 1 2 1 3 3 4 2 4
 clean:
 	rm -rf lattice/
-
-test:
-	./lattice.sh 5 5 16
 
 c:
 	gcc -O3 src/c/n-body.c -o bin/c/n-body ${LIBGC}
