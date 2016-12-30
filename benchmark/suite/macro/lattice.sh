@@ -102,7 +102,13 @@ gen_output()
     local lpc_t=$(echo "${less_precise_count}/1000000000" | bc -l | awk '{printf "%.2f\n",$0}')
 
     local name=$(basename "$path")
-    local disk_name="${name}${disk_aux_name}_${c1}_${c2}"
+
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
+    local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
+    local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
+    local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
+    local disk_name="${name}${disk_aux_name}_${ct}"
+    
     cum_perf_lattice_fig="${OUT_DIR}/cumperflattice/${disk_name}.png"
     cum_perf_lattice_tbl="${OUT_DIR}/cumperflattice/${disk_name}.tex"
     perf_lattice_fig="${OUT_DIR}/perflattice/${disk_name}.png"
@@ -145,8 +151,8 @@ gen_output()
     	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
     	   `"set ytics nomirror 0,200;"`
 	   `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
-    	   `"plot '${logfile2}' using 1:2 with lines lw 2 title 'Config ${c1}' smooth cumulative,"`
-    	   `"'${logfile4}' using 1:2 with lines lw 2 title 'Config ${c2}' smooth cumulative"
+    	   `"plot '${logfile2}' using 1:2 with lines lw 2 title '${c1t}' smooth cumulative,"`
+    	   `"'${logfile4}' using 1:2 with lines lw 2 title '${c2t}' smooth cumulative"
 
     echo "\begin{tabular}{|l|l|l|}
 \hline

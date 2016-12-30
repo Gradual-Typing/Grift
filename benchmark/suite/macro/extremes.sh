@@ -71,8 +71,10 @@ gen_fig()
            `"set boxwidth 0.9;"`
 	   `"set key left;"`
            `"set title \"\";"`
+	   `"set yrange [0:];"`
 	   `"set xtic rotate by -45 scale 0;"`
 	   `"set grid ytics;"`
+           `"set ytics add (\"0\" 0, \"1\" 1);"`
            `"plot '${logfile}' using 2:xtic(1) title col,"`
       	   `"for [i=3:$N] \"\" using i title columnheader(i)"
 }
@@ -87,8 +89,10 @@ run_experiment()
     
     local logfile1="${DATA_DIR}/static.log"
     local logfile2="${DATA_DIR}/dyn.log"
-    echo "name,schml$(join ,schml ${SCHML_CONFIGS[@]})" > "$logfile1"
-    echo "name,gambit,chezscheme,schml$(join ,schml ${SCHML_CONFIGS[@]})" > "$logfile2"
+
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -a)
+    echo "name,${config_str}" > "$logfile1"
+    echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
 
     local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand10000.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_bc_arg" "bestcase"

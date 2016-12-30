@@ -13,35 +13,24 @@
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
-(define (guarded-compile src i cast ref opened?)
+(define (guarded-compile src i cast ref)
   (let* ([exe (path-replace-extension
                src
                (string-append ".o" (number->string i)))])
-    (parameterize ([specialize-cast-code-generation? opened?])
+    (parameterize ([specialize-cast-code-generation? #f])
       (if (not (file-exists? exe))
           (begin
             (printf "~a\n" exe)
             (compile src #:output exe #:cast cast #:ref ref))
           (void)))))
 
+(define configs
+  (call-with-input-file "benchmark/configs.dat"
+    (lambda (in) (read in))))
+
 (define (compile-file f)
-  ;; config 01: guarded references,   coercions,  close coded
-  (guarded-compile f 1 'Coercions 'Guarded #f)
-  ;; config 02: guarded references,   type-based, close coded
-  (guarded-compile f 2 'Type-Based 'Guarded #f)
-  ;; config 03: monotonic references, coercions,  close coded
-  (guarded-compile f 3 'Coercions 'Monotonic #f)
-  ;; config 04: monotonic references, type-based, close coded
-  (guarded-compile f 4 'Type-Based 'Monotonic #f)
-  ;; ;; config 05: guarded references,   coercions,  open coded
-  ;; (guarded-compile f 5 'Coercions 'Guarded #t)
-  ;; ;; config 06: guarded references,   type-based, open coded
-  ;; (guarded-compile f 6 'Type-Based 'Guarded #t)
-  ;; ;; config 07: monotonic references, coercions,  open coded
-  ;; (guarded-compile f 7 'Coercions 'Monotonic #t)
-  ;; ;; config 08: monotonic references, type-based, open coded
-  ;; (guarded-compile f 8 'Type-Based 'Monotonic #t)
-  )
+  (for ([i (in-range 1 (+ (hash-count configs) 1))])
+    (apply guarded-compile (cons f (cons i (hash-ref configs i))))))
 
 (define (compile-directory compile-dir)
   ;; The directory should exist if we are going to compile it
