@@ -176,8 +176,8 @@ mean slowdown               & ${mean2}x             & ${mean1}x            \\\ \
     	   `"set title \"${printname}\";"`
 	   `"set xlabel \"slowdown\";"`
 	   `"set ylabel \"How much of the code is typed\";"`
-    	   `"plot '${logfile1}' using 4:(100-\$2) with points title 'Config ${c1}',"`
-    	   `"'${logfile3}' using 4:(100-\$2) with points title 'Config ${c2}'"
+    	   `"plot '${logfile1}' using 4:(100-\$2) with points title '${c1t}',"`
+    	   `"'${logfile3}' using 4:(100-\$2) with points title '${c2t}'"
     # fi
 }
 

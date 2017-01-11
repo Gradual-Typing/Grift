@@ -24,7 +24,7 @@
                          (let ([r : (Vect (Vect Int)) (vector ar (vector bc 0))])
                            (begin
                              (repeat (i 0 x1) (_ ())
-                                     (let ([ri : (Vect Dyn) (vector y2 0)])
+                                     (let ([ri : (Vect Int) (vector y2 0)])
                                        (begin
                                          (repeat (j 0 y2) (_ ())
                                                  (repeat (k 0 y1) (_ ())
@@ -34,10 +34,10 @@
                                                                              (vector-ref (vector-ref y k) j))))))
                                          (vector-set! r i ri))))
                              r)))])
-	  (let ([a : (Vect (Vect Int)) (create ar ac)]
-		[b : (Vect (Vect Int)) (create br bc)]
+	  (let ([a : Dyn (create ar ac)]
+		[b : Dyn (create br bc)]
 		[bx : (Ref Int) (box 0)])
 	    (begin
-	      (time (box-set! bx (vector-ref (vector-ref (mult a ar b br bc) (- ar 1)) (- ac 1))))
+	      (box-set! bx (vector-ref (vector-ref (mult a ar b br bc) (- ar 1)) (- ac 1)))
 	      (unbox bx))))
 	0)))

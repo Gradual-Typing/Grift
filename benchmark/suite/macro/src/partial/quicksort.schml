@@ -31,7 +31,7 @@
                                    (vector-set! a i (vector-ref a j))
                                    (vector-set! a j t)))))])
       (begin
-        (repeat (i 0 size) (_ ())
+        (repeat (i 0 iters) (_ ())
                 (vector-set! a i (read-int)))
         (time (sort a 0 (- iters 1)))
         (vector-ref a (- iters 1))))))

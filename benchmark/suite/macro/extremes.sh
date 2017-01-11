@@ -4,7 +4,30 @@ set -euo pipefail
 declare -r PRECISION=5
 TIMEFORMAT=%R
 
-function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
+# function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
+
+# $1 - baseline system
+# $2 - benchmark filename without extension
+# $3 - space-separated benchmark arguments
+# $4 - aux name
+# $5 - static/dyn/partial
+# $6 - logfile full path
+write_schml_slowdowns()
+{
+    local baseline_system="$1"; shift
+    local name="$1";            shift
+    local benchmark_args="$1";  shift
+    local disk_aux_name="$1";   shift
+    local dir="$1";             shift
+    local logfile="$1";         shift
+    
+    local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+    for config_index in ${configs[@]}; do
+	get_schml_slowdown $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
+	echo -n ,$RETURN >> $logfile
+    done
+    printf "\n" >> $logfile
+}
 
 # $1 - static baseline system
 # $2 - dynamic baseline system
@@ -21,6 +44,7 @@ run_benchmark()
 
     local logfile1="${DATA_DIR}/static.log"
     local logfile2="${DATA_DIR}/dyn.log"
+    local logfile3="${DATA_DIR}/partial.log"
 
     local disk_aux_name="" print_aux_name=""
     if [[ ! -z "${aux_name}" ]]; then
@@ -37,19 +61,22 @@ run_benchmark()
 	echo "$benchmark_args" > "$benchmark_args_file"
     fi
 
-    get_schml_slowdown $baseline_system_static "${TMP_DIR}/static/${name}" "$benchmark_args" "$disk_aux_name"
-    local ss="${RETURN[@]}"
-    echo "$name$print_aux_name",$(join \, ${ss[@]}) >> $logfile1
+    echo -n "$name$print_aux_name" >> "$logfile1"
+    write_schml_slowdowns $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
     
     get_slowdown gambit $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
-    local gs=$RETURN
+    echo -n "$name$print_aux_name",$RETURN >> $logfile2
     get_slowdown chezscheme $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
-    local css=$RETURN
-    get_schml_slowdown $baseline_system_dynamic "${TMP_DIR}/dyn/${name}" "$benchmark_args" "$disk_aux_name"
-    local sd="${RETURN[@]}"
-    echo "$name$print_aux_name",$gs,$css,$(join \, ${sd[@]}) >> $logfile2
+    echo -n ,$RETURN >> $logfile2
+    write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
+
+    local partial_path="${TMP_DIR}/partial/${name}"
+    if [ -f "${partial_path}.schml" ]; then
+	echo -n "$name$print_aux_name" >> "$logfile3"
+	write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
+    fi
     
-    echo "finished " "${name}${print_aux_name}"
+    echo "finished ${name}${print_aux_name}"
 }
 
 # $1 - static or dyn
@@ -89,13 +116,21 @@ run_experiment()
     
     local logfile1="${DATA_DIR}/static.log"
     local logfile2="${DATA_DIR}/dyn.log"
+    local logfile3="${DATA_DIR}/partial.log"
 
     local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -a)
-    echo "name,${config_str}" > "$logfile1"
-    echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
+    if [ ! -f "$logfile1" ]; then
+	echo "name,${config_str}" > "$logfile1"
+    fi
+    if [ ! -f "$logfile2" ]; then
+	echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
+    fi
+    if [ ! -f "$logfile3" ]; then
+	echo "name,${config_str}" > "$logfile3"
+    fi
 
-    local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand10000.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_bc_arg" "bestcase"
+    # local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand10000.txt")\""
+    # run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_bc_arg" "bestcase"
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" "worstcase"
@@ -106,6 +141,7 @@ run_experiment()
 
     gen_fig static
     gen_fig dyn
+    gen_fig partial
 }
 
 main()
@@ -116,8 +152,18 @@ main()
 	exit 1
     fi
     LOOPS="$1";          shift
+    local date="$1";     shift
 
-    declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
+    if [ "$date" == "fresh" ]; then
+	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
+    else
+	declare -r DATE="$date"
+	if [ ! -d "$SCHML_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
+	    echo "Directory not found"
+	    exit 1
+	fi
+    fi
+    
     declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
     declare -r DATA_DIR="$EXP_DIR/data"
@@ -127,8 +173,6 @@ main()
     declare -r INPUT_DIR="$TEST_DIR/inputs"
     declare -r PARAMS_LOG="$EXP_DIR/params.txt"
 
-    declare -r SCHML_CONFIGS=(1 2 3 4)
-
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
     mkdir -p "$TMP_DIR"
@@ -137,24 +181,27 @@ main()
     . "lib/runtime.sh"
 
     cd "$SCHML_DIR"
-    # copying the benchmarks to a temporary directory
-    cp -r ${SRC_DIR}/* $TMP_DIR
 
-    # logging
-    printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
-    MYEMAIL="`id -un`@`hostname -f`"
-    printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
-    schml_ver=$(git rev-parse HEAD)
-    printf "Schml ver.\t:%s\n" "$schml_ver" >> "$PARAMS_LOG"
-    clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-    printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
-    gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-    printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
-    racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
-    printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
-    chezscheme_ver=$(scheme --version 2>&1)
-    printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
-    printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
+    if [ "$date" == "fresh" ]; then
+	# copying the benchmarks to a temporary directory
+	cp -r ${SRC_DIR}/* $TMP_DIR
+
+	# logging
+	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
+	MYEMAIL="`id -un`@`hostname -f`"
+	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
+	schml_ver=$(git rev-parse HEAD)
+	printf "Schml ver.\t:%s\n" "$schml_ver" >> "$PARAMS_LOG"
+	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
+	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+	printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
+	racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
+	printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
+	chezscheme_ver=$(scheme --version 2>&1)
+	printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
+	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
+    fi
 
     run_experiment get_c_runtime get_racket_runtime
     echo "done."
