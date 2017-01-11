@@ -114,6 +114,7 @@ should be able to compile programs this the twosome casts for future comparison.
      (Gvector-ref (c2c-expr e) (c2c-expr i))]
     [(Gvector-set! e1 e2 e3)
      (Gvector-set! (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
+    [(Gvector-length e) (Gvector-length (c2c-expr e))]
     [(Mbox e t) (Mbox (c2c-expr e) t)]
     [(Munbox e) (Munbox (c2c-expr e))]
     [(Mbox-set! e1 e2) (Mbox-set! (c2c-expr e1) (c2c-expr e2))]
@@ -127,6 +128,7 @@ should be able to compile programs this the twosome casts for future comparison.
      (MVectCastedRef u (c2c-expr i) t)]
     [(MVectCastedSet! u (app c2c-expr i) (app c2c-expr e) t)
      (MVectCastedSet! u i e t)]
+    [(Mvector-length e) (Mvector-length (c2c-expr e))]
     [(Var id) (Var id)]
     ;; While each of these forms implicitly have coercive behavior
     ;; this will be exposed when we have make coercion

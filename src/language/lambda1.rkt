@@ -115,6 +115,7 @@
           (Guarded-Proxy-Target E)
           (Guarded-Proxy-Blames E)
           (Guarded-Proxy-Coercion E)
+          (Unguarded-Vect-length E)
           ;; Monotonic references
           (Mbox E Immediate-Type)
           (Mbox-val-set! E E)
@@ -133,7 +134,7 @@
           (Type-MRef-Of E)
           (Error E)
           (Mvector E E Immediate-Type)
-          (Mvector-size E)
+          (Mvector-length E)
           (Mvector-val-ref E E)
           (Mvector-val-set! E E E)
           (Mvector-rtti-ref Uid)

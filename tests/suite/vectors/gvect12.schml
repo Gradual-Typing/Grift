@@ -1,2 +1,4 @@
-
-(gvector-ref (gvector 100 42) 50)
+(define len 100)
+(define vec (gvector len 42))
+(gvector-ref vec 50)
+(gvector-length vec)

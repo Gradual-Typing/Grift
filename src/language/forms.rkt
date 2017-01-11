@@ -67,6 +67,9 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Perform a No Operation
   (No-Op)
   ;; Effect operations
+  (Gvector-length vect)
+  (Unguarded-Vect-length vect)
+  (Mvector-length vect)
   ;; Monotonic effects
   (MboxS value) ;; source level mbox has no type annotation
   (Mbox value type)
@@ -85,7 +88,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (MBoxCastedSet! addr v type)
   (MvectorS value constructor)
   (Mvector value constructor type)
-  (Mvector-size value)
   (Mvector-set! vector index value)
   (Mvector-set!T vector index value type)
   (Mvector-ref vector index)

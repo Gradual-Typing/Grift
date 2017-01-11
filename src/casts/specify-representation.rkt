@@ -1150,6 +1150,8 @@ but a static single assignment is implicitly maintained.
         [(Guarded-Proxy-Huh (app recur e))
          (Op '= `(,(Op 'binary-and (list e GREP-TAG-MASK))
                   ,GPROXY-TAG))]
+        [(Unguarded-Vect-length (app recur e))
+         (Op 'Array-ref (list e UGVECT-SIZE-INDEX))]
         [(Guarded-Proxy (app recur e) r)
          ;; Consider using sr-alloc here
          (match r
@@ -1196,7 +1198,7 @@ but a static single assignment is implicitly maintained.
                  (Repeat i MVECT-OFFSET (Var tmp4) a UNIT-IMDT
                          (Op 'Array-set! (list (Var tmp3) (Var i) (Var tmp2)))))
                 (Var tmp3))]
-        [(Mvector-size (app recur e))
+        [(Mvector-length (app recur e))
          (Op 'Array-ref (list e MVECT-SIZE-INDEX))]
         [(Mvector-rtti-set! u (app recur e))
          (Op 'Array-set! (list (Var u) MONO-RTTI-INDEX e))]

@@ -316,6 +316,7 @@ T?l $ (_  ; )  = what here
        (Gvector-ref e i)]
       [(Gvector-set! (app recur e1) (app recur i) (app recur e2))
        (Gvector-set! e1 i e2)]
+      [(Gvector-length e) (Gvector-length (recur e))]
       [(Mbox (app recur e) t) (Mbox e t)]
       [(Munbox (app recur e)) (Munbox e)]
       [(Mbox-set! (app recur e1) (app recur e2))
@@ -333,6 +334,7 @@ T?l $ (_  ; )  = what here
        (MVectCastedRef u i t)]
       [(MVectCastedSet! u (app recur i) (app recur e) t)
        (MVectCastedSet! u i e t)]
+      [(Mvector-length e) (Mvector-length (recur e))]
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
        (Dyn-Fn-App e e* t* l)]
       [(Dyn-GRef-Ref (app recur e) l)

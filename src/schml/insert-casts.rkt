@@ -312,6 +312,14 @@
            [else (error 'insert-casts/Mvector-set!T
                         "unexpected value for e1 type: ~a"
                         e1-ty)]))]
+      [(Mvector-length (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
+       (if (Dyn? e-ty)
+           (Mvector-length (mk-cast e-src (mk-label "mvector-length" e-src) e e-ty (MVect DYN-TYPE)))
+           (Mvector-length e))]
+      [(Gvector-length (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
+       (if (Dyn? e-ty)
+           (Gvector-length (mk-cast e-src (mk-label "gvector-length" e-src) e e-ty (GVect DYN-TYPE)))
+           (Gvector-length e))]
       [(Create-tuple e*) (Create-tuple (map ic-expr e*))]
       [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) i)
        (cond
