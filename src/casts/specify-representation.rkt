@@ -1121,10 +1121,10 @@ but a static single assignment is implicitly maintained.
                    (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
                        (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET))))
                        (Begin
-                         (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                         (list (Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                          (Op 'Exit (list (Quote -1)))))
                    (Begin
-                     (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                     (list (Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
                (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET))))))]
         [(Unguarded-Vect-Set! (app recur e1) (app recur e2) (app recur e3))
@@ -1141,10 +1141,10 @@ but a static single assignment is implicitly maintained.
                    (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var zro))))
                        (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET)) e3))
                          (Begin
-                           (list (Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                           (list (Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                            (Op 'Exit (list (Quote -1)))))
                    (Begin
-                     `(,(Op 'Printf (list (Quote "index out of bound %l\n") ind-var)))
+                     `(,(Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
                (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var UGVECT-OFFSET)) e3))))]
         [(Guarded-Proxy-Huh (app recur e))
@@ -1218,10 +1218,10 @@ but a static single assignment is implicitly maintained.
                    (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var MVECT-SIZE-INDEX))))
                        (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))
                        (Begin
-                         (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                         (list (Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                          (Op 'Exit (list (Quote -1)))))
                    (Begin
-                     (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                     (list (Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
                (Op 'Array-ref (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET))))))]
         [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3))
@@ -1239,13 +1239,13 @@ but a static single assignment is implicitly maintained.
                    (If (Op '< (list ind-var (Op 'Array-ref (list tmp1-var MVECT-SIZE-INDEX))))
                        (Op 'Array-set! (list tmp1-var (Op '+ (list ind-var MVECT-OFFSET)) e3))
                        (Begin
-                         (list (Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                         (list (Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                          (Op 'Exit (list (Quote -1)))))
                    (Begin
-                     `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                     `(,(Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                      (Op 'Exit (list (Quote -1)))))
                (Begin
-                 `(,(Op 'Printf (list (Quote "index out of bound %li\n") ind-var)))
+                 `(,(Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                  (Op 'Exit (list (Quote -1))))))]
         [(Type-MVect (app recur e))
          (sr-alloc "MVectT" data:TYPE-MVECT-TAG `(("type" . ,e)))]

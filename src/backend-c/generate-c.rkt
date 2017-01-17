@@ -414,11 +414,17 @@
 (: imdt->float Caster)
 (define (imdt->float th) (display "imdt_to_float")(emit-wrap (th)))
 
+(: imdt->float->int Caster)
+(define (imdt->float->int th)
+  (emit-wrap (display IMDT-C-TYPE))
+  (display "imdt_to_float") (emit-wrap (th)))
+
 (: no-cast Caster)
 (define (no-cast th) (th))
 (define imdt->int   no-cast)
 (define int->imdt   no-cast)
 (define bool->imdt  no-cast)
+(define imdt->bool  no-cast)
 (define char->imdt  no-cast)
 (define imdt->char  no-cast)
 (: imdt->string Caster)
@@ -446,6 +452,9 @@
      (=          infix-op "=="    (,imdt->int ,imdt->int) (,bool->imdt))
      (>          infix-op ">"     (,imdt->int ,imdt->int) (,bool->imdt))
      (>=         infix-op ">="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (and        infix-op "&&"    (,imdt->bool ,imdt->bool) (,bool->imdt))
+     (or         infix-op "||"    (,imdt->bool ,imdt->bool) (,bool->imdt))
+     (quotient   infix-op "/"     (,imdt->int ,imdt->int) (,int->imdt))
      (fl+        infix-op "+"     (,imdt->float ,imdt->float) (,float->imdt))
      (fl-        infix-op "-"     (,imdt->float ,imdt->float) (,float->imdt))
      (fl*        infix-op "*"     (,imdt->float ,imdt->float) (,float->imdt))
@@ -456,11 +465,13 @@
      (fl=        infix-op "=="    (,imdt->float ,imdt->float) (,bool->imdt))
      (fl>        infix-op ">"     (,imdt->float ,imdt->float) (,bool->imdt))
      (fl>=       infix-op ">="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (flquotient infix-op "/"     (,imdt->float ,imdt->float) (,int->imdt))
      (flabs      function "fabs"  (,imdt->float) (,float->imdt))
      (flfloor    function "floor" (,imdt->float) (,float->imdt))
      (flceiling  function "ceil"  (,imdt->float) (,float->imdt))
      (flcos      function "cos"   (,imdt->float) (,float->imdt))
      (fltan      function "tan"   (,imdt->float) (,float->imdt))
+     (flsin      function "sin"   (,imdt->float) (,float->imdt))
      (flasin     function "asin"  (,imdt->float) (,float->imdt))
      (flacos     function "acos"  (,imdt->float) (,float->imdt))
      (flatan     function "atan"  (,imdt->float) (,float->imdt))
@@ -471,6 +482,7 @@
      (Print      function "printf"  (,imdt->string) ())
      (Exit       function "exit"  (,no-cast) ())
      (int->float identity "none"  (,imdt->float) ())
+     (float->int identity "none"  (,imdt->float->int) ())
      (read-int   function "read_int"   () (,int->imdt))
      (read-float function "read_float" () (,float->imdt))
      (read-char  function "read_ascii_char" () (,char->imdt))
@@ -531,7 +543,7 @@
     [('timer-report (list)) (display timer-report)]
     [((? easy-p? (app easy-p->impl (list t s a* r))) e*)
      (emit-easy-op e* t s a* r)]
-    [(other wise) (error 'backend-c/generate-c/emit-op "unmatched value")]))
+    [(other wise) (error 'backend-c/generate-c/emit-op "unmatched value ~a" other)]))
 
 
 

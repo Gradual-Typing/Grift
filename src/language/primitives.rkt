@@ -14,11 +14,13 @@
      IntxInt->Bool-Primitive
      ->Int-Primitive
      FloatxFloat->Float-Primitive
+     FloatxFloat->Int-Primitive
      Float->Float-Primitive
      ->Float-Primitive
      Int->Float-Primitive
      Float->Int-Primitive
      FloatxFloat->Bool-Primitive
+     BoolxBool->Bool-Primitive
      Char->Int-Primitive
      Int->Char-Primitive 
      ->Char-Primitive))
@@ -39,7 +41,8 @@
 
 (define-type IntxInt->Int-Primitive (U '* '+ '-
                                        'binary-and 'binary-or 'binary-xor
-                                       '%/ '%>> '%<< '%%))
+                                       '%/ '%>> '%<< '%%
+                                       'quotient))
 
 (define-type IxI->I-Prim IntxInt->Int-Primitive)
 
@@ -52,11 +55,14 @@
 (define-predicate ->Int-primitive? ->Int-Primitive)
 
 (define-type IntxInt->Bool-Primitive (U '< '<= '= '> '>=))
+(define-type BoolxBool->Bool-Primitive (U 'and 'or))
 (define-type IxI->B-Prim IntxInt->Bool-Primitive)
 (define-predicate IntxInt->Bool-primitive? IntxInt->Bool-Primitive)
+(define-predicate BoolxBool->Bool-primitive? BoolxBool->Bool-Primitive)
 
 (define-type FloatxFloat->Float-Primitive
   (U 'fl+ 'fl- 'fl* 'fl/ 'flmodulo 'flexpt))
+(define-type FloatxFloat->Int-Primitive (U 'flquotient))
 (define-type Float->Float-Primitive
   (U 'flabs 'flround 'flfloor 'flceiling 'fltruncate
      'flsin 'flcos 'fltan 'flasin 'flacos 'flatan
@@ -80,6 +86,8 @@
 (define-predicate Int->Float-primitive? Int->Float-Primitive)
 (define-predicate Float->Int-primitive? Float->Int-Primitive)
 (define-predicate FloatxFloat->Bool-primitive? FloatxFloat->Bool-Primitive)
+(define-predicate BoolxBool->Bool-Primitive? BoolxBool->Bool-Primitive)
+(define-predicate FloatxFloat->Int-Primitive? FloatxFloat->Int-Primitive)
 
 (define-type Timer-Primitive (U 'timer-start 'timer-stop 'timer-report))
 
@@ -91,12 +99,15 @@
 
 
 (define INTxINT-TYPE (list INT-TYPE INT-TYPE))
+(define BOOLxBOOL-TYPE (list BOOL-TYPE BOOL-TYPE))
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
+(define BOOLxBOOL->BOOL-TYPE (Fn 2 BOOLxBOOL-TYPE BOOL-TYPE))
 (define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
 (define ->INT-TYPE (Fn 0 '() INT-TYPE))
 
 (define FLOATxFLOAT-TYPE (list FLOAT-TYPE FLOAT-TYPE))
 (define FLOATxFLOAT->BOOL-TYPE (Fn 2 FLOATxFLOAT-TYPE BOOL-TYPE))
+(define FLOATxFLOAT->INT-TYPE (Fn 2 FLOATxFLOAT-TYPE INT-TYPE))
 (define FLOATxFLOAT->FLOAT-TYPE (Fn 2 FLOATxFLOAT-TYPE FLOAT-TYPE))
 (define FLOAT->FLOAT-TYPE (Fn 1 (list FLOAT-TYPE) FLOAT-TYPE))
 (define ->FLOAT-TYPE (Fn 0 '() FLOAT-TYPE))
@@ -143,6 +154,9 @@
      (=  . ,INTxINT->BOOL-TYPE)
      (>  . ,INTxINT->BOOL-TYPE)
      (>= . ,INTxINT->BOOL-TYPE)
+     (and . ,BOOLxBOOL->BOOL-TYPE)
+     (or . ,BOOLxBOOL->BOOL-TYPE)
+     (quotient . ,INTxINT->INT-TYPE)
      ;; Float operations
      (fl+   . ,FLOATxFLOAT->FLOAT-TYPE)
      (fl-   . ,FLOATxFLOAT->FLOAT-TYPE)
@@ -161,6 +175,7 @@
      (flfloor . ,FLOAT->FLOAT-TYPE)
      (flceiling . ,FLOAT->FLOAT-TYPE)
      (fltruncate . ,FLOAT->FLOAT-TYPE)
+     (flquotient . ,FLOATxFLOAT->INT-TYPE)
      ;; Float operations (trig)
      (flsin . ,FLOAT->FLOAT-TYPE)
      (flcos .  ,FLOAT->FLOAT-TYPE)
@@ -203,6 +218,8 @@ We are going to UIL
 (define-type UIL-Expr-Prim
   (U ->Float-Primitive Float->Float-Primitive Float->Int-Primitive
      FloatxFloat->Float-Primitive
+     FloatxFloat->Int-Primitive
+     BoolxBool->Bool-Primitive
      Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim
      ->Char-Primitive Char->Int-Primitive Int->Char-Primitive))
 

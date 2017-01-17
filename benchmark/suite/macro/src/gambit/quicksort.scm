@@ -1,4 +1,4 @@
-#!/u/dalmahal/bin/bin/gsi-script -:d0
+#!gsi-script -:d0
 
 (declare
  (fixnum)

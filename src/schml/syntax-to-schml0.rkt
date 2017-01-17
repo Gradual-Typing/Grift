@@ -589,6 +589,9 @@ represents types in the schml abstract syntax tree.
      (=  . ,core-parse-prim)
      (>  . ,core-parse-prim)
      (>= . ,core-parse-prim)
+     (and . ,core-parse-prim)
+     (or  . ,core-parse-prim)
+     (quotient . ,core-parse-prim)
      ;; Float operations
      (fl+   . ,core-parse-prim)
      (fl-   . ,core-parse-prim)
@@ -607,6 +610,7 @@ represents types in the schml abstract syntax tree.
      (flfloor . ,core-parse-prim)
      (flceiling . ,core-parse-prim)
      (fltruncate . ,core-parse-prim)
+     (flquotient . ,core-parse-prim)
      ;; Float operations (trig)
      (flsin . ,core-parse-prim)
      (flcos . ,core-parse-prim)

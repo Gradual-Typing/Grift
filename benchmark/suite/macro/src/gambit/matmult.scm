@@ -1,4 +1,4 @@
-#!/usr/bin/gsi -:d0
+#!gsi-script -:d0
 
 (declare
  (standard-bindings)
