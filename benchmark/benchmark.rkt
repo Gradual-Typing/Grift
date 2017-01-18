@@ -71,12 +71,12 @@
    #:args (path)
    (if (string->path path)
        (cond
-         [(and (directory-exists? path) (> config-index? 0))
-          (compile-directory path config-index?)]
+         [(and (directory-exists? path) (> (config-index?) 0))
+          (compile-directory path (config-index?))]
          [(directory-exists? path)
           (compile-directory-all-configs path)]
-         [(and (file-exists? path) (> config-index? 0))
-          (compile-file path config-index?)]
+         [(and (file-exists? path) (> (config-index?) 0))
+          (compile-file path (config-index?))]
          [(file-exists? path)
           (compile-file-all-configs path)])
        (error 'benchmark-main "could parse ~v as a path" path))))

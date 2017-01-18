@@ -76,13 +76,13 @@ get_schml_runtime()
     local disk_aux_name="$1";  shift
     local config_index="$1";   shift
     
-    local cache_file="${benchmark_path}${disk_aux_name}.runtime"
+    local cache_file="${benchmark_path}${disk_aux_name}${config_index}.runtime"
     if [ -f $cache_file ]; then
-        readarray RETURN < "$cache_file"
+        RETURN=$(cat "$cache_file")
     else
 	racket "${SCHML_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.schml"
-	"${benchmark_path}.o${config_index}" "$benchmark_args"
-	echo "$RETURN" >> "$cache_file"
+	avg "${benchmark_path}.o${config_index}" "$benchmark_args"
+	echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -122,7 +122,7 @@ get_gambit_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	gsc -exe -cc-options -O3 "${benchmark_path}.scm"
+	gsc -prelude "(declare (standard-bindings) (block))" -exe -cc-options -O3 "${benchmark_path}.scm"
 	avg "${benchmark_path}" "$benchmark_args"
 	echo "$RETURN" > "$cache_file"
     fi
@@ -172,7 +172,7 @@ get_schml_slowdown()
     local disk_aux_name="$1";   shift
     local config_index="$1";    shift
     
-    local cache_file="${benchmark_path}${disk_aux_name}.slowdown_${baseline_system}"
+    local cache_file="${benchmark_path}${disk_aux_name}${config_index}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else

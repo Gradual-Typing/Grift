@@ -139,6 +139,8 @@ run_experiment()
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "n-body" "100000" ""
 
+    run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "4096" ""
+
     gen_fig static
     gen_fig dyn
     gen_fig partial

@@ -251,6 +251,8 @@ run_experiment()
 
     run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" ""
 
+    run_benchmark $baseline_system $c1 $c2 "fft" "4096" "$nsamples" ""
+
     # convert "*_${c1}_${c2}.png" -append "${c1}_${c2}".png
 
     echo "finished experiment comparing" $c1 "vs" $c2
