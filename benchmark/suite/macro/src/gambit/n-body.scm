@@ -14,8 +14,6 @@ Correct output N = 1000 is
 -0.169087605
 |#
 
-(declare (standard-bindings)(extended-bindings)(block) (safe))
-
 (define-macro (unless test . body)
   `(if (not ,test)
        (begin

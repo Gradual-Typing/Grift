@@ -1,5 +1,4 @@
-#! /usr/bin/env scheme-script
-(import (chezscheme))
+#lang racket/base
 
 (define n (read))
 (define data (make-vector n #i0.0))
@@ -31,7 +30,7 @@
   (if (< mmax n)
       (let ([theta (/ pi*2 (exact->inexact mmax))])
         (let ([wpr (let ([x (sin (* #i0.5 theta))])
-		     (* #i-2.0 (* x x)))]
+                             (* #i-2.0 (* x x)))]
               [wpi (sin theta)])
           (begin
             (loop4 #i1.0 #i0.0 0 mmax wpr wpi)
@@ -47,13 +46,13 @@
   (if (< i n)
       (let ([j (+ i mmax)])
         (let ([tempr
-	       (-
-		(* wr (vector-ref data j))
-		(* wi (vector-ref data (+ j 1))))]
+                     (-
+                      (* wr (vector-ref data j))
+                      (* wi (vector-ref data (+ j 1))))]
               [tempi
-	       (+
-		(* wr (vector-ref data (+ j 1)))
-		(* wi (vector-ref data j)))])
+                     (+
+                      (* wr (vector-ref data (+ j 1)))
+                      (* wi (vector-ref data j)))])
           (begin
             (vector-set! data j
                          (- (vector-ref data i) tempr))
@@ -72,4 +71,4 @@
 (begin
   (loop1 0 0) ;; bit-reversal section
   (loop3 2)   ;; Danielson-Lanczos section
-  (display (vector-ref data 0)))
+  (vector-ref data 0))

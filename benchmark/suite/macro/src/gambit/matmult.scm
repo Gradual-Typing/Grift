@@ -1,9 +1,5 @@
 #!gsi-script -:d0
 
-(declare
- (standard-bindings)
- (fixnum))
-
 (define (main)
   (let ([size (read)])
     (let ([ar size]

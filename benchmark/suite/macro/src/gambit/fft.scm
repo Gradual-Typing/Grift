@@ -1,6 +1,8 @@
 #!gsi-script -:d0
 
-(define n 4096)
+;; Taken by Deyaaeldeen Almahallawi from http://www.iro.umontreal.ca/~gambit/bench.tar.gz
+
+(define n (read))
 (define data (make-vector n #i0.0))
 (define pi*2 #i6.28318530717959) ; to compute the inverse, negate this value
 

@@ -1,9 +1,5 @@
 #!gsi-script -:d0
 
-(declare
- (fixnum)
- (standard-bindings))
-
 (define (main)
   (let* ([size (read)]
 	 [arr (make-vector size 0)])

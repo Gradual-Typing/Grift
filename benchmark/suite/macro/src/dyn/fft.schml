@@ -1,4 +1,4 @@
-(define n : Dyn 4096)
+(define n : Dyn (read-int))
 (define data : Dyn (vector n #i0.0))
 (define pi*2 : Dyn #i6.28318530717959) ; to compute the inverse, negate this value
 
