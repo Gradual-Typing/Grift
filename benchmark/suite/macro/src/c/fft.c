@@ -57,8 +57,8 @@ typedef struct{
 loop2_clos* loop2;
 
 void loop1_code(int i, int j){
-  float temp;
-  float c_temp;
+  double temp;
+  double c_temp;
   if (i < n) {
     if (i < j) {
       vector_ref(temp,data,i);
@@ -102,7 +102,7 @@ loop4_clos* loop4;
 
 void loop3_code(int mmax){
   if (mmax < n){
-    float theta = pi2 / mmax;
+    double theta = pi2 / mmax;
     double x = sin(0.5 * theta);
     double wpr = -2.0 * x * x;
     double wpi = sin(theta);
