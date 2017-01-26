@@ -1,0 +1,181 @@
+;;; RAY -- Ray-trace a simple scene with spheres, generating a ".pgm" file.
+;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
+
+(define (make-point [x : Float] [y : Float] [z : Float]) : (Tuple Float Float Float)
+  (tuple x y z))
+
+(define (point-x [p : (Tuple Float Float Float)]) : Float
+  (tuple-proj p 0))
+(define (point-y [p : (Tuple Float Float Float)]) : Float
+  (tuple-proj p 1))
+(define (point-z [p : (Tuple Float Float Float)]) : Float
+  (tuple-proj p 2))
+
+(define (sq [x : Float]) : Float
+  (fl* x x))
+
+(define (mag [x : Float] [y : Float] [z : Float]) : Float
+  (flsqrt (fl+ (sq x) (fl+ (sq y) (sq z)))))
+
+(define (unit-vector [x : Float] [y : Float] [z : Float]) : (Tuple Float Float Float)
+  (let ([d : Float (mag x y z)])
+    (make-point (fl/ x d) (fl/ y d) (fl/ z d))))
+
+(define (distance [p1 : (Tuple Float Float Float)]
+                  [p2 : (Tuple Float Float Float)]) : Float
+                  (mag (fl- (point-x p1) (point-x p2))
+                       (fl- (point-y p1) (point-y p2))
+                       (fl- (point-z p1) (point-z p2))))
+
+(define *world* : (Vect (Tuple Float Float (Tuple Float Float Float)))
+  (vector 34 (tuple #i0 #i0 (tuple #i0 #i0 #i0))))
+
+(define eye : (Tuple Float Float Float) (make-point #i0.0 #i0.0 #i200.0))
+
+(define (tracer [res : Int]) : Int
+  (let ([extent : Int (* res 100)])
+    (repeat (y 0 extent) (_ : Int 0)
+      (repeat (x 0 extent) (_ : Int 0)
+        (color-at
+         (fl+ #i-50.0
+              (fl/ (int->float x) (int->float res)))
+         (fl+ #i-50.0
+              (fl/ (int->float y) (int->float res))))))))
+
+(define (color-at [x : Float] [y : Float]) : Int
+  (let ([ray : (Tuple Float Float Float)
+             (unit-vector (fl- x (point-x eye))
+                          (fl- y (point-y eye))
+                          (flnegate (point-z eye)))])
+    (float->int (flround (fl* (sendray eye ray) #i255.0)))))
+
+(define (sendray [pt : (Tuple Float Float Float)]
+                 [ray : (Tuple Float Float Float)]) : Float
+                 (let ([x : (Tuple (Tuple Float Float (Tuple Float Float Float)) (Tuple Float Float Float))
+                          (loop pt ray 0
+                                (vector-length *world*)
+                                *world*
+                                (tuple #i0 #i0 (tuple #i0 #i0 #i0))
+                                (tuple #i0 #i0 #i0)
+                                #i1e308)])
+                   (let ([s : (Tuple Float Float (Tuple Float Float Float))
+                            (tuple-proj x 0)])
+                     (let ([int : (Tuple Float Float Float)
+                                (tuple-proj x 1)])
+                       (fl* (lambert s int ray)
+                            (sphere-color s))))))
+
+(define (loop
+         [pt : (Tuple Float Float Float)]
+         [ray : (Tuple Float Float Float)]
+         [index : Int]
+         [lst-len : Int]
+         [lst : (Vect (Tuple Float Float (Tuple Float Float Float)))]
+         [surface : (Tuple Float Float (Tuple Float Float Float))]
+         [hit : (Tuple Float Float Float)]
+         [dist : Float]) : (Tuple (Tuple Float Float (Tuple Float Float Float)) (Tuple Float Float Float))
+         (if (= index lst-len)
+             (tuple surface hit)
+             (let ([s : (Tuple Float Float (Tuple Float Float Float))
+                      (vector-ref lst index)])
+               (let ([xr : Float (point-x ray)]
+                     [yr : Float (point-y ray)]
+                     [zr : Float (point-z ray)]
+                     [sc : (Tuple Float Float Float) (sphere-center s)])
+                 (let ([a : Float (fl+ (sq xr) (fl+ (sq yr) (sq zr)))]
+                       [b : Float (fl* #i2.0
+                                       (fl+ (fl* (fl- (point-x pt) (point-x sc)) xr)
+                                            (fl+ (fl* (fl- (point-y pt) (point-y sc)) yr)
+                                                 (fl* (fl- (point-z pt) (point-z sc)) zr))))]
+                       [c : Float (fl+ (fl+ (sq (fl- (point-x pt) (point-x sc)))
+                                            (sq (fl- (point-y pt) (point-y sc))))
+                                       (fl+ (sq (fl- (point-z pt) (point-z sc)))
+                                            (flnegate (sq (sphere-radius s)))))])
+                   (if (fl= a #i0)
+                       (let ([n : Float (fl/ (flnegate c) b)])
+                         (let ([h : (Tuple Float Float Float)
+                                  (make-point (fl+ (point-x pt) (fl* n xr))
+                                              (fl+ (point-y pt) (fl* n yr))
+                                              (fl+ (point-z pt) (fl* n zr)))])
+                           (let ([d : Float (distance h pt)])
+                             (if (fl< d dist)
+                                 (loop pt ray (+ index 1) lst-len lst s h d)
+                                 (loop pt ray (+ index 1) lst-len lst surface hit dist)))))
+                       (let ([disc : Float (fl- (sq b) (fl* #i4.0 (fl* a c)))])
+                         (if (fl< disc #i0.0)
+                             (loop pt ray (+ index 1) lst-len lst surface hit dist)
+                             (let ([discrt : Float (flsqrt disc)]
+                                   (minus-b : Float (flnegate b))
+                                   (two-a : Float (fl* #i2.0 a)))
+                               (let ([n : Float (flmin (fl/ (fl+ minus-b discrt) two-a)
+                                                       (fl/ (fl- minus-b discrt) two-a))])
+                                 (let ([h : (Tuple Float Float Float)
+                                          (make-point (fl+ (point-x pt) (fl* n xr))
+                                                      (fl+ (point-y pt) (fl* n yr))
+                                                      (fl+ (point-z pt) (fl* n zr)))])
+                                   (let ([d : Float (distance h pt)])
+                                     (if (fl< d dist)
+                                         (loop pt ray (+ index 1) lst-len lst s h d)
+                                         (loop pt ray (+ index 1) lst-len lst surface hit dist))))))))))))))
+
+
+(define (lambert [s : (Tuple Float Float (Tuple Float Float Float))]
+                 [int : (Tuple Float Float Float)]
+                 [ray : (Tuple Float Float Float)]) : Float
+                 (let ([n : (Tuple Float Float Float) (sphere-normal s int)])
+                   (flmax #i0.0
+                          (fl+ (fl* (point-x ray) (point-x n))
+                               (fl+ (fl* (point-y ray) (point-y n))
+                                    (fl* (point-z ray) (point-z n)))))))
+
+(define (make-sphere
+         [color : Float]
+         [radius : Float]
+         [center : (Tuple Float Float Float)]) : (Tuple Float Float (Tuple Float Float Float))
+         (tuple color radius center))
+
+(define (sphere-color [s : (Tuple Float Float (Tuple Float Float Float))]) : Float
+  (tuple-proj s 0))
+(define (sphere-radius [s : (Tuple Float Float (Tuple Float Float Float))]) : Float
+  (tuple-proj s 1))
+(define (sphere-center [s : (Tuple Float Float (Tuple Float Float Float))]) : (Tuple Float Float Float)
+  (tuple-proj s 2))
+
+(define (defsphere
+          [i : Int]
+          [x : Float]
+          [y : Float]
+          [z : Float]
+          [r : Float]
+          [c : Float]) : (Tuple Float Float (Tuple Float Float Float))
+          (let ([s : (Tuple Float Float (Tuple Float Float Float))
+                   (make-sphere c r (make-point x y z))])
+            (begin
+              (vector-set! *world* i s)
+              s)))
+
+(define (sphere-normal [s : (Tuple Float Float (Tuple Float Float Float))]
+                       [pt : (Tuple Float Float Float)]) : (Tuple Float Float Float)
+                       (let ([c : (Tuple Float Float Float)
+                                (sphere-center s)])
+                         (unit-vector (fl- (point-x c) (point-x pt))
+                                      (fl- (point-y c) (point-y pt))
+                                      (fl- (point-z c) (point-z pt)))))
+
+(let ([counter : (Ref Int) (box 4)])
+  (begin
+    (defsphere 0 #i0.0 #i-300.0 #i-1200.0 #i200.0 #i0.8)
+    (defsphere 1 #i-80.0 #i-150.0 #i-1200.0 #i200.0 #i0.7)
+    (defsphere 2 #i70.0 #i-100.0 #i-1200.0 #i200.0 #i0.9)
+    (repeat (x -2 3) (_ : Unit ())
+      (repeat (z 2 8) (_ : Unit ())
+        (begin
+          (defsphere
+            (unbox counter)
+            (fl* (int->float x) #i200.0)
+            #i300.0
+            (fl* (int->float z) #i-400.0)
+            #i40.0
+            #i0.75)
+          (box-set! counter (+ 1 (unbox counter))))))
+    (tracer 1)))
