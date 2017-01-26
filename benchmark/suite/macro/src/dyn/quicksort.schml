@@ -1,36 +1,36 @@
+(define (sort [a : Dyn] [p : Dyn] [r : Dyn]) : Dyn
+  (if (< p r)
+      (let ([q : Dyn (partition a p r)])
+        (begin
+          (sort a p (- q 1))
+          (sort a (+ q 1) r)))
+      ()))
+
+(define (partition [a : Dyn] [p : Dyn] [r : Dyn]) : Dyn
+  (let ([i : Dyn (box (- p 1))]
+        [x : Dyn (vector-ref a r)])
+    (begin
+      (repeat (j p r) (_ : Dyn ())
+        (if (<= (vector-ref a j) x)
+            (begin
+              (box-set! i (+ (unbox i) 1))
+              (swap a (unbox i) j))
+            ()))
+      (swap a (+ (unbox i) 1) r)
+      (+ (unbox i) 1))))
+
+(define (swap [a : Dyn] [i : Dyn] [j : Dyn]) : Dyn
+  (if (= i j)
+      ()
+      (let ([t : Dyn (vector-ref a i)])
+        (begin
+          (vector-set! a i (vector-ref a j))
+          (vector-set! a j t)))))
+
 (let ([size : Dyn (read-int)])
-  (let ([a : Dyn (vector size 1)])
-    (letrec ([sort : Dyn
-                   (lambda ([a : Dyn] [p : Dyn] [r : Dyn])
-                     (if (< p r)
-                         (let ([q : Dyn (partition a p r)])
-                           (begin
-                             (sort a p (- q 1))
-                             (sort a (+ q 1) r)))
-                         ()))]
-             [partition : Dyn
-                        (lambda ([a : Dyn] [p : Dyn] [r : Dyn])
-                          (let ([i : Dyn (box (- p 1))]
-                                [x : Dyn (vector-ref a r)])
-                            (begin
-                              (repeat (j p r) (_ : Dyn ())
-                                      (if (<= (vector-ref a j) x)
-                                          (begin
-                                            (box-set! i (+ (unbox i) 1))
-                                            (swap a (unbox i) j))
-                                          ()))
-                              (swap a (+ (unbox i) 1) r)
-                              (+ (unbox i) 1))))]
-             [swap : Dyn
-                   (lambda ([a : Dyn] [i : Dyn] [j : Dyn])
-                     (if (= i j)
-                         ()
-                         (let ([t : Dyn (vector-ref a i)])
-                           (begin
-                             (vector-set! a i (vector-ref a j))
-                             (vector-set! a j t)))))])
-      (begin
-        (repeat (i 0 size) (_ : Dyn ())
-                (vector-set! a i (read-int)))
-        (time (sort a 0 (- size 1)))
-        (: (vector-ref a (- size 1)) Int)))))
+  (let ([a : Dyn (vector size (: 1 Dyn))])
+    (begin
+      (repeat (i 0 size) (_ : Dyn ())
+        (vector-set! a i (read-int)))
+      (time (sort a 0 (- size 1)))
+      (: (vector-ref a (- size 1)) Int))))

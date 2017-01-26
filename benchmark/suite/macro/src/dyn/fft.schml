@@ -1,5 +1,5 @@
 (define n : Dyn (read-int))
-(define data : Dyn (vector n #i0.0))
+(define data : Dyn (vector n (: #i0.0 Dyn)))
 (define pi*2 : Dyn #i6.28318530717959) ; to compute the inverse, negate this value
 
 (define (loop1 [i : Dyn] [j : Dyn]) : Dyn
@@ -80,4 +80,4 @@
 (begin
   (loop1 0 0) ;; bit-reversal section
   (loop3 2)   ;; Danielson-Lanczos section
-  (vector-ref data 0))
+  (: (vector-ref data 0) Float))

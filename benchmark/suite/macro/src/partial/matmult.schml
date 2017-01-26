@@ -1,6 +1,6 @@
-(define (create [l1 : Int] [l2 : Int]) : (Vect Int)
-  (let ([x : (Vect Int)
-           (vector (* l1 l2) 0)])
+(define (create [l1 : Int] [l2 : Int]) : Dyn
+  (let ([x : Dyn
+           (vector (* l1 l2) (: 0 Dyn))])
     (begin
       (repeat (i 0 l1) (_ ())
         (repeat (j 0 l2) (_ ())
@@ -29,7 +29,6 @@
 	[bc : Int size])
     (if (= ac br)
 	(let ([a : Dyn (create ar ac)]
-              [b : Dyn (create br bc)]
-              [bx : (Ref Int) (box 0)])
+              [b : Dyn (create br bc)])
           (time (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1))))
 	0)))

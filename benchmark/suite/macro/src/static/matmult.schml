@@ -1,4 +1,3 @@
-
 (define (create [l1 : Int] [l2 : Int]) : (Vect Int)
   (let ([x : (Vect Int)
            (vector (* l1 l2) 0)])
