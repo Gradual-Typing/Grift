@@ -61,13 +61,13 @@
 (define-predicate BoolxBool->Bool-primitive? BoolxBool->Bool-Primitive)
 
 (define-type FloatxFloat->Float-Primitive
-  (U 'fl+ 'fl- 'fl* 'fl/ 'flmodulo 'flexpt))
+  (U 'fl+ 'fl- 'fl* 'fl/ 'flmodulo 'flexpt 'flmin 'flmax))
 (define-type FloatxFloat->Int-Primitive (U 'flquotient))
 (define-type Float->Float-Primitive
   (U 'flabs 'flround 'flfloor 'flceiling 'fltruncate
      'flsin 'flcos 'fltan 'flasin 'flacos 'flatan
      'fllog 'flexp 'flsqrt
-     'flmin 'flmax))
+     'flnegate))
 (define-type Float->Unit-Primitive (U 'print-float))
 (define-type ->Float-Primitive    (U 'read-float))
 (define-type Int->Float-Primitive (U 'int->float))
@@ -163,6 +163,8 @@
      (fl*   . ,FLOATxFLOAT->FLOAT-TYPE)
      (fl/   . ,FLOATxFLOAT->FLOAT-TYPE)
      (flmodulo . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flmin . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flmax . ,FLOATxFLOAT->FLOAT-TYPE)
      (flabs . ,FLOAT->FLOAT-TYPE)
      (fl<   . ,FLOATxFLOAT->BOOL-TYPE)
      (fl<=  . ,FLOATxFLOAT->BOOL-TYPE)
@@ -171,6 +173,7 @@
      (fl>   . ,FLOATxFLOAT->BOOL-TYPE)
      (flmin . ,FLOATxFLOAT->FLOAT-TYPE)
      (flmax . ,FLOATxFLOAT->FLOAT-TYPE)
+     (flnegate . ,FLOAT->FLOAT-TYPE)
      (flround . ,FLOAT->FLOAT-TYPE)
      (flfloor . ,FLOAT->FLOAT-TYPE)
      (flceiling . ,FLOAT->FLOAT-TYPE)

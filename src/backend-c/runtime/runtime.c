@@ -91,3 +91,7 @@ int64_t read_ascii_char(){
   }
   return c;
 }
+
+double neg_float(double n){
+  n = -n;
+}

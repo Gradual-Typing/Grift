@@ -593,6 +593,7 @@ represents types in the schml abstract syntax tree.
      (or  . ,core-parse-prim)
      (quotient . ,core-parse-prim)
      ;; Float operations
+     (flnegate . ,core-parse-prim)
      (fl+   . ,core-parse-prim)
      (fl-   . ,core-parse-prim)
      (fl*   . ,core-parse-prim)

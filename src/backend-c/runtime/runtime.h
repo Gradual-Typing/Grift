@@ -44,4 +44,6 @@ void display_ascii_char(int64_t);
 
 int64_t read_ascii_char();
 
+double neg_float(double n);
+
 #endif
