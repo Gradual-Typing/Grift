@@ -80,38 +80,38 @@
 ;; TODO make these C Macros
 (define-values (timer-start timer-stop timer-report timer-boiler-plate)
   (cond
-   [(timer-uses-process-time?)
-    (values
-     "timer_started = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_start_time)"
-     "timer_stopped = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_stop_time)"
-     "timer_report()"
-     (concat-string-literal
-     "//This is the global state for the timer\n"
-     "struct timespec timer_start_time;\n"
-     "struct timespec timer_stop_time;\n"
-     "struct timespec timer_result_time;\n"
-     "int timer_started = 1;\n"
-     "int timer_stopped = 1;\n\n"
-     "void timer_report(){\n\n"
-     "    // some very minor error checking\n"
-     "    if(timer_started){\n"
-     "        printf(\"error starting timer\");\n"
-     "        exit(-1);\n"
-     "    }\n"
-     "    if(timer_stopped){\n"
-     "        printf(\"error stopping timer\");\n"
-     "        exit(-1);\n"
-     "    }\n\n"
-     "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_nsec / 1.0e9);\n"
-     "double t2 = timer_stop_time.tv_sec  + (timer_stop_time.tv_nsec  / 1.0e9);\n"
-     "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
-     "}\n"))]
-   [else
-    (values
-     "timer_started = gettimeofday(&timer_start_time, NULL)"
-     "timer_stopped = gettimeofday(&timer_stop_time, NULL)"
-     "timer_report()"
-     (concat-string-literal
+    [(timer-uses-process-time?)
+     (values
+      "timer_started = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_start_time)"
+      "timer_stopped = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_stop_time)"
+      "timer_report()"
+      (concat-string-literal
+       "//This is the global state for the timer\n"
+       "struct timespec timer_start_time;\n"
+       "struct timespec timer_stop_time;\n"
+       "struct timespec timer_result_time;\n"
+       "int timer_started = 1;\n"
+       "int timer_stopped = 1;\n\n"
+       "void timer_report(){\n\n"
+       "    // some very minor error checking\n"
+       "    if(timer_started){\n"
+       "        printf(\"error starting timer\");\n"
+       "        exit(-1);\n"
+       "    }\n"
+       "    if(timer_stopped){\n"
+       "        printf(\"error stopping timer\");\n"
+       "        exit(-1);\n"
+       "    }\n\n"
+       "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_nsec / 1.0e9);\n"
+       "double t2 = timer_stop_time.tv_sec  + (timer_stop_time.tv_nsec  / 1.0e9);\n"
+       "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+       "}\n"))]
+    [else
+     (values
+      "timer_started = gettimeofday(&timer_start_time, NULL)"
+      "timer_stopped = gettimeofday(&timer_stop_time, NULL)"
+      "timer_report()"
+      (concat-string-literal
        "//This is the global state for the timer\n"
        "struct timeval timer_start_time;\n"
        "struct timeval timer_stop_time;\n"
@@ -152,8 +152,8 @@
   ;; TODO remove this and C-DECLATIONS definition if this works
   #;(newline)
   #;(for ([d : String C-DECLARATIONS])
-    (display d)
-    (newline))
+      (display d)
+      (newline))
   (newline)
   (display timer-boiler-plate)
   (newline))
@@ -272,7 +272,7 @@
             (display " else ")
             (emit-block '() a)
             (newline))]
-        [(Switch t c* d)
+    [(Switch t c* d)
      (begin (display "switch (") (emit-value t) (display "){\n")
             (for ([c c*])
               (let loop : Void ([l* (car c)])
@@ -419,6 +419,12 @@
   (emit-wrap (display IMDT-C-TYPE))
   (display "imdt_to_float") (emit-wrap (th)))
 
+(: imdt->int->float Caster)
+(define (imdt->int->float th)
+  (display "float_to_imdt")
+  (emit-wrap (emit-wrap (display "double"))
+             (emit-wrap (th))))
+
 (: no-cast Caster)
 (define (no-cast th) (th))
 (define imdt->int   no-cast)
@@ -485,7 +491,7 @@
      (flsqrt     function "sqrt"  (,imdt->float) (,float->imdt))
      (Print      function "printf"  (,imdt->string) ())
      (Exit       function "exit"  (,no-cast) ())
-     (int->float identity "none"  (,imdt->float) ())
+     (int->float identity "none"  (,imdt->int->float) ())
      (float->int identity "none"  (,imdt->float->int) ())
      (read-int   function "read_int"   () (,int->imdt))
      (read-float function "read_float" () (,float->imdt))
