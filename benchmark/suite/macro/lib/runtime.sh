@@ -9,12 +9,13 @@ get_racket_runtime()
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/racket/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	raco make "${benchmark_path}.rkt"
-	avg "racket ${benchmark_path}.rkt" "$benchmark_args"
+	avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -30,12 +31,13 @@ get_chezscheme_runtime()
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/chezscheme/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	echo "(compile-program \"${benchmark_path}.ss\")" | scheme -q
-	avg "${TMP_DIR}/chezscheme/./${benchmark}.so" "$benchmark_args"
+	avg "${TMP_DIR}/chezscheme/./${benchmark}.so" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -49,7 +51,8 @@ get_schml_runtimes()
     local benchmark_path="$1"; shift
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
-    
+
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
@@ -57,7 +60,7 @@ get_schml_runtimes()
 	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.schml"
 	local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
 	for i in ${configs[@]}; do
-	    avg "${benchmark_path}.o${i}" "$benchmark_args"
+	    avg "${benchmark_path}.o${i}" "$benchmark_args" "$runtimes_file"
 	    echo "$RETURN" >> "$cache_file"
 	done
 	readarray RETURN < "$cache_file"
@@ -75,13 +78,14 @@ get_schml_runtime()
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
     local config_index="$1";   shift
-    
+
+    local runtimes_file="${benchmark_path}${disk_aux_name}${config_index}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}${config_index}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	racket "${SCHML_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.schml"
-	avg "${benchmark_path}.o${config_index}" "$benchmark_args"
+	avg "${benchmark_path}.o${config_index}" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -97,12 +101,13 @@ get_c_runtime()
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/c/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	clang "${benchmark_path}.c" "${SCHML_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${SCHML_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
-	avg "${benchmark_path}.o" "$benchmark_args"
+	avg "${benchmark_path}.o" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -118,12 +123,13 @@ get_gambit_runtime()
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/gambit/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	gsc -prelude "(declare (standard-bindings) (block))" -exe -cc-options -O3 "${benchmark_path}.scm"
-	avg "${benchmark_path}" "$benchmark_args"
+	avg "${benchmark_path}" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -222,13 +228,15 @@ get_slowdown()
 # $RETURN - average runtime
 avg()
 {
-    local bin="$1"; shift
-    local arg="$1"; shift
+    local bin="$1";           shift
+    local arg="$1";           shift
+    local runtimes_file="$1"; shift
     local c="time ( echo ${arg} | ${bin} ) 2>&1 1>/dev/null"
     local avg_sum=0
     local avg_i avg_t
     for avg_i in `seq $LOOPS`; do
 	avg_t=$(eval "$c")
+	echo $avg_t >> "$runtimes_file"
 	avg_sum=$(echo "scale=${PRECISION};${avg_sum}+${avg_t}" | bc)
     done
     RETURN=$(echo "scale=${PRECISION};${avg_sum}/${LOOPS}" | bc)
