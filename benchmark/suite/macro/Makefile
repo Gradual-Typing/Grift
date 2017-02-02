@@ -1,4 +1,7 @@
 LIBGC=../../../src/backend-c/runtime/boehm-gc-install/lib/libgc.a
+SCHML=racket ../../../main.rkt -g
+GAMBIT=gsc -exe -cc-options "-O3"
+GCC=gcc -O3
 
 all:
 	./lattice.sh
@@ -47,3 +50,31 @@ r: c
 	time echo 5000000 | ./bin/dyn/n-body.type-based-casts
 	time ./bin/c/n-body 5000000
 	time ./bin/gambit/n-body 5000000
+
+b: 
+	$(GCC) src/c/blackscholes.c -o bin/c/blackscholes ${LIBGC}	
+	$(SCHML) --coercions \
+		 --assert-statically-typed \
+		 -o bin/static/blackscholes.coercions\
+		 src/static/blackscholes.schml
+	$(SCHML) --type-based-casts \
+		 --assert-statically-typed \
+		 -o bin/static/blackscholes.type-based-casts \
+		 src/static/blackscholes.schml
+	$(SCHML) --coercions \
+		 -o bin/dyn/blackscholes.coercions \
+		 src/dyn/blackscholes.schml
+	$(SCHML) --type-based-casts \
+		 -o bin/dyn/blackscholes.type-based-casts \
+		 src/dyn/blackscholes.schml
+	$(GAMBIT) -o bin/gambit/blackscholes src/gambit/blackscholes.scm
+
+BLACKSCHOLES_INPUT=time cat inputs/blackscholes/in_64K.txt
+
+br:
+	$(BLACKSCHOLES_INPUT) | bin/c/blackscholes > /dev/null
+	$(BLACKSCHOLES_INPUT) | bin/static/blackscholes.coercions > /dev/null
+	$(BLACKSCHOLES_INPUT) | bin/static/blackscholes.type-based-casts > /dev/null
+	$(BLACKSCHOLES_INPUT) | bin/dyn/blackscholes.coercions > /dev/null
+	$(BLACKSCHOLES_INPUT) | bin/gambit/blackscholes > /dev/null
+	$(BLACKSCHOLES_INPUT) | bin/dyn/blackscholes.type-based-casts > /dev/null

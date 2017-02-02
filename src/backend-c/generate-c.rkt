@@ -510,6 +510,9 @@
                 (display ", ")
                 (display "imdt_to_float")
                 (emit-wrap (emit-value f)))]
+    [('print-int (list d))
+     (display "printf")
+     (emit-wrap (display "\"%ld\",") (emit-value d))]
     [('Printf (cons fmt exp*))
      (begin (display "printf")
             (emit-wrap
@@ -531,7 +534,8 @@
     [('timer-report (list)) (display timer-report)]
     [((? easy-p? (app easy-p->impl (list t s a* r))) e*)
      (emit-easy-op e* t s a* r)]
-    [(other wise) (error 'backend-c/generate-c/emit-op "unmatched value")]))
+    [(other wise)
+     (error 'backend-c/generate-c/emit-op "unmatched value ~a" other)]))
 
 
 

@@ -1,0 +1,145 @@
+
+(define inv-sqrt-2x-pi : Dyn 0.39894228040143270286)
+
+(define (cummulative-normal-distribution [InputX : Dyn]) : Dyn
+  (let ([sign : Dyn (fl< InputX #i0.0)]
+        [x-input : Dyn (if (fl< InputX #i0.0)
+                             (fl* InputX #i-1.0)
+                             InputX)])
+    (let ([exp-values : Dyn (flexp (fl* #i-0.5 (fl* x-input x-input)))])
+      (let ([n-prime-of-x : Dyn (fl* exp-values inv-sqrt-2x-pi)]
+            [x-k2 : Dyn (fl/ #i1.0 (fl+ #i1.0 (fl* #i0.2316419 x-input)))])
+        (let ([x-k2^2 : Dyn (fl* x-k2 x-k2)])
+          (let ([x-k2^3 : Dyn (fl* x-k2^2 x-k2)])
+            (let ([x-k2^4 : Dyn (fl* x-k2^3 x-k2)])
+              (let ([x-k2^5 : Dyn (fl* x-k2^4 x-k2)])
+                (let ([x1 : Dyn (fl* 0.319381530  x-k2)]
+                      [x2 : Dyn (fl* -0.356563782 x-k2^2)]
+                      [x3 : Dyn (fl* 1.781477937  x-k2^3)]
+                      [x4 : Dyn (fl* -1.821255978 x-k2^4)]
+                      [x5 : Dyn (fl* 1.330274429  x-k2^5)])
+                  (let ([x : Dyn (fl+ x1 (fl+ x5 (fl+ x4 (fl+ x2 x3))))])
+                    (let ([x : Dyn (fl- #i1.0 (fl* x n-prime-of-x))])
+                      (if sign (fl- #i1.0 x) x))))))))))))
+
+(define (black-scholes [spot : Dyn]
+                       [strike : Dyn]
+                       [rate : Dyn]
+                       [volatility : Dyn]
+                       [time : Dyn]
+                       [option-type : Dyn]
+                       [timet : Dyn])
+  : Dyn
+  (let ([log : Dyn (fllog (fl/ spot strike))]
+        [pow : Dyn (fl* #i0.5 (fl* volatility volatility))]
+        [den : Dyn (fl* volatility (flsqrt time))])
+    (let ([d1 : Dyn (fl/ (fl+ log (fl* time (fl+ rate pow))) den)])
+      (let ([d2 : Dyn (fl- d1 den)])
+        (let ([n-of-d1 : Dyn (cummulative-normal-distribution d1)]
+              [n-of-d2 : Dyn (cummulative-normal-distribution d2)]
+              [fut-value : Dyn
+               (fl* strike (flexp (fl* #i-1 (fl* rate time))))])
+          (if (= option-type 0)
+              (fl- (fl* spot n-of-d1) (fl* fut-value n-of-d2))
+              (fl- (fl* fut-value (fl- #i1.0 n-of-d2))
+                   (fl* spot (fl- #i1.0 n-of-d1)))))))))
+
+(define (make-option [spot-price : Dyn]
+                     [strike-price : Dyn]
+                     [rfi-rate : Dyn]
+                     [divr : Dyn]
+                     [volatility : Dyn]
+                     [time : Dyn]
+                     [option-type : Dyn]
+                     [divs : Dyn]
+                     [DerivGem-value : Dyn])
+  : (Tuple Dyn Dyn Dyn Dyn 
+           Dyn Dyn Dyn Dyn Dyn)
+  (tuple spot-price strike-price rfi-rate
+         divr volatility time option-type
+         divs DerivGem-value))
+
+(define (read-option-type) : Dyn
+  (let ([c : Dyn (read-char)])
+    (if (= (char->int c) (char->int #\P))
+        c
+        (if (= (char->int c) (char->int #\C))
+            c
+            (if (= (char->int c) (char->int #\space))
+                (read-char)
+                (read-char))))));; raise error?
+
+(define (read-option) : Dyn
+  (let ([spot-price : Dyn (read-float)])
+    (let ([strike-price : Dyn (read-float)])
+      (let ([rfi-rate : Dyn (read-float)])
+        (let ([dividend-rate : Dyn (read-float)])
+          (let ([volatility : Dyn (read-float)])
+            (let ([maturity-len : Dyn (read-float)])
+              (let ([option-type : Dyn (read-option-type)])
+                (let ([divs : Dyn (read-float)])
+                  (let ([DerivGem-value : Dyn (read-float)])
+                    (make-option spot-price strike-price rfi-rate
+                                 dividend-rate volatility maturity-len
+                                 option-type divs DerivGem-value)))))))))))
+
+(define number-of-runs : Dyn 100)
+(define number-of-options : Dyn (read-int))
+
+(define fake-data : Dyn
+  (tuple #i0 #i0 #i0 #i0 #i0 #i0 #\P #i0 #i0))
+
+(define data
+  : Dyn
+  (let ([v (vector number-of-options fake-data)])
+    (begin ;; todo fix unit syntax
+      (repeat (i 0 number-of-options) (_ : Dyn ()) 
+       (vector-set! v i (read-option)))
+      v)))
+  
+
+;; This seems really dumb but I am doing it because
+;; this is the way the original benchmark did it.
+(define spots : Dyn (vector number-of-options #i0))
+(define strikes : Dyn (vector number-of-options #i0))
+(define rates : Dyn (vector number-of-options #i0))
+(define volatilities : Dyn (vector number-of-options #i0))
+(define otypes : Dyn (vector number-of-options 0))
+(define otimes : Dyn
+  ;; This is done this way to prevent the unit value
+  ;; from printing out at the top level.
+  (let ([otimes : Dyn (vector number-of-options #i0)])
+    (begin
+      (repeat (i 0 number-of-options) (_ : Dyn ())
+              ;; We really need define-type!
+        (let ([od : Dyn (vector-ref data i)])
+         (begin
+           (vector-set! otypes i
+                        (if (= (char->int (tuple-proj od 6))
+                               (char->int #\P))
+                            1
+                            0))
+           (vector-set! spots i (tuple-proj od 0))
+           (vector-set! strikes i (tuple-proj od 1))
+           (vector-set! rates i (tuple-proj od 2))
+           (vector-set! volatilities i (tuple-proj od 4))
+           (vector-set! otimes i (tuple-proj od 5)))))
+      otimes)))
+
+(define prices : Dyn
+  (let ([prices : Dyn (vector number-of-options #i0)])
+    (begin
+      (repeat (j 0 number-of-runs) (_ : Dyn ())
+       (repeat (i 0 number-of-options) (_ : Dyn ())
+        (vector-set! prices i
+                     (black-scholes (vector-ref spots i)
+                                    (vector-ref strikes i)
+                                    (vector-ref rates i)
+                                    (vector-ref volatilities i)
+                                    (vector-ref otimes i)
+                                    (vector-ref otypes i)
+                                    #i0))))
+      (repeat (i 0 number-of-options) (_ : Dyn ())
+       (begin (print-float (vector-ref prices i) 18)
+              (display-char #\newline)))
+      prices)))

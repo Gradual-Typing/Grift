@@ -29,7 +29,7 @@
   (U Timer-Primitive
      Char->Unit-Primitive
      Int->Unit-Primitive
-     Float->Unit-Primitive))
+     FloatxInt->Unit-Primitive))
 
 (define-predicate schml-prim!? Schml-Prim!)
 #;(: schml-prim!? (Any -> Boolean : Schml-Prim!))
@@ -62,7 +62,7 @@
      'flsin 'flcos 'fltan 'flasin 'flacos 'flatan
      'fllog 'flexp 'flsqrt
      'flmin 'flmax))
-(define-type Float->Unit-Primitive (U 'print-float))
+(define-type FloatxInt->Unit-Primitive (U 'print-float))
 (define-type ->Float-Primitive    (U 'read-float))
 (define-type Int->Float-Primitive (U 'int->float))
 (define-type Float->Int-Primitive (U 'float->int))
@@ -116,6 +116,7 @@
 (define INT->UNIT-TYPE (Fn 1 (list INT-TYPE) UNIT-TYPE))
 (define CHAR->UNIT-TYPE (Fn 1 (list CHAR-TYPE) UNIT-TYPE))
 (define FLOAT->UNIT-TYPE (Fn 1 (list FLOAT-TYPE) UNIT-TYPE))
+(define FLOATxINT->UNIT-TYPE (Fn 2 (list FLOAT-TYPE INT-TYPE) UNIT-TYPE))
 
 (define schml-primitive-type-table
   : (HashTable Schml-Primitive (Fn Index (Listof Base-Type) Base-Type))
@@ -176,7 +177,7 @@
      (float->int . ,FLOAT->INT-TYPE)
      (int->float . ,INT->FLOAT-TYPE)
      (read-float . ,->FLOAT-TYPE)
-     (print-float . ,FLOAT->UNIT-TYPE) 
+     (print-float . ,FLOATxINT->UNIT-TYPE) 
      (timer-start . ,->UNIT-TYPE)
      (timer-stop . ,->UNIT-TYPE)
      (timer-report . ,->UNIT-TYPE))))
