@@ -60,7 +60,7 @@ vect* mult(vect* x, int x1, int x2,
 
 int main(){
   int64_t size = 0, ar,ac,br,bc;
-  scanf("%ld", &size);
+  scanf("%" PRId64 "", &size);
   ar=size;ac=size;br=size;bc=size;
 
   GC_INIT();
@@ -71,7 +71,7 @@ int main(){
   vect* r = mult(a, ar, ac, b, br, bc);
   int64_t rf;
   vector_ref(rf,r,(ar*bc)-1);
-  printf ("%ld ",rf);
+  printf ("%" PRId64 " ",rf);
   
   /* for (int i=1;i<=ar;++i) */
   /*     for (int j=1;j<=bc;++j) */
