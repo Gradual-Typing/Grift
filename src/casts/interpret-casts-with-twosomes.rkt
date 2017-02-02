@@ -457,7 +457,7 @@ form, to the shortest branch of the cast tree that is relevant.
            (Blame lbl))]
      [(op=? type1 (Type CHAR-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
-           (Dyn-make value (Type FLOAT-TYPE))
+           (Dyn-make value (Type CHAR-TYPE))
            (Blame lbl))]
      [(op=? type1 (Type UNIT-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)

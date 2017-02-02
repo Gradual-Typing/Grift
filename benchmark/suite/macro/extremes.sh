@@ -128,7 +128,10 @@ run_experiment()
     if [ ! -f "$logfile3" ]; then
 	echo "name,${config_str}" > "$logfile3"
     fi
-
+    
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_rand64k.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" ""
+    
     # local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand10000.txt")\""
     # run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_bc_arg" "bestcase"
     

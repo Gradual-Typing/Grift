@@ -53,8 +53,7 @@
                      [option-type : Dyn]
                      [divs : Dyn]
                      [DerivGem-value : Dyn])
-  : (Tuple Dyn Dyn Dyn Dyn 
-           Dyn Dyn Dyn Dyn Dyn)
+  : Dyn
   (tuple spot-price strike-price rfi-rate
          divr volatility time option-type
          divs DerivGem-value))
