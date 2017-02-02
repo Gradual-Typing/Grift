@@ -64,7 +64,6 @@ run_benchmark()
 
     echo -n "$name$print_aux_name" >> "$logfile1"
     write_schml_slowdowns $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
-    
     get_slowdown gambit $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
     echo -n "$name$print_aux_name",$RETURN >> $logfile2
     get_slowdown chezscheme $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
@@ -126,10 +125,10 @@ run_experiment()
     echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "200" ""
-
-    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_rand64k.txt")\""
-    run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" ""
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "blackscholes" "$bs_bc_arg" ""
+    
+    run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "400" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" "worstcase"

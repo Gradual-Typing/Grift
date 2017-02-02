@@ -30,7 +30,7 @@
 
 (define (loop3 mmax)
   (if (< mmax n)
-      (let ([theta (/ pi*2 (exact->inexact mmax))])
+      (let ([theta (fl/ pi*2 (exact->inexact mmax))])
         (let ([wpr (let ([x (sin (* #i0.5 theta))])
 		     (* #i-2.0 (* x x)))]
               [wpi (sin theta)])
@@ -48,25 +48,25 @@
   (if (< i n)
       (let ([j (+ i mmax)])
         (let ([tempr
-	       (-
+	       (fl-
 		(* wr (vector-ref data j))
 		(* wi (vector-ref data (+ j 1))))]
               [tempi
-	       (+
+	       (fl+
 		(* wr (vector-ref data (+ j 1)))
 		(* wi (vector-ref data j)))])
           (begin
             (vector-set! data j
-                         (- (vector-ref data i) tempr))
+                         (fl- (vector-ref data i) tempr))
             (vector-set! data (+ j 1)
-                         (- (vector-ref data (+ i 1)) tempi))
+                         (fl- (vector-ref data (+ i 1)) tempi))
             (vector-set! data i
-                         (+ (vector-ref data i) tempr))
+                         (fl+ (vector-ref data i) tempr))
             (vector-set! data (+ i 1)
-                         (+ (vector-ref data (+ i 1)) tempi))
+                         (fl+ (vector-ref data (+ i 1)) tempi))
             (loop5 (+ j mmax) mmax wr wi m wpr wpi))))
-      (loop4 (+ (- (* wr wpr) (* wi wpi)) wr)
-             (+ (+ (* wi wpr) (* wr wpi)) wi)
+      (loop4 (fl+ (fl- (* wr wpr) (* wi wpi)) wr)
+             (fl+ (fl+ (* wi wpr) (* wr wpi)) wi)
              (+ m 2)
              mmax wpr wpi)))
 
@@ -75,3 +75,5 @@
     (loop1 0 0) ;; bit-reversal section
     (loop3 2)   ;; Danielson-Lanczos section
     (display (vector-ref data 0))))
+
+(main)
