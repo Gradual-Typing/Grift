@@ -1,5 +1,7 @@
 #lang racket/base
 
+(require racket/flonum racket/format)
+
 (define n (read))
 (define data (make-vector n #i0.0))
 (define pi*2 #i6.28318530717959) ; to compute the inverse, negate this value
