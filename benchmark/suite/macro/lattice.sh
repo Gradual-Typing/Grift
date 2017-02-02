@@ -241,7 +241,7 @@ run_experiment()
     local c2="$1";              shift
     local nsamples="$1";        shift
 
-    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_rand64k.txt")\""
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
     run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" ""
     
     local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand1000.txt")\""

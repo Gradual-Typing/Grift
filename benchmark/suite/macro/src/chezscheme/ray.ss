@@ -12,19 +12,19 @@
 (define (point-y p) (vector-ref p 1))
 (define (point-z p) (vector-ref p 2))
 
-(define (sq x) (* x x))
+(define (sq x) (fl* x x))
 
 (define (mag x y z) 
-  (sqrt (+ (sq x) (+ (sq y) (sq z)))))
+  (flsqrt (fl+ (sq x) (fl+ (sq y) (sq z)))))
 
 (define (unit-vector x y z) 
   (let ([d  (mag x y z)])
-    (make-point (/ x d) (/ y d) (/ z d))))
+    (make-point (fl/ x d) (fl/ y d) (fl/ z d))))
 
 (define (distance p1 p2) 
-  (mag (- (point-x p1) (point-x p2))
-       (- (point-y p1) (point-y p2))
-       (- (point-z p1) (point-z p2))))
+  (mag (fl- (point-x p1) (point-x p2))
+       (fl- (point-y p1) (point-y p2))
+       (fl- (point-z p1) (point-z p2))))
 
 (define *world* (make-vector 33 (vector 0.0 0.0 (vector 0.0 0.0 0.0))))
 
@@ -43,17 +43,17 @@
       (do ((x 0 (+ x 1)))
           ((= x extent))
         (write (color-at
-                (+ -50.0
-                   (/ (exact->inexact x) (exact->inexact res)))
-                (+ -50.0
-                   (/ (exact->inexact y) (exact->inexact res)))))
+                (fl+ -50.0
+                   (fl/ (exact->inexact x) (exact->inexact res)))
+                (fl+ -50.0
+                   (fl/ (exact->inexact y) (exact->inexact res)))))
         (newline)))))
 
 (define (color-at x y)
-  (let ([ray (unit-vector (- x (point-x eye))
-                          (- y (point-y eye))
-                          (- (point-z eye)))])
-    (inexact->exact (round (* (sendray eye ray) 255.0)))))
+  (let ([ray (unit-vector (fl- x (point-x eye))
+                          (fl- y (point-y eye))
+                          (fl- (point-z eye)))])
+    (inexact->exact (flround (fl* (sendray eye ray) 255.0)))))
 
 (define (sendray pt ray)
   (let ([x (loop pt ray 0
@@ -65,7 +65,7 @@
     (let ([s (vector-ref x 0)]
           [int (vector-ref x 1)])
       (if s
-          (* (lambert s int ray)
+          (fl* (lambert s int ray)
              (sphere-color s))
           0.0))))
 
@@ -77,47 +77,47 @@
               [yr  (point-y ray)]
               [zr  (point-z ray)]
               [sc  (sphere-center s)])
-          (let ([a  (+ (sq xr) (+ (sq yr) (sq zr)))]
-                [b  (* 2.0
-                       (+ (* (- (point-x pt) (point-x sc)) xr)
-                          (+ (* (- (point-y pt) (point-y sc)) yr)
-                             (* (- (point-z pt) (point-z sc)) zr))))]
-                [c  (+ (+ (sq (- (point-x pt) (point-x sc)))
-                          (sq (- (point-y pt) (point-y sc))))
-                       (+ (sq (- (point-z pt) (point-z sc)))
-                          (- (sq (sphere-radius s)))))])
+          (let ([a  (fl+ (sq xr) (fl+ (sq yr) (sq zr)))]
+                [b  (fl* 2.0
+                       (fl+ (fl* (fl- (point-x pt) (point-x sc)) xr)
+                          (fl+ (fl* (fl- (point-y pt) (point-y sc)) yr)
+                             (fl* (fl- (point-z pt) (point-z sc)) zr))))]
+                [c  (fl+ (fl+ (sq (fl- (point-x pt) (point-x sc)))
+                          (sq (fl- (point-y pt) (point-y sc))))
+                       (fl+ (sq (fl- (point-z pt) (point-z sc)))
+                          (fl- (sq (sphere-radius s)))))])
             (if (zero? a)
-                (let ([n  (/ (- c) b)])
-                  (let ([h (make-point (+ (point-x pt) (* n xr))
-                                       (+ (point-y pt) (* n yr))
-                                       (+ (point-z pt) (* n zr)))])
+                (let ([n  (fl/ (fl- c) b)])
+                  (let ([h (make-point (fl+ (point-x pt) (fl* n xr))
+                                       (fl+ (point-y pt) (fl* n yr))
+                                       (fl+ (point-z pt) (fl* n zr)))])
                     (let ([d (distance h pt)])
-                      (if (< d dist)
+                      (if (fl< d dist)
                           (loop pt ray (+ index 1) lst-len lst s h d)
                           (loop pt ray (+ index 1) lst-len lst surface hit dist)))))
-                (let ([disc  (- (sq b) (* 4.0 (* a c)))])
+                (let ([disc (fl- (sq b) (fl* 4.0 (fl* a c)))])
                   (if (negative? disc)
                       (loop pt ray (+ index 1) lst-len lst surface hit dist)
                       (let ([discrt  (sqrt disc)]
-                            (minus-b  (- b))
-                            (two-a  (* 2.0 a)))
-                        (let ([n (min (/ (+ minus-b discrt) two-a)
-                                      (/ (- minus-b discrt) two-a))])
-                          (let ([h (make-point (+ (point-x pt) (* n xr))
-                                               (+ (point-y pt) (* n yr))
-                                               (+ (point-z pt) (* n zr)))])
+                            (minus-b  (fl- b))
+                            (two-a  (fl* 2.0 a)))
+                        (let ([n (flmin (fl/ (fl+ minus-b discrt) two-a)
+                                      (fl/ (fl- minus-b discrt) two-a))])
+                          (let ([h (make-point (fl+ (point-x pt) (fl* n xr))
+                                               (fl+ (point-y pt) (fl* n yr))
+                                               (fl+ (point-z pt) (fl* n zr)))])
                             (let ([d  (distance h pt)])
-                              (if (< d dist)
+                              (if (fl< d dist)
                                   (loop pt ray (+ index 1) lst-len lst s h d)
                                   (loop pt ray (+ index 1) lst-len lst surface hit dist))))))))))))))
 
 
 (define (lambert s int ray)
   (let ([n (sphere-normal s int)])
-    (max 0.0
-         (+ (* (point-x ray) (point-x n))
-            (+ (* (point-y ray) (point-y n))
-               (* (point-z ray) (point-z n)))))))
+    (flmax 0.0
+         (fl+ (fl* (point-x ray) (point-x n))
+            (fl+ (fl* (point-y ray) (point-y n))
+               (fl* (point-z ray) (point-z n)))))))
 
 (define (make-sphere color radius center) 
   (vector color radius center))
@@ -137,9 +137,9 @@
 
 (define (sphere-normal s pt) 
   (let ([c (sphere-center s)])
-    (unit-vector (- (point-x c) (point-x pt))
-                 (- (point-y c) (point-y pt))
-                 (- (point-z c) (point-z pt)))))
+    (unit-vector (fl- (point-x c) (point-x pt))
+                 (fl- (point-y c) (point-y pt))
+                 (fl- (point-z c) (point-z pt)))))
 
 (begin
   (let ([counter (box 29)])
@@ -153,9 +153,9 @@
             ((> z 7))
           (defsphere
             (unbox counter)
-            (* (exact->inexact x) 200.0)
+            (fl* (exact->inexact x) 200.0)
             300.0
-            (* (exact->inexact z) -400.0)
+            (fl* (exact->inexact z) -400.0)
             40.0
             0.75)
           (set-box! counter (- (unbox counter) 1))))))
