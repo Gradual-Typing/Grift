@@ -1,6 +1,7 @@
 #!/bin/sh
+set -uo pipefail
+trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
-set -euo pipefail
 declare -r PRECISION=5
 TIMEFORMAT=%R
 
@@ -161,6 +162,8 @@ main()
 	    exit 1
 	fi
     fi
+
+    SCHML_DIR=${SCHML_DIR:=`pwd`/../../..}
     
     declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
