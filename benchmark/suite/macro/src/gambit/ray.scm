@@ -1,6 +1,5 @@
 ;;; RAY -- Ray-trace a simple scene with spheres.
 ;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
-;;; And then translated to Schml by Deyaaeldeen Almahallawi
 
 (define (make-point x y z)
   (vector x y z))
@@ -158,4 +157,5 @@
               0.75)
             (set-box! counter (- (unbox counter) 1))))))
     (tracer 1)))
+
 (main)
