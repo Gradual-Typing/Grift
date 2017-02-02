@@ -251,7 +251,7 @@ run_experiment()
 
     run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" ""
 
-    run_benchmark $baseline_system $c1 $c2 "fft" "4096" "$nsamples" ""
+    run_benchmark $baseline_system $c1 $c2 "fft" "65536" "$nsamples" ""
 
     # convert "*_${c1}_${c2}.png" -append "${c1}_${c2}".png
 

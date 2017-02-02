@@ -70,11 +70,11 @@ run_benchmark()
     echo -n ,$RETURN >> $logfile2
     write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
 
-    local partial_path="${TMP_DIR}/partial/${name}"
-    if [ -f "${partial_path}.schml" ]; then
-	echo -n "$name$print_aux_name" >> "$logfile3"
-	write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
-    fi
+    # local partial_path="${TMP_DIR}/partial/${name}"
+    # if [ -f "${partial_path}.schml" ]; then
+    # 	echo -n "$name$print_aux_name" >> "$logfile3"
+    # 	write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
+    # fi
     
     echo "finished ${name}${print_aux_name}"
 }
@@ -87,6 +87,8 @@ gen_fig()
     local logfile="${DATA_DIR}/${mode}.log"
     local outfile="${OUT_DIR}/${mode}.png"
     local N=$(head -1 "${logfile}" | sed 's/[^,]//g' | wc -c)
+
+    rm -rf "$outfile"
     
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
@@ -119,31 +121,22 @@ run_experiment()
     local logfile3="${DATA_DIR}/partial.log"
 
     local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -a)
-    if [ ! -f "$logfile1" ]; then
-	echo "name,${config_str}" > "$logfile1"
-    fi
-    if [ ! -f "$logfile2" ]; then
-	echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
-    fi
-    if [ ! -f "$logfile3" ]; then
-	echo "name,${config_str}" > "$logfile3"
-    fi
+    echo "name,${config_str}" > "$logfile1"
+    echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
+    echo "name,${config_str}" > "$logfile3"
 
-    # local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand10000.txt")\""
-    # run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_bc_arg" "bestcase"
+    run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "200" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" "worstcase"
-    
-    run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "200" ""
+
+    run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "n-body" "100000" ""
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "4096" ""
-
     gen_fig static
     gen_fig dyn
-    gen_fig partial
+    # gen_fig partial
 }
 
 main()
