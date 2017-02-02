@@ -173,7 +173,7 @@ int main(int argc, char* argv[]){
 
   GC_INIT();
 
-  data = GC_MALLOC(sizeof(vect));
+  data = GC_MALLOC(sizeof(int64_t)+n*sizeof(double));
   data->size = n;
   for (int i = 0; i < data->size; ++i)
     data->data[i] = 0;
