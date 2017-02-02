@@ -11,7 +11,7 @@
 #define GC_INITIAL_HEAP_SIZE 1048576
 #include "../../../../../src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
 
-#define apply(c, args...) ((c)*(args)) 
+#define apply(c, args...) (c.code(args)) 
 
 #define vector_ref(t, x, i)                   \
   if ((i) >= 0 && (i) < x->size){             \
@@ -60,13 +60,18 @@ typedef struct OptionData_ {
 // See Hull, Section 11.8, P.243-244
 #define inv_sqrt_2xPI 0.39894228040143270286
 
-typedef fptype(*CDNF_code_t)(fptype InputX);
+typedef fptype(*CNDF_code_t)(fptype InputX);
 
 typedef struct{
-  CDNF_code_t code;
-} CDNF_clos;
+  CNDF_code_t code;
+} CNDF_clos;
 
-fptype CNDF ( fptype InputX ) 
+fptype CNDF_code ( fptype InputX );
+CNDF_clos CNDF_closure = {CNDF_code};
+
+#define CNDF(IX)(apply(CNDF_closure, IX))
+
+fptype CNDF_code ( fptype InputX ) 
 {
     int sign;
 
@@ -139,15 +144,27 @@ fptype CNDF ( fptype InputX )
 //////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////
-typedef fptype*(*BlkSchlsEqEuroNoDiv_code_t) (fptype, fptype, fptype, fptype,
-                                              fptype, int, float);
+typedef fptype(*BlkSchlsEqEuroNoDiv_code_t) (fptype, fptype, fptype, fptype,
+                                             fptype, int, float);
 
 typedef struct{
   BlkSchlsEqEuroNoDiv_code_t code;
 } BlkSchlsEqEuroNoDiv_clos;
 
+fptype BlkSchlsEqEuroNoDiv_code(fptype sptprice,
+                                fptype strike,
+                                fptype rate,
+                                fptype volatility,
+                                fptype time,
+                                int otype,
+                                float timet);
 
-fptype BlkSchlsEqEuroNoDiv(fptype sptprice,
+BlkSchlsEqEuroNoDiv_clos BS_closure = {BlkSchlsEqEuroNoDiv_code};
+
+#define BlkSchlsEqEuroNoDiv(sp, st, ra, v, t, ot, tt)\
+  (apply(BS_closure, sp, st, ra, v, t, ot, tt))
+
+fptype BlkSchlsEqEuroNoDiv_code(fptype sptprice,
                            fptype strike,
                            fptype rate,
                            fptype volatility,

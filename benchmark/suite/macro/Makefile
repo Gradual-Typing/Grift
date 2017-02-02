@@ -1,5 +1,5 @@
 LIBGC=../../../src/backend-c/runtime/boehm-gc-install/lib/libgc.a
-SCHML=racket ../../../main.rkt -g
+SCHML=racket ../../../main.rkt -O 3
 GAMBIT=gsc -exe -cc-options "-O3"
 GCC=gcc -O3
 
@@ -73,9 +73,8 @@ br:
 	$(BLACKSCHOLES_INPUT) | bin/static/blackscholes.coercions > /dev/null
 	$(BLACKSCHOLES_INPUT) | bin/static/blackscholes.type-based-casts > /dev/null
 	$(BLACKSCHOLES_INPUT) | bin/dyn/blackscholes.coercions > /dev/null
-	$(BLACKSCHOLES_INPUT) | bin/gambit/blackscholes > /dev/null
 	$(BLACKSCHOLES_INPUT) | bin/dyn/blackscholes.type-based-casts > /dev/null
+	$(BLACKSCHOLES_INPUT) | bin/gambit/blackscholes > /dev/null
 
-brd: 
-	$(SCHML) --type-based-casts --keep-c bs.c -o bs bs.schml 
-	./bs
+
+

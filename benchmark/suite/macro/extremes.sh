@@ -126,6 +126,9 @@ run_experiment()
     echo "name,${config_str}" > "$logfile3"
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "200" ""
+
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_rand64k.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" "worstcase"
