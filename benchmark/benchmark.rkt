@@ -13,40 +13,32 @@
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
-(define (guarded-compile src i cast ref opened?)
+(define (guarded-compile src i cast ref)
   (let* ([exe (path-replace-extension
                src
                (string-append ".o" (number->string i)))])
-    (parameterize ([specialize-cast-code-generation? opened?])
+    (parameterize ([specialize-cast-code-generation? #f])
       (if (not (file-exists? exe))
           (begin
             (printf "~a\n" exe)
             (compile src #:output exe #:cast cast #:ref ref))
           (void)))))
 
-(define (compile-file f)
-  ;; config 01: guarded references,   coercions,  close coded
-  (guarded-compile f 1 'Coercions 'Guarded #f)
-  ;; config 02: guarded references,   type-based, close coded
-  (guarded-compile f 2 'Type-Based 'Guarded #f)
-  ;; config 03: monotonic references, coercions,  close coded
-  (guarded-compile f 3 'Coercions 'Monotonic #f)
-  ;; config 04: monotonic references, type-based, close coded
-  (guarded-compile f 4 'Type-Based 'Monotonic #f)
-  ;; ;; config 05: guarded references,   coercions,  open coded
-  ;; (guarded-compile f 5 'Coercions 'Guarded #t)
-  ;; ;; config 06: guarded references,   type-based, open coded
-  ;; (guarded-compile f 6 'Type-Based 'Guarded #t)
-  ;; ;; config 07: monotonic references, coercions,  open coded
-  ;; (guarded-compile f 7 'Coercions 'Monotonic #t)
-  ;; ;; config 08: monotonic references, type-based, open coded
-  ;; (guarded-compile f 8 'Type-Based 'Monotonic #t)
-  )
+(define configs
+  (call-with-input-file "benchmark/configs.dat"
+    (lambda (in) (read in))))
 
-(define (compile-directory compile-dir)
+(define (compile-file f i)
+  (apply guarded-compile (cons f (cons i (hash-ref configs i)))))
+
+(define (compile-file-all-configs f)
+  (for ([i (in-range 1 (+ (hash-count configs) 1))])
+    (compile-file f i)))
+
+(define (compile-directory-all-configs compile-dir)
   ;; The directory should exist if we are going to compile it
   (unless (directory-exists? compile-dir)
-    (error 'compile-directory "no such directory ~a" compile-dir))
+    (error 'compile-directory-all-configs "no such directory ~a" compile-dir))
 
   ;; ;; if the output path exists make sure it is a directory
   ;; ;; otherwise make the output directory.
@@ -63,18 +55,28 @@
   ;; compile them to 
   (for ((fl (find-files schml-file? compile-dir)))
     (debug fl)
-    (compile-file fl)))
+    (compile-file-all-configs fl)))
 
 (module+ main
+  (define config-index? (make-parameter 0))
   (c-flags (cons "-O3" (c-flags)))
   (command-line
    #:once-each
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
+   [("--config" "-i") i
+    "Compile a path with a single configuration, must be a number > 0"
+    (config-index? (string->number i))]
    #:args (path)
    (if (string->path path)
        (cond
-         [(directory-exists? path) (compile-directory path)]
-         [(file-exists? path) (compile-file path)])
+         [(and (directory-exists? path) (> (config-index?) 0))
+          (compile-directory path (config-index?))]
+         [(directory-exists? path)
+          (compile-directory-all-configs path)]
+         [(and (file-exists? path) (> (config-index?) 0))
+          (compile-file path (config-index?))]
+         [(file-exists? path)
+          (compile-file-all-configs path)])
        (error 'benchmark-main "could parse ~v as a path" path))))

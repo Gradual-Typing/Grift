@@ -1,8 +1,4 @@
-#!/usr/bin/gsi -:d0
-
-(declare
- (standard-bindings)
- (fixnum))
+#!gsi-script -:d0
 
 (define (main)
   (let ([size (read)])

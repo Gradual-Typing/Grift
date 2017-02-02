@@ -514,6 +514,8 @@ represents types in the schml abstract syntax tree.
               (core (parse-simple-form 'gvector-ref Gvector-ref 2))]
              [parse-gvector-set!
               (core (parse-simple-form 'gvector-set! Gvector-set! 3))]
+             [parse-gvector-length
+              (core (parse-simple-form 'gvector-length Gvector-length 1))]
              [parse-mbox
               (core (parse-simple-form 'mbox MboxS 1))]
              [parse-munbox
@@ -525,39 +527,45 @@ represents types in the schml abstract syntax tree.
              [parse-mvector-ref
               (core (parse-simple-form 'mvector-ref Mvector-ref 2))]
              [parse-mvector-set!
-              (core (parse-simple-form 'mvector-set! Mvector-set! 3))])
+              (core (parse-simple-form 'mvector-set! Mvector-set! 3))]
+             [parse-mvector-length
+              (core (parse-simple-form 'mvector-length Mvector-length 1))])
          `(,@(match (reference-semantics)
                ['Guarded
-                `((Ref          . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
-                  (Vect         . ,(core (make-parse-type-w/ctr 'GVect GVect)))
-                  (vector       . ,parse-gvector)
-                  (vector-ref   . ,parse-gvector-ref)
-                  (vector-set!  . ,parse-gvector-set!)
-                  (box          . ,parse-gbox)
-                  (box-set!     . ,parse-gbox-set!)
-                  (unbox        . ,parse-gunbox))]
+                `((Ref            . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
+                  (Vect           . ,(core (make-parse-type-w/ctr 'GVect GVect)))
+                  (vector         . ,parse-gvector)
+                  (vector-ref     . ,parse-gvector-ref)
+                  (vector-set!    . ,parse-gvector-set!)
+                  (vector-length  . ,parse-gvector-length)
+                  (box            . ,parse-gbox)
+                  (box-set!       . ,parse-gbox-set!)
+                  (unbox          . ,parse-gunbox))]
                ['Monotonic
-                `((Ref          . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
-                  (Vect         . ,(core (make-parse-type-w/ctr 'MVect MVect)))
-                  (vector       . ,parse-mvector)
-                  (vector-ref   . ,parse-mvector-ref)
-                  (vector-set!  . ,parse-mvector-set!)
-                  (box          . ,parse-mbox)
-                  (box-set!     . ,parse-mbox-set!)
-                  (unbox        . ,parse-munbox))]
+                `((Ref            . ,(core (make-parse-type-w/ctr 'MRef  MRef)))
+                  (Vect           . ,(core (make-parse-type-w/ctr 'MVect MVect)))
+                  (vector         . ,parse-mvector)
+                  (vector-ref     . ,parse-mvector-ref)
+                  (vector-set!    . ,parse-mvector-set!)
+                  (vector-length  . ,parse-mvector-length)
+                  (box            . ,parse-mbox)
+                  (box-set!       . ,parse-mbox-set!)
+                  (unbox          . ,parse-munbox))]
                [other (error 'syntax-to-schml0/top-level-env "unmatched: ~a" other)])
-           (gvector      . ,parse-gvector)
-           (gvector-ref  . ,parse-gvector-ref)
-           (gvector-set! . ,parse-gvector-set!)
-           (gbox         . ,parse-gbox)
-           (gbox-set!    . ,parse-gbox-set!)
-           (gunbox       . ,parse-gunbox)
-           (mvector      . ,parse-mvector)
-           (mvector-ref  . ,parse-mvector-ref)
-           (mvector-set! . ,parse-mvector-set!)
-           (mbox         . ,parse-mbox)
-           (mbox-set!    . ,parse-mbox-set!)
-           (munbox       . ,parse-munbox)))
+           (gvector        . ,parse-gvector)
+           (gvector-ref    . ,parse-gvector-ref)
+           (gvector-set!   . ,parse-gvector-set!)
+           (gvector-length . ,parse-gvector-length)
+           (gbox           . ,parse-gbox)
+           (gbox-set!      . ,parse-gbox-set!)
+           (gunbox         . ,parse-gunbox)
+           (mvector        . ,parse-mvector)
+           (mvector-ref    . ,parse-mvector-ref)
+           (mvector-set!   . ,parse-mvector-set!)
+           (mvector-length . ,parse-mvector-length)
+           (mbox           . ,parse-mbox)
+           (mbox-set!      . ,parse-mbox-set!)
+           (munbox         . ,parse-munbox)))
      (ann . ,(core parse-ascription))
      (: . ,(core parse-ascription))
      ;; Char operations
@@ -584,7 +592,11 @@ represents types in the schml abstract syntax tree.
      (=  . ,core-parse-prim)
      (>  . ,core-parse-prim)
      (>= . ,core-parse-prim)
+     (and . ,core-parse-prim)
+     (or  . ,core-parse-prim)
+     (quotient . ,core-parse-prim)
      ;; Float operations
+     (flnegate . ,core-parse-prim)
      (fl+   . ,core-parse-prim)
      (fl-   . ,core-parse-prim)
      (fl*   . ,core-parse-prim)
@@ -602,6 +614,7 @@ represents types in the schml abstract syntax tree.
      (flfloor . ,core-parse-prim)
      (flceiling . ,core-parse-prim)
      (fltruncate . ,core-parse-prim)
+     (flquotient . ,core-parse-prim)
      ;; Float operations (trig)
      (flsin . ,core-parse-prim)
      (flcos . ,core-parse-prim)

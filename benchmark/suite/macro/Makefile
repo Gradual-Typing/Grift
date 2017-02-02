@@ -4,12 +4,9 @@ GAMBIT=gsc -exe -cc-options "-O3"
 GCC=gcc -O3
 
 all:
-	./lattice.sh
+	./lattice.sh 300 5 fresh 1 2 1 3 3 4 2 4
 clean:
 	rm -rf lattice/
-
-test:
-	./lattice.sh 5 5 16
 
 c:
 	gcc -O3 src/c/n-body.c -o bin/c/n-body ${LIBGC}
@@ -78,3 +75,7 @@ br:
 	$(BLACKSCHOLES_INPUT) | bin/dyn/blackscholes.coercions > /dev/null
 	$(BLACKSCHOLES_INPUT) | bin/gambit/blackscholes > /dev/null
 	$(BLACKSCHOLES_INPUT) | bin/dyn/blackscholes.type-based-casts > /dev/null
+
+brd: 
+	$(SCHML) --type-based-casts --keep-c bs.c -o bs bs.schml 
+	./bs

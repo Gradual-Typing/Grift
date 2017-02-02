@@ -1,8 +1,4 @@
-#!/u/dalmahal/bin/bin/gsi-script -:d0
-
-(declare
- (fixnum)
- (standard-bindings))
+#!gsi-script -:d0
 
 (define (main)
   (let* ([size (read)]

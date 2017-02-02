@@ -49,6 +49,7 @@
           (Gvector E E)
           (Gvector-set! E E E)
           (Gvector-ref E E)
+          (Gvector-length E)
           ;; Monotonic
           (Mbox E Schml-Type)
           (Munbox E) ;; fast read
@@ -60,6 +61,7 @@
           (Mvector-set! E E E) ;; fast write
           (MVectCastedRef Uid E Schml-Type)
           (MVectCastedSet! Uid E E Schml-Type)
+          (Mvector-length E)
           ;; Dynamic Operations
           (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
           (Dyn-GVector-Ref E E Blame-Label)

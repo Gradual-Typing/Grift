@@ -1,7 +1,7 @@
 #lang racket
 
 (module+ main
-  (let ([size (string->number (read-line))])
+  (let ([size (read)])
     (let ([ar size]
           [ac size]
           [br size]

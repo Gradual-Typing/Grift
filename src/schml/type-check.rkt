@@ -372,6 +372,18 @@ The type rules for core forms that have interesting type rules
       (MVect init-ty)
       (error 'type-check/todo)))
 
+(: mvector-length-type-rule (-> Schml-Type Schml-Type))
+(define (mvector-length-type-rule vect-ty)
+  (if (or (MVect? vect-ty) (Dyn? vect-ty))
+      INT-TYPE
+      (error 'type-check/todo)))
+
+(: gvector-length-type-rule (-> Schml-Type Schml-Type))
+(define (gvector-length-type-rule vect-ty)
+  (if (or (GVect? vect-ty) (Dyn? vect-ty))
+      INT-TYPE
+      (error 'type-check/todo)))
+
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
 ;; The type of the index must be consistent with Int
@@ -505,12 +517,15 @@ The type rules for core forms that have interesting type rules
          (let ([ty (mvector-set!-type-rule t1 t2 t3)]
                [T  (mvector-val-type t1)])
            (values (if (completely-static-type? T) (Mvector-set! e1 e2 e3) (Mvector-set!T e1 e2 e3 T)) ty))]
+        [(Mvector-length (app recur e t))
+         (values (Mvector-length e) (mvector-length-type-rule t))]
         [(Gvector (app recur e1 t1) (app recur e2 t2))
          (values (Gvector e1 e2) (gvector-type-rule t1 t2))]
         [(Gvector-ref (app recur e1 t1) (app recur e2 t2))
          (values (Gvector-ref e1 e2) (gvector-ref-type-rule t1 t2))]
         [(Gvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
          (values (Gvector-set! e1 e2 e3) (gvector-set!-type-rule t1 t2 t3))]
+        [(Gvector-length (app recur e t)) (values (Gvector-length e) (gvector-length-type-rule t))]
         [(Create-tuple (app map-recur e* t*))
          (values (Create-tuple e*) (tuple-type-rule t*))]
         [(Tuple-proj (app recur e t) i)

@@ -401,6 +401,7 @@
        (Guarded-Proxy-Blames exp)]
       [(Guarded-Proxy-Coercion (app recur exp))
        (Guarded-Proxy-Coercion exp)]
+      [(Unguarded-Vect-length e) (Unguarded-Vect-length (recur e))]
       [(Mbox (app recur e) (app type->imdt t)) (Mbox e t)]
       [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
       [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
@@ -420,7 +421,6 @@
       [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
       [(Mvector (app recur e1) (app recur e2) (app type->imdt t))
        (Mvector e1 e2 t)]
-      [(Mvector-size (app recur e)) (Mvector-size e)]
       [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
@@ -431,6 +431,7 @@
       [(MVect-Coercion-Huh e) (MVect-Coercion-Huh (recur e))]
       [(MVect-Coercion-Type e) (MVect-Coercion-Type (recur e))]
       [(MVect-Coercion e) (MVect-Coercion (recur e))]
+      [(Mvector-length e) (Mvector-length (recur e))]
       [(Error (app recur e)) (Error e)]
       [(Create-tuple (app recur* e*))
        (Create-tuple e*)]

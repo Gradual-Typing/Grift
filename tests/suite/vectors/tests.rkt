@@ -26,5 +26,5 @@
    (test-file "vectors" "gvect7-7.schml" (int 42))
    (test-file "vectors" "gvect8.schml" (int 42))
    (test-file "vectors" "gvect9.schml" (bool #f))
-   (test-file "vectors" "gvect12.schml" (int 42))
+   (test-file "vectors" "gvect12.schml" (int 100))
    ))

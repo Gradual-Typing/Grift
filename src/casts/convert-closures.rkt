@@ -388,6 +388,7 @@
          (Guarded-Proxy-Blames e)]
         [(Guarded-Proxy-Coercion (app recur e))
          (Guarded-Proxy-Coercion e)]
+        [(Unguarded-Vect-length (app recur e)) (Unguarded-Vect-length e)]
         [(Mbox (app recur e) t) (Mbox e t)]
         [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
         [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
@@ -406,7 +407,7 @@
         [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
         [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
         [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
-        [(Mvector-size (app recur e)) (Mvector-size e)]
+        [(Mvector-length (app recur e)) (Mvector-length e)]
         [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
         [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
         [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
