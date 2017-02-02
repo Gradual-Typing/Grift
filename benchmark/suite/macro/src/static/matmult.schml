@@ -29,7 +29,6 @@
 	[bc : Int size])
     (if (= ac br)
 	(let ([a : (Vect Int) (create ar ac)]
-              [b : (Vect Int) (create br bc)]
-              [bx : (Ref Int) (box 0)])
+              [b : (Vect Int) (create br bc)])
           (time (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1))))
 	0)))
