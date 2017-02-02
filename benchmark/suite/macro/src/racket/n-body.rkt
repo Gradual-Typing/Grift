@@ -28,7 +28,7 @@ Correct output N = 1000 is
 (define +pi+ 3.141592653589793) ;; define locally to enable inlining
 (define +days-per-year+ 365.24)
 
-(define +solar-mass+ (fl* 4 +pi+ +pi+))
+(define +solar-mass+ (fl* 4.0 (fl* +pi+ +pi+)))
 
 (define +dt+ 0.01)
 
