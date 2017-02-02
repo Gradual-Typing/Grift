@@ -1,40 +1,45 @@
 #lang racket
 
-(module+ main
-  (let ([size (read)])
-    (let ([ar size]
-          [ac size]
-          [br size]
-          [bc size])
-      (if (= ac br)
-          (letrec ([create (lambda (l1 l2)
-                             (let ([x  (make-vector l1 (make-vector l2 0))])
-                               (begin
-                                 (for [(i (range 0 l1))]
-                                   (let ([xi (make-vector l2 0)])
-                                     (begin
-                                       (for ([j (range 0 l2)])
-                                         (vector-set! xi j (+ j i)))
-                                       (vector-set! x i xi))))
-                                 x)))]
-                   [mult (lambda (x x1 x2 y y1 y2)
-                           (let ([r (make-vector ar (make-vector bc 0))])
-                             (begin
-                               (for ([i (range 0 x1)])
-                                 (let ([ri (make-vector y2 0)])
-                                   (begin
-                                     (for ([j (range 0 y2)])
-                                       (for ([k (range 0 y1)])
-                                         (vector-set! ri j
-                                                      (+ (vector-ref ri j)
-                                                         (* (vector-ref (vector-ref x i) k)
-                                                            (vector-ref (vector-ref y k) j))))))
-                                     (vector-set! r i ri))))
-                               r)))])
-            (let ([a (create ar ac)]
-                  [b (create br bc)]
-                  [bx (box 0)])
-              (begin
-                (set-box! bx (vector-ref (vector-ref (mult a ar ac b br bc) (- ar 1)) (- ac 1)))
-                (printf "~a\n" (unbox bx)))))
-          '()))))
+(require racket/fixnum)
+
+(define (create l1 l2)
+  (let ([x (make-vector (fx* l1 l2) 0)])
+    (let loop1 ([i 0])
+      (if (fx< i l1)
+	  (let loop2 ([j 0])
+	    (begin
+	      (if (fx< j l2)
+		  (begin
+		    (vector-set! x (fx+ (fx* l2 i) j) (fx+ j i))
+		    (loop2 (fx+ 1 j)))
+		  (loop1 (fx+ 1 i)))))
+	  x))))
+
+(define (mult x x1 x2 y y1 y2)
+  (let ([r (make-vector (fx* y2 x1) 0)])
+    (let loop1 ([i 0])
+      (if (fx< i x1)
+	  (let loop2 ([j 0])
+	    (if (fx< j y2)
+		(let loop3 ([k 0])
+		  (if (fx< k y1)
+		      (begin
+			(vector-set! r (fx+ (fx* i y2) j)
+				     (fx+ (vector-ref r (fx+ (fx* i y2) j))
+					  (fx* (vector-ref x (fx+ (fx* i x2) k))
+					       (vector-ref y (fx+ (fx* k y2) j)))))
+			(loop3 (fx+ k 1)))
+		      (loop2 (fx+ j 1))))
+		(loop1 (fx+ i 1))))
+	  r))))
+
+(let ([size (read)])
+  (let ([ar size]
+	[ac size]
+	[br size]
+	[bc size])
+    (if (fx= ac br)
+	(let ([a (create ar ac)]
+              [b (create br bc)])
+          (time (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1))))
+	0)))

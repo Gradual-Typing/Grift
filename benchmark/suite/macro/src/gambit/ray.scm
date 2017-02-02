@@ -157,5 +157,3 @@
               0.75)
             (set-box! counter (- (unbox counter) 1))))))
     (tracer 1)))
-
-(main)

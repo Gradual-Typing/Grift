@@ -75,5 +75,3 @@
     (loop1 0 0) ;; bit-reversal section
     (loop3 2)   ;; Danielson-Lanczos section
     (display (vector-ref data 0))))
-
-(main)
