@@ -226,7 +226,7 @@ double sendray_code(point* pt, point* ray){
   looprec* x = loop->code(pt,ray,0,world->size,world,NULL,NULL,1e308);
   entry* s = x->e;
   point* Int = x->p;
-  if (s) {
+  if (s != NULL) {
     return (lambert->code(s,Int,ray) * sphere_color->code(s));
   } else {
     return 0;
@@ -270,13 +270,13 @@ looprec* loop_code(point* pt,
     double zr = point_z->code(ray);
     point* sc = sphere_center->code(s);
     double a = sq->code(xr) + sq->code(yr) + sq->code(zr);
-    double b = 2.0 * (((point_x->code(pt) - point_x->code(sc)) * xr) *
+    double b = 2.0 * (((point_x->code(pt) - point_x->code(sc)) * xr) +
 		      (((point_y->code(pt) - point_y->code(sc)) * yr) +
 		       ((point_z->code(pt) - point_z->code(sc)) * zr)));
-    double c = (((sq->code(point_x->code(pt) - point_x->code(sc))) +
-		 (sq->code(point_y->code(pt) - point_y->code(sc)))) +
-		((sq->code(point_z->code(pt) - point_z->code(sc))) +
-		 (-(sq->code(sphere_radius->code(s))))));
+    double c = sq->code(point_x->code(pt) - point_x->code(sc)) +
+      sq->code(point_y->code(pt) - point_y->code(sc)) +
+      sq->code(point_z->code(pt) - point_z->code(sc)) +
+      (-sq->code(sphere_radius->code(s)));
     if (a == 0) {
       double n = -c/b;
       point* h = make_point->code(point_x->code(pt) + (n*xr),
@@ -322,7 +322,7 @@ sphere_normal_clos* sphere_normal;
 
 double lambert_code(entry* s, point* Int, point* ray){
   point* n = sphere_normal->code(s,Int);
-  return fmax(0,
+  return fmax(0.0,
 	      (point_x->code(ray) * point_x->code(n)) +
 	      (point_y->code(ray) * point_y->code(n)) +
 	      (point_z->code(ray) * point_z->code(n)));
@@ -454,7 +454,7 @@ int main(int argc, char* argv[]){
     for (int z = 2; z < 8; ++z){
       fx = (double) x;
       fz = (double) z;
-      defsphere->code(counter,fx*200,300,fz*-400,40,10.75);
+      defsphere->code(counter,fx*200,300,fz*-400,40,0.75);
       counter--;
     }
   }

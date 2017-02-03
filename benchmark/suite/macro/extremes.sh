@@ -127,6 +127,8 @@ run_experiment()
 
     local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "blackscholes" "$bs_bc_arg" ""
+
+    run_benchmark $baseline_system_static $baseline_system_dynamic "ray" "" ""
     
     run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "400" ""
     
