@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require racket/flonum racket/format)
+(require racket/flonum racket/format racket/fixnum)
 
 (define inv-sqrt-2x-pi 0.39894228040143270286)
 
@@ -33,7 +33,7 @@
         (let ([n-of-d1 (cummulative-normal-distribution d1)]
               [n-of-d2 (cummulative-normal-distribution d2)]
               [fut-value (fl* strike (flexp (fl* #i-1 (fl* rate time))))])
-          (let ([price (if (= option-type 0)
+          (let ([price (if (fx= option-type 0)
                            (fl- (fl* spot n-of-d1) (fl* fut-value n-of-d2))
                            (fl- (fl* fut-value (fl- #i1.0 n-of-d2))
                                 (fl* spot (fl- #i1.0 n-of-d1))))])
@@ -48,11 +48,11 @@
 
 (define (read-option-type)
   (let ([c (read-char)])
-    (if (= (char->integer c) (char->integer #\P))
+    (if (fx= (char->integer c) (char->integer #\P))
         c
-        (if (= (char->integer c) (char->integer #\C))
+        (if (fx= (char->integer c) (char->integer #\C))
             c
-            (if (= (char->integer c) (char->integer #\space))
+            (if (fx= (char->integer c) (char->integer #\space))
                 (read-char)
                 (read-char))))));; raise error?
 
@@ -97,7 +97,7 @@
     (for ([i (in-range 0 number-of-options)])
       (let ([od (vector-ref data i)])
         (vector-set! otypes i
-                     (if (= (char->integer (vector-ref od 6))
+                     (if (fx= (char->integer (vector-ref od 6))
                             (char->integer #\P))
                          1
                          0))

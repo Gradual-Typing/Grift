@@ -27,17 +27,17 @@
 (define eye (make-point 0.0 0.0 200.0))
 
 (define (tracer res)
-  (let ([extent (* res 100)])
+  (let ([extent (fx* res 100)])
     (display "P2 ")
     (write extent)
     (display " ")
     (write extent)
     (display " 255")
     (newline)
-    (do ((y 0 (+ y 1)))
-        ((= y extent))
-      (do ((x 0 (+ x 1)))
-          ((= x extent))
+    (do ((y 0 (fx+ y 1)))
+        ((fx= y extent))
+      (do ((x 0 (fx+ x 1)))
+          ((fx= x extent))
         (write (color-at
                 (fl+ -50.0
                      (fl/ (exact->inexact x) (exact->inexact res)))
@@ -66,7 +66,7 @@
           0.0))))
 
 (define (loop pt ray index lst-len lst surface hit dist)
-  (if (= index lst-len)
+  (if (fx= index lst-len)
       (vector surface hit)
       (let ([s (vector-ref lst index)])
         (let ([xr  (point-x ray)]
@@ -91,9 +91,9 @@
                       (if (fl< d dist)
                           (loop pt ray (+ index 1) lst-len lst s h d)
                           (loop pt ray (+ index 1) lst-len lst surface hit dist)))))
-                (let ([disc  (fl- (sq b) (fl* 4.0 (fl* a c)))])
+                (let ([disc (fl- (sq b) (fl* 4.0 (fl* a c)))])
                   (if (flnegative? disc)
-                      (loop pt ray (+ index 1) lst-len lst surface hit dist)
+                      (loop pt ray (fx+ index 1) lst-len lst surface hit dist)
                       (let ([discrt  (flsqrt disc)]
                             (minus-b  (fl- b))
                             (two-a  (fl* 2.0 a)))
@@ -102,10 +102,10 @@
                           (let ([h (make-point (fl+ (point-x pt) (fl* n xr))
                                                (fl+ (point-y pt) (fl* n yr))
                                                (fl+ (point-z pt) (fl* n zr)))])
-                            (let ([d  (distance h pt)])
+                            (let ([d (distance h pt)])
                               (if (fl< d dist)
-                                  (loop pt ray (+ index 1) lst-len lst s h d)
-                                  (loop pt ray (+ index 1) lst-len lst surface hit dist))))))))))))))
+                                  (loop pt ray (fx+ index 1) lst-len lst s h d)
+                                  (loop pt ray (fx+ index 1) lst-len lst surface hit dist))))))))))))))
 
 
 (define (lambert s int ray)
@@ -144,10 +144,10 @@
         (defsphere 32 0.0 -300.0 -1200.0 200.0 0.8)
         (defsphere 31 -80.0 -150.0 -1200.0 200.0 0.7)
         (defsphere 30 70.0 -100.0 -1200.0 200.0 0.9)
-        (do ((x -2 (+ x 1)))
-            ((> x 2))
-          (do ((z 2 (+ z 1)))
-              ((> z 7))
+        (do ((x -2 (fx+ x 1)))
+            ((fx> x 2))
+          (do ((z 2 (fx+ z 1)))
+              ((fx> z 7))
             (defsphere
               (unbox counter)
               (fl* (exact->inexact x) 200.0)
