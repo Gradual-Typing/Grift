@@ -62,7 +62,7 @@
           [int (vector-ref x 1)])
       (if s
           (fl* (lambert s int ray)
-               (sphere-color s))
+		 (sphere-color s))
           0.0))))
 
 (define (loop pt ray index lst-len lst surface hit dist)
@@ -157,3 +157,5 @@
               0.75)
             (set-box! counter (- (unbox counter) 1))))))
     (tracer 1)))
+
+(main)

@@ -27,7 +27,17 @@ typedef struct{
   int64_t data[];
 } vect;
 
-vect* create (int64_t l1, int64_t l2){
+vect* create_code(int64_t l1, int64_t l2);
+
+typedef vect*(*create_code_t)(int64_t,int64_t);
+
+typedef struct{
+  create_code_t code;
+} create_clos;
+
+create_clos* create;
+
+vect* create_code(int64_t l1, int64_t l2){
   vect* x = GC_MALLOC((l1*l2 + 1) * sizeof(int64_t));
   x->size = l1*l2;
   for (int i = 0; i < l1; ++i){
@@ -38,8 +48,19 @@ vect* create (int64_t l1, int64_t l2){
   return x;
 }
 
-vect* mult(vect* x, int x1, int x2,
-	   vect* y, int y1, int y2){
+vect* mult_code(vect* x, int64_t x1, int64_t x2,
+		vect* y, int64_t y1, int64_t y2);
+
+typedef vect*(*mult_code_t)(vect*,int64_t,int64_t,vect*,int64_t,int64_t);
+
+typedef struct{
+  mult_code_t code;
+} mult_clos;
+
+mult_clos* mult;
+
+vect* mult_code(vect* x, int64_t x1, int64_t x2,
+		vect* y, int64_t y1, int64_t y2){
   int64_t tmp1;
   int64_t tmp2;
   int64_t tmp3;
@@ -65,10 +86,16 @@ int main(){
 
   GC_INIT();
 
-  vect* a = create (ar,ac);
-  vect* b = create (br,bc);
+  create = GC_MALLOC(sizeof(create_clos));
+  create->code = create_code;
+
+  mult = GC_MALLOC(sizeof(mult_clos));
+  mult->code = mult_code;
+
+  vect* a = create->code(ar,ac);
+  vect* b = create->code(br,bc);
   
-  vect* r = mult(a, ar, ac, b, br, bc);
+  vect* r = mult->code(a, ar, ac, b, br, bc);
   int64_t rf;
   vector_ref(rf,r,(ar*bc)-1);
   printf ("%" PRId64 " ",rf);

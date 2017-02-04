@@ -33,15 +33,28 @@
 
 (define eye : (Tuple Float Float Float) (make-point #i0.0 #i0.0 #i200.0))
 
-(define (tracer [res : Int]) : Unit
+(define (tracer [res : Int]) : ()
   (let ([extent : Int (* res 100)])
-    (repeat (y 0 extent) (_ : Unit ())
-      (repeat (x 0 extent) (_ : Unit ())
-        (color-at
-         (fl+ #i-50.0
-              (fl/ (int->float x) (int->float res)))
-         (fl+ #i-50.0
-              (fl/ (int->float y) (int->float res))))))))
+    (begin
+      (display-char #\P)
+      (print-int 2)
+      (display-char #\space)
+      (print-int extent)
+      (display-char #\space)
+      (print-int extent)
+      (display-char #\space)
+      (print-int 255)
+      (display-char #\newline)
+      (repeat (y 0 extent) (_ : Unit ())
+        (repeat (x 0 extent) (_ : Unit ())
+          (begin
+            (print-int
+             (color-at
+              (fl+ #i-50.0
+                   (fl/ (int->float x) (int->float res)))
+              (fl+ #i-50.0
+                   (fl/ (int->float y) (int->float res)))))
+            (display-char #\newline)))))))
 
 (define (color-at [x : Float] [y : Float]) : Int
   (let ([ray : (Tuple Float Float Float)

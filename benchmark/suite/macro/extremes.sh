@@ -5,8 +5,6 @@ trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 declare -r PRECISION=5
 TIMEFORMAT=%R
 
-# function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
-
 # $1 - baseline system
 # $2 - benchmark filename without extension
 # $3 - space-separated benchmark arguments
@@ -125,10 +123,13 @@ run_experiment()
     echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
-    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "blackscholes" "$bs_bc_arg" ""
+    local tak_bc_arg="\"$(cat "${INPUT_DIR}/tak/slow.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "tak" "$tak_bc_arg" ""
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "ray" "" ""
+
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "blackscholes" "$bs_bc_arg" ""
     
     run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "400" ""
     
