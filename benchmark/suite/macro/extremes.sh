@@ -123,6 +123,9 @@ run_experiment()
     echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
+    local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/slow.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "array" "$arr_bc_arg" ""
+    
     local tak_bc_arg="\"$(cat "${INPUT_DIR}/tak/slow.txt")\""
     run_benchmark $baseline_system_static $baseline_system_dynamic "tak" "$tak_bc_arg" ""
 
