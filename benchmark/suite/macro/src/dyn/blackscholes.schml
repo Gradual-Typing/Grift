@@ -85,7 +85,7 @@
 (define number-of-runs : Dyn 100)
 (define number-of-options : Dyn (read-int))
 
-(define fake-data : Dyn
+(define fake-data : (Tuple Dyn Dyn Dyn Dyn Dyn Dyn Dyn Dyn Dyn)
   (tuple #i0 #i0 #i0 #i0 #i0 #i0 #\P #i0 #i0))
 
 (define data
@@ -99,15 +99,15 @@
 
 ;; This seems really dumb but I am doing it because
 ;; this is the way the original benchmark did it.
-(define spots : Dyn (vector number-of-options #i0))
-(define strikes : Dyn (vector number-of-options #i0))
-(define rates : Dyn (vector number-of-options #i0))
-(define volatilities : Dyn (vector number-of-options #i0))
-(define otypes : Dyn (vector number-of-options 0))
+(define spots : Dyn (vector number-of-options (: #i0 Dyn)))
+(define strikes : Dyn (vector number-of-options (: #i0 Dyn)))
+(define rates : Dyn (vector number-of-options (: #i0 Dyn)))
+(define volatilities : Dyn (vector number-of-options (: #i0 Dyn)))
+(define otypes : Dyn (vector number-of-options (: 0 Dyn)))
 (define otimes : Dyn
   ;; This is done this way to prevent the unit value
   ;; from printing out at the top level.
-  (let ([otimes : Dyn (vector number-of-options #i0)])
+  (let ([otimes : Dyn (vector number-of-options (: #i0 Dyn))])
     (begin
       (repeat (i 0 number-of-options) (_ : Dyn ())
               ;; We really need define-type!
@@ -126,7 +126,7 @@
       otimes)))
 
 (define prices : Dyn
-  (let ([prices : Dyn (vector number-of-options #i0)])
+  (let ([prices : Dyn (vector number-of-options (: #i0 Dyn))])
     (begin
       (repeat (j 0 number-of-runs) (_ : Dyn ())
        (repeat (i 0 number-of-options) (_ : Dyn ())
