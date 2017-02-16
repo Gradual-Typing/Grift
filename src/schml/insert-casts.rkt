@@ -266,10 +266,14 @@
           (define lbl (mk-label "mvector index" size-src))
           (Mvector (mk-cast size-src lbl size size-ty INT-TYPE) e t)]
          [else (Mvector size e t)])]
-      [(Mvector-ref (app ic-expr e1) (app ic-expr e2))
-       (Mvector-ref e1 e2)]
-      [(Mvector-set! (app ic-expr e1) (app ic-expr e2) (app ic-expr e3))
-       (Mvector-set! e1 e2 e3)]
+      [(Mvector-ref (app ic-expr e) (and (Ann _ (cons i-src i-ty)) (app ic-expr i)))
+       (if (Dyn? i-ty)
+           (Mvector-ref e (mk-cast i-src (mk-label "mvector-ref index" i-src) i i-ty INT-TYPE))
+           (Mvector-ref e i))]
+      [(Mvector-set! (app ic-expr e1) (and (Ann _ (cons i-src i-ty)) (app ic-expr i)) (app ic-expr e2))
+       (if (Dyn? i-ty)
+           (Mvector-set! e1 (mk-cast i-src (mk-label "mvector-ref index" i-src) i i-ty INT-TYPE) e2)
+           (Mvector-set! e1 i e2))]
       [(Mvector-refT (and (Ann _ (cons e-src e-ty)) (app ic-expr e))
                      (and (Ann _ (cons i-src i-ty)) (app ic-expr i))
                      t)
