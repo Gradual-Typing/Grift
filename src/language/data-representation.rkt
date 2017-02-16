@@ -4,12 +4,13 @@
 (provide (all-defined-out))
 
 (define-syntax (define-constants stx)
-    (syntax-case stx ()
-      [(_ (name val) ...)
-       (with-syntax ([(lname ...) (map (lambda (x) (format-id stx "l:~a" x)) (syntax->list #'(name ...)))])
+  (syntax-case stx ()
+    [(_ (name val) ...)
+     (let ([fmt (lambda (x) (format-id stx "data:~a" x))])
+       (with-syntax ([(fmt-name ...) (map fmt (syntax->list #'(name ...)))])
          #'(begin
-             (define lname val) ...
-             (define name (Quote lname)) ...))]))
+             (define fmt-name val) ...
+             (define name (Quote fmt-name)) ...)))]))
 
 (define-constants
   ;; types
@@ -22,6 +23,7 @@
   (TYPE-BOOL-RT-VALUE  #b010111)
   (TYPE-UNIT-RT-VALUE  #b011111)
   (TYPE-FLOAT-RT-VALUE #b100111)
+  (TYPE-CHAR-RT-VALUE  #b101111)
   ;; function type representation
   (TYPE-FN-TAG                    #b000)
   (TYPE-FN-ARITY-INDEX            0)
@@ -96,6 +98,7 @@
   (DYN-INT-TAG                    #b001)
   (DYN-BOOL-TAG                   #b111)
   (DYN-UNIT-TAG                   #b010)
+  (DYN-CHAR-TAG                   #b011)
   (DYN-IMDT-SHIFT                 3)
   ;; allocated dynamic value representation
   (DYN-BOX-SIZE                   2)

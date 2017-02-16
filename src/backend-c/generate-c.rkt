@@ -80,38 +80,38 @@
 ;; TODO make these C Macros
 (define-values (timer-start timer-stop timer-report timer-boiler-plate)
   (cond
-   [(timer-uses-process-time?)
-    (values
-     "timer_started = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_start_time)"
-     "timer_stopped = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_stop_time)"
-     "timer_report()"
-     (concat-string-literal
-     "//This is the global state for the timer\n"
-     "struct timespec timer_start_time;\n"
-     "struct timespec timer_stop_time;\n"
-     "struct timespec timer_result_time;\n"
-     "int timer_started = 1;\n"
-     "int timer_stopped = 1;\n\n"
-     "void timer_report(){\n\n"
-     "    // some very minor error checking\n"
-     "    if(timer_started){\n"
-     "        printf(\"error starting timer\");\n"
-     "        exit(-1);\n"
-     "    }\n"
-     "    if(timer_stopped){\n"
-     "        printf(\"error stopping timer\");\n"
-     "        exit(-1);\n"
-     "    }\n\n"
-     "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_nsec / 1.0e9);\n"
-     "double t2 = timer_stop_time.tv_sec  + (timer_stop_time.tv_nsec  / 1.0e9);\n"
-     "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
-     "}\n"))]
-   [else
-    (values
-     "timer_started = gettimeofday(&timer_start_time, NULL)"
-     "timer_stopped = gettimeofday(&timer_stop_time, NULL)"
-     "timer_report()"
-     (concat-string-literal
+    [(timer-uses-process-time?)
+     (values
+      "timer_started = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_start_time)"
+      "timer_stopped = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer_stop_time)"
+      "timer_report()"
+      (concat-string-literal
+       "//This is the global state for the timer\n"
+       "struct timespec timer_start_time;\n"
+       "struct timespec timer_stop_time;\n"
+       "struct timespec timer_result_time;\n"
+       "int timer_started = 1;\n"
+       "int timer_stopped = 1;\n\n"
+       "void timer_report(){\n\n"
+       "    // some very minor error checking\n"
+       "    if(timer_started){\n"
+       "        printf(\"error starting timer\");\n"
+       "        exit(-1);\n"
+       "    }\n"
+       "    if(timer_stopped){\n"
+       "        printf(\"error stopping timer\");\n"
+       "        exit(-1);\n"
+       "    }\n\n"
+       "double t1 = timer_start_time.tv_sec + (timer_start_time.tv_nsec / 1.0e9);\n"
+       "double t2 = timer_stop_time.tv_sec  + (timer_stop_time.tv_nsec  / 1.0e9);\n"
+       "printf(\"time (sec): %lf\\n\", t2 - t1);\n"
+       "}\n"))]
+    [else
+     (values
+      "timer_started = gettimeofday(&timer_start_time, NULL)"
+      "timer_stopped = gettimeofday(&timer_stop_time, NULL)"
+      "timer_report()"
+      (concat-string-literal
        "//This is the global state for the timer\n"
        "struct timeval timer_start_time;\n"
        "struct timeval timer_stop_time;\n"
@@ -152,8 +152,8 @@
   ;; TODO remove this and C-DECLATIONS definition if this works
   #;(newline)
   #;(for ([d : String C-DECLARATIONS])
-    (display d)
-    (newline))
+      (display d)
+      (newline))
   (newline)
   (display timer-boiler-plate)
   (newline))
@@ -272,7 +272,7 @@
             (display " else ")
             (emit-block '() a)
             (newline))]
-        [(Switch t c* d)
+    [(Switch t c* d)
      (begin (display "switch (") (emit-value t) (display "){\n")
             (for ([c c*])
               (let loop : Void ([l* (car c)])
@@ -313,6 +313,10 @@
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Quote (? inexact-real? f))  (printf "float_to_imdt(~a)" f)]
+    [(Quote (? char? c))
+     (if (<= 0 (char->integer c) 255)
+         (printf "'\\x~a'" (number->string (char->integer c) 16))
+         (error 'generate-c/quote-char "currently only supports ASCII"))]
     [(Quote k)            (print k)]
     ;; TODO Consider changing how Halt is handled
     [(Halt)           (display "exit(-1),-1")]
@@ -382,7 +386,7 @@
 (define-type Caster  (Emitter -> Void))
 
 (: emit-easy-op :
-   (Listof D5-Value) (U 'infix-op 'function 'identity) String
+   (Listof D5-Value) Implementation-Type String
    (Listof Caster) (Listof Caster) -> Void)
 (define (emit-easy-op args type op arg-cast return-cast)
   (define (expr-th)
@@ -399,6 +403,9 @@
        (display op) (sequence emit-e.c e.c* display "(" "" "," "" ")")]
       [('identity (list e) (list c))
        (c (thunk (emit-value e)))]
+      [('prefix-op (list e1) (list c1))
+       (display #\space) (display op) (display #\space)
+       (c1 (thunk (emit-value e1)))]
       [(other wi se) (error 'emit-easy-op/expr-th "unmatched ~v" other)]))
   (emit-wrap
    (if (pair? return-cast)
@@ -410,62 +417,94 @@
 (: imdt->float Caster)
 (define (imdt->float th) (display "imdt_to_float")(emit-wrap (th)))
 
+(: imdt->float->int Caster)
+(define (imdt->float->int th)
+  (emit-wrap (display IMDT-C-TYPE))
+  (display "imdt_to_float") (emit-wrap (th)))
+
+(: imdt->int->float Caster)
+(define (imdt->int->float th)
+  (display "float_to_imdt")
+  (emit-wrap (emit-wrap (display "double"))
+             (emit-wrap (th))))
+
 (: no-cast Caster)
 (define (no-cast th) (th))
 (define imdt->int   no-cast)
 (define int->imdt   no-cast)
 (define bool->imdt  no-cast)
+(define imdt->bool  no-cast)
+(define char->imdt  no-cast)
+(define imdt->char  no-cast)
 (: imdt->string Caster)
 (define (imdt->string th) (display "(char*)") (th))
-(define-type  IMPL (List (U 'function 'infix-op 'identity) String (Listof Caster) (Listof Caster)))
+(define-type Implementation-Type (U 'function 'infix-op 'prefix-op 'identity))
+(define-type  IMPL
+  (List Implementation-Type String (Listof Caster) (Listof Caster)))
 (define prim-impl : (HashTable Symbol IMPL)
   ;; TODO If we keep types we could drop these type casts at primitives and
   ;; possibly generate cleaner more understandable code.
   ;; A possible intermediate step would be to generate this table from
   ;; a operator giving type information
   (make-immutable-hash
-   `((+          infix-op "+"     (,imdt->int ,imdt->int) (,int->imdt))
-     (-          infix-op "-"     (,imdt->int ,imdt->int) (,int->imdt))
-     (*          infix-op "*"     (,imdt->int ,imdt->int) (,int->imdt))
-     (%<<        infix-op "<<"    (,imdt->int ,imdt->int) (,int->imdt))
-     (%>>        infix-op ">>"    (,imdt->int ,imdt->int) (,int->imdt))
-     (%/         infix-op "/"     (,imdt->int ,imdt->int) (,int->imdt))
-     (%%         infix-op "%"     (,imdt->int ,imdt->int) (,int->imdt))
-     (binary-and infix-op "&"     (,imdt->int ,imdt->int) (,int->imdt))
-     (binary-or  infix-op "|"     (,imdt->int ,imdt->int) (,int->imdt))
-     (binary-xor infix-op "^"     (,imdt->int ,imdt->int) (,int->imdt))
-     (<          infix-op "<"     (,imdt->int ,imdt->int) (,bool->imdt))
-     (<=         infix-op "<="    (,imdt->int ,imdt->int) (,bool->imdt))
-     (=          infix-op "=="    (,imdt->int ,imdt->int) (,bool->imdt))
-     (>          infix-op ">"     (,imdt->int ,imdt->int) (,bool->imdt))
-     (>=         infix-op ">="    (,imdt->int ,imdt->int) (,bool->imdt))
-     (fl+        infix-op "+"     (,imdt->float ,imdt->float) (,float->imdt))
-     (fl-        infix-op "-"     (,imdt->float ,imdt->float) (,float->imdt))
-     (fl*        infix-op "*"     (,imdt->float ,imdt->float) (,float->imdt))
-     (fl/        infix-op "/"     (,imdt->float ,imdt->float) (,float->imdt))
-     (flmodulo   function "fmod"  (,imdt->float ,imdt->float) (,float->imdt))
-     (fl<        infix-op "<"     (,imdt->float ,imdt->float) (,bool->imdt))
-     (fl<=       infix-op "<="    (,imdt->float ,imdt->float) (,bool->imdt))
-     (fl=        infix-op "=="    (,imdt->float ,imdt->float) (,bool->imdt))
-     (fl>        infix-op ">"     (,imdt->float ,imdt->float) (,bool->imdt))
-     (fl>=       infix-op ">="    (,imdt->float ,imdt->float) (,bool->imdt))
-     (flabs      function "fabs"  (,imdt->float) (,float->imdt))
-     (flfloor    function "floor" (,imdt->float) (,float->imdt))
-     (flceiling  function "ceil"  (,imdt->float) (,float->imdt))
-     (flcos      function "cos"   (,imdt->float) (,float->imdt))
-     (fltan      function "tan"   (,imdt->float) (,float->imdt))
-     (flasin     function "asin"  (,imdt->float) (,float->imdt))
-     (flacos     function "acos"  (,imdt->float) (,float->imdt))
-     (flatan     function "atan"  (,imdt->float) (,float->imdt))
-     (flatan2    function "atan2" (,imdt->float ,imdt->float) (,float->imdt)) 
-     (fllog      function "log"   (,imdt->float) (,float->imdt))
-     (flexp      function "exp"   (,imdt->float) (,float->imdt))
-     (flsqrt     function "sqrt"  (,imdt->float) (,float->imdt))
-     (Print      function "printf"  (,imdt->string) ())
-     (Exit       function "exit"  (,no-cast) ())
-     (int->float identity "none"  (,imdt->float) ())
-     (read-int   function "read_int"   () (,int->imdt))
-     (read-float function "read_float" () (,float->imdt)))))
+   `((+          infix-op  "+"     (,imdt->int ,imdt->int) (,int->imdt))
+     (-          infix-op  "-"     (,imdt->int ,imdt->int) (,int->imdt))
+     (*          infix-op  "*"     (,imdt->int ,imdt->int) (,int->imdt))
+     (%<<        infix-op  "<<"    (,imdt->int ,imdt->int) (,int->imdt))
+     (%>>        infix-op  ">>"    (,imdt->int ,imdt->int) (,int->imdt))
+     (%/         infix-op  "/"     (,imdt->int ,imdt->int) (,int->imdt))
+     (%%         infix-op  "%"     (,imdt->int ,imdt->int) (,int->imdt))
+     (binary-and infix-op  "&"     (,imdt->int ,imdt->int) (,int->imdt))
+     (binary-or  infix-op  "|"     (,imdt->int ,imdt->int) (,int->imdt))
+     (binary-xor infix-op  "^"     (,imdt->int ,imdt->int) (,int->imdt))
+     (<          infix-op  "<"     (,imdt->int ,imdt->int) (,bool->imdt))
+     (<=         infix-op  "<="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (=          infix-op  "=="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (>          infix-op  ">"     (,imdt->int ,imdt->int) (,bool->imdt))
+     (>=         infix-op  ">="    (,imdt->int ,imdt->int) (,bool->imdt))
+     (and        infix-op  "&&"    (,imdt->bool ,imdt->bool) (,bool->imdt))
+     (or         infix-op  "||"    (,imdt->bool ,imdt->bool) (,bool->imdt))
+     (quotient   infix-op  "/"     (,imdt->int ,imdt->int) (,int->imdt))
+     (fl+        infix-op  "+"     (,imdt->float ,imdt->float) (,float->imdt))
+     (fl-        infix-op  "-"     (,imdt->float ,imdt->float) (,float->imdt))
+     (fl*        infix-op  "*"     (,imdt->float ,imdt->float) (,float->imdt))
+     (fl/        infix-op  "/"     (,imdt->float ,imdt->float) (,float->imdt))
+     (flmodulo   function  "fmod"  (,imdt->float ,imdt->float) (,float->imdt))
+     (flmin      function  "fmin"  (,imdt->float ,imdt->float) (,float->imdt))
+     (flmax      function  "fmax"  (,imdt->float ,imdt->float) (,float->imdt))
+     (fl<        infix-op  "<"     (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl<=       infix-op  "<="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl=        infix-op  "=="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl>        infix-op  ">"     (,imdt->float ,imdt->float) (,bool->imdt))
+     (fl>=       infix-op  ">="    (,imdt->float ,imdt->float) (,bool->imdt))
+     (flquotient infix-op  "/"     (,imdt->float ,imdt->float) (,int->imdt))
+     (flround    function  "round" (,imdt->float) (,float->imdt))
+     (flnegate   prefix-op "-"    (,imdt->float) (,float->imdt))
+     (flabs      function  "fabs"  (,imdt->float) (,float->imdt))
+     (flfloor    function  "floor" (,imdt->float) (,float->imdt))
+     (flceiling  function  "ceil"  (,imdt->float) (,float->imdt))
+     (flcos      function  "cos"   (,imdt->float) (,float->imdt))
+     (fltan      function  "tan"   (,imdt->float) (,float->imdt))
+     (flsin      function  "sin"   (,imdt->float) (,float->imdt))
+     (flasin     function  "asin"  (,imdt->float) (,float->imdt))
+     (flacos     function  "acos"  (,imdt->float) (,float->imdt))
+     (flatan     function  "atan"  (,imdt->float) (,float->imdt))
+     (flatan2    function  "atan2" (,imdt->float ,imdt->float) (,float->imdt)) 
+     (fllog      function  "log"   (,imdt->float) (,float->imdt))
+     (flexp      function  "exp"   (,imdt->float) (,float->imdt))
+     (flsqrt     function  "sqrt"  (,imdt->float) (,float->imdt))
+     (Print      function  "printf"  (,imdt->string) ())
+     (Exit       function  "exit"  (,no-cast) ())
+     (int->float identity  "none"  (,imdt->int->float) ())
+     (float->int identity  "none"  (,imdt->float->int) ())
+     (read-int   function  "read_int"   () (,int->imdt))
+     (read-float function  "read_float" () (,float->imdt))
+     (read-char  function  "read_ascii_char" () (,char->imdt))
+     (print-char function  "print_ascii_char" (,imdt->char) ())
+     (display-char function "display_ascii_char" (,imdt->char) ())
+     (int->char  identity   "none"  (,imdt->char) ())
+     (char->int  identity   "none"  (,char->imdt) ()))))
+
 (define (easy-p? [s : Symbol]) : Boolean
   (if (hash-ref prim-impl s #f) #t #f))
 (define (easy-p->impl [s : Symbol]) : IMPL
@@ -497,6 +536,9 @@
                 (display ", ")
                 (display "imdt_to_float")
                 (emit-wrap (emit-value f)))]
+    [('print-int (list d))
+     (display "printf")
+     (emit-wrap (display "\"%ld\",") (emit-value d))]
     [('Printf (cons fmt exp*))
      (begin (display "printf")
             (emit-wrap
@@ -518,8 +560,8 @@
     [('timer-report (list)) (display timer-report)]
     [((? easy-p? (app easy-p->impl (list t s a* r))) e*)
      (emit-easy-op e* t s a* r)]
-    [(other wise) (error 'backend-c/generate-c/emit-op "unmatched value")]))
-
+    [(other wise)
+     (error 'backend-c/generate-c/emit-op "unmatched value ~a" other)]))
 
 
 ;;(: emit-primitive-value (->  Void))

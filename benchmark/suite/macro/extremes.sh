@@ -1,262 +1,216 @@
 #!/bin/sh
-set -euo pipefail
+set -uo pipefail
+trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
-loops=20
-precision=4
-schml_mem_limit1=999999
-schml_mem_limit2=999999
-schml_mem_limit3=999999
-# --------------------------------------------------------------------
-# quicksort worstcase parameters
-quicksort_worstcase_array_len=10000
-
-# quicksort bestcase parameters
-quicksort_bestcase_array_len=10000
-
-# matrix multiplication parameters
-matmult_mat_side_len=300
-
-# --------------------------------------------------------------------
-date=`date +%Y_%m_%d_%H_%M_%S`
-
-schmldir=$SCHML_DIR
-testdir=$schmldir/benchmark/suite/macro
-extremesdir=$testdir/extremes/$date
-datadir=$extremesdir/data
-outdir=$extremesdir/output
-tmpdir=$extremesdir/tmp
-miscdir=$testdir/misc
-srcdir=$testdir/src
-paramfile=$extremesdir/params.txt
+declare -r PRECISION=5
 TIMEFORMAT=%R
-#---------------------------------------------------------------------
 
-# scaling racket and gambit timing from milliseconds to seconds
-c1=$(echo "1/1000" | bc -l)
-
-schml_regex="sed -n 's/.*): \\([0-9]\\+\\)/\\1/p'"
-
-# create the result directory if it does not exist
-mkdir -p $datadir
-mkdir -p $tmpdir
-mkdir -p $outdir
-
-# copying the benchmarks to a temporary directory
-cp -r $srcdir/* $tmpdir
-
-printf "Date\t\t:%s\n" "$date" >> $paramfile
-MYEMAIL="`id -un`@`hostname -f`"
-printf "Machine\t\t:%s\n" "$MYEMAIL" >> $paramfile
-schml_ver=$(git rev-parse HEAD)
-printf "Schml ver.\t:%s\n" "$schml_ver" >> $paramfile
-clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-printf "Clang ver.\t:%s\n" "$clang_ver" >> $paramfile
-gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-printf "Gambit ver.\t:%s\n" "$gambit_ver" >> $paramfile
-racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
-printf "Racket ver.\t:%s\n" "$racket_ver" >> $paramfile
-
-
-# ---------------------------------
-# preparing the quicksort worstcase benchmark
-benchmark=quicksort_worstcase
-
-printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
-printf "Arg_array_len\t:%s\n" "$quicksort_worstcase_array_len" >> $paramfile
-
-benchmark_rkt="$tmpdir/rkt/$benchmark"
-raco make $benchmark_rkt.rkt
-quicksort_worstcase_rkt_command="racket $benchmark_rkt.rkt $quicksort_worstcase_array_len"
-
-benchmark_clang="$tmpdir/c/$benchmark"
-clang $benchmark_clang.c -O3 -o $benchmark_clang.o
-quicksort_worstcase_clang_command="$benchmark_clang.o $quicksort_worstcase_array_len"
-
-benchmark_gambit="$tmpdir/gambit/$benchmark"
-gsc -exe -cc-options -O3 $benchmark_gambit.scm
-quicksort_worstcase_gambit_command="$benchmark_gambit $quicksort_worstcase_array_len"
-
-quicksort_worstcase_schml_arg=$quicksort_worstcase_array_len
-
-# ---------------------------------
-# preparing the quicksort bestcase benchmark
-benchmark=quicksort_bestcase
-
-printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
-printf "Arg_array_len\t:%s\n" "$quicksort_bestcase_array_len" >> $paramfile
-
-benchmark_rkt="$tmpdir/rkt/$benchmark"
-raco make $benchmark_rkt.rkt
-quicksort_bestcase_rkt_command="racket $benchmark_rkt.rkt $quicksort_bestcase_array_len"
-
-benchmark_clang="$tmpdir/c/$benchmark"
-clang $benchmark_clang.c -O3 -o $benchmark_clang.o
-quicksort_bestcase_clang_command="$benchmark_clang.o $quicksort_bestcase_array_len"
-
-benchmark_gambit="$tmpdir/gambit/$benchmark"
-gsc -exe -cc-options -O3 $benchmark_gambit.scm
-quicksort_bestcase_gambit_command="$benchmark_gambit $quicksort_bestcase_array_len"
-
-quicksort_bestcase_schml_arg=$quicksort_bestcase_array_len
-
-s=""
-f=""
-n=$(($quicksort_bestcase_array_len-1))
-for i in `seq 0 $n`; do
-    # x=$(perl -e 'print int rand $quicksort_bestcase_array_len, "\n"; ')
-    x=$(( ( RANDOM % $quicksort_bestcase_array_len )  + 1 ))
-    f="$f\n$x"
-    s="$s\n(gvector-set! a $i $x)"
-done
-
-echo -e $f > $tmpdir/nums
-
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/static/$benchmark.schml
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/partial/$benchmark.schml
-echo "s/INITIALIZE-VECTOR/$s/" | sed -f - -i  $tmpdir/dyn/$benchmark.schml
-
-# ---------------------------------
-# preparing the matmult benchmark
-benchmark=matmult
-
-printf "Benchmark\t:%s\n" "$benchmark" >> $paramfile
-printf "Mat_side_len\t:%s\n" "$matmult_mat_side_len" >> $paramfile
-
-benchmark_rkt="$tmpdir/rkt/$benchmark"
-raco make $benchmark_rkt.rkt
-matmult_rkt_command="racket $benchmark_rkt.rkt $matmult_mat_side_len"
-
-benchmark_clang="$tmpdir/c/$benchmark"
-clang $benchmark_clang.c -O3 -o $benchmark_clang.o
-matmult_clang_command="$benchmark_clang.o $matmult_mat_side_len"
-
-benchmark_gambit="$tmpdir/gambit/$benchmark"
-gsc -exe -cc-options -O3 $benchmark_gambit.scm
-matmult_gambit_command="$benchmark_gambit $matmult_mat_side_len"
-
-matmult_schml_arg=$matmult_mat_side_len
-#---------------------------------------------------------------------
-
-# compiling all Schml source files
-cd $schmldir
-racket $schmldir/benchmark/benchmark.rkt $tmpdir/static/ $schml_mem_limit1
-racket $schmldir/benchmark/benchmark.rkt $tmpdir/partial/ $schml_mem_limit2
-racket $schmldir/benchmark/benchmark.rkt $tmpdir/dyn/ $schml_mem_limit3
-
-avg()
+# $1 - baseline system
+# $2 - benchmark filename without extension
+# $3 - space-separated benchmark arguments
+# $4 - aux name
+# $5 - static/dyn/partial
+# $6 - logfile full path
+write_schml_slowdowns()
 {
-    local avg_sum=0
-    local avg_i
-    # echo $1
-    for avg_i in `seq $loops`; do
-	avg_t=$(eval $1)
-	avg_sum=$(echo "scale=$precision;$avg_sum+$avg_t" | bc)
+    local baseline_system="$1"; shift
+    local name="$1";            shift
+    local benchmark_args="$1";  shift
+    local disk_aux_name="$1";   shift
+    local dir="$1";             shift
+    local logfile="$1";         shift
+    
+    local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+    for config_index in ${configs[@]}; do
+	get_schml_slowdown $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
+	echo -n ,$RETURN >> $logfile
     done
-    RETURN=$(echo "scale=$precision;$avg_sum/$loops" | bc)
-    # echo $RETURN
+    printf "\n" >> $logfile
 }
 
-function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
+# $1 - static baseline system
+# $2 - dynamic baseline system
+# $3 - benchmark filename without extension
+# $4 - space-separated benchmark arguments
+# $5 - aux name
+run_benchmark()
+{
+    local baseline_system_static="$1";  shift
+    local baseline_system_dynamic="$1"; shift
+    local name="$1";                    shift
+    local benchmark_args="$1";          shift
+    local aux_name="$1";                shift
 
-in=0
-for f in $tmpdir/static/*.schml; do
-    path="${f%.*}";name=$(basename "$path")
-    # parameters are benchmark dependent
-    if [ "$name" = "quicksort_worstcase" ]; then
-	command1=$quicksort_worstcase_rkt_command
-	command2=$quicksort_worstcase_clang_command
-	command3=$quicksort_worstcase_gambit_command
-	schml_arg=$quicksort_worstcase_schml_arg
-    elif [ "$name" = "quicksort_bestcase" ]; then
-	command1=$quicksort_bestcase_rkt_command
-	command2=$quicksort_bestcase_clang_command
-	command3=$quicksort_bestcase_gambit_command
-	schml_arg=$quicksort_bestcase_schml_arg
-    elif [ "$name" = "matmult" ]; then
-	command1=$matmult_rkt_command
-	command2=$matmult_clang_command
-	command3=$matmult_gambit_command
-	schml_arg=$matmult_schml_arg
+    local logfile1="${DATA_DIR}/static.log"
+    local logfile2="${DATA_DIR}/dyn.log"
+    local logfile3="${DATA_DIR}/partial.log"
+
+    local disk_aux_name="" print_aux_name=""
+    if [[ ! -z "${aux_name}" ]]; then
+	disk_aux_name="_${aux_name}"
+	print_aux_name="(${aux_name})"
     fi
+
+    local benchmark_args_file="${TMP_DIR}/${name}${disk_aux_name}.args"
+    if [ -f benchmark_args_file ]; then
+	benchmark_args=$(cat "$benchmark_args_file")
+    else
+	printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
+	printf "Args\t\t:%s\n" "$benchmark_args" >> "$PARAMS_LOG"
+	echo "$benchmark_args" > "$benchmark_args_file"
+    fi
+
+    echo -n "$name$print_aux_name" >> "$logfile1"
+    write_schml_slowdowns $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
+    get_slowdown gambit $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
+    echo -n "$name$print_aux_name",$RETURN >> $logfile2
+    get_slowdown chezscheme $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
+    echo -n ,$RETURN >> $logfile2
+    write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
+
+    # local partial_path="${TMP_DIR}/partial/${name}"
+    # if [ -f "${partial_path}.schml" ]; then
+    # 	echo -n "$name$print_aux_name" >> "$logfile3"
+    # 	write_schml_slowdowns $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
+    # fi
     
-    path="${f%.*}";name=$(basename "$path")
-    logfile1=$datadir/${name}1.log
-    logfile2=$datadir/${name}1.csv
-    logfile3=$datadir/${name}2.log
-    logfile4=$datadir/${name}2.csv
+    echo "finished ${name}${print_aux_name}"
+}
 
-
-    names[$in]=$(echo $name | tr _ " " | sed -e "s/\b\(.\)/\u\1/g" | tr " " "-")
-
-    cd $tmpdir
-    c="$command1 | sed -n 's/cpu time: \\([0-9]*\\) .*/\\1/p;q' | awk -v c="$c1" -v p="$precision" '{printf(\"%.*f\\n\", p,(\$1*c))}'"
-    avg "$c"
-    rkt[$in]=$RETURN
-
-    c="$command2 | $schml_regex"
-    avg "$c"
-    clang[$in]=$RETURN
+# $1 - static or dyn
+gen_fig()
+{
+    local mode="$1"; shift
     
-    c="$command3 | sed -n '3,3s/ *\\([0-9]*\\).*/\\1/p' | awk -v c="$c1" -v p="$precision"  '{printf(\"%.*f\\n\",p, \$1*c)}'"
-    avg "$c"
-    gambit[$in]=$RETURN
+    local logfile="${DATA_DIR}/${mode}.log"
+    local outfile="${OUT_DIR}/${mode}.png"
+    local N=$(head -1 "${logfile}" | sed 's/[^,]//g' | wc -c)
+
+    rm -rf "$outfile"
     
-    c="echo $schml_arg | $tmpdir/static/$name.o1 | $schml_regex"
-    avg "$c"
-    sc1[$in]=$RETURN
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+      	   `"enhanced color font 'Verdana,10' ;"`
+    	   `"set output '${outfile}';"`
+	   `"set border 15 back;"`
+           `"set style data histogram;"`
+           `"set style histogram cluster gap 1;"`
+           `"set style fill pattern border -1;"`
+           `"set boxwidth 0.9;"`
+	   `"set key left;"`
+           `"set title \"\";"`
+	   `"set yrange [0:];"`
+	   `"set xtic rotate by -45 scale 0;"`
+	   `"set grid ytics;"`
+           `"set ytics add (\"0\" 0, \"1\" 1);"`
+           `"plot '${logfile}' using 2:xtic(1) title col,"`
+      	   `"for [i=3:$N] \"\" using i title columnheader(i)"
+}
 
-    c="echo $schml_arg | $tmpdir/partial/$name.o1 | $schml_regex"
-    avg "$c"
-    sc2[$in]=$RETURN
 
-    c="echo $schml_arg | $tmpdir/dyn/$name.o1 | $schml_regex"
-    avg "$c"
-    sc3[$in]=$RETURN
+# $1 - static baseline system
+# $2 - dynamic baseline system
+run_experiment()
+{
+    local baseline_system_static="$1";  shift
+    local baseline_system_dynamic="$1"; shift
     
-    c="echo $schml_arg | $tmpdir/static/$name.o2 | $schml_regex"
-    avg "$c"
-    stb1[$in]=$RETURN
+    local logfile1="${DATA_DIR}/static.log"
+    local logfile2="${DATA_DIR}/dyn.log"
+    local logfile3="${DATA_DIR}/partial.log"
 
-    c="echo $schml_arg | $tmpdir/partial/$name.o2 | $schml_regex"
-    avg "$c"
-    stb2[$in]=$RETURN
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -a)
+    echo "name,${config_str}" > "$logfile1"
+    echo "name,gambit,chezscheme,${config_str}" > "$logfile2"
+    echo "name,${config_str}" > "$logfile3"
+
+    local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/slow.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "array" "$arr_bc_arg" ""
     
-    c="echo $schml_arg | $tmpdir/dyn/$name.o2 | $schml_regex"
-    avg "$c"
-    stb3[$in]=$RETURN
+    local tak_bc_arg="\"$(cat "${INPUT_DIR}/tak/slow.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "tak" "$tak_bc_arg" ""
+
+    run_benchmark $baseline_system_static $baseline_system_dynamic "ray" "" ""
+
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "blackscholes" "$bs_bc_arg" ""
     
-    echo "finished " ${names[$in]}
-    let in=in+1
-done
+    run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "400" ""
+    
+    local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" "worstcase"
 
-header=$(printf '|l%.0s' eval {1..$in})
+    run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
 
-namesx=$(join \& ${names[@]})
-clangx=$(join \& ${clang[@]})
-stb1x=$(join \& ${stb1[@]})
-sc1x=$(join \& ${sc1[@]})
-stb2x=$(join \& ${stb2[@]})
-sc2x=$(join \& ${sc2[@]})
-stb3x=$(join \& ${stb3[@]})
-sc3x=$(join \& ${sc3[@]})
-rktx=$(join \& ${rkt[@]})
-gambitx=$(join \& ${gambit[@]})
-i1=$((in+1))
+    run_benchmark $baseline_system_static $baseline_system_dynamic "n-body" "100000" ""
 
-echo "\begin{tabular}{|l$header|}
-\hline
-                   & \multicolumn{$in}{c|}{Time(s)} \\\ \hline
-                   & $namesx    \\\ \hline
-\multicolumn{$i1}{|c|}{Statically typed}                         \\\ \hline
-Clang C            & $clangx       \\\ \hline
-Schml              & $stb1x        \\\ \hline
-Schml (coercions)  & $sc1x        \\\ \hline
-\multicolumn{$i1}{|c|}{Partially typed}                          \\\ \hline
-Schml              & $stb2x         \\\ \hline
-Schml (coercions)  & $sc2x         \\\ \hline
-\multicolumn{$i1}{|c|}{Dynamically typed}                        \\\ \hline
-Gambit Scheme      & $gambitx        \\\ \hline
-Racket             & $rktx        \\\ \hline
-Schml              & $stb3x         \\\ \hline
-Schml (coercions)  & $sc3x         \\\ \hline
-\end{tabular}" > $outdir/extremes.tex
+    gen_fig static
+    gen_fig dyn
+    # gen_fig partial
+}
+
+main()
+{
+    USAGE="Usage: $0 loops"
+    if [ "$#" == "0" ]; then
+	echo "$USAGE"
+	exit 1
+    fi
+    LOOPS="$1";          shift
+    local date="$1";     shift
+
+    if [ "$date" == "fresh" ]; then
+	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
+    else
+	declare -r DATE="$date"
+	if [ ! -d "$SCHML_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
+	    echo "Directory not found"
+	    exit 1
+	fi
+    fi
+
+    SCHML_DIR=${SCHML_DIR:=`pwd`/../../..}
+    
+    declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
+    declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
+    declare -r DATA_DIR="$EXP_DIR/data"
+    declare -r OUT_DIR="$EXP_DIR/output"
+    declare -r TMP_DIR="$EXP_DIR/tmp"
+    declare -r SRC_DIR="$TEST_DIR/src"
+    declare -r INPUT_DIR="$TEST_DIR/inputs"
+    declare -r PARAMS_LOG="$EXP_DIR/params.txt"
+
+    # create the result directory if it does not exist
+    mkdir -p "$DATA_DIR"
+    mkdir -p "$TMP_DIR"
+    mkdir -p "$OUT_DIR"
+
+    . "lib/runtime.sh"
+
+    cd "$SCHML_DIR"
+
+    if [ "$date" == "fresh" ]; then
+	# copying the benchmarks to a temporary directory
+	cp -r ${SRC_DIR}/* $TMP_DIR
+
+	# logging
+	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
+	MYEMAIL="`id -un`@`hostname -f`"
+	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
+	schml_ver=$(git rev-parse HEAD)
+	printf "Schml ver.\t:%s\n" "$schml_ver" >> "$PARAMS_LOG"
+	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
+	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+	printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
+	racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
+	printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
+	chezscheme_ver=$(scheme --version 2>&1)
+	printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
+	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
+    fi
+
+    run_experiment get_c_runtime get_racket_runtime
+    echo "done."
+}
+
+main "$@"

@@ -228,7 +228,8 @@
       [(Type-MRef-Huh (app ll-expr e)) (Type-MRef-Huh e)]
       [(Type-MRef-Of (app ll-expr e)) (Type-MRef-Of e)]
       [(Mvector (app ll-expr e1) (app ll-expr e2) t) (Mvector e1 e2 t)]
-      [(Mvector-size (app ll-expr e)) (Mvector-size e)]
+      [(Mvector-length (app ll-expr e)) (Mvector-length e)]
+      [(Unguarded-Vect-length e) (Unguarded-Vect-length (ll-expr e))]
       [(Mvector-val-set! (app ll-expr e1) (app ll-expr e2) (app ll-expr e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app ll-expr e1) (app ll-expr e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-rtti-set! u (app ll-expr e)) (Mvector-rtti-set! u e)]
@@ -257,7 +258,7 @@
       [(Type-Tuple-num e) (Type-Tuple-num (ll-expr e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (ll-expr t1) (ll-expr t2) (ll-expr lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (ll-expr e1) (ll-expr e2))]
-      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (ll-expr e))]
+      [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (ll-expr e))]
       [other (error 'll-expr "~a" other)]))
 
 ;; recur through a code binding

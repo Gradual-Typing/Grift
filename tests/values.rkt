@@ -1,11 +1,16 @@
 #lang typed/racket/base
 
 (require racket/port
-         "../src/helpers.rkt")
+         racket/match
+         (rename-in (only-in racket/base char?)
+                    [char? r:char?])
+         (prefix-in s: (submod "../src/logging.rkt" typed)))
 
 (provide (all-defined-out))
 
-(define-type Test-Value (U blame bool int unit dyn gbox mbox mvect tuple gvect function debug))
+(define-type Test-Value
+  (U blame bool int unit float char
+     dyn gbox mbox mvect tuple gvect function debug))
 
 (struct not-lbl ([value : String])
   #:transparent)
@@ -15,6 +20,10 @@
 (struct bool ([value : Boolean])
   #:transparent)
 (struct int ([value : Integer])
+  #:transparent)
+(struct char ([value : Char]) 
+  #:transparent)
+(struct float ([value : Float])
   #:transparent)
 (struct dyn ()
   #:transparent)
@@ -37,14 +46,19 @@
 
 (: value=? (Any Any . -> . Boolean))
 (define (value=? x y)
+  (: atomic-value=? : Any Any -> Boolean)
+  (define (atomic-value=? x y)
+    (or (and (blame? x) (blame? y) (blame=? x y))
+        (and (unit? x) (unit? y))
+        (and (bool? x) (bool? y) (bool=? x y))
+        (and (int? x) (int? y) (int=? x y))
+        (and (char? x) (char? y) (char=? x y))
+        (and (float? x) (float? y) (float=? x y))))
   (or (cond
-        [(debug? x) (begin (logging value=? (All) "~v" y) #t)]
-        [(debug? y) (begin (logging value=? (All) "~v" x) #t)]
+        [(debug? x) (s:debug y #t)]
+        [(debug? y) (s:debug x #t)]
         [else #f])
-      (and (blame? x) (blame? y) (blame=? x y))
-      (and (unit? x) (unit? y))
-      (and (bool? x) (bool? y) (bool=? x y))
-      (and (int? x) (int? y) (int=? x y))
+      (atomic-value=? x y)
       (and (gbox? x) (gbox? y))
       (and (gvect? x) (gvect? y))
       (and (mbox? x) (mbox? y))
@@ -79,6 +93,14 @@
 (define (int=? x y)
   (equal? (int-value x) (int-value y)))
 
+(: char=? (char char -> Boolean))
+(define (char=? x y)
+  (equal? (char-value x) (char-value y)))
+
+(: float=? (float float -> Boolean))
+(define (float=? x y)
+  (equal? (float-value x) (float-value y)))
+
 #| capture the output of exp on current-output-port and match
    as if it were returning a value from one of our compiled
    programs.
@@ -87,24 +109,42 @@
 
 (: parse-observable (String -> Test-Value))
 (define (parse-observable s)
-  (logging parse-observable (All) s)
-  (cond
-    [(regexp-match #rx".*Int : (-?[0-9]+)" s) =>
-     (lambda (r)
-       (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
-    [(regexp-match #rx".*Bool : #(t|f)" s) =>
-     (lambda (r)
-       (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
-    [(regexp-match #rx".*Function : \\?" s) (function)]
-    [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
-    [(regexp-match #rx".*GReference : \\?" s) (gbox)]
-    [(regexp-match #rx".*GVector : \\?" s) (gvect)]
-    [(regexp-match #rx".*GArray : \\?" s) (gvect)]
-    [(regexp-match #rx".*MReference : \\?" s) (mbox)]
-    [(regexp-match #rx".*MVector : \\?" s) (mvect)]
-    [(regexp-match #rx".*Tuple : \\?" s) (tuple)]
-    [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
-    [else (blame #f s)]))
+  (define who 'parse-observable)
+  (s:debug
+   who
+   s
+   (cond
+     [(regexp-match #px".*Int : (-?[0-9]+)" s) =>
+      (lambda (r) 
+        (int (cast (string->number (cadr (cast r (Listof String)))) Integer)))]
+     [(regexp-match #px".*Bool : #(t|f)" s) =>
+      (lambda (r)
+        (bool (not (equal? "f" (cadr (cast r (Listof String)))))))]
+     [(regexp-match #px"Char : (#\\\\\\S+)" s) =>
+      (lambda (r)
+        (: realize : String -> Any)
+        (define (realize c) (call-with-input-string c read))
+        (match r
+          [(list r (? string? (app realize (? r:char? c)))) (char c)]
+          [_ (blame #f (format "parse-observable: failed to parse ~a" s))]))]
+     [(regexp-match #px".*Float : (-?\\d+.\\d+)" s) =>
+      (lambda (r)
+        (define r->f real->double-flonum)
+        (define s->n string->number)
+        (match r
+          [(list _ (? string? (app s->n (? real? (app r->f f)))))
+           (float f)]
+          [_ (blame #f (format "parse-observable: failed to parse ~a" s))]))] 
+     [(regexp-match #rx".*Function : \\?" s) (function)]
+     [(regexp-match #rx".*Dynamic : \\?" s) (dyn)]
+     [(regexp-match #rx".*GReference : \\?" s) (gbox)]
+     [(regexp-match #rx".*GVector : \\?" s) (gvect)]
+     [(regexp-match #rx".*GArray : \\?" s) (gvect)]
+     [(regexp-match #rx".*MReference : \\?" s) (mbox)]
+     [(regexp-match #rx".*MVector : \\?" s) (mvect)]
+     [(regexp-match #rx".*Tuple : \\?" s) (tuple)]
+     [(regexp-match #rx".*Unit : \\(\\)" s) (unit)]
+     [else (blame #f s)])))
 
 (define-syntax-rule (observe exp)
   (let ([s (call-with-output-string 
@@ -113,5 +153,5 @@
                               [current-error-port p])
                  exp
                  (flush-output p))))])
-    (logging observe () "~v" s)
-    (parse-observable s)))
+    (define who 'observe)
+    (s:debug who s (parse-observable s))))

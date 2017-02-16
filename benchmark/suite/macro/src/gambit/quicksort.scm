@@ -1,53 +1,48 @@
-#!/u/dalmahal/bin/bin/gsi-script -:d0
+#!gsi-script -:d0
 
-(declare
- (fixnum)
- (standard-bindings))
+(define (sort a p r)
+  (if (fx< p r)
+      (let ([q (partition a p r)])
+	(begin
+	  (sort a p (fx- q 1))
+	  (sort a (fx+ q 1) r)))
+      0))
 
-(define (readlines p sep)
-  (let loop ((line (read-line p sep))
-	     (result '()))
-    (if (eof-object? line)
-	(let ([a (reverse (cdr result))])
-	  (cons (car a) (list->vector (cdr a))))
-	(loop (read-line p sep) (cons (string->number line) result)))))
+(define (partition a p r)
+  (let ([i (box (fx- p 1))]
+	[x (vector-ref a r)])
+    (begin
+      (let loop ([j p])
+	(if (< j r)
+	    (begin
+	      (if (<= (vector-ref a j) x)
+		  (begin
+		    (set-box! i (fx+ (unbox i) 1))
+		    (swap a (unbox i) j))
+		  0)
+	      (loop (fx+ j 1)))
+            0))
+      (swap a (fx+ (unbox i) 1) r)
+      (fx+ (unbox i) 1))))
+
+(define (swap a i j)
+  (if (fx= i j)
+      0
+      (let ([t (vector-ref a i)])
+	(begin
+	  (vector-set! a i (vector-ref a j))
+	  (vector-set! a j t)
+	  0))))
 
 (define (main)
-  (let* ([a (readlines (current-input-port) #\ )]
-	 [size (car a)]
-	 [arr (cdr a)])
-    (letrec ([sort (lambda (a p r)
-		     (if (< p r)
-			 (let ([q (partition a p r)])
-			   (begin
-			     (sort a p (- q 1))
-			     (sort a (+ q 1) r)))
-			 0))]
-	     [partition (lambda (a p r)
-			  (let ([i (box (- p 1))]
-				[x (vector-ref a r)])
-			    (begin
-			      (let loop ([j p])
-				(if (< j r)
-				    (begin
-				      (if (<= (vector-ref a j) x)
-					  (begin
-					    (set-box! i (+ (unbox i) 1))
-					    (swap a (unbox i) j))
-					  0)
-				      (loop (+ j 1)))))
-			      (swap a (+ (unbox i) 1) r)
-			      (+ (unbox i) 1))))]
-	     
-	     [swap (lambda (a i j)
-		     (if (= i j)
-			 0
-			 (let ([t (vector-ref a i)])
-			   (begin
-			     (vector-set! a i (vector-ref a j))
-			     (vector-set! a j t)
-			     0))))]
-	     [init (lambda (n a) (if (= n 0) a (begin (vector-set! a (- 10000 n) n) (init (- n 1) a))))])
+  (let ([size (read)])
+    (let ([a (make-vector size 1)])
       (begin
-	(sort arr 0 (- size 1))
-	(pretty-print (vector-ref arr (- size 1)))))))
+	(let loop ([i 0])
+	  (if (< i size)
+	      (begin
+		(vector-set! a i (read))
+		(loop (fx+ i 1)))
+	      0))
+	(sort a 0 (fx- size 1))
+	(pretty-print (vector-ref a (fx- size 1)))))))

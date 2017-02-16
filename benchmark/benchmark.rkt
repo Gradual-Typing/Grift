@@ -13,188 +13,70 @@
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
-(define (compile-directory compile-dir)
+(define (guarded-compile src i cast ref)
+  (let* ([exe (path-replace-extension
+               src
+               (string-append ".o" (number->string i)))])
+    (parameterize ([specialize-cast-code-generation? #f])
+      (if (not (file-exists? exe))
+          (begin
+            (printf "~a\n" exe)
+            (compile src #:output exe #:cast cast #:ref ref))
+          (void)))))
+
+(define configs
+  (call-with-input-file "benchmark/configs.dat"
+    (lambda (in) (read in))))
+
+(define (compile-file f i)
+  (apply guarded-compile (cons f (cons i (hash-ref configs i)))))
+
+(define (compile-file-all-configs f)
+  (for ([i (in-range 1 (+ (hash-count configs) 1))])
+    (compile-file f i)))
+
+(define (compile-directory-all-configs compile-dir)
   ;; The directory should exist if we are going to compile it
   (unless (directory-exists? compile-dir)
-    (error 'compile-directory "no such directory ~a" compile-dir))
+    (error 'compile-directory-all-configs "no such directory ~a" compile-dir))
 
-  ;; Don't store the files output on top of the of the source
-  ;; put them in a sub directory so that it is easier to delete
-  ;; alternatively we should put them in a user specified place.
-  (define c-dir (build-path compile-dir "c"))
-
-  ;; if the output path exists make sure it is a directory
-  ;; otherwise make the output directory.
-  (cond
-    [(file-exists? c-dir)
-     (error 'compiler-directory "not a directory ~a" compile-dir)]
-    [(not (directory-exists? c-dir)) (make-directory c-dir)])
+  ;; ;; if the output path exists make sure it is a directory
+  ;; ;; otherwise make the output directory.
+  ;; (cond
+  ;;   [(file-exists? c-dir)
+  ;;    (error 'compiler-directory "not a directory ~a" compile-dir)]
+  ;;   [(not (directory-exists? c-dir)) (make-directory c-dir)])
 
   ;; We are currently only supporting .schml files
   (define (schml-file? path-searched)
     (equal? #"schml" (filename-extension path-searched)))
-
-  (debug compile-dir c-dir)
   
   ;; Iterate over all schml files in directory and
   ;; compile them to 
   (for ((fl (find-files schml-file? compile-dir)))
     (debug fl)
-    (define file-name (file-name-from-path fl))
-
-    (define (renaming-output-files suffix)
-      (define out-file (path-replace-suffix file-name suffix))
-      (define c-file (path-add-suffix out-file #".c"))
-      (values (build-path compile-dir out-file) (build-path c-dir c-file)))
-
-    ;; config 01: no gc, guarded references, coercions, and close coded
-    ;; config 02: no gc, guarded references, type-based and close coded
-    ;; config 03: no gc, guarded references, coercions and open coded
-    ;; config 04: no gc, guarded references, type-based and open coded
-    ;; config 05: no gc, monotonic references, type-based and close coded
-    ;; config 06: no gc, monotonic references, type-based and close coded
-    ;; config 07: no gc, monotonic references, coercions and open coded
-    ;; config 08: no gc, monotonic references, type-based and open coded
-    ;; config 09: boehm, guarded references, coercions, and close coded
-    ;; config 10: boehm, guarded references, type-based and close coded
-    ;; config 11: boehm, guarded references, coercions and open coded
-    ;; config 12: boehm, guarded references, type-based and open coded
-    ;; config 13: boehm, monotonic references, coercions and close coded
-    ;; config 14: boehm, monotonic references, type-based and close coded
-    ;; config 15: boehm, monotonic references, coercions and open coded
-    ;; config 16: boehm, monotonic references, type-based and open coded
-    (define-values (nogc-guarded-coercion-closecoded-f-o nogc-guarded-coercion-closecoded-f-c) (renaming-output-files #".o1"))
-    (define-values (nogc-guarded-twosome-closecoded-f-o nogc-guarded-twosome-closecoded-f-c)   (renaming-output-files #".o2"))
-    (define-values (nogc-guarded-coercion-opencoded-f-o nogc-guarded-coercion-opencoded-f-c) (renaming-output-files #".o3"))
-    (define-values (nogc-guarded-twosome-opencoded-f-o nogc-guarded-twosome-opencoded-f-c)   (renaming-output-files #".o4"))
-    (define-values (nogc-mono-coercion-closecoded-f-o nogc-mono-coercion-closecoded-f-c) (renaming-output-files #".o5"))
-    (define-values (nogc-mono-twosome-closecoded-f-o nogc-mono-twosome-closecoded-f-c)   (renaming-output-files #".o6"))
-    (define-values (nogc-mono-coercion-opencoded-f-o nogc-mono-coercion-opencoded-f-c) (renaming-output-files #".o7"))
-    (define-values (nogc-mono-twosome-opencoded-f-o nogc-mono-twosome-opencoded-f-c)   (renaming-output-files #".o8"))
-    (define-values (boehm-guarded-coercion-closecoded-f-o boehm-guarded-coercion-closecoded-f-c) (renaming-output-files #".o9"))
-    (define-values (boehm-guarded-twosome-closecoded-f-o boehm-guarded-twosome-closecoded-f-c)   (renaming-output-files #".o10"))
-    (define-values (boehm-guarded-coercion-opencoded-f-o boehm-guarded-coercion-opencoded-f-c) (renaming-output-files #".o11"))
-    (define-values (boehm-guarded-twosome-opencoded-f-o boehm-guarded-twosome-opencoded-f-c)   (renaming-output-files #".o12"))
-    (define-values (boehm-mono-coercion-closecoded-f-o boehm-mono-coercion-closecoded-f-c) (renaming-output-files #".o13"))
-    (define-values (boehm-mono-twosome-closecoded-f-o boehm-mono-twosome-closecoded-f-c)   (renaming-output-files #".o14"))
-    (define-values (boehm-mono-coercion-opencoded-f-o boehm-mono-coercion-opencoded-f-c) (renaming-output-files #".o15"))
-    (define-values (boehm-mono-twosome-opencoded-f-o boehm-mono-twosome-opencoded-f-c)   (renaming-output-files #".o16"))
-    (compile fl
-             #:output nogc-guarded-coercion-closecoded-f-o
-             #:keep-c nogc-guarded-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Guarded
-             #:gc     'None)
-    (compile fl
-             #:output nogc-guarded-twosome-closecoded-f-o
-             #:keep-c nogc-guarded-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Guarded
-             #:gc     'None)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output nogc-guarded-coercion-opencoded-f-o
-               #:keep-c nogc-guarded-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Guarded
-               #:gc     'None)
-      (compile fl
-               #:output nogc-guarded-twosome-opencoded-f-o
-               #:keep-c nogc-guarded-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Guarded
-               #:gc     'None))
-    (compile fl
-             #:output nogc-mono-coercion-closecoded-f-o
-             #:keep-c nogc-mono-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Monotonic
-             #:gc     'None)
-    (compile fl
-             #:output nogc-mono-twosome-closecoded-f-o
-             #:keep-c nogc-mono-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Monotonic
-             #:gc     'None)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output nogc-mono-coercion-opencoded-f-o
-               #:keep-c nogc-mono-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Monotonic
-               #:gc     'None)
-      (compile fl
-               #:output nogc-mono-twosome-opencoded-f-o
-               #:keep-c nogc-mono-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Monotonic
-               #:gc     'None))
-    (compile fl
-             #:output boehm-guarded-coercion-closecoded-f-o
-             #:keep-c boehm-guarded-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Guarded
-             #:gc     'Boehm)
-    (compile fl
-             #:output boehm-guarded-twosome-closecoded-f-o
-             #:keep-c boehm-guarded-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Guarded
-             #:gc     'Boehm)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output boehm-guarded-coercion-opencoded-f-o
-               #:keep-c boehm-guarded-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Guarded
-               #:gc     'Boehm)
-      (compile fl
-               #:output boehm-guarded-twosome-opencoded-f-o
-               #:keep-c boehm-guarded-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Guarded
-               #:gc     'Boehm))
-    (compile fl
-             #:output boehm-mono-coercion-closecoded-f-o
-             #:keep-c boehm-mono-coercion-closecoded-f-c
-             #:cast   'Coercions
-             #:ref    'Monotonic
-             #:gc     'Boehm)
-    (compile fl
-             #:output boehm-mono-twosome-closecoded-f-o
-             #:keep-c boehm-mono-twosome-closecoded-f-c
-             #:cast   'Type-Based
-             #:ref    'Monotonic
-             #:gc     'Boehm)
-    (parameterize ([specialize-cast-code-generation? #t])
-      (compile fl
-               #:output boehm-mono-coercion-opencoded-f-o
-               #:keep-c boehm-mono-coercion-opencoded-f-c
-               #:cast   'Coercions
-               #:ref    'Monotonic
-               #:gc     'Boehm)
-      (compile fl
-               #:output boehm-mono-twosome-opencoded-f-o
-               #:keep-c boehm-mono-twosome-opencoded-f-c
-               #:cast   'Type-Based
-               #:ref    'Monotonic
-               #:gc     'Boehm))))
+    (compile-file-all-configs fl)))
 
 (module+ main
+  (define config-index? (make-parameter 0))
   (c-flags (cons "-O3" (c-flags)))
   (command-line
    #:once-each
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
-   #:args (directory ;; memory-limit
-                     )
-
-   ;; set the default memory limit for the compiler
-   ;; (init-heap-kilobytes
-   ;;  (or (string->number memory-limit)
-   ;;      (error 'command-line
-   ;;             "couldn't parse ~a as a number" memory-limit)))
-   (compile-directory
-    (or (string->path directory)
-        (error 'benchmark-main "could parse ~v as a path" directory)))))
+   [("--config" "-i") i
+    "Compile a path with a single configuration, must be a number > 0"
+    (config-index? (string->number i))]
+   #:args (path)
+   (if (string->path path)
+       (cond
+         [(and (directory-exists? path) (> (config-index?) 0))
+          (compile-directory path (config-index?))]
+         [(directory-exists? path)
+          (compile-directory-all-configs path)]
+         [(and (file-exists? path) (> (config-index?) 0))
+          (compile-file path (config-index?))]
+         [(file-exists? path)
+          (compile-file-all-configs path)])
+       (error 'benchmark-main "could parse ~v as a path" path))))

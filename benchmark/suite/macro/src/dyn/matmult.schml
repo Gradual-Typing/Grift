@@ -1,43 +1,35 @@
+(define (create [l1 : Dyn] [l2 : Dyn]) : Dyn
+  (let ([x : Dyn
+           (vector (* l1 l2) (: 0 Dyn))])
+    (begin
+      (repeat (i 0 l1) (_ ())
+        (repeat (j 0 l2) (_ ())
+          (vector-set! x (+ (* l2 i) j) (+ j i))))
+      x)))
+
+(define (mult [x : Dyn]
+              [x1 : Dyn] [x2 : Dyn]
+              [y : Dyn]
+              [y1 : Dyn] [y2 : Dyn]) : Dyn
+              (let ([r : Dyn (vector (* y2 x1) (: 0 Dyn))])
+                (begin
+                  (repeat (i 0 x1) (_ ())
+                    (repeat (j 0 y2) (_ ())
+                      (repeat (k 0 y1) (_ ())
+                        (vector-set! r (+ (* i y2) j)
+                                     (+ (vector-ref r (+ (* i y2) j))
+                                        (* (vector-ref x (+ (* i x2) k))
+                                           (vector-ref y (+ (* k y2) j))))))))
+                  r)))
+
 (let ([size : Dyn (read-int)])
   (let ([ar : Dyn size]
 	[ac : Dyn size]
 	[br : Dyn size]
 	[bc : Dyn size])
     (if (= ac br)
-	(letrec ([create : (Dyn Dyn -> Dyn)
-                         (lambda ([l1 : Dyn] [l2 : Dyn]) : Dyn
-                           (let ([x : Dyn
-                                    (vector l1 (vector l2 0))])
-                             (begin
-                               (repeat (i 0 l1) (_ ())
-                                       (let ([xi : Dyn (vector l2 0)])
-                                         (begin
-                                           (repeat (j 0 l2) (_ ())
-                                                   (vector-set! xi j (+ j i)))
-                                           (vector-set! x i xi))))
-                               x)))]
-                 [mult : (Dyn Dyn Dyn Dyn Dyn -> Dyn)
-                       (lambda ([x : Dyn]
-                                [x1 : Dyn]
-                                [y : Dyn]
-                                [y1 : Dyn] [y2 : Dyn]) : Dyn
-                         (let ([r : Dyn (vector ar (vector bc 0))])
-                           (begin
-                             (repeat (i 0 x1) (_ ())
-                                     (let ([ri : Dyn (vector y2 0)])
-                                       (begin
-                                         (repeat (j 0 y2) (_ ())
-                                                 (repeat (k 0 y1) (_ ())
-                                                         (vector-set! ri j
-                                                                       (+ (vector-ref ri j)
-                                                                          (* (vector-ref (vector-ref x i) k)
-                                                                             (vector-ref (vector-ref y k) j))))))
-                                         (vector-set! r i ri))))
-                             r)))])
-	  (let ([a : Dyn (create ar ac)]
-		[b : Dyn (create br bc)]
-		[bx : Dyn (box 0)])
-	    (begin
-	      (time (box-set! bx (vector-ref (vector-ref (mult a ar b br bc) (- ar 1)) (- ac 1))))
-	      (unbox bx))))
+	(let ([a : Dyn (create ar ac)]
+              [b : Dyn (create br bc)]
+              [bx : (Ref Dyn) (box 0)])
+          (time (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1))))
 	0)))

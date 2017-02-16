@@ -26,6 +26,6 @@
    (test-file "monovectors" "mvect7-7.schml" (int 42))
    ;; (test-file "monovectors" "mvect8.schml" (int 42))
    (test-file "monovectors" "mvect9.schml" (bool #f))
-   (test-file "monovectors" "mvect12.schml" (int 42))
+   (test-file "monovectors" "mvect12.schml" (int 100))
    (test-file "monovectors" "mvect13.schml" (int 42))
    ))

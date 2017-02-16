@@ -43,6 +43,7 @@
      (MvectorS E E)
      (Mvector-set! E E E)
      (Mvector-ref E E)
+     (Mvector-length E)
      ;; Guarded effects
      (Gbox E)
      (Gunbox E)
@@ -50,6 +51,7 @@
      (Gvector E E)
      (Gvector-set! E E E)
      (Gvector-ref E E)
+     (Gvector-length E)
      ;;
      (Create-tuple (Listof E))
      (Tuple-proj E Index)))

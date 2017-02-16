@@ -186,20 +186,24 @@ form, to the shortest branch of the cast tree that is relevant.
   (: gbox-set! : Gbox-setT)
   (: gvec-ref : Gvec-refT)
   (: gvec-set! : Gvec-setT)
+  (: gvec-length : Gvec-LengthT)
   (: bindings-needed-for-guarded : CoC3-Bnd-Code*)
   (define-values (gbox-ref gbox-set! gvec-ref gvec-set!
+                           gvec-length
                            bindings-needed-for-guarded)
     ;; First we create initialize the code generators
     (let ([gen-gbox-ref-code (make-gbox-ref-code interp-cast-call)]
           [gen-gbox-set!-code (make-gbox-set!-code interp-cast-call)]
           [gen-gvec-ref-code (make-gvect-ref-code interp-cast-call)]
-          [gen-gvec-set!-code (make-gvect-set!-code interp-cast-call)])
+          [gen-gvec-set!-code (make-gvect-set!-code interp-cast-call)]
+          [gen-gvec-length-code (make-gvect-length-code)])
       (cond
         [(inline-guarded-branch?)
          ;; we just hand back the code generators to build
          ;; inline code everywhere.
          (values gen-gbox-ref-code gen-gbox-set!-code
                  gen-gvec-ref-code gen-gvec-set!-code
+                 gen-gvec-length-code
                  '())]
         [else
          ;; If they are not inlined then the compiler generates
@@ -216,10 +220,13 @@ form, to the shortest branch of the cast tree that is relevant.
                [gvs   (next-uid! "rt_gvec_set")]
                [gvs-r (next-uid! "vec")]
                [gvs-i (next-uid! "ind")]
-               [gvs-v (next-uid! "val")])
+               [gvs-v (next-uid! "val")]
+               [gvl   (next-uid! "rt_gvec_len")]
+               [gvl-r (next-uid! "vec")])
            (values
             (apply-code gbr) (apply-code gbs)
             (apply-code gvr) (apply-code gvs)
+            (apply-code gvl)
             `([,gbr
                . ,(Code (list gbr-b) (gen-gbox-ref-code (Var gbr-b)))]
               [,gbs
@@ -231,7 +238,10 @@ form, to the shortest branch of the cast tree that is relevant.
               [,gvs
                . ,(Code (list gvs-r gvs-i gvs-v)
                     (gen-gvec-set!-code (Var gvs-r) (Var gvs-i)
-                                        (Var gvs-v)))])))])))
+                                        (Var gvs-v)))]
+              [,gvl
+               . ,(Code (list gvl-r)
+                    (gen-gvec-length-code (Var gvl-r)))])))])))
 
 
   (: dyn-fn-app : Dyn-Fn-AppT)
@@ -329,7 +339,7 @@ form, to the shortest branch of the cast tree that is relevant.
     (interpret-casts-in-expr
      next-uid!
      interp-cast-uid interp-cast compose-coercions make-coercion
-     gbox-set! gbox-ref gvec-set! gvec-ref
+     gbox-set! gbox-ref gvec-set! gvec-ref gvec-length
      dyn-gbox-set! dyn-gbox-ref dyn-gvec-set! dyn-gvec-ref dyn-fn-app
      prgm-exp))
   
@@ -351,10 +361,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define ((make-cast-code next-uid! cast cast-u mk-crcn comp-crcn glbt copy-val-monoref) v c mono_type)
   (define who 'make-cast-code)
   (debug who v c)
-  ;; schml: /home/deyaa/mono/Schml/src/casts/interpret-casts-with-coercions.rkt:354:2:
-  ;; who='make-cast-code
-  ;; v=(Var (Uid "r0" 0))
-  ;; c=(Quote-Coercion (MonoVect (STuple 3 (list #0=(Int) #1=(Dyn) (MVect (STuple 3 (list #0# #0# #1#)))))))
 
   (define-syntax-let$* let$* next-uid!)
   ;; apply-cast is normally specified in terms of inspecting the
@@ -445,7 +451,7 @@ form, to the shortest branch of the cast tree that is relevant.
                            (list
                             (Mvector-rtti-set! a t3)
                             (let$* ([c (mk-crcn t1 t3 (Quote ""))]
-                                    [vn (Mvector-size val)])
+                                    [vn (Mvector-length val)])
                               (let* ([i-u (next-uid! "index")]
                                      [i (Var i-u)]
                                      [x (next-uid! "_")])
@@ -697,7 +703,7 @@ form, to the shortest branch of the cast tree that is relevant.
    (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
    (CoC3-Expr CoC3-Expr -> CoC3-Expr)
    (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-   Gbox-setT Gbox-refT Gvec-setT Gvec-refT
+   Gbox-setT Gbox-refT Gvec-setT Gvec-refT Gvec-LengthT
    Dyn-Gbox-setT Dyn-Gbox-refT
    Dyn-Gvec-setT Dyn-Gvec-refT
    Dyn-Fn-AppT
@@ -707,6 +713,7 @@ form, to the shortest branch of the cast tree that is relevant.
 (define (interpret-casts-in-expr next-uid!
                                  interp-uid interp-cast interp-compose mk-coercion
                                  gbox-set! gbox-ref gvect-set! gvect-ref
+                                 gvect-length
                                  dyn-gbox-set! dyn-gbox-ref
                                  dyn-gvec-set! dyn-gvec-ref
                                  dyn-fn-app
@@ -811,6 +818,11 @@ form, to the shortest branch of the cast tree that is relevant.
        (if (null? b*)
            (gvect-set! v^ i^ w^)
            (Let b* (gvect-set! v^ i^ w^)))]
+      [(Gvector-length e)
+       (if (Var? e)
+           (gvect-length e)
+           (let ([u (next-uid! "gvect")])
+             (Let (list (cons u (recur e))) (gvect-length (Var u)))))]
       [(Mbox (app recur e) t) (Mbox e t)]
       [(Munbox (app recur e)) (Mbox-val-ref e)]
       [(Mbox-set! (app recur e1) (app recur e2))
@@ -903,6 +915,7 @@ form, to the shortest branch of the cast tree that is relevant.
                (let ([val (next-uid! "write_cv")])
                  (Let (list (cons val e))
                    (mvect-set! addr i (Var val) (Var t1)))))))]
+      [(Mvector-length e) (Mvector-length (recur e))]
       
       ;; The translation of the dynamic operation 
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
@@ -1191,10 +1204,11 @@ form, to the shortest branch of the cast tree that is relevant.
 
 
 ;; Functions for use sites of guarded references with coercions
-(define-type Gbox-refT ((Var Uid) -> CoC3-Expr))
-(define-type Gbox-setT ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Gvec-refT ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Gvec-setT ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Gbox-refT    ((Var Uid) -> CoC3-Expr))
+(define-type Gbox-setT    ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Gvec-refT    ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Gvec-setT    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Gvec-LengthT ((Var Uid) -> CoC3-Expr))
 
 (: make-gbox-ref-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gbox-refT))
 (define ((make-gbox-ref-code cast) gref)
@@ -1220,6 +1234,12 @@ form, to the shortest branch of the cast tree that is relevant.
             (Ref-Coercion-Read (Guarded-Proxy-Coercion gref))
             (Quote 0))
       (Unguarded-Vect-Ref gref index)))
+
+(: make-gvect-length-code (-> Gvec-LengthT))
+(define ((make-gvect-length-code) gvect)
+  (If (Guarded-Proxy-Huh gvect)
+      (Unguarded-Vect-length (Guarded-Proxy-Ref gvect))
+      (Unguarded-Vect-length gvect)))
 
 (: make-gvect-set!-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gvec-setT))
 (define ((make-gvect-set!-code cast) gref index val)

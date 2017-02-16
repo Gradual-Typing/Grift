@@ -19,6 +19,7 @@
 ;; These keys are what are iterated over to control the benchmark
 (define tests               '(Ref RefOverhead Call CallOverhead))
 (define compilers           '(Gambit Coercions Type-Based))
+(define refs                '(Guarded Monotonic))
 (define dynamic-operations? '(#f #t))
 (define just-testing? (make-parameter #f))
 

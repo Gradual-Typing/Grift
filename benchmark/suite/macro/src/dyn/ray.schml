@@ -1,0 +1,182 @@
+;;; RAY -- Ray-trace a simple scene with spheres, generating a ".pgm" file.
+;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
+;;; And then translated to Schml by Deyaaeldeen Almahallawi
+
+(define (make-point [x : Dyn] [y : Dyn] [z : Dyn]) : Dyn
+  (tuple x y z))
+
+(define (point-x [p : Dyn]) : Dyn
+  (tuple-proj p 0))
+(define (point-y [p : Dyn]) : Dyn
+  (tuple-proj p 1))
+(define (point-z [p : Dyn]) : Dyn
+  (tuple-proj p 2))
+
+(define (sq [x : Dyn]) : Dyn
+  (fl* x x))
+
+(define (mag [x : Dyn] [y : Dyn] [z : Dyn]) : Dyn
+  (flsqrt (fl+ (sq x) (fl+ (sq y) (sq z)))))
+
+(define (unit-vector [x : Dyn] [y : Dyn] [z : Dyn]) : Dyn
+  (let ([d : Dyn (mag x y z)])
+    (make-point (fl/ x d) (fl/ y d) (fl/ z d))))
+
+(define (distance [p1 : Dyn] [p2 : Dyn]) : Dyn
+  (mag (fl- (point-x p1) (point-x p2))
+       (fl- (point-y p1) (point-y p2))
+       (fl- (point-z p1) (point-z p2))))
+
+(define *world* : (Vect (Tuple Dyn Dyn (Tuple Dyn Dyn Dyn)))
+  (vector 33 (tuple #i0 #i0 (tuple #i0 #i0 #i0))))
+
+(define eye : (Tuple Dyn Dyn Dyn) (make-point #i0.0 #i0.0 #i200.0))
+
+(define (tracer [res : Dyn]) : ()
+  (let ([extent : Dyn (* res 100)])
+    (begin
+      (display-char #\P)
+      (print-int 2)
+      (display-char #\space)
+      (print-int extent)
+      (display-char #\space)
+      (print-int extent)
+      (display-char #\space)
+      (print-int 255)
+      (display-char #\newline)
+      (repeat (y 0 extent) (_ : Dyn ())
+        (repeat (x 0 extent) (_ : Dyn ())
+          (begin
+            (print-int
+             (color-at
+              (fl+ #i-50.0
+                   (fl/ (int->float x) (int->float res)))
+              (fl+ #i-50.0
+                   (fl/ (int->float y) (int->float res)))))
+            (display-char #\newline)))))))
+
+(define (color-at [x : Dyn] [y : Dyn]) : Dyn
+  (let ([ray : Dyn
+             (unit-vector (fl- x (point-x eye))
+                          (fl- y (point-y eye))
+                          (flnegate (point-z eye)))])
+    (float->int (flround (fl* (sendray eye ray) #i255.0)))))
+
+(define (sendray [pt : Dyn]
+                 [ray : Dyn]) : Dyn
+                 (let ([x : Dyn
+                          (loop pt ray 0
+                                (vector-length *world*)
+                                *world*
+                                (: (tuple #i0 #i0 (tuple #i0 #i0 #i0))
+                                   (Tuple Dyn Dyn (Tuple Dyn Dyn Dyn)))
+                                (: (tuple #i0 #i0 #i0)
+                                   (Tuple Dyn Dyn Dyn))
+                                #i1e308)])
+                   (let ([s : Dyn (tuple-proj x 0)])
+                     (let ([int : Dyn (tuple-proj x 1)])
+                       (fl* (lambert s int ray)
+                            (sphere-color s))))))
+
+(define (loop
+         [pt : Dyn]
+         [ray : Dyn]
+         [index : Dyn]
+         [lst-len : Dyn]
+         [lst : Dyn]
+         [surface : Dyn]
+         [hit : Dyn]
+         [dist : Dyn]) : Dyn
+         (if (= index lst-len)
+             (tuple surface hit)
+             (let ([s : Dyn (vector-ref lst index)])
+               (let ([xr : Dyn (point-x ray)]
+                     [yr : Dyn (point-y ray)]
+                     [zr : Dyn (point-z ray)]
+                     [sc : Dyn (sphere-center s)])
+                 (let ([a : Dyn (fl+ (sq xr) (fl+ (sq yr) (sq zr)))]
+                       [b : Dyn (fl* #i2.0
+                                     (fl+ (fl* (fl- (point-x pt) (point-x sc)) xr)
+                                          (fl+ (fl* (fl- (point-y pt) (point-y sc)) yr)
+                                               (fl* (fl- (point-z pt) (point-z sc)) zr))))]
+                       [c : Dyn (fl+ (fl+ (sq (fl- (point-x pt) (point-x sc)))
+                                          (sq (fl- (point-y pt) (point-y sc))))
+                                     (fl+ (sq (fl- (point-z pt) (point-z sc)))
+                                          (flnegate (sq (sphere-radius s)))))])
+                   (if (fl= a #i0)
+                       (let ([n : Dyn (fl/ (flnegate c) b)])
+                         (let ([h : Dyn (make-point
+                                         (fl+ (point-x pt) (fl* n xr))
+                                         (fl+ (point-y pt) (fl* n yr))
+                                         (fl+ (point-z pt) (fl* n zr)))])
+                           (let ([d : Dyn (distance h pt)])
+                             (if (fl< d dist)
+                                 (loop pt ray (+ index 1) lst-len lst s h d)
+                                 (loop pt ray (+ index 1) lst-len lst surface hit dist)))))
+                       (let ([disc : Dyn (fl- (sq b) (fl* #i4.0 (fl* a c)))])
+                         (if (fl< disc #i0.0)
+                             (loop pt ray (+ index 1) lst-len lst surface hit dist)
+                             (let ([discrt : Dyn (flsqrt disc)]
+                                   (minus-b : Dyn (flnegate b))
+                                   (two-a : Dyn (fl* #i2.0 a)))
+                               (let ([n : Dyn (flmin (fl/ (fl+ minus-b discrt) two-a)
+                                                     (fl/ (fl- minus-b discrt) two-a))])
+                                 (let ([h : Dyn (make-point
+                                                 (fl+ (point-x pt) (fl* n xr))
+                                                 (fl+ (point-y pt) (fl* n yr))
+                                                 (fl+ (point-z pt) (fl* n zr)))])
+                                   (let ([d : Dyn (distance h pt)])
+                                     (if (fl< d dist)
+                                         (loop pt ray (+ index 1) lst-len lst s h d)
+                                         (loop pt ray (+ index 1) lst-len lst surface hit dist))))))))))))))
+
+
+(define (lambert [s : Dyn] [int : Dyn] [ray : Dyn]) : Dyn
+  (let ([n : Dyn (sphere-normal s int)])
+    (flmax #i0.0
+           (fl+ (fl* (point-x ray) (point-x n))
+                (fl+ (fl* (point-y ray) (point-y n))
+                     (fl* (point-z ray) (point-z n)))))))
+
+(define (make-sphere [color : Dyn] [radius : Dyn] [center : Dyn]) : Dyn
+  (tuple color radius center))
+
+(define (sphere-color [s : Dyn]) : Dyn
+  (tuple-proj s 0))
+(define (sphere-radius [s : Dyn]) : Dyn
+  (tuple-proj s 1))
+(define (sphere-center [s : Dyn]) : Dyn
+  (tuple-proj s 2))
+
+(define (defsphere
+          [i : Dyn]
+          [x : Dyn] [y : Dyn] [z : Dyn]
+          [r : Dyn] [c : Dyn]) : Dyn
+          (let ([s : Dyn (make-sphere c r (make-point x y z))])
+            (begin
+              (vector-set! *world* i s)
+              s)))
+
+(define (sphere-normal [s : Dyn] [pt : Dyn]) : Dyn
+  (let ([c : Dyn (sphere-center s)])
+    (unit-vector (fl- (point-x c) (point-x pt))
+                 (fl- (point-y c) (point-y pt))
+                 (fl- (point-z c) (point-z pt)))))
+
+(begin
+  (defsphere 32 #i0.0 #i-300.0 #i-1200.0 #i200.0 #i0.8)
+  (defsphere 31 #i-80.0 #i-150.0 #i-1200.0 #i200.0 #i0.7)
+  (defsphere 30 #i70.0 #i-100.0 #i-1200.0 #i200.0 #i0.9)
+  (let ([counter : (Ref Dyn) (box 29)])
+    (repeat (x -2 3) (_ : Dyn ())
+      (repeat (z 2 8) (_ : Dyn ())
+        (begin
+          (defsphere
+            (unbox counter)
+            (fl* (int->float x) #i200.0)
+            #i300.0
+            (fl* (int->float z) #i-400.0)
+            #i40.0
+            #i0.75)
+          (box-set! counter (- (unbox counter) 1))))))
+  (tracer 1))

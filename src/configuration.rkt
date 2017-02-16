@@ -30,7 +30,7 @@
 
 ;; Cast behavior 
 (: specialize-cast-code-generation? (Parameterof Boolean))
-(define specialize-cast-code-generation? (make-parameter #t))
+(define specialize-cast-code-generation? (make-parameter #f))
 
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof (Option Path))

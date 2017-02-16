@@ -19,6 +19,14 @@
    (test-file "core" "const-negative.schml" (int -5))
    (test-file "core" "const-ninetynine.schml" (int 99))
    (test-file "core" "const-larg-int.schml" (int 123456))
+   (test-file "core" "const-char-a.schml" (char #\a))
+   (test-file "core" "const-char-null.schml" (char #\nul))
+   (test-file "core" "let-const-char-z.schml" (char #\z))
+   ;; Primitive character operators
+   (test-file "core" "print-char-b.schml" (unit))
+   (test-file "core" "char-to-int.schml" (int 42))
+   (test-file "core" "int-to-char.schml" (char #\A))
+   
    ;; Primitive operators TODO (should add more to test corners)
    (test-file "core" "prim-plus.schml"  (int 10))
    (test-file "core" "prim-minus.schml" (int 10))

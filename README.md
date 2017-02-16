@@ -1,4 +1,6 @@
 # Schml A GTLC Compiler
+[![Build Status](https://travis-ci.org/akuhlens/schml.svg?branch=master)](https://travis-ci.org/akuhlens/schml)
+
 Welcome to the home of a compiler for the Gradually Typed Lambda 
 Calculus (GTLC). The compiler is intended to explore how different
 gradual typing semantics may be represented at runtime. It is currently
@@ -8,14 +10,6 @@ play with the runtime representation of objects freely.
 I will post some of the relavant paper here or in the wiki soon.
 
 ## Installation
-
-The package is known to install correctly with:
-+ Racket 6.1
-+ Racket 6.1.1
-
-There Are Known issues with
-+ Racket 6.2 (bug with contract generation)
-
 
 ```bash
 git clone git@github.com:akuhlens/schml

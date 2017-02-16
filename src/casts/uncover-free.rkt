@@ -209,6 +209,7 @@
      (values (Guarded-Proxy-Blames e) fv)]
     [(Guarded-Proxy-Coercion (app uf-expr e fv))
      (values (Guarded-Proxy-Coercion e) fv)]
+    [(Unguarded-Vect-length (app uf-expr e fv)) (values (Unguarded-Vect-length e) fv)]
     [(Mbox (app uf-expr e fv) t) (values (Mbox e t) fv)]
     [(Mbox-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Mbox-val-set! e1 e2) (set-union fv1 fv2))]
@@ -217,7 +218,7 @@
     [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) mt-set)]
     [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
      (values (Mvector e1 e2 t) (set-union fv1 fv2))]
-    [(Mvector-size (app uf-expr e fv)) (values (Mvector-size e) fv)]
+    [(Mvector-length (app uf-expr e fv)) (values (Mvector-length e) fv)]
     [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
      (values (Mvector-val-set! e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2))
@@ -270,7 +271,7 @@
      (values (Make-Tuple-Coercion uid e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Compose-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Compose-Tuple-Coercion uid e1 e2) (set-union fv1 fv2))]
-    [(Mediating-Coercion-Huh? (app uf-expr e fv)) (values (Mediating-Coercion-Huh? e) fv)]
+    [(Mediating-Coercion-Huh (app uf-expr e fv)) (values (Mediating-Coercion-Huh e) fv)]
     [other (error 'uncover-free "unmatched ~a" other)]))
 
 

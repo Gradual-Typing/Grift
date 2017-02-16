@@ -1,7 +1,7 @@
 all:
-	racket run.rkt --generate
+	racket run_bogus.rkt --generate
 	emacs changes.c tmp/src/*x1*byHand.c
-	racket run.rkt --run
+
 
 test:
 	racket run.rkt --generate

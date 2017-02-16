@@ -148,7 +148,8 @@
   (if (Type? o)
       (let ([v (Type-type o)])
         (cond
-          [(or (Dyn? v) (Int? v) (Bool? v) (Unit? v) (Float? v))
+          [(or (Dyn? v) (Int? v) (Bool? v) (Unit? v)
+               (Character? v)(Float? v))
            (Tag 'Atomic)]
           [(GRef? v) (Tag 'GRef)]
           [(GVect? v) (Tag 'GVect)]
@@ -198,7 +199,7 @@
   (mrefC?$           MonoRef?        MRef-Coercion-Huh)
   (mvectC?$          MonoVect?       MVect-Coercion-Huh)
   (tuple?$           CTuple?         Tuple-Coercion-Huh)
-  (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh?))
+  (mediating-crcn?$  mediating-crcn? Mediating-Coercion-Huh))
 
 (define (mediating-crcn? x)
   (or (CTuple? x) (Ref? x) (Fn? x) (MonoRef? x) (MonoVect? x)))

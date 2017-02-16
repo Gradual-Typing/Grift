@@ -11,107 +11,19 @@ set -euo pipefail
 declare -r PRECISION=5
 TIMEFORMAT=%R
 
-# $1 - benchmark filename without extension
-# $2 - space-separated benchmark arguments
-# $3 - disk aux name
-# $RETURN - the runtime for the racket benchmark
-get_racket_runtime()
-{
-    local benchmark="$1"; shift
-    local benchmark_args="$1"; shift
-    local disk_aux_name="$1"; shift
-    
-    local benchmark_path="${TMP_DIR}/rkt/${benchmark}"
-    local cache_file="${benchmark_path}${disk_aux_name}.cache"
-    if [ -f $cache_file ]; then
-        RETURN=$(cat "$cache_file")
-    else
-	raco make "${benchmark_path}.rkt"
-	avg "racket ${benchmark_path}.rkt" "$benchmark_args"
-	echo "$RETURN" > "$cache_file"
-    fi
-}
-
-# $1 - benchmark filename without extension
-# $2 - space-separated benchmark arguments
-# $3 - disk aux name
-# $RETURN - the slowdown factor for the C benchmark
-get_c_slowdown()
-{
-    local benchmark="$1"; shift
-    local benchmark_args="$1"; shift
-    local disk_aux_name="$1"; shift
-    
-    local benchmark_path="${TMP_DIR}/c/${benchmark}"
-    local cache_file="${benchmark_path}${disk_aux_name}.cache"
-    if [ -f $cache_file ]; then
-        RETURN=$(cat "$cache_file")
-    else
-	get_racket_runtime "$benchmark" "$benchmark_args" "$disk_aux_name"
-	local baseline="$RETURN";
-	clang "${benchmark_path}.c" "${SCHML_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${SCHML_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
-	avg "${benchmark_path}.o" "$benchmark_args"
-	local ct="$RETURN"
-	local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
-	echo "$RETURN" > "$cache_file"
-    fi
-}
-
-# $1 - benchmark filename without extension
-# $2 - space-separated benchmark arguments
-# $3 - disk aux name
-# $RETURN - the slowdown factor for the C benchmark
-get_gambit_slowdown()
-{
-    local benchmark="$1"; shift
-    local benchmark_args="$1"; shift
-    local disk_aux_name="$1"; shift
-    
-    local benchmark_path="${TMP_DIR}/gambit/${benchmark}"
-    local cache_file="${benchmark_path}${disk_aux_name}.cache"
-    if [ -f $cache_file ]; then
-        RETURN=$(cat "$cache_file")
-    else
-	get_racket_runtime "$benchmark" "$benchmark_args" "$disk_aux_name"
-	local baseline="$RETURN";
-	gsc -exe -cc-options -O3 "${benchmark_path}.scm"
-	avg "${benchmark_path}" "$benchmark_args"
-	local ct="$RETURN"
-	local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
-	echo "$RETURN" > "$cache_file"
-    fi
-}
-
-# $1 - binary to run
-# $2 - stdin arguments
-# $RETURN - average runtime
-avg()
-{
-    local bin="$1"; shift
-    local arg="$1"; shift
-    local c="time ( echo ${arg} | ${bin} ) 2>&1 1>/dev/null"
-    local avg_sum=0
-    local avg_i avg_t
-    for avg_i in `seq $LOOPS`; do
-	avg_t=$(eval "$c")
-	avg_sum=$(echo "scale=${PRECISION};${avg_sum}+${avg_t}" | bc)
-    done
-    RETURN=$(echo "scale=${PRECISION};${avg_sum}/${LOOPS}" | bc)
-}
-
-# $1 - logfile index
-# $2 - $path
-# $3 - space-separated benchmark arguments
-# $4 - disk aux name
+# $1 - baseline system
+# $2 - logfile index
+# $3 - $path
+# $4 - space-separated benchmark arguments
+# $5 - disk aux name
 # $RETURN - number of configurations
 run_config()
 {
-    local i="$1";             shift
-    local path="$1";          shift
-    local args="$1";          shift
-    local disk_aux_name="$1"; shift
+    local baseline_system="$1"; shift
+    local i="$1";               shift
+    local path="$1";            shift
+    local args="$1";            shift
+    local disk_aux_name="$1";   shift
     
     local name=$(basename "$path")
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${i}.log"
@@ -121,7 +33,7 @@ run_config()
 	RETURN=$(cat "$cache_file")
     else
 	local n=0 b
-	get_racket_runtime "$name" "$args" "$disk_aux_name"
+	$baseline_system "$name" "$args" "$disk_aux_name"
 	local baseline="$RETURN"
 	echo "name,precision,time,slowdown" > "$logfile1"
 	for b in $(find "$path" -name "*.o$i"); do
@@ -166,29 +78,37 @@ compute_typed_untyped_ratio()
     fi
 }
 
-# $1 - first config index
-# $2 - second config index
-# $3 - $path
-# $4 - space-separated benchmark arguments
-# $5 - output of dynamizer
-# $6 - printed name of the benchmark
-# $7 - disk aux name
+# $1 - baseline system
+# $2 - first config index
+# $3 - second config index
+# $4 - $path
+# $5 - space-separated benchmark arguments
+# $6 - output of dynamizer
+# $7 - printed name of the benchmark
+# $8 - disk aux name
 gen_output()
 {
-    local c1="$1";                     shift
-    local c2="$1";                     shift
-    local path="$1";                   shift
-    local benchmark_args="$1";         shift
-    local dynamizer_out="$1";          shift
-    local printname="$1";              shift
-    local disk_aux_name="$1";          shift
+    local baseline_system="$1"; shift
+    local c1="$1";              shift
+    local c2="$1";              shift
+    local path="$1";            shift
+    local benchmark_args="$1";  shift
+    local dynamizer_out="$1";   shift
+    local printname="$1";       shift
+    local disk_aux_name="$1";   shift
 
     local type_constructor_count=$(echo "$dynamizer_out" | sed -n 's/[0-9]\+.\([0-9]\+\)/\1/p')
     local less_precise_count=$(echo "$dynamizer_out" | sed -n 's/\([0-9]\+\).*/\1/p')
     local lpc_t=$(echo "${less_precise_count}/1000000000" | bc -l | awk '{printf "%.2f\n",$0}')
 
     local name=$(basename "$path")
-    local disk_name="${name}${disk_aux_name}_${c1}_${c2}"
+
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
+    local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
+    local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
+    local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
+    local disk_name="${name}${disk_aux_name}_${ct}"
+    
     cum_perf_lattice_fig="${OUT_DIR}/cumperflattice/${disk_name}.png"
     cum_perf_lattice_tbl="${OUT_DIR}/cumperflattice/${disk_name}.tex"
     perf_lattice_fig="${OUT_DIR}/perflattice/${disk_name}.png"
@@ -200,9 +120,9 @@ gen_output()
     local logfile3="${DATA_DIR}/${name}${disk_aux_name}${c2}.log"
     local logfile4="${DATA_DIR}/${name}${disk_aux_name}${c2}.csv"
 
-    get_c_slowdown "$name" "$benchmark_args" "$disk_aux_name"
+    get_slowdown c $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
     local cr_t="$RETURN"
-    get_gambit_slowdown "$name" "$benchmark_args" "$disk_aux_name"
+    get_slowdown gambit $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
     local gr_t="$RETURN"
 
     compute_typed_untyped_ratio "$c1" "$name" "$benchmark_args" "$disk_aux_name"
@@ -210,8 +130,8 @@ gen_output()
     compute_typed_untyped_ratio "$c2" "$name" "$benchmark_args" "$disk_aux_name"
     local typed_untyped_ratio2="$RETURN"
 
-    run_config "$c1" "$path" "$benchmark_args" "$disk_aux_name"
-    run_config "$c2" "$path" "$benchmark_args" "$disk_aux_name"
+    run_config $baseline_system "$c1" "$path" "$benchmark_args" "$disk_aux_name"
+    run_config $baseline_system "$c2" "$path" "$benchmark_args" "$disk_aux_name"
     local n="$RETURN"
     
     local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile2")
@@ -231,8 +151,8 @@ gen_output()
     	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
     	   `"set ytics nomirror 0,200;"`
 	   `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
-    	   `"plot '${logfile2}' using 1:2 with lines lw 2 title 'Config ${c1}' smooth cumulative,"`
-    	   `"'${logfile4}' using 1:2 with lines lw 2 title 'Config ${c2}' smooth cumulative"
+    	   `"plot '${logfile2}' using 1:2 with lines lw 2 title '${c1t}' smooth cumulative,"`
+    	   `"'${logfile4}' using 1:2 with lines lw 2 title '${c2t}' smooth cumulative"
 
     echo "\begin{tabular}{|l|l|l|}
 \hline
@@ -256,25 +176,27 @@ mean slowdown               & ${mean2}x             & ${mean1}x            \\\ \
     	   `"set title \"${printname}\";"`
 	   `"set xlabel \"slowdown\";"`
 	   `"set ylabel \"How much of the code is typed\";"`
-    	   `"plot '${logfile1}' using 4:(100-\$2) with points title 'Config ${c1}',"`
-    	   `"'${logfile3}' using 4:(100-\$2) with points title 'Config ${c2}'"
+    	   `"plot '${logfile1}' using 4:(100-\$2) with points title '${c1t}',"`
+    	   `"'${logfile3}' using 4:(100-\$2) with points title '${c2t}'"
     # fi
 }
 
-# $1 - first config index
-# $2 - second config index
-# $3 - benchmark filename without extension
-# $4 - space-separated benchmark arguments
-# $5 - nsamples
-# $6 - aux name
+# $1 - baseline system
+# $2 - first config index
+# $3 - second config index
+# $4 - benchmark filename without extension
+# $5 - space-separated benchmark arguments
+# $6 - nsamples
+# $7 - aux name
 run_benchmark()
 {
-    local c1="$1";             shift
-    local c2="$1";             shift
-    local name="$1";           shift
-    local benchmark_args="$1"; shift
-    local nsamples="$1";       shift
-    local aux_name="$1";       shift
+    local baseline_system="$1"; shift
+    local c1="$1";              shift
+    local c2="$1";              shift
+    local name="$1";            shift
+    local benchmark_args="$1";  shift
+    local nsamples="$1";        shift
+    local aux_name="$1";        shift
 
     local lattice_path="${TMP_DIR}/static/${name}"
     local benchmark_file="${lattice_path}.schml"
@@ -300,46 +222,41 @@ run_benchmark()
     if [ ! -f "$lattice_file" ]; then
 	rm -rf "$lattice_path"
 	local dynamizer_out=$(dynamizer "$lattice_path" "$nsamples" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
 	echo "$dynamizer_out" > "$lattice_file"
     fi
+    racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
     dynamizer_out=$(cat "$lattice_file")
 
-    gen_output $c1 $c2 "$lattice_path" "$benchmark_args" "$dynamizer_out" "$print_name" "$disk_aux_name"
+    gen_output $baseline_system $c1 $c2 "$lattice_path" "$benchmark_args" "$dynamizer_out" "$print_name" "$disk_aux_name"
 }
 
-# $1 - first config index
-# $2 - second config index
-# $3 - nsamples
+# $1 - baseline system
+# $2 - first config index
+# $3 - second config index
+# $4 - nsamples
 run_experiment()
 {
-    local c1="$1";       shift
-    local c2="$1";       shift
-    local nsamples="$1"; shift
+    local baseline_system="$1"; shift
+    local c1="$1";              shift
+    local c2="$1";              shift
+    local nsamples="$1";        shift
 
-    local qs_bc_arg="1000"
-    local s=""
-    local n=$(($qs_bc_arg-1)) i
-    for i in `seq 0 $n`; do
-	x=$(( ( RANDOM % $qs_bc_arg )  + 1 ))
-	s="$s$x "
-    done
-    qs_bc_arg="\"$qs_bc_arg $s\""
-    run_benchmark $c1 $c2 "quicksort" "$qs_bc_arg" "$nsamples" "bestcase"
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" ""
     
-    local qs_wc_arg="1000"
-    local s=""
-    local n=$(($qs_wc_arg-1)) i
-    for i in `seq 0 $n`; do
-	x=$(( n-i ))
-	s="$s$x "
-    done
-    qs_wc_arg="\"$qs_wc_arg $s\""
-    run_benchmark $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "worstcase"
+    local qs_bc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_rand1000.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_bc_arg" "$nsamples" "bestcase"
     
-    run_benchmark $c1 $c2 "matmult" "200" "$nsamples" ""
+    local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend1000.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "worstcase"
+    
+    run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" ""
 
-    run_benchmark $c1 $c2 "n-body" "10000" "$nsamples" ""
+    run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" ""
+
+    run_benchmark $baseline_system $c1 $c2 "fft" "65536" "$nsamples" ""
+
+    # convert "*_${c1}_${c2}.png" -append "${c1}_${c2}".png
 
     echo "finished experiment comparing" $c1 "vs" $c2
 }
@@ -353,7 +270,7 @@ main()
     fi
     local nsamples="$1"; shift
     LOOPS="$1";          shift
-    date="$1";           shift
+    local date="$1";     shift
 
     if [ "$date" == "fresh" ]; then
 	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
@@ -366,18 +283,25 @@ main()
     fi
     
     declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
-    declare -r LATTICE_DIR="$TEST_DIR/lattice/$DATE"
-    declare -r DATA_DIR="$LATTICE_DIR/data"
-    declare -r OUT_DIR="$LATTICE_DIR/output"
-    declare -r TMP_DIR="$LATTICE_DIR/tmp"
+    declare -r EXP_DIR="$TEST_DIR/lattice/$DATE"
+    declare -r DATA_DIR="$EXP_DIR/data"
+    declare -r OUT_DIR="$EXP_DIR/output"
+    declare -r TMP_DIR="$EXP_DIR/tmp"
     declare -r SRC_DIR="$TEST_DIR/src"
-    declare -r PARAMS_LOG="$LATTICE_DIR/params.txt"
+    declare -r INPUT_DIR="$TEST_DIR/inputs"
+    declare -r PARAMS_LOG="$EXP_DIR/params.txt"
 
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
     mkdir -p "$TMP_DIR"
     mkdir -p "$OUT_DIR/cumperflattice"
     mkdir -p "$OUT_DIR/perflattice"
+
+    . "lib/runtime.sh"
+
+    cd "$SCHML_DIR"
+
+    local baseline_system=get_racket_runtime
 
     if [ "$date" == "fresh" ]; then
 	# copying the benchmarks to a temporary directory
@@ -395,10 +319,11 @@ main()
 	printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
 	racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
 	printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
+	chezscheme_ver=$(scheme --version 2>&1)
+	printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
 	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
 	printf "nsamples\t:%s\n" "$nsamples" >> "$PARAMS_LOG"
 
-	cd "$SCHML_DIR"
 	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${TMP_DIR}/static/"
 	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${TMP_DIR}/dyn/"
     fi
@@ -409,7 +334,7 @@ main()
 	for i in `seq ${config}`; do
 	    for j in `seq ${i} ${config}`; do
 		if [ ! $i -eq $j ]; then
-		    run_experiment $i $j $nsamples
+		    run_experiment $baseline_system $i $j $nsamples
 		fi
 	    done
 	done
@@ -417,7 +342,7 @@ main()
 	while (( "$#" )); do
 	    i=$1; shift
 	    j=$1; shift
-	    run_experiment $i $j $nsamples
+	    run_experiment $baseline_system $i $j $nsamples
 	done
     fi
     echo "done."

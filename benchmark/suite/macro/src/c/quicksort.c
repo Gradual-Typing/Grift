@@ -195,9 +195,9 @@ int main(){
     x[i] = num;
   }
 
-  sort_clos = GC_MALLOC(8 * 3);
+  sort_clos = GC_MALLOC(3*sizeof(int64_t));
   partition_clos = GC_MALLOC(8 * 2);
-  swap_clos = GC_MALLOC(8 * 1);
+  swap_clos = GC_MALLOC(sizeof(int64_t));
   ((long *)sort_clos)[0] = ((long)sort);
   ((long *)sort_clos)[1] = partition_clos;
   ((long *)sort_clos)[2] = sort_clos;

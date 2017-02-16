@@ -157,6 +157,7 @@
     [(Guarded-Proxy-Target e) (recur e)]
     [(Guarded-Proxy-Blames e) (recur e)]
     [(Guarded-Proxy-Coercion e) (recur e)]
+    [(Unguarded-Vect-length e) (recur e)]
     [(Mbox e t) (recur e)]
     [(Mbox-val-set! e1 e2) (recur-all e1 e2)]
     [(Mbox-val-ref e) (recur e)]
@@ -173,7 +174,7 @@
     [(Type-MRef-Huh e) (recur e)]
     [(Type-MRef-Of e) (recur e)]
     [(Mvector e1 e2 t) (recur-all e1 e2)]
-    [(Mvector-size e) (recur e)]
+    [(Mvector-length e) (recur e)]
     [(Mvector-val-set! e1 e2 e3) (recur-all e1 e2 e3)]
     [(Mvector-val-ref e1 e2) (recur-all e1 e2)]
     [(Mvector-rtti-set! u e) (recur e)]
@@ -199,7 +200,7 @@
     [(Type-Tuple-num e) (recur e)]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
     [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
-    [(Mediating-Coercion-Huh? e) (recur e)]
+    [(Mediating-Coercion-Huh e) (recur e)]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
 
 ;; A specialized version of replace-ref that knows it takes and recieves
@@ -421,6 +422,7 @@
      (Guarded-Proxy-Blames expr)]
     [(Guarded-Proxy-Coercion (app recur expr))
      (Guarded-Proxy-Coercion expr)]
+    [(Unguarded-Vect-length e) (Unguarded-Vect-length (recur e))]
     [(Mbox (app recur e) t) (Mbox e t)]
     [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
     [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
@@ -439,7 +441,7 @@
     [(Type-MRef-Huh (app recur e)) (Type-MRef-Huh e)]
     [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
     [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
-    [(Mvector-size (app recur e)) (Mvector-size e)]
+    [(Mvector-length (app recur e)) (Mvector-length e)]
     [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
     [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
     [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
@@ -455,6 +457,12 @@
     [(Copy-Tuple (app recur n) (app recur v))
        (Copy-Tuple n v)]
     [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+    [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
+    [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+    [(Make-Tuple-Coercion uid t1 t2 lbl)
+     (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
+    [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
+    [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
     [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
     [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
      (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
@@ -735,6 +743,7 @@
      (Guarded-Proxy-Blames expr)]
     [(Guarded-Proxy-Coercion (app pl-expr expr))
      (Guarded-Proxy-Coercion expr)]
+    [(Unguarded-Vect-length e) (Unguarded-Vect-length (pl-expr e))]
     [(Mbox (app pl-expr e) t) (Mbox e t)]
     [(Mbox-val-set! (app pl-expr e1) (app pl-expr e2)) (Mbox-val-set! e1 e2)]
     [(Mbox-val-ref (app pl-expr e)) (Mbox-val-ref e)]
@@ -753,7 +762,7 @@
     [(Type-MRef-Huh (app pl-expr e)) (Type-MRef-Huh e)]
     [(Type-MRef-Of (app pl-expr e)) (Type-MRef-Of e)]
     [(Mvector (app pl-expr e1) (app pl-expr e2) t) (Mvector e1 e2 t)]
-    [(Mvector-size (app pl-expr e)) (Mvector-size e)]
+    [(Mvector-length (app pl-expr e)) (Mvector-length e)]
     [(Mvector-val-set! (app pl-expr e1) (app pl-expr e2) (app pl-expr e3)) (Mvector-val-set! e1 e2 e3)]
     [(Mvector-val-ref (app pl-expr e1) (app pl-expr e2)) (Mvector-val-ref e1 e2)]
     [(Mvector-rtti-set! u (app pl-expr e)) (Mvector-rtti-set! u e)]
@@ -782,7 +791,7 @@
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]
     [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (pl-expr e1) (pl-expr e2))]
-    [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (pl-expr e))]
+    [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (pl-expr e))]
     [other (error 'purify-letrec/expr "unmatched ~a" other)]))
 
 #|

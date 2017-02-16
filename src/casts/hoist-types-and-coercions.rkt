@@ -132,19 +132,19 @@
 
 ;; Make all types of equal structure the same structure
 ;; this is essentially a compile time hash-consing of the types
-(: identify-type! (Unique-Counter Type-Table -> (Schml-Type -> Prim-Type)))
+(: identify-type! (Unique-Counter Type-Table -> (Schml-Type -> Immediate-Type)))
 (define (identify-type! us tt)
   (match-define (cons ti sb) tt)
 
   (: ti! : Nat Compact-Type -> (Values (Static-Id Uid) Nat))
   (define ti! (table-identify! us ti sb))
   
-  (lambda ([type : Schml-Type]) : Prim-Type
+  (lambda ([type : Schml-Type]) : Immediate-Type
     ;; Here the Nonnegative Integer creates a partial order which
     ;; Identifies the order in which types can be constructed.
     ;; It can be seen as counting the number of types that must be
     ;; constructed before this type can be constructed.
-    (: recur (Schml-Type -> (Values Prim-Type Nat)))
+    (: recur (Schml-Type -> (Values Immediate-Type Nat)))
     (define (recur t)
       (match t
         [(Dyn)  (values DYN-TYPE  0)]
@@ -152,6 +152,7 @@
         [(Int)  (values INT-TYPE  0)]
         [(Bool) (values BOOL-TYPE 0)]
         [(Float) (values FLOAT-TYPE 0)]
+        [(Character) (values CHAR-TYPE 0)]
         [(Fn ar (app recur* t* m) (app recur t n))
          (ti! (max m n) (Fn ar t* t))]
         [(GRef (app recur t n))
@@ -165,7 +166,7 @@
         [(STuple arity (app recur* t* n))
          (ti! n (STuple arity t*))]
         [other (error 'hoist-types/identify-type! "unmatched ~a" other)]))
-    (: recur* ((Listof Schml-Type) -> (Values (Listof Prim-Type) Nat)))
+    (: recur* ((Listof Schml-Type) -> (Values (Listof Immediate-Type) Nat)))
     (define (recur* t*)
       (match t*
         ['() (values '() 0)]
@@ -221,7 +222,7 @@
       c)))
     
 (: map-hoisting-thru-Expr :
-   (Schml-Type -> Prim-Type)
+   (Schml-Type -> Immediate-Type)
    (Schml-Coercion -> Immediate-Coercion)
    CoC3-Expr
    -> L0-Expr)
@@ -400,6 +401,7 @@
        (Guarded-Proxy-Blames exp)]
       [(Guarded-Proxy-Coercion (app recur exp))
        (Guarded-Proxy-Coercion exp)]
+      [(Unguarded-Vect-length e) (Unguarded-Vect-length (recur e))]
       [(Mbox (app recur e) (app type->imdt t)) (Mbox e t)]
       [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
       [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
@@ -419,7 +421,6 @@
       [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
       [(Mvector (app recur e1) (app recur e2) (app type->imdt t))
        (Mvector e1 e2 t)]
-      [(Mvector-size (app recur e)) (Mvector-size e)]
       [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
@@ -430,6 +431,7 @@
       [(MVect-Coercion-Huh e) (MVect-Coercion-Huh (recur e))]
       [(MVect-Coercion-Type e) (MVect-Coercion-Type (recur e))]
       [(MVect-Coercion e) (MVect-Coercion (recur e))]
+      [(Mvector-length e) (Mvector-length (recur e))]
       [(Error (app recur e)) (Error e)]
       [(Create-tuple (app recur* e*))
        (Create-tuple e*)]
@@ -449,7 +451,7 @@
       [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
-      [(Mediating-Coercion-Huh? e) (Mediating-Coercion-Huh? (recur e))]
+      [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
       [(? string? x) (error 'hoist-types/string)]
       [other (error 'hoist-types/expr "unmatched ~a" other)]))
   ;; Recur through other type containing ast forms
