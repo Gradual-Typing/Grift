@@ -212,6 +212,15 @@
 
   )
 
+
+(define (cc/runtime* c-src-dir bin-dir)
+  (for ([src-path (in-directory c-src-dir)])
+    (when (regexp-match? #px"\\.c$" src-path)
+      (define rp (find-relative-path c-src-dir src-path))
+      (define cp (path-replace-extension rp #""))
+      (define out-path (build-path bin-dir cp))
+      (cc/runtime (path->string out-path) (path->string src-path) "-O3 -w"))))
+
 (define (build-benchmark test reps compiler ref hand-coded?)
   (define out-path (configuration->exe-path test reps compiler ref hand-coded?))
   (define src-path (configuration->src-path test reps compiler ref hand-coded?))
@@ -249,6 +258,8 @@
     (* run-result-in-milliseconds (expt 10 6)))
   
   (/ run-result-in-nanoseconds iterations))
+
+
 
 (define (analyze-results
          results
@@ -404,6 +415,8 @@
         "\\end{tabular}\n")))))
 
 
+
+
 (module+ main
   ;; 10 miliseconds is the smallest time we accept for this test
   (define program-main
@@ -437,6 +450,8 @@
        (generate-benchmarks generate-fn-app-test-src 'fn-app)
        (generate-benchmarks generate-vector-read-write-src 'ref-read-write)
        (display "make edits and run benchmark\n")))]
+   ["--compile" src bin "Run c compiler on generated code"
+    (program-main (lambda () (cc/runtime* src bin)))]
    ["--run" "Run the benchmark on generated code"
     (program-main
      (lambda () (analyze-results (run-static-benchmarks))))]
