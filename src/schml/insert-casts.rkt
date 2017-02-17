@@ -270,10 +270,13 @@
        (if (Dyn? i-ty)
            (Mvector-ref e (mk-cast i-src (mk-label "mvector-ref index" i-src) i i-ty INT-TYPE))
            (Mvector-ref e i))]
-      [(Mvector-set! (app ic-expr e1) (and (Ann _ (cons i-src i-ty)) (app ic-expr i)) (app ic-expr e2))
-       (if (Dyn? i-ty)
-           (Mvector-set! e1 (mk-cast i-src (mk-label "mvector-ref index" i-src) i i-ty INT-TYPE) e2)
-           (Mvector-set! e1 i e2))]
+      [(Mvector-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
+                     (and (Ann _ (cons i-src i-ty)) (app ic-expr i))
+                     (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
+       (Mvector-set!
+        e1
+        (mk-cast i-src (mk-label "mvector-set index" i-src) i i-ty INT-TYPE)
+        (mk-cast e2-src (mk-label "mvector-set val" i-src) e2 e2-ty (MVect-arg e1-ty)))]
       [(Mvector-refT (and (Ann _ (cons e-src e-ty)) (app ic-expr e))
                      (and (Ann _ (cons i-src i-ty)) (app ic-expr i))
                      t)
