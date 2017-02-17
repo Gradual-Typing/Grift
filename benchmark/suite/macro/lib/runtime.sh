@@ -223,6 +223,36 @@ get_slowdown()
     fi
 }
 
+# $1 - system
+# $2 - baseline system
+# $3 - benchmark filename without extension
+# $4 - space-separated benchmark arguments
+# $5 - disk aux name
+# $6 - aux information
+# $RETURN - the slowdown factor for that system benchmark
+get_speedup()
+{
+    local system="$1";          shift
+    local baseline_system="$1"; shift
+    local benchmark="$1";       shift
+    local benchmark_args="$1";  shift
+    local disk_aux_name="$1";   shift
+    
+    local benchmark_path="${TMP_DIR}/${system}/${benchmark}"
+    local cache_file="${benchmark_path}${disk_aux_name}.slowdown_${baseline_system}"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+	local baseline="$RETURN";
+	"get_${system}_runtime" "$benchmark" "$benchmark_args" "$disk_aux_name"
+	local ct="$RETURN"
+	local cr=$(echo "${baseline}/${ct}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
+	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
+	echo "$RETURN" > "$cache_file"
+    fi
+}
+
 # $1 - binary to run
 # $2 - stdin arguments
 # $RETURN - average runtime

@@ -220,7 +220,9 @@
                       e1-ty)])]
       [(Mbox (app ic-expr e) t) (Mbox e t)]
       [(Munbox (app ic-expr e)) (Munbox e)]
-      [(Mbox-set! (app ic-expr e1) (app ic-expr e2)) (Mbox-set! e1 e2)]
+      [(Mbox-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
+                  (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
+       (Mbox-set! e1 (mk-cast e2-src (mk-label "mboxset" e2-src) e2 e2-ty (MRef-arg e1-ty)))]
       [(MunboxT (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) t)
        (cond
          [(Dyn? e-ty)
