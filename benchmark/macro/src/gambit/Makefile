@@ -1,19 +1,12 @@
-CC=gsc
-OPTS=-exe -cc-options "-O3"
+ROOT_DIR=..
+COMPILE=gsc
+COMPILE_OPTIONS=-exe -cc-options "-O3"
+COMPILE_VERSION=gsc -v
+CLEANED= src/*~ log bin out
+SRC_EXT=scm
+include $(ROOT_DIR)/shared.mk
 
-all: bin/n-body
+.PHONY: all
+all: $(BINS) $(ERRS)
 
-bin:
-	mkdir bin
 
-logs:
-	mkdir logs
-	$(CC) -v >> logs/compile.log
-	echo options >> logs/compile.log
-	echo $(OPTS) >> logs/compile.log
-
-bin/%: bin logs
-	$(CC) $(OPTS) -o $@ $*.scm
-
-clean:
-	rm -rf bin logs *~ *.o

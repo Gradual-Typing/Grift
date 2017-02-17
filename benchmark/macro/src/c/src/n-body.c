@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <math.h>
 #define GC_INITIAL_HEAP_SIZE 1048576
-#include "../../../../src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
+#include "../../../../../src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
 /* void *alloc_ptr; */
 /* long free_ptr; */
 /* long limit; */

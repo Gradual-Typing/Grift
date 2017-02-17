@@ -1,34 +1,55 @@
 #lang racket 
 
-(require math/statistics
-	 racket/runtime-path)
+(require math/statistics 
+	 racket/runtime-path
+         "shared.rkt"
+	 file/glob)
 
 (define langs '("c" "gambit" "racket"
-		"static/coercions"
-		"static/casts"
-	 	"dynamic/coercions"
-		"dynamic/casts"))
+		"schml/static/coercions"
+		"schml/static/casts"
+	 	"schml/dynamic/coercions"
+		"schml/dynamic/casts"))
 
-(define runs 10)
+(define (print-stat-layout-to-port p)
+ (define data-layout "#language, mean(sec), stddev(sec)\n")
+  (display data-layout p)
+  (display data-layout))
 
-(define-runtime-path this-dir ".")
-(define time-rx #px"time \\(sec\\) (\\d+.\\d+)")
+;; TODO This needs to be result driven instead of input driven
+(define number-of-runs (make-parameter #f))
+(command-line
+  #:once-each
+  [("--assert-runs") runs
+    "check the number of runs"
+    (let ([runs? (string->number runs)])
+      (unless runs? (error '--assert-runs "invalid: ~v" runs))
+      (number-of-runs runs?))]
+ #:args ()
+ (display (glob "{c,gambit,racket,schml}/{,static/,dynamic/}*.err"))
+ (unless (directory-exists? "stats")
+  (make-directory "stats"))
+ (for* ([input (in-glob "inputs/*")])
+   (printf "~a\n" input)
+   (define-values (_1 filename _2) (split-path input))
+   (define benchmark (path->string filename))
+  (call-with-output-file      
+   #:exists 'replace
+   (general-stats-path benchmark)
+   (lambda (p)
+    (print-stat-layout-to-port p)
+    (for* ([lang (in-list langs)])
+      (define err-output-path
+            (build-path root-dir lang "out" (string-append benchmark ".err")))
+      (define err-output (file->string err-output-path))
+      (define runtimes (parse-runtimes err-output))
+      (when (and (number-of-runs)
+      	    	 (not (= (length runtimes) (number-of-runs))))
+	  (error 'avg-n-body "~a" runtimes))
+      (define avg (mean runtimes))
+      (define std (stddev runtimes))
+      (printf "~a\n  mean(sec)=~a\n  sdev(sec)=~a\n~a\n\n"
+        lang avg std runtimes)
+      (display (format "~a, ~a, ~a\n" lang avg std) p))))))
 
-(define (read-runtimes-from-port str)
- (for/list ([m (regexp-match* time-rx str)])
-  (match (regexp-match time-rx m)
-   [(list _ (app string->number (? number? seconds))) 
-    seconds]
-   [other (error 'todo "~a" other)])))
-
-(for ([l langs])
-  (define err-path (build-path this-dir l "logs/n-body.err"))
-  (define err-out (file->string err-path))
-  (define runtimes (read-runtimes-from-port err-out))
-  (unless (= (length runtimes) runs)
-      (error 'avg-n-body "~a" runtimes))
-   (define avg (mean runtimes))
-   (define std (stddev runtimes))
-  (printf "~a:\n avg=~a\n std=~a\n" l avg std))
- 
   
