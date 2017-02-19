@@ -214,17 +214,17 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	   `"set key left;"`
 	   `"set logscale y;"`
     	   `"set xrange [0:100];"`
-	   `"set ytics add (\"1\" 1, \"${g1}\" ${g1}, \"\" ${g2});"`
+	   `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
 	   `"set ytics font \", 13\";"`
 	   `"set xtics font \", 13\";"`
     	   `"set title \"${printname}\";"`
 	   `"set ylabel \"log(Racket/Schml)\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
-    	   `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
+    	   `"plot 1 dt 2 lc rgb \"black\" title 'Racket',"`
+	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}',"`
-	   `"${g1} dt 2 lc rgb \"#3182bd\" title '${c1t} mean',"`
-	   `"${g2} dt 2 lc rgb \"#fdae6b\" title '${c2t} mean',"`
-    	   `"1 dt 2 lc rgb \"black\" title 'Racket'"
+	   `"${g1} lw 2 dt 2 lc rgb \"#3182bd\" title '${c1t} mean',"`
+	   `"${g2} lw 2 dt 2 lc rgb \"#fdae6b\" title '${c2t} mean'"
     # fi
 }
 

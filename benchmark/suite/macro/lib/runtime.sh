@@ -275,13 +275,5 @@ avg()
 speedup_geometric_mean()
 {
     local logfile="$1"; shift
-    local c_slowdown_prod=1.0 n=0
-
-    while read p; do
-	c_slowdown=$(echo "$p" | sed -n "s/.*,.*,.*,.*,\(.*\)/\1/p")
-	let n=n+1
-	c_slowdown_prod=$(echo "scale=100;$c_slowdown_prod*$c_slowdown" | bc -l)
-    done <<< "$(sed 1d $logfile)"
-    RETURN=$(echo $c_slowdown_prod | awk -v n="$n" '{ printf "%.2f", $1^(1/n)}')
-    echo $logfile $RETURN >> /home/deyaa/xxx
+    RETURN=$(cat "$logfile" | sed 1d | cut -d, -f5 | "${TEST_DIR}/lib/geo")
 }
