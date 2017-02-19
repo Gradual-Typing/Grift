@@ -255,6 +255,7 @@ get_speedup()
 
 # $1 - binary to run
 # $2 - stdin arguments
+# $3 - path to the file that will record individual runtimes
 # $RETURN - average runtime
 avg()
 {
@@ -272,6 +273,8 @@ avg()
     RETURN=$(echo "scale=${PRECISION};${avg_sum}/${LOOPS}" | bc)
 }
 
+# $1 - logfile
+# $RETURN - geometric mean of the fifth column in the logfile
 speedup_geometric_mean()
 {
     local logfile="$1"; shift

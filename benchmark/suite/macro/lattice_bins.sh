@@ -214,11 +214,12 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	   `"set key left;"`
 	   `"set logscale y;"`
     	   `"set xrange [0:100];"`
+    	   `"set yrange [0.01:100];"`
 	   `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
 	   `"set ytics font \", 13\";"`
 	   `"set xtics font \", 13\";"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"log(Racket/Schml)\";"`
+	   `"set ylabel \"(Racket runtime/Schml runtime) in logarithmic scale\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
     	   `"plot 1 dt 2 lc rgb \"black\" title 'Racket',"`
 	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
@@ -226,6 +227,7 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	   `"${g1} lw 2 dt 2 lc rgb \"#3182bd\" title '${c1t} mean',"`
 	   `"${g2} lw 2 dt 2 lc rgb \"#fdae6b\" title '${c2t} mean'"
     # fi
+    RETURN=$(awk -v g1="$g1" -v g2="$g2" "BEGIN {printf \"%.2f\n\", g1/g2}")
 }
 
 # $1 - baseline system
@@ -292,24 +294,34 @@ run_experiment()
     local nsamples="$1";        shift
     local nbins="$1";           shift
 
+    local g=()
+
     # local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_4K.txt")\""
     # run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" "$nbins" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend1000.txt")\""
     run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "$nbins" "worstcase"
+    g+=($RETURN)
     
     run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
     run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
     run_benchmark $baseline_system $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
     local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/fast.txt")\""
     run_benchmark $baseline_system $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
-    # convert "*_${c1}_${c2}.png" -append "${c1}_${c2}".png
+    IFS=$'\n'
+    max=$(echo "${g[*]}" | sort -nr | head -n1)
+    min=$(echo "${g[*]}" | sort -n | head -n1)
+    
 
-    echo "finished experiment comparing" $c1 "vs" $c2
+    echo "finished experiment comparing" $c1 "vs" $c2 ", where speedups range from " $min " to " $max
 }
 
 main()
