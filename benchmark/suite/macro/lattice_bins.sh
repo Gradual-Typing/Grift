@@ -35,7 +35,7 @@ run_config()
 	local n=0 b
 	$baseline_system "$name" "$args" "$disk_aux_name"
 	local baseline="$RETURN"
-	echo "name,precision,time,speedup" > "$logfile1"
+	echo "name,precision,time,slowdown,speedup" > "$logfile1"
 	for b in $(find "$path" -name "*.o$i"); do
 	    let n=n+1
 	    local binpath="${b%.*}"
@@ -44,9 +44,10 @@ run_config()
 	    echo $b
 	    avg "$b" "$args" "${b}.runtimes"
 	    local t="$RETURN"
-	    local f=$(echo "${baseline}/${t}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
-	    echo $n $b $f
-	    printf "%d,%.2f,%.${PRECISION}f,%.2f\n" $bname $p $t $f >> $logfile1
+	    local speedup=$(echo "${baseline}/${t}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
+	    local slowdown=$(echo "${t}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
+	    echo $n $b $speedup
+	    printf "%d,%.2f,%.${PRECISION}f,%.2f,%.2f\n" $bname $p $t $slowdown $speedup >> $logfile1
 	done
 	cut -d, -f4 "$logfile1" | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > "$logfile2"
 	RETURN="$n"
@@ -112,10 +113,12 @@ gen_output()
     
     cum_perf_lattice_fig="${OUT_DIR}/cumperflattice/${disk_name}.png"
     cum_perf_lattice_tbl="${OUT_DIR}/cumperflattice/${disk_name}.tex"
-    perf_lattice_fig="${OUT_DIR}/perflattice/${disk_name}.png"
+    perf_lattice_slowdown_fig="${OUT_DIR}/perflattice/slowdown/${disk_name}.png"
+    perf_lattice_speedup_fig="${OUT_DIR}/perflattice/speedup/${disk_name}.png"
+    perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}.png"
     
-    # if [[ ! -f "$cum_perf_lattice_fig" || ! -f "$cum_perf_lattice_tbl" || ! -f "$perf_lattice_fig" ]]; then
-    rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_fig"
+    # if [[ ! -f "$cum_perf_lattice_slowdown_fig" || ! -f "$cum_perf_lattice_tbl" || ! -f "$perf_lattice_slowdown_fig" ]]; then
+    rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_slowdown_fig"
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${c1}.log"
     local logfile2="${DATA_DIR}/${name}${disk_aux_name}${c1}.csv"
     local logfile3="${DATA_DIR}/${name}${disk_aux_name}${c2}.log"
@@ -134,6 +137,11 @@ gen_output()
     run_config $baseline_system "$c1" "$path" "$benchmark_args" "$disk_aux_name"
     run_config $baseline_system "$c2" "$path" "$benchmark_args" "$disk_aux_name"
     local n="$RETURN"
+
+    speedup_geometric_mean "$logfile1"
+    g1="$RETURN"
+    speedup_geometric_mean "$logfile3"
+    g2="$RETURN"
     
     local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile2")
     local min2=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile4")
@@ -172,15 +180,51 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
-    	   `"set output '${perf_lattice_fig}';"`
+    	   `"set output '${perf_lattice_slowdown_fig}';"`
+	   `"set key left;"`
     	   `"set xrange [0:100];"`
+	   `"set ytics add (\"\" 0, \"1\" 1);"`
 	   `"set ytics font \", 13\";"`
 	   `"set xtics font \", 13\";"`
+	   `"set grid ytics;"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"speedup with respect to Racket\";"`
+	   `"set ylabel \"Slowdown with respect to Racket\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
     	   `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
+
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+      	   `"enhanced color font 'Verdana,10' ;"`
+    	   `"set output '${perf_lattice_speedup_fig}';"`
+	   `"set key left;"`
+    	   `"set xrange [0:100];"`
+	   `"set ytics add (\"\" 0, \"1\" 1);"`
+	   `"set ytics font \", 13\";"`
+	   `"set xtics font \", 13\";"`
+	   `"set grid ytics;"`
+    	   `"set title \"${printname}\";"`
+	   `"set ylabel \"Speedup with respect to Racket\";"`
+	   `"set xlabel \"How much of the code is typed\";"`
+    	   `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
+    	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
+
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+      	   `"enhanced color font 'Verdana,10' ;"`
+    	   `"set output '${perf_lattice_log_fig}';"`
+	   `"set key left;"`
+	   `"set logscale y;"`
+    	   `"set xrange [0:100];"`
+	   `"set ytics add (\"1\" 1, \"${g1}\" ${g1}, \"\" ${g2});"`
+	   `"set ytics font \", 13\";"`
+	   `"set xtics font \", 13\";"`
+    	   `"set title \"${printname}\";"`
+	   `"set ylabel \"log(Racket/Schml)\";"`
+	   `"set xlabel \"How much of the code is typed\";"`
+    	   `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
+    	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}',"`
+	   `"${g1} dt 2 lc rgb \"#3182bd\" title '${c1t} mean',"`
+	   `"${g2} dt 2 lc rgb \"#fdae6b\" title '${c2t} mean',"`
+    	   `"1 dt 2 lc rgb \"black\" title 'Racket'"
     # fi
 }
 
@@ -303,7 +347,9 @@ main()
     mkdir -p "$DATA_DIR"
     mkdir -p "$TMP_DIR"
     mkdir -p "$OUT_DIR/cumperflattice"
-    mkdir -p "$OUT_DIR/perflattice"
+    mkdir -p "$OUT_DIR/perflattice/slowdown"
+    mkdir -p "$OUT_DIR/perflattice/speedup"
+    mkdir -p "$OUT_DIR/perflattice/log"
 
     . "lib/runtime.sh"
 
