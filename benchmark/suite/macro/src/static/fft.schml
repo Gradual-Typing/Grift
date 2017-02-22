@@ -1,6 +1,6 @@
 (define n : Int (read-int))
 (define data : (Vect Float) (vector n #i0.0))
-(define pi*2 : Float #i6.28318530717959) ; to compute the inverse, negate this value
+(define pi*2 : Float #i6.28318530717959) ;; to compute the inverse, negate this value
 
 (define (loop1 [i : Int] [j : Int]) : Unit
   (if (< i n)

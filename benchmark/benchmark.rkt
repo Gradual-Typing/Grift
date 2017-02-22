@@ -54,7 +54,6 @@
   ;; Iterate over all schml files in directory and
   ;; compile them to 
   (for ((fl (find-files schml-file? compile-dir)))
-    (debug fl)
     (compile-file-all-configs fl)))
 
 (module+ main

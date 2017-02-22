@@ -7,7 +7,7 @@
            (tak (- y 1) z x)
            (tak (- z 1) x y))))
 
-(let ([x (read-int)])
-  (let ([y (read-int)])
-    (let ([z (read-int)])
+(let ([x : Int (read-int)])
+  (let ([y : Int (read-int)])
+    (let ([z : Int (read-int)])
       (tak x y z))))

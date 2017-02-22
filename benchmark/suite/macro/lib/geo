@@ -1,0 +1,10 @@
+#!/usr/bin/awk -f
+{
+    x  = $1;   # value of 1st column
+    G += log(x);  
+    N++;	
+}
+ 
+END {
+   printf "%.2f",exp(G/N);
+}

@@ -2,8 +2,8 @@
   (let ([x : (Vect Int)
            (vector (* l1 l2) 0)])
     (begin
-      (repeat (i 0 l1) (_ ())
-        (repeat (j 0 l2) (_ ())
+      (repeat (i 0 l1) (_ : Unit ())
+        (repeat (j 0 l2) (_ : Unit ())
           (vector-set! x (+ (* l2 i) j) (+ j i))))
       x)))
 
@@ -13,9 +13,9 @@
               [y1 : Int] [y2 : Int]) : (Vect Int)
               (let ([r : (Vect Int) (vector (* y2 x1) 0)])
                 (begin
-                  (repeat (i 0 x1) (_ ())
-                    (repeat (j 0 y2) (_ ())
-                      (repeat (k 0 y1) (_ ())
+                  (repeat (i 0 x1) (_ : Unit ())
+                    (repeat (j 0 y2) (_ : Unit ())
+                      (repeat (k 0 y1) (_ : Unit ())
                         (vector-set! r (+ (* i y2) j)
                                      (+ (vector-ref r (+ (* i y2) j))
                                         (* (vector-ref x (+ (* i x2) k))

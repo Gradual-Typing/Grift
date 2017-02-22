@@ -23,6 +23,6 @@
       (go (- m 1) n (my-try n))
       r))
 
-(let ([input1 (read-int)])
-  (let ([input2 (read-int)])
+(let ([input1 : Dyn (read-int)])
+  (let ([input2 : Dyn (read-int)])
     (: (go input1 input2 0) Int)))
