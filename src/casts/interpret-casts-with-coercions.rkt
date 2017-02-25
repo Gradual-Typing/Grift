@@ -92,16 +92,6 @@ form, to the shortest branch of the cast tree that is relevant.
       [(open-coded? 'make-coercion) gen-make-coercion-code]
       [else make-coercion-call]))
 
-
-  (define gen-compose-coercions-code : Compose-Coercions-Type
-    (make-compose-coercions-code next-uid! compose-coercions-call
-                                 compose-coercions-uid make-coercion))
-
-  (define compose-coercions : Compose-Coercions-Type
-    (cond
-      [(open-coded? 'compose-coercions) gen-compose-coercions-code]
-      [else compose-coercions-call]))
-
   ;; The runtime label for the greatest lower bound
   (define greatest-lower-bound-type-uid (next-uid! "greatest_lower_bound"))
   ;; a call to the runtime greatest lower bound
@@ -131,6 +121,16 @@ form, to the shortest branch of the cast tree that is relevant.
     (cond
       [(open-coded? 'greatest-lower-bound-type) gen-greatest-lower-bound-type]
       [else greatest-lower-bound-type-call]))
+
+  (define gen-compose-coercions-code : Compose-Coercions-Type
+    (make-compose-coercions-code next-uid! compose-coercions-call
+                                 compose-coercions-uid make-coercion
+                                 greatest-lower-bound-type))
+
+  (define compose-coercions : Compose-Coercions-Type
+    (cond
+      [(open-coded? 'compose-coercions) gen-compose-coercions-code]
+      [else compose-coercions-call]))
   
   ;; Code generators for the coercion casting runtime
   (define gen-interp-cast-code
@@ -605,8 +605,9 @@ form, to the shortest branch of the cast tree that is relevant.
    Compose-Coercions-Type
    Uid
    Make-Coercion-Type
+   GreatestLowerBound-Type
    -> Compose-Coercions-Type)
-(define ((make-compose-coercions-code next-uid! compose compose-uid mk-crcn) c1 c2)
+(define ((make-compose-coercions-code next-uid! compose compose-uid mk-crcn mk-glbt) c1 c2)
   (define-syntax-let$* let$* next-uid!)
   (: help-comp : Schml-Coercion Schml-Coercion -> Schml-Coercion)
   (define (help-comp s t)
@@ -690,6 +691,16 @@ form, to the shortest branch of the cast tree that is relevant.
                   (Quote-Coercion (CTuple (CTuple-num c2) arg*)))
                 (error 'compose-coercions "given ~a ~a" c1 c2)))
           (Compose-Tuple-Coercion compose-uid c1 c2))]
+     [(mrefC?$ c1)
+      (let$* ([ref1_type  (mrefC-type$ c1)]
+              [ref2_type  (mrefC-type$ c2)]
+              [type3  (mk-glbt ref1_type  ref2_type)])
+        (mrefC$ type3))]
+     [(mvectC?$ c1)
+      (let$* ([ref1_type  (mvectC-type$ c1)]
+              [ref2_type  (mvectC-type$ c2)]
+              [type3  (mk-glbt ref1_type  ref2_type)])
+        (mvectC$ type3))]
      [else (Blame (Quote "bad implemention of mediating coercions"))])]
    ;; C1 must be a failed coercion
    [else (Blame (fail-label$ c1))]))
