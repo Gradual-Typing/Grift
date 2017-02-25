@@ -10,8 +10,8 @@
       (lambda (in)
         (write
          (hash
-          1 (list (string->symbol "Coercions") (string->symbol "Guarded"))
-          2 (list (string->symbol "Type-Based") (string->symbol "Guarded"))
+          1 (list (string->symbol "Coercions") (string->symbol "Proxied"))
+          2 (list (string->symbol "Type-Based") (string->symbol "Proxied"))
           3 (list (string->symbol "Coercions") (string->symbol "Monotonic"))
           4 (list (string->symbol "Type-Based") (string->symbol "Monotonic")))
          in))))

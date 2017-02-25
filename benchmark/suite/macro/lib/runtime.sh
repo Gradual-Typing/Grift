@@ -187,8 +187,35 @@ get_schml_slowdown()
 	local baseline="$RETURN" st sr;
 	get_schml_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
 	local st="$RETURN";
-	sr=$(echo "${st}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	RETURN=$(echo "$sr" | awk '{printf "%.2f\n",$0}')
+	RETURN=$(echo "${st} ${baseline}" | awk '{printf "%.2f", $1 \ $2}')
+	echo "$RETURN" >> "$cache_file"
+    fi
+}
+
+# $1 - baseline system
+# $2 - benchmark file path without extension
+# $3 - space-separated benchmark arguments
+# $4 - disk aux name
+# $5 - configuration index
+# $RETURN - the runtime for the racket benchmark
+get_schml_speedup()
+{
+    local baseline_system="$1"; shift
+    local benchmark_path="$1";  shift
+    local benchmark_args="$1";  shift
+    local disk_aux_name="$1";   shift
+    local config_index="$1";    shift
+    
+    local cache_file="${benchmark_path}${disk_aux_name}${config_index}.slowdown_${baseline_system}"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+	local benchmark=$(basename "$benchmark_path")
+	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+	local baseline="$RETURN" st sr;
+	get_schml_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
+	local st="$RETURN";
+	RETURN=$(echo "${baseline} ${st}" | awk '{printf "%.2f\n", $1 / $2}')
 	echo "$RETURN" >> "$cache_file"
     fi
 }
@@ -247,8 +274,7 @@ get_speedup()
 	local baseline="$RETURN";
 	"get_${system}_runtime" "$benchmark" "$benchmark_args" "$disk_aux_name"
 	local ct="$RETURN"
-	local cr=$(echo "${baseline}/${ct}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
+	RETURN=$(echo "${baseline} ${ct}" | awk '{printf "%.2f", $1 / $2}')
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -263,14 +289,14 @@ avg()
     local arg="$1";           shift
     local runtimes_file="$1"; shift
     local c="time ( echo ${arg} | ${bin} ) 2>&1 1>/dev/null"
-    local avg_sum=0
+    local avg_sum=0.0
     local avg_i avg_t
     for avg_i in `seq $LOOPS`; do
 	avg_t=$(eval "$c")
 	echo $avg_t >> "$runtimes_file"
-	avg_sum=$(echo "scale=${PRECISION};${avg_sum}+${avg_t}" | bc)
+	avg_sum=$(echo "${avg_sum} ${avg_t}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 + $2}')
     done
-    RETURN=$(echo "scale=${PRECISION};${avg_sum}/${LOOPS}" | bc)
+    RETURN=$(echo "${avg_sum} ${LOOPS}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 / $2}')
 }
 
 # $1 - logfile

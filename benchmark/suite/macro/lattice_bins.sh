@@ -40,7 +40,7 @@ run_config()
 	    let n=n+1
 	    local binpath="${b%.*}"
 	    local bname=$(basename "$binpath")
-	    local p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < "${binpath}.schml")
+	    local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' < "${binpath}.schml")
 	    echo $b
 	    avg "$b" "$args" "${b}.runtimes"
 	    local t="$RETURN"
@@ -188,7 +188,7 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	   `"set xtics font \", 13\";"`
 	   `"set grid ytics;"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"Slowdown with respect to Racket\";"`
+	   `"set ylabel \"Slowdown with respect to Gambit\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
     	   `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
@@ -203,7 +203,7 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	   `"set xtics font \", 13\";"`
 	   `"set grid ytics;"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"Speedup with respect to Racket\";"`
+	   `"set ylabel \"Speedup with respect to Gambit\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
     	   `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
@@ -219,15 +219,15 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	   `"set ytics font \", 13\";"`
 	   `"set xtics font \", 13\";"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"(Racket runtime/Schml runtime) in logarithmic scale\";"`
+	   `"set ylabel \"(Gambit runtime/Schml runtime) in logarithmic scale\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
-    	   `"plot 1 dt 2 lc rgb \"black\" title 'Racket',"`
+    	   `"plot 1 dt 2 lc rgb \"black\" title 'Gambit',"`
 	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}',"`
 	   `"${g1} lw 2 dt 2 lc rgb \"#3182bd\" title '${c1t} mean',"`
 	   `"${g2} lw 2 dt 2 lc rgb \"#fdae6b\" title '${c2t} mean'"
     # fi
-    RETURN=$(awk -v g1="$g1" -v g2="$g2" "BEGIN {printf \"%.2f\n\", g1/g2}")
+    RETURN=$(awk -v g1="$g1" -v g2="$g2" "BEGIN {printf \"%.2f\n\", g2/g1}")
 }
 
 # $1 - baseline system
@@ -367,7 +367,7 @@ main()
 
     cd "$SCHML_DIR"
 
-    local baseline_system=get_racket_runtime
+    local baseline_system=get_gambit_runtime
 
     if [ "$date" == "fresh" ]; then
 	# copying the benchmarks to a temporary directory
