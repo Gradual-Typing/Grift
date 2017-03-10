@@ -109,7 +109,7 @@ gen_output()
     local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
     local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
     local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
-    local disk_name="${name}${disk_aux_name}_${ct}"
+    local disk_name="${name}${disk_aux_name}_$(echo "$ct" | tr " " "_")"
     
     cum_perf_lattice_fig="${OUT_DIR}/cumperflattice/${disk_name}.png"
     cum_perf_lattice_tbl="${OUT_DIR}/cumperflattice/${disk_name}.tex"
@@ -142,6 +142,8 @@ gen_output()
     g1="$RETURN"
     speedup_geometric_mean "$logfile3"
     g2="$RETURN"
+
+    printf "%s:\t\t%d=%.2f\t%d=%.2f\n" $name $c1 $g1 $c2 $g2
     
     local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile2")
     local min2=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile4")
@@ -209,26 +211,27 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
 
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-      	   `"enhanced color font 'Verdana,10' ;"`
+      	   `"enhanced color font 'Verdana,13' ;"`
     	   `"set output '${perf_lattice_log_fig}';"`
 	   `"set key left;"`
 	   `"set logscale y;"`
     	   `"set xrange [0:100];"`
     	   `"set yrange [0.01:100];"`
 	   `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
-	   `"set ytics font \", 13\";"`
-	   `"set xtics font \", 13\";"`
     	   `"set title \"${printname}\";"`
 	   `"set ylabel \"(Gambit runtime/Schml runtime) in logarithmic scale\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
-    	   `"plot 1 dt 2 lc rgb \"black\" title 'Gambit',"`
-	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
-    	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}',"`
-	   `"${g1} lw 2 dt 2 lc rgb \"#3182bd\" title '${c1t} mean',"`
-	   `"${g2} lw 2 dt 2 lc rgb \"#fdae6b\" title '${c2t} mean'"
+    	   `"plot 1 lw 2 dt 2 lc rgb \"black\" title 'Gambit',"`
+	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
+    	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
+	   `"${g1} lw 2 dt 2 lc rgb \"#0072B2\" title '${c1t} mean',"`
+	   `"${g2} lw 2 dt 2 lc rgb \"#E69F00\" title '${c2t} mean'"
     # fi
     RETURN=$(awk -v g1="$g1" -v g2="$g2" "BEGIN {printf \"%.2f\n\", g2/g1}")
 }
+
+##3182bd
+##fdae6b
 
 # $1 - baseline system
 # $2 - first config index
@@ -258,7 +261,7 @@ run_benchmark()
 	print_aux_name=" (${aux_name})"
     fi
     
-    local print_name="$(echo "$name" | tr _ " " | sed -e "s/\b\(.\)/\u\1/g" | tr " " "-")${print_aux_name}"
+    local print_name="$(echo "$name" | tr _ "-")${print_aux_name}"
 
     local benchmark_args_file="${TMP_DIR}/${name}${disk_aux_name}.args"
     if [ -f benchmark_args_file ]; then
@@ -300,7 +303,7 @@ run_experiment()
     # run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" "$nbins" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend1000.txt")\""
-    run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "$nbins" "worstcase"
+    run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "$nbins" ""
     g+=($RETURN)
     
     run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
@@ -413,3 +416,5 @@ main()
 }
 
 main "$@"
+
+# find . -name *quicksort_worstcase* | sed -e "p;s/quicksort_worstcase/quicksort/" | xargs -n2 mv

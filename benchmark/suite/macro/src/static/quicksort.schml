@@ -14,11 +14,11 @@
                                       [x : Int (vector-ref a r)])
                                   (begin
                                     (repeat (j p r) (_ : Unit ())
-                                            (if (<= (vector-ref a j) x)
-                                                (begin
-                                                  (box-set! i (+ (unbox i) 1))
-                                                  (swap a (unbox i) j))
-                                                ()))
+                                      (if (<= (vector-ref a j) x)
+                                          (begin
+                                            (box-set! i (+ (unbox i) 1))
+                                            (swap a (unbox i) j))
+                                          ()))
                                     (swap a (+ (unbox i) 1) r)
                                     (+ (unbox i) 1))))]
              [swap : ((Vect Int) Int Int -> ())
@@ -31,6 +31,6 @@
                                    (vector-set! a j t)))))])
       (begin
         (repeat (i 0 size) (_ : Unit ())
-                (vector-set! a i (read-int)))
+          (vector-set! a i (read-int)))
         (sort a 0 (- size 1))
         (vector-ref a (- size 1))))))

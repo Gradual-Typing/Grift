@@ -141,7 +141,7 @@ run_experiment()
     run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "400" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" "worstcase"
+    run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" ""
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
 
