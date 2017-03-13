@@ -8,7 +8,7 @@
   (make-parameter 'Lazy-D))
 
 ;; How casts are represented
-(define-type Cast-Representation (U 'Type-Based 'Coercions))
+(define-type Cast-Representation (U 'Type-Based 'Coercions 'Hyper-Coercions))
 (define cast-representation : (Parameterof Cast-Representation)
   (make-parameter 'Coercions))
 

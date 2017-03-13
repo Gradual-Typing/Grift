@@ -47,17 +47,28 @@
     (program . ,program-tests)
     (large   . ,large-tests)))
 
+;; The value of the test-cast-representations parameter
+;; before alterations to the configuration.
+(define default-test-cast-representation
+  '(Type-Based Coercions))
 
+;; Parameter Specifying which cast-representation variables
+;; get tested when running the test suite
 (define test-cast-representation
-  (make-parameter '(Type-Based Coercions)))
+  (make-parameter default-test-cast-representation))
+
 (define test-blame-semantics
   (make-parameter '(Lazy-D)))
+
 (define test-dynamic-operations
   (make-parameter '(#f #t inline)))
+
 (define test-specialize-cast-code-generation
   (make-parameter '(#f #t)))
+
 (define test-init-heap-kilobytes
   (make-parameter (list (expt 1024 2))))
+
 (define test-c-flags
   (make-parameter
    '(("-Wno-int-conversion" "-Wno-format" "-Wno-unused-value")
@@ -157,14 +168,22 @@
         (suite (cdr s?))
         (error 'tests "--suite given invalid argument ~a" choice)))]
  ;; Compiler Configuration
- #:once-each
+ #:multi
  [("-r" "--cast-representation") crep
-  "specify which cast representation to use (Type-Based or Coercions)"
+  "add a cast representation to the tests"
   (let ((crep (string->symbol crep)))
-    (if (or (eq? 'Type-Based crep)
-            (eq? 'Coercions crep))
-        (test-cast-representation (list crep))
-        (error 'tests "--cast-representation given invalid argument ~a" crep)))]
+    (case crep 
+      [(Type-Base Coercions Hyper-Coercions)
+       (define current-test-cast-representation (test-cast-representation))
+       (test-cast-representation
+        (if (eq? default-test-cast-representation
+                 current-test-cast-representation)
+           ;; Reset to empty and add
+           (list crep)
+           (cons crep current-test-cast-representation)))]
+      [else 
+       (error 'tests
+              "--cast-representation given invalid argument ~a" crep)]))]
  ;; Compiler Configuration -> GC Selection
  #:once-any
  ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
