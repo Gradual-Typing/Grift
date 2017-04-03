@@ -84,6 +84,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Make-Fn-Type expression1 expression2 expression3) ;; create meeted function type in runtime
   (Make-Tuple-Type expression1 expression2 expression3)
   ;; the underlying value can be accessed by the location encoded in the type
+  ;; What is the meaning of the above comment? - Andre (TODO)
   (MBoxCastedRef addr type)
   (MBoxCastedSet! addr v type)
   (MvectorS value constructor)
@@ -690,12 +691,17 @@ Dyn
   (Fn-Coercion args return)
   (Fn-Coercion-Arg coercion index)
   (Fn-Coercion-Return coercion)
+  (Id-Fn-Coercion arity)
+  (Fn-Coercion-Return-Set! fn return)
+  (Fn-Coercion-Arg-Set! fn index arg)
   ;;
   (CTuple num items)
   (Tuple-Coercion items)
   (Tuple-Coercion-Huh c)
   (Tuple-Coercion-Num c)
   (Tuple-Coercion-Item c indx)
+  (Id-Tuple-Coercion num)
+  (Tuple-Coercion-Item-Set! tuple index item)
   (Make-Tuple-Coercion make-uid t1 t2 lbl)
   (Compose-Tuple-Coercion Uid c1 c2)
   (Mediating-Coercion-Huh c)
@@ -740,7 +746,16 @@ Dyn
   (Fn-Coercion-Huh crcn)
   ;; (Make-Coercion t1 t2 lbl)
   (Make-Fn-Coercion make-uid t1 t2 lbl)
-  (Compose-Fn-Coercion comp-uid c1 c2))
+  (Compose-Fn-Coercion comp-uid c1 c2)
+  (HC project? t1 label inject? t2 med)
+  (Quote-HCoercion coercion)
+  (HC-Project-Huh hc)
+  (HC-Inject-Huh hc)
+  (HC-Identity-Huh hc)
+  (HC-Med hc)
+  (HC-Label hc)
+  (HC-T1 hc)
+  (HC-T2 hc))
 
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Schml-Type))
@@ -753,17 +768,32 @@ Dyn
                            'Fn 'Atomic 'Boxed 'GRef
                            'GVect 'MRef 'MVect 'STuple))
 
+
+(define-type (Mediating-Coercion C)
+  (U Identity
+     (Fn Index (Listof C) C)
+     (CTuple Index (Listof C))
+     (Ref C C)
+     (MonoRef Schml-Type)
+     (MonoVect Schml-Type)
+     (Failed Blame-Label)))
+
 (define-type Schml-Coercion
-  (Rec C (U Identity
-            (Project Schml-Type Blame-Label)
+  (Rec C (U (Project Schml-Type Blame-Label)
             (Inject Schml-Type)
             (Sequence C C)
-            (Failed Blame-Label)
-            (Fn Index (Listof C) C)
-            (Ref C C)
-            (MonoRef Schml-Type)
-            (MonoVect Schml-Type)
-            (CTuple Index (Listof C)))))
+            (Mediating-Coercion C))))
+
+(define-type Hyper-Coercion
+  (HC Boolean Schml-Type (Option Blame-Label)
+      Boolean Schml-Type
+      (Mediating-Coercion Hyper-Coercion)))
+
+(define-type Mixed-Coercion
+  (U Schml-Coercion
+     Hyper-Coercion
+     (Mediating-Coercion Hyper-Coercion)))
+
 
 (define IDENTITY : Identity (Identity))
 
@@ -798,6 +828,9 @@ Dyn
   (U (Project Immediate-Type Blame-Label)
      (Inject Immediate-Type)
      (Sequence Immediate-Coercion Immediate-Coercion)
+     (HC Boolean Immediate-Type (Option Blame-Label)
+         Boolean Immediate-Type
+         Immediate-Coercion)
      (Failed Blame-Label)
      (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
      (MonoRef Immediate-Type)

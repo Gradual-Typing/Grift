@@ -3,7 +3,8 @@
 #|------------------------------------------------------------------------------+
 |Pass: src/insert-casts                                                         |
 +-------------------------------------------------------------------------------+
-|Author: Deyaaeldeen Almahallawi (dalmahal@indiana.edu)                         |
+|Author: Deyaaeldeen Almahallawi (dalmahal@indiana.edu)
+|        Andre Kuhlenschmidt (akuhlens@indiana.edu)                             |
 +-------------------------------------------------------------------------------+
 |Description: This pass rewrites letrec expressions so that, in the output of   |
 | the pass, all letrec expressions are "pure," i.e., bind only variables to     |
@@ -56,22 +57,19 @@
   (: recur-all : (->* () #:rest L0-Expr Boolean))
   (define (recur-all . x*)
     (recur* x*))
-  
+
+  (debug 'simple? expr uid*)
   (match expr
     ;; The really interesting choices
     [(Var x) (set-member? uid* x)]
     [(Lambda _ (Castable ctr e))
-     (if (> depth 0)
-         (simple? e uid* (+ 1 depth) #t)
-         #f)]
+     (and (> depth 0) (simple? e uid* (+ 1 depth) #t))]
     [(App-Fn e e*) 
-     (if outer-lambda?
-         (and (recur e) (recur* e*))
-         #f)]
+     (and outer-lambda? (recur e) (recur* e*))]
     [(App-Fn-or-Proxy u e e*)
-     (if outer-lambda?
-         (and (recur e) (recur* e*))
-         #f)]
+     (and outer-lambda? (recur e) (recur* e*))]
+    [(App-Code e e*)
+     (and outer-lambda? (recur e) (recur* e*))]
     ;; Constant data is simple
     [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _) (No-Op)) #t]
     ;; All other forms are simple if their constituents are simple
@@ -90,8 +88,7 @@
      (and (recur-all e d) (recur* (map (inst cdr Any L0-Expr) c*)))]
     [(Begin e* e)  (and (recur e) (recur* e*))]
     [(Repeat i e1 e2 a e3 e4) (recur-all e1 e2 e3 e4)]
-    [(Break-Repeat) #f]
-    [(App-Code e e*) (and (recur e) (recur* e*))]
+    [(Break-Repeat) #f] ;; TODO consider why this is false
     [(Lambda f* (Castable c e)) (recur e)]
     [(Fn-Caster e) (recur e)]
     [(Fn-Proxy i e1 e2) (recur-all e1 e2)]
@@ -99,13 +96,27 @@
     [(Fn-Proxy-Closure e) (recur e)]
     [(Fn-Proxy-Coercion e) (recur e)]
     [(Compose-Coercions e1 e2) (recur-all e1 e2)]
+    [(HC p? t1 lbl i? t2 m) (recur-all p? t1 lbl i? t2 m)]
+    [(HC-Inject-Huh h) (recur h)]
+    [(HC-Project-Huh h) (recur h)]
+    [(HC-Identity-Huh h) (recur h)]
+    [(HC-Label h) (recur h)]
+    [(HC-T1 h) (recur h)]
+    [(HC-T2 h) (recur h)]
+    [(HC-Med h) (recur h)]
     [(Id-Coercion-Huh e) (recur e)]
     [(Fn-Coercion-Huh e) (recur e)]
     [(Make-Fn-Coercion u e1 e2 e3) (recur-all e1 e2 e3)]
     [(Compose-Fn-Coercion u e1 e2) (recur-all e1 e2)]
     [(Fn-Coercion e* e) (and (recur e) (recur* e*))]
+    [(Fn-Coercion-Arity e) (recur e)]
     [(Fn-Coercion-Arg e1 e2) (recur-all e1 e2)]
     [(Fn-Coercion-Return e) (recur e)]
+    [(Id-Fn-Coercion a) (recur a)]
+    [(Fn-Coercion-Arg-Set! f i a) (recur-all f i a)]
+    [(Fn-Coercion-Return-Set! f r) (recur-all f r)]
+    [(Tuple-Coercion-Item-Set! t i e) (recur-all t i e)]
+    [(Id-Tuple-Coercion a) (recur a)]
     [(Ref-Coercion e1 e2) (recur-all e1 e2)]
     [(Ref-Coercion-Huh e) (recur e)]
     [(Ref-Coercion-Read e) (recur e)]
@@ -188,16 +199,17 @@
     [(Error e) (recur e)]
     [(Create-tuple e*) (recur* e*)]
     [(Copy-Tuple n v) (recur-all n v)]
-    [(Tuple-proj e i) (recur e)]
+    [(Tuple-proj e i) (recur-all e i)]
     [(Tuple-Coercion-Huh e) (recur e)]
     [(Tuple-Coercion-Num e) (recur e)]
-    [(Tuple-Coercion-Item e i) (recur e)]
+    [(Tuple-Coercion-Item e i) (recur-all e i)]
     [(Coerce-Tuple uid e1 e2) (recur-all e1 e2)]
     [(Coerce-Tuple-In-Place uid e1 e2 e3) (recur-all e1 e2 e3)]
     [(Cast-Tuple uid e1 e2 e3 e4) (recur-all e1 e2 e3 e4)]
     [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5) (recur-all e1 e2 e3 e4 e5)]
     [(Type-Tuple-Huh e) (recur e)]
     [(Type-Tuple-num e) (recur e)]
+    [(Type-Tuple-item e i) (recur-all e i)]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
     [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
     [(Mediating-Coercion-Huh e) (recur e)]
@@ -294,6 +306,17 @@
      (Fn-Proxy-Coercion e)]
     [(Compose-Coercions (app recur e1) (app recur e2))
      (Compose-Coercions e1 e2)]
+    [(HC (app recur p?) (app recur t1) (app recur lbl)
+         (app recur i?) (app recur t2)
+         (app recur m))
+     (HC p? t1 lbl i? t2 m)]
+    [(HC-Inject-Huh (app recur h)) (HC-Inject-Huh h)]
+    [(HC-Project-Huh (app recur h)) (HC-Project-Huh h)]
+    [(HC-Identity-Huh (app recur h)) (HC-Identity-Huh h)]
+    [(HC-Label (app recur h)) (HC-Label h)]
+    [(HC-T1 (app recur h)) (HC-T1 h)]
+    [(HC-T2 (app recur h)) (HC-T2 h)]
+    [(HC-Med (app recur h)) (HC-Med h)]
     [(Id-Coercion-Huh (app recur e))
      (Id-Coercion-Huh e)]
     [(Fn-Coercion-Huh (app recur e))
@@ -304,10 +327,21 @@
      (Compose-Fn-Coercion u e1 e2)]
     [(Fn-Coercion (app recur* e*)(app recur e))
      (Fn-Coercion e* e)]
+    [(Fn-Coercion-Arity (app recur e))
+     (Fn-Coercion-Arity e)]
     [(Fn-Coercion-Arg (app recur e1)(app recur e2))
      (Fn-Coercion-Arg e1 e2)]
     [(Fn-Coercion-Return (app recur e))
      (Fn-Coercion-Return e)]
+    [(Id-Fn-Coercion (app recur a)) (Id-Fn-Coercion a)]
+    [(Fn-Coercion-Arg-Set! (app recur f) (app recur i) (app recur a))
+     (Fn-Coercion-Arg-Set! f i a)]
+    [(Fn-Coercion-Return-Set! (app recur f) (app recur r))
+     (Fn-Coercion-Return-Set! f r)]
+    [(Tuple-Coercion-Item-Set! (app recur t) (app recur i) (app recur e))
+     (Tuple-Coercion-Item-Set! t i e)]
+    [(Id-Tuple-Coercion (app recur a))
+     (Id-Tuple-Coercion a)]
     [(Ref-Coercion (app recur e1) (app recur e2))
      (Ref-Coercion e1 e2)]
     [(Ref-Coercion-Huh (app recur e))
@@ -456,9 +490,10 @@
     [(Create-tuple e*) (Create-tuple (recur* e*))]
     [(Copy-Tuple (app recur n) (app recur v))
        (Copy-Tuple n v)]
-    [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+    [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
     [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+    [(Type-Tuple-item e i) (Type-Tuple-item (recur e) (recur i))]
     [(Make-Tuple-Coercion uid t1 t2 lbl)
      (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
     [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
@@ -512,8 +547,10 @@
            [(cons i (app pl-expr expr))
             (cond
               [(simple? expr bound-uid* 0 #f)
+               (debug 'is-simple? i expr bound-uid*)
                (values `([,i . ,expr] . ,s*) c* l*)]
               [else (values s* `([,i . ,expr] . ,c*) l*)])])))
+     (debug 'purify-letrec complex* lambda*)
      (define t* : Uid* (map (lambda (x) (next-uid! "tmp")) complex*))
      (define c* : Uid* (map (inst car Uid Any) complex*))
      (define l* : Uid* (map (inst car Uid Any) lambda*))
@@ -536,7 +573,7 @@
        (if (null? complex*)
            '()
            (cons (ann (cons i (Unguarded-Box (Quote #f))) L1-Bnd)
-                 (map bnd-unitialized-box c*))))
+                 (debug (map bnd-unitialized-box c*)))))
      ;; Don't traverse lambdas unless there is work to be done
      (define lambda-bnd* : L1-Bnd-Lambda*
        (cond
@@ -555,7 +592,7 @@
               : L1-Bnd
               (match-define (cons _ e) c)
               (cons t (replace-ref e setofc* setofl* i)))
-            t* complex*))
+            (debug t*) complex*))
      (define (make-move [c : Uid] [t : Uid]) : L1-Expr
        (Unguarded-Box-Set! (Var c) (Var t)))
      (define set-complex* : L1-Expr*
@@ -565,21 +602,26 @@
              (append move* (list (Unguarded-Box-Set! (Var i) (Quote #t)))))))
      (define return
        (let* ([let-tmps : L1-Expr
-                      (cond
-                        [(null? temp-bnd*) expr^]
-                        [else (Let temp-bnd* (Begin set-complex* expr^))])]
-            [let-lambdas : L1-Expr
+                        (debug
                          (cond
-                           [(null? lambda-bnd*) let-tmps]
-                           [else (Letrec lambda-bnd* let-tmps)])]
-            [let-complex : L1-Expr
-                         (cond
-                           [(null? complex-bnd*) let-lambdas]
-                           [else (Let complex-bnd* let-lambdas)])])
-       (cond
-         [(null? simple*) let-complex]
-         [else (Let simple* let-complex)])))
-         (debug who-return return)]
+                           [(null? temp-bnd*) expr^]
+                           [else (Let temp-bnd* (Begin set-complex* expr^))]))]
+              
+              [let-lambdas : L1-Expr
+                           (debug
+                            (cond
+                              [(null? lambda-bnd*) let-tmps]
+                              [else (Letrec lambda-bnd* let-tmps)]))]
+              [let-complex : L1-Expr
+                           (debug
+                            (cond
+                              [(null? complex-bnd*) let-lambdas]
+                              [else (Let complex-bnd* let-lambdas)]))])
+         (debug
+          (cond
+            [(null? simple*) let-complex]
+            [else (Let simple* let-complex)]))))
+     (debug who-return return)]
     [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
     [(or  (Code-Label _) (Tag _) (No-Op)) expr]
     [(Code-Label u)
@@ -606,6 +648,17 @@
      (Fn-Proxy-Coercion e)]
     [(Compose-Coercions (app pl-expr e1) (app pl-expr e2))
      (Compose-Coercions e1 e2)]
+    [(HC (app pl-expr p?) (app pl-expr t1) (app pl-expr lbl)
+         (app pl-expr i?) (app pl-expr t2)
+         (app pl-expr m))
+     (HC p? t1 lbl i? t2 m)]
+    [(HC-Inject-Huh (app pl-expr h)) (HC-Inject-Huh h)]
+    [(HC-Project-Huh (app pl-expr h)) (HC-Project-Huh h)]
+    [(HC-Identity-Huh (app pl-expr h)) (HC-Identity-Huh h)]
+    [(HC-Label (app pl-expr h)) (HC-Label h)]
+    [(HC-T1 (app pl-expr h)) (HC-T1 h)]
+    [(HC-T2 (app pl-expr h)) (HC-T2 h)]
+    [(HC-Med (app pl-expr h)) (HC-Med h)]
     [(Id-Coercion-Huh (app pl-expr e))
      (Id-Coercion-Huh e)]
     [(Fn-Coercion-Huh (app pl-expr e))
@@ -616,10 +669,21 @@
      (Compose-Fn-Coercion u e1 e2)]
     [(Fn-Coercion (app pl-expr* e*)(app pl-expr e))
      (Fn-Coercion e* e)]
+    [(Fn-Coercion-Arity (app pl-expr e))
+     (Fn-Coercion-Arity e)]
     [(Fn-Coercion-Arg (app pl-expr e1)(app pl-expr e2))
      (Fn-Coercion-Arg e1 e2)]
     [(Fn-Coercion-Return (app pl-expr e))
      (Fn-Coercion-Return e)]
+    [(Id-Fn-Coercion (app pl-expr a)) (Id-Fn-Coercion a)]
+    [(Fn-Coercion-Arg-Set! (app pl-expr f) (app pl-expr i) (app pl-expr a))
+     (Fn-Coercion-Arg-Set! f i a)]
+    [(Fn-Coercion-Return-Set! (app pl-expr f) (app pl-expr r))
+     (Fn-Coercion-Return-Set! f r)]
+    [(Tuple-Coercion-Item-Set! (app pl-expr t) (app pl-expr i) (app pl-expr e))
+     (Tuple-Coercion-Item-Set! t i e)]
+    [(Id-Tuple-Coercion (app pl-expr a))
+     (Id-Tuple-Coercion a)]
     [(Ref-Coercion (app pl-expr e1) (app pl-expr e2))
      (Ref-Coercion e1 e2)]
     [(Ref-Coercion-Huh (app pl-expr e))
@@ -777,10 +841,10 @@
     [(Create-tuple e*) (Create-tuple (pl-expr* e*))]
     [(Copy-Tuple n v)
      (Copy-Tuple (pl-expr n) (pl-expr v))]
-    [(Tuple-proj e i) (Tuple-proj (pl-expr e) i)]
+    [(Tuple-proj e i) (Tuple-proj (pl-expr e) (pl-expr i))]
     [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (pl-expr e))]
     [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (pl-expr e))]
-    [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (pl-expr e) i)]
+    [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (pl-expr e) (pl-expr i))]
     [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (pl-expr e1) (pl-expr e2))]
     [(Coerce-Tuple-In-Place uid e1 e2 e3)
      (Coerce-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3))]
@@ -789,6 +853,7 @@
      (Cast-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3) (pl-expr e4) (pl-expr e5))]
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (pl-expr e))]
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
+    [(Type-Tuple-item e i) (Type-Tuple-item (pl-expr e) (pl-expr i))]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]
     [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (pl-expr e1) (pl-expr e2))]
     [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (pl-expr e))]

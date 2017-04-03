@@ -6,6 +6,7 @@
  "../helpers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
+ "../unique-identifiers.rkt"
  "../language/cast-or-coerce3.rkt")
 
 (provide (all-defined-out))
@@ -117,6 +118,13 @@
             (let*-values ([(b* t*) (trivialize (~a 't*) v* b*)] ...)
               (let ([body : CoC3-Expr b])
                 (let$*-help b* body))))])))))
+
+;; This uses the dynamically scoped next-uid! which looks at the
+;; current-next-unique-counter variable.
+;; Old way of defining new syntax each time you want to use
+;; let$* blows. TODO get rid of all uses of the old macro so that
+;; we can define this more simply.
+(define-syntax-let$* let$* next-uid!)
 
 ;; performs compile time folding of prim = on literals
 ;; todo convert this to using eq-huh
@@ -230,23 +238,25 @@
   (tuple-num$   CTuple?    Quote          CTuple-num    Tuple-Coercion-Num)
   (fail-label$  Failed?    Quote          Failed-label  Failed-Coercion-Label))
 
-(: tuple-crcn-arg$ (CoC3-Expr Index -> CoC3-Expr))
+(: tuple-crcn-arg$ (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (tuple-crcn-arg$ x i)
-  (if (not (Quote-Coercion? x))
-      (Tuple-Coercion-Item x i)
-      (let ([x (Quote-Coercion-const x)])
-        (if (CTuple? x)
+  (if (and (Quote-Coercion? x) (Quote? i))
+      (let ([x (Quote-Coercion-const x)]
+            [i (Quote-literal i)])
+        (if (and (CTuple? x) (integer? i) (index? i))
             (Quote-Coercion (list-ref (CTuple-items x) i))
-            (error 'interpret-casts "~a applied to ~a" 'tuple-crcn x)))))
+            (error 'interpret-casts "~a applied to ~a" 'tuple-crcn x)))
+      (Tuple-Coercion-Item x i)))
 
-(: tuple-type-arg$ (CoC3-Expr Index -> CoC3-Expr))
+(: tuple-type-arg$ (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (tuple-type-arg$ x i)
-  (if (not (Type? x))
-      (Type-Tuple-item x i)
-      (let ([x (Type-type x)])
-        (if (STuple? x)
+  (if (and (Type? x) (Quote? i))
+      (let ([x (Type-type x)]
+            [i (Quote-literal i)])
+        (if (and (STuple? x) (integer? i) (index? i))
             (Type (list-ref (STuple-items x) i))
-            (error 'interpret-casts "~a applied to ~a" 'tuple-type x)))))
+            (error 'interpret-casts "~a applied to ~a" 'tuple-type x)))
+      (Type-Tuple-item x i)))
 
 (define-syntax-rule
   (define-smart-coercion (name compile-time run-time field ...) ...)

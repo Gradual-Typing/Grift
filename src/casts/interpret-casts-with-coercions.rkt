@@ -492,7 +492,7 @@ form, to the shortest branch of the cast tree that is relevant.
                  [(index? i)
                   (define tmp (next-uid! "element"))
                   (values
-                   (cons tmp (cast (Tuple-proj val i) (Quote-Coercion c) (Quote 0)))
+                   (cons tmp (cast (Tuple-proj val (Quote i)) (Quote-Coercion c) (Quote 0)))
                    (Var tmp))]
                  [else (error 'interpret-casts-with-coercions "bad index")])))
            (Let bnd* (Create-tuple var*))]
@@ -1038,7 +1038,7 @@ form, to the shortest branch of the cast tree that is relevant.
        (Fn-Proxy-Coercion (recur e))]
       [(Create-tuple e*)
        (Create-tuple (map recur e*))]
-      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) (Quote i))]
       ;; Coercions manipulation
       [(or (Guarded-Proxy-Source _) (Guarded-Proxy-Target _)
            (Guarded-Proxy-Blames _))

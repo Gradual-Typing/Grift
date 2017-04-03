@@ -1,0 +1,35 @@
+* Top level functions can have inner and outer types
+* Hyper-Coercions (paper #2)
+* Bottle up Current Tests and Tag the Development for future reproducability
+* Generalize Constructors, Destructors, Mutators (faster dev)
+* Linear Space Reference Coercions (paper #2)
+* Optimizing Letrec    (paper #2/3)
+* closure optimization (paper #2/3)
+* inlining, constant propagation, common-subexpression elimination (paper #2/3)
+* case compiler for more efficient dispatch in runtime             (paper #2/3)
+* Type Case                                (paper #2/3)
+
+* runtime written in typed IR language (paper #2/3)
+** C like Type System for Underlying Language
+** Dependent Type System for Underlying Language
+** Tune GC using IR Types Don't trace non-numeric arrays
+* Strings
+** Printing Composite Data Types  (usability)
+* Standard Library                         (paper #3)
+* Type inference / function specialization (paper #2/3)
+* Partial Evaluation of Casts              (paper #3)
+* Recursive Types, True Unions    (paper #3)
+* Parametric Polymorphism                  (paper #3)
+** Parametric Specialization
+* LLVM Backend
+** Cast Aware Tail Call Optimization       (paper #3)
+** Bibop Generational Copying GC
+*** If all else false do lazy shadow stack creation
+*** Incremental         
+*** Parallel 
+*** Self-Hosted in 
+* Modules                                  (paper #3)
+* Exotic Function Features
+** Rest Arguments
+** Case Lambda
+** Apply

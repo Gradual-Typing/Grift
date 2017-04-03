@@ -50,7 +50,7 @@
 ;; The value of the test-cast-representations parameter
 ;; before alterations to the configuration.
 (define default-test-cast-representation
-  '(Type-Based Coercions))
+  '(Type-Based Coercions Hyper-Coercions))
 
 ;; Parameter Specifying which cast-representation variables
 ;; get tested when running the test suite
@@ -138,7 +138,8 @@
                    [output-path (build-path test-tmp-path "t.out")]
                    [c-path (build-path test-tmp-path "t.c")]
                    [c-flags (cons "-O3" (c-flags))]
-                   [specialize-cast-code-generation? #t])
+                   [specialize-cast-code-generation? #t]
+                   [check-asserts? #t])
       (printf "~a tests running:\n" cast-rep)
       (run-tests (suite)))))
 
