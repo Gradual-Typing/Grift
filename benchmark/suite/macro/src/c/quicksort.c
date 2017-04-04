@@ -184,20 +184,20 @@ int main(){
   int64_t tmp_value_sort1;
   int64_t LEN = 0;
   int64_t num=0;
-  scanf("%ld", &LEN);
+  scanf("%" PRId64 , &LEN);
 
   GC_INIT();
   
   int64_t *x = (int64_t*) GC_MALLOC(sizeof(int64_t)*(1+LEN));
   x[0]=LEN;
   for (int64_t i = 1; i <= LEN; ++i){
-    scanf("%ld", &num);
+    scanf("%" PRId64 , &num);
     x[i] = num;
   }
 
-  sort_clos = GC_MALLOC(3*sizeof(int64_t));
-  partition_clos = GC_MALLOC(8 * 2);
-  swap_clos = GC_MALLOC(sizeof(int64_t));
+  sort_clos = (int64_t*) GC_MALLOC(3*sizeof(int64_t));
+  partition_clos = (int64_t*) GC_MALLOC(8 * 2);
+  swap_clos = (int64_t*) GC_MALLOC(sizeof(int64_t));
   ((long *)sort_clos)[0] = ((long)sort);
   ((long *)sort_clos)[1] = partition_clos;
   ((long *)sort_clos)[2] = sort_clos;
