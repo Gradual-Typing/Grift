@@ -61,6 +61,10 @@
           (Dyn-GVector-Ref E E Blame-Label)
           (Dyn-GRef-Set! E E Schml-Type Blame-Label)
           (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-MVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-MVector-Ref E E Blame-Label)
+          (Dyn-MRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-MRef-Ref E Blame-Label)
           (Dyn-Fn-App E Crcn-Expr* Schml-Type* Blame-Label)
           )))
 

@@ -466,8 +466,8 @@
 (define ((gen-copy-value-in-monoref-code next-uid!) a-var)
   (define-syntax-let$* let$* next-uid!)
   (match a-var
-    [(Var a) (let$* ([t (Mbox-rtti-ref a)]
-                     [v (Mbox-val-ref (Var a))])
+    [(Var a) (let$* ([t (Mbox-rtti-ref a-var)]
+                     [v (Mbox-val-ref a-var)])
                (cond$
                 [(tupleT?$ t)
                  (let$* ([n (Type-Tuple-num t)]

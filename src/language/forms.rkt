@@ -79,8 +79,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (Mbox-set!T box value type)
   (Mbox-val-ref expression)
   (Mbox-val-set! expression1 expression2)
-  (Mbox-rtti-ref address)
-  (Mbox-rtti-set! address expression)
+  (Mbox-rtti-ref expr)
+  (Mbox-rtti-set! expression1 expression2)
   (Make-Fn-Type expression1 expression2 expression3) ;; create meeted function type in runtime
   (Make-Tuple-Type expression1 expression2 expression3)
   ;; the underlying value can be accessed by the location encoded in the type
@@ -95,7 +95,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Mvector-val-ref vector index)
   (Mvector-val-set! vector index value)
   (Mvector-rtti-ref vector)
-  (Mvector-rtti-set! address expression)
+  (Mvector-rtti-set! expression1 expression2)
   (MVectCastedRef addr index type)
   (MVectCastedSet! addr index value type)
   ;; Guarded effects
@@ -175,6 +175,10 @@ And a type constructor "name" expecting the types of field1 and field2
   (Dyn-GRef-Set! expr1 expr2 type label)
   (Dyn-GVector-Ref expr index label)
   (Dyn-GVector-Set! expr1 index expr2 type label)
+  (Dyn-MVector-Set! e1 i e2 e2-ty label)
+  (Dyn-MVector-Ref e i label)
+  (Dyn-MRef-Set! e1 e2 e2-ty label)
+  (Dyn-MRef-Ref e label)
   ;; Observational Operations
   (Blame expression)
   (Observe expression type)

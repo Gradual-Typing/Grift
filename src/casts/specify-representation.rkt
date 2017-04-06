@@ -1174,10 +1174,10 @@ but a static single assignment is implicitly maintained.
          (Op 'Array-set! (list e1 MBOX-VALUE-INDEX e2))]
         [(Mbox-val-ref (app recur e))
          (Op 'Array-ref (list e MBOX-VALUE-INDEX))]
-        [(Mbox-rtti-set! u (app recur e))
-         (Op 'Array-set! (list (Var u) MONO-RTTI-INDEX e))]
-        [(Mbox-rtti-ref u)
-         (Op 'Array-ref (list (Var u) MONO-RTTI-INDEX))]
+        [(Mbox-rtti-set! (app recur addr) (app recur e))
+         (Op 'Array-set! (list addr MONO-RTTI-INDEX e))]
+        [(Mbox-rtti-ref (app recur addr))
+         (Op 'Array-ref (list addr MONO-RTTI-INDEX))]
         [(Mvector (app recur e1) (app recur e2) (app sr-prim-type t))
          (define tmp1     (next-uid! "mvect1"))
          (define tmp2     (next-uid! "mvect2"))
@@ -1199,10 +1199,10 @@ but a static single assignment is implicitly maintained.
                 (Var tmp3))]
         [(Mvector-length (app recur e))
          (Op 'Array-ref (list e MVECT-SIZE-INDEX))]
-        [(Mvector-rtti-set! u (app recur e))
-         (Op 'Array-set! (list (Var u) MONO-RTTI-INDEX e))]
-        [(Mvector-rtti-ref u)
-         (Op 'Array-ref (list (Var u) MONO-RTTI-INDEX))]
+        [(Mvector-rtti-set! (app recur addr) (app recur e))
+         (Op 'Array-set! (list addr MONO-RTTI-INDEX e))]
+        [(Mvector-rtti-ref (app recur addr))
+         (Op 'Array-ref (list addr MONO-RTTI-INDEX))]
         [(Mvector-val-ref (app recur e1) (app recur e2))
          (define ind  (next-uid! "index"))
          (define tmp1 (next-uid! "mvect"))

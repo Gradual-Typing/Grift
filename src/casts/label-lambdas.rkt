@@ -213,8 +213,9 @@
       [(Mbox (app ll-expr e) t) (Mbox e t)]
       [(Mbox-val-set! (app ll-expr e1) (app ll-expr e2)) (Mbox-val-set! e1 e2)]
       [(Mbox-val-ref (app ll-expr e)) (Mbox-val-ref e)]
-      [(Mbox-rtti-set! u (app ll-expr e)) (Mbox-rtti-set! u e)]
-      [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+      [(Mbox-rtti-set! (app ll-expr addr) (app ll-expr e))
+       (Mbox-rtti-set! addr e)]
+      [(Mbox-rtti-ref (app ll-expr addr)) (Mbox-rtti-ref addr)]
       [(Make-Fn-Type e1 (app ll-expr e2) (app ll-expr e3))
        (Make-Fn-Type e1 e2 e3)]
       [(Make-Tuple-Type e1 (app ll-expr e2) (app ll-expr e3))
@@ -232,8 +233,9 @@
       [(Unguarded-Vect-length e) (Unguarded-Vect-length (ll-expr e))]
       [(Mvector-val-set! (app ll-expr e1) (app ll-expr e2) (app ll-expr e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app ll-expr e1) (app ll-expr e2)) (Mvector-val-ref e1 e2)]
-      [(Mvector-rtti-set! u (app ll-expr e)) (Mvector-rtti-set! u e)]
-      [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+      [(Mvector-rtti-set! (app ll-expr addr) (app ll-expr e))
+       (Mvector-rtti-set! addr e)]
+      [(Mvector-rtti-ref (app ll-expr addr)) (Mvector-rtti-ref addr)]
       [(Type-MVect e) (Type-MVect (ll-expr e))]
       [(Type-MVect-Huh e) (Type-MVect-Huh (ll-expr e))]
       [(Type-MVect-Of e) (Type-MVect-Of (ll-expr e))]

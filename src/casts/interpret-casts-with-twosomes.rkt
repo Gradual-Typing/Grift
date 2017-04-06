@@ -555,16 +555,16 @@ form, to the shortest branch of the cast tree that is relevant.
                  (let$* ([t2 (mref-of$ type2)])
                    (if$ (dyn?$ t2)
                         val
-                        (let$* ([t1 (Mbox-rtti-ref a)]
+                        (let$* ([t1 (Mbox-rtti-ref val)]
                                 [t3 (glbt t1 t2)])
                           (if$ (op=? t1 t3)
                                val
                                (Begin
                                  (list
-                                  (Mbox-rtti-set! a t3))
+                                  (Mbox-rtti-set! val t3))
                                  (let$* ([vv (copy-val-monoref val)]
                                          [cv (cast vv t1 t3 (Quote "") val)]
-                                         [t4 (Mbox-rtti-ref a)])
+                                         [t4 (Mbox-rtti-ref val)])
                                    (if$ (op=? t3 t4)
                                         (Begin
                                           (list (Mbox-val-set! val cv))
@@ -587,13 +587,13 @@ form, to the shortest branch of the cast tree that is relevant.
                  (let$* ([t2 (mvect-of$ type2)])
                    (if$ (dyn?$ t2)
                         val
-                        (let$* ([t1 (Mvector-rtti-ref a)]
+                        (let$* ([t1 (Mvector-rtti-ref val)]
                                 [t3 (glbt t1 t2)])
                           (if$ (op=? t1 t3)
                                val
                                (Begin
                                  (list
-                                  (Mvector-rtti-set! a t3)
+                                  (Mvector-rtti-set! val t3)
                                   (let* ([i-u (next-uid! "index")]
                                          [i (Var i-u)]
                                          [x (next-uid! "_")])
@@ -608,7 +608,7 @@ form, to the shortest branch of the cast tree that is relevant.
                                                       (list
                                                        (Mvector-val-set! val i cvi))
                                                       (let$* ([ccvi (cast cvi t1 t3 (Quote "") val)]
-                                                              [t4 (Mvector-rtti-ref a)])
+                                                              [t4 (Mvector-rtti-ref val)])
                                                         (if$ (op=? t3 t4)
                                                              (Mvector-val-set! val i ccvi)
                                                              (Break-Repeat)))))))]
@@ -617,7 +617,7 @@ form, to the shortest branch of the cast tree that is relevant.
                                         (Repeat i-u (Quote 0) vn x UNIT-IMDT
                                                 (let$* ([vi (Mvector-val-ref val i)]
                                                         [cvi (cast vi t1 t3 (Quote "") val)]
-                                                        [t4 (Mvector-rtti-ref a)])
+                                                        [t4 (Mvector-rtti-ref val)])
                                                   (if$ (op=? t3 t4)
                                                        (Mvector-val-set! val i cvi)
                                                        (Break-Repeat))))]))))
@@ -876,7 +876,7 @@ form, to the shortest branch of the cast tree that is relevant.
        (let ([t1 (next-uid! "t1")]
              [t2 (next-uid! "t2")])
          (Let (list
-               (cons t1 (Mbox-rtti-ref addr))
+               (cons t1 (Mbox-rtti-ref (Var addr)))
                (cons t2 (Type t)))
            (interp-cast (Mbox-val-ref (Var addr)) (Var t1) (Var t2) (Quote "") (Quote 0))))]
       [(MBoxCastedSet! addr (app recur e) t)
@@ -886,7 +886,7 @@ form, to the shortest branch of the cast tree that is relevant.
                      CoC3-Expr))
        (define (mbox-set! addr val t1)
          (define-syntax-let$* let$* next-uid!)
-         (let$* ([t2 (Mbox-rtti-ref addr)]
+         (let$* ([t2 (Mbox-rtti-ref (Var addr))]
                  [cv (cond$
                       [(and$ (tupleT?$ t1) (tupleT?$ t2))
                        (let$* ([n (Type-Tuple-num t2)]
@@ -897,7 +897,7 @@ form, to the shortest branch of the cast tree that is relevant.
                            ctv))]
                       [else val])]
                  [ccv (interp-cast cv t1 t2 (Quote "") (Var addr))]
-                 [t2-new (Mbox-rtti-ref addr)])
+                 [t2-new (Mbox-rtti-ref (Var addr))])
            (if$ (op=? t2 t2-new)
                 (Mbox-val-set! (Var addr) ccv)
                 (Quote 0))))
@@ -916,7 +916,7 @@ form, to the shortest branch of the cast tree that is relevant.
        (let ([t1 (next-uid! "t1")]
              [t2 (next-uid! "t2")])
          (Let (list
-               (cons t1 (Mvector-rtti-ref addr))
+               (cons t1 (Mvector-rtti-ref (Var addr)))
                (cons t2 (Type t)))
            (interp-cast (Mvector-val-ref (Var addr) i) (Var t1) (Var t2) (Quote "") (Quote 0))))]
       [(MVectCastedSet! addr (app recur i) (app recur e) t)
@@ -927,7 +927,7 @@ form, to the shortest branch of the cast tree that is relevant.
                       CoC3-Expr))
        (define (mvect-set! addr i val t1)
          (define-syntax-let$* let$* next-uid!)
-         (let$* ([t2 (Mvector-rtti-ref addr)])
+         (let$* ([t2 (Mvector-rtti-ref (Var addr))])
            (cond$
             [(and$ (tupleT?$ t1) (tupleT?$ t2))
              (let$* ([n (Type-Tuple-num t2)]
@@ -936,13 +936,13 @@ form, to the shortest branch of the cast tree that is relevant.
                  (list
                   (Mvector-val-set! (Var addr) i cvi))
                  (let$* ([ccvi (interp-cast cvi t1 t2 (Quote "") (Var addr))]
-                         [t2-new (Mvector-rtti-ref addr)])
+                         [t2-new (Mvector-rtti-ref (Var addr))])
                    (if$ (op=? t2 t2-new)
                         (Mvector-val-set! (Var addr) i ccvi)
                         (Quote 0)))))]
             [else
              (let$* ([cvi (interp-cast val t1 t2 (Quote "") (Var addr))]
-                     [t2-new (Mvector-rtti-ref addr)])
+                     [t2-new (Mvector-rtti-ref (Var addr))])
                (if$ (op=? t2 t2-new)
                     (Mvector-val-set! (Var addr) i cvi)
                     (Quote 0)))])))
@@ -988,6 +988,34 @@ form, to the shortest branch of the cast tree that is relevant.
          (bnd-non-vars next-uid! (list e1 i e2 (Quote l))
                        #:names (list "dyn_gvec" "index" "write_val" "blame_info")))
        (Let b* (dyn-gvec-set! e1^ i^ e2^ (Type t) l^))]
+      [(Dyn-MRef-Ref (app recur e) l)
+       (error "monotonic dynamic optimization not implemented yet")
+       ;; (match-define-values (b* (list e^ l^))
+       ;;   (bnd-non-vars next-uid! (list e (Quote l))
+       ;;                 #:names (list "dyn_mbox" "blame_info")))
+       ;; (Let b* (dyn-mbox-ref e^ l^))
+       ]
+      [(Dyn-MRef-Set! (app recur e1) (app recur e2) t l)
+       (error "monotonic dynamic optimization not implemented yet")
+       ;; (match-define-values (b* (list e1^ e2^ l^))
+       ;;   (bnd-non-vars next-uid! (list e1 e2 (Quote l))
+       ;;                 #:names (list "dyn_mbox" "write_val" "blame_info")))
+       ;; (Let b* (dyn-mbox-set! e1^ e2^ (Type t) l^))
+       ]
+      [(Dyn-MVector-Ref (app recur e) (app recur i) l)
+       (error "monotonic dynamic optimization not implemented yet")
+       ;; (match-define-values (b* (list e^ i^ l^))
+       ;;   (bnd-non-vars next-uid! (list e i (Quote l))
+       ;;                 #:names (list "dyn_mvec" "index" "blame_info")))
+       ;; (Let b* (dyn-mvec-ref e^ i^ l^))
+       ]
+      [(Dyn-MVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
+       (error "monotonic dynamic optimization not implemented yet")
+       ;; (match-define-values (b* (list e1^ i^ e2^ l^))
+       ;;   (bnd-non-vars next-uid! (list e1 i e2 (Quote l))
+       ;;                 #:names (list "dyn_mvec" "index" "write_val" "blame_info")))
+       ;; (Let b* (dyn-mvec-set! e1^ i^ e2^ (Type t) l^))
+       ]
       ;; We should consider desugaring the data structure rep
       ;; here if we are using it. That translation makes more
       ;; sense but is weird because we defer hybrid until

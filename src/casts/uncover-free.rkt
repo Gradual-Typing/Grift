@@ -214,8 +214,10 @@
     [(Mbox-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Mbox-val-set! e1 e2) (set-union fv1 fv2))]
     [(Mbox-val-ref (app uf-expr e fv)) (values (Mbox-val-ref e) fv)]
-    [(Mbox-rtti-set! u (app uf-expr e fv)) (values (Mbox-rtti-set! u e) fv)]
-    [(Mbox-rtti-ref u) (values (Mbox-rtti-ref u) mt-set)]
+    [(Mbox-rtti-set! (app uf-expr addr fv1) (app uf-expr e fv2))
+     (values (Mbox-rtti-set! addr e) (set-union fv1 fv2))]
+    [(Mbox-rtti-ref (app uf-expr addr fv))
+     (values (Mbox-rtti-ref addr) fv)]
     [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
      (values (Mvector e1 e2 t) (set-union fv1 fv2))]
     [(Mvector-length (app uf-expr e fv)) (values (Mvector-length e) fv)]
@@ -223,9 +225,10 @@
      (values (Mvector-val-set! e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Mvector-val-ref e1 e2) (set-union fv1 fv2))]
-    [(Mvector-rtti-set! u (app uf-expr e fv))
-     (values (Mvector-rtti-set! u e) fv)]
-    [(Mvector-rtti-ref u) (values (Mvector-rtti-ref u) mt-set)]
+    [(Mvector-rtti-set! (app uf-expr addr fv1) (app uf-expr e fv2))
+     (values (Mvector-rtti-set! addr e) (set-union fv1 fv2))]
+    [(Mvector-rtti-ref (app uf-expr addr fv))
+     (values (Mvector-rtti-ref addr) fv)]
     [(Type-MVect (app uf-expr e fv)) (values (Type-MVect e) fv)]
     [(Type-MVect-Huh (app uf-expr e fv)) (values (Type-MVect-Huh e) fv)]
     [(Type-MVect-Of (app uf-expr e fv)) (values (Type-MVect-Of e) fv)]

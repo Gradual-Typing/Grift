@@ -41,6 +41,7 @@
     (core    . ,core-tests)
     (box     . ,box-tests)
     (monobox . ,monobox-tests)
+    (monovector . ,monovector-tests)
     (vector  . ,vector-tests)
     (tuples  . ,tuple-tests)
     (tool    . ,tool-tests)

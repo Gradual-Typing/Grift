@@ -160,7 +160,6 @@
              ;; TODO register dynamic operation as a cast
              (Dyn-GRef-Set! e1 e2 e2-ty (lbl1))]
             [else
-             
              (Gbox-set! (mk-cast e1-src lbl1 e1 DYN-TYPE REF-DYN-TYPE)
                         (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE))])]
          [else
@@ -224,13 +223,24 @@
                   (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
        (Mbox-set! e1 (mk-cast e2-src (mk-label "mboxset" e2-src) e2 e2-ty (MRef-arg e1-ty)))]
       [(MunboxT (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) t)
+       ;; It would be nice if I can insert the cast from the runtime
+       ;; type here but that will ultimately expose the runtime
+       ;; operations so early and has little benefit because the
+       ;; source type is not known at this point anyway. However, we
+       ;; can detect injections in the coercions case to be optimized
+       ;; later by some cast optimizer.
        (cond
          [(Dyn? e-ty)
-          (let ([addr (next-uid! "addr")])
-            (Let `((,addr
-                    .
-                    ,(mk-cast e-src (mk-label "munbox" e-src) e e-ty (MRef DYN-TYPE))))
-              (MBoxCastedRef addr t)))]
+          (let ([lbl (mk-label "munbox" e-src)])
+            (cond
+              [(dynamic-operations?)
+               (Dyn-MRef-Ref e (lbl))]
+              [else
+               (let ([addr (next-uid! "addr")])
+                 (Let `((,addr
+                         .
+                         ,(mk-cast e-src lbl e e-ty (MRef DYN-TYPE))))
+                   (MBoxCastedRef addr t)))]))]
          [(MRef? e-ty)
           (match e
             [(Var addr) (MBoxCastedRef addr t)]
@@ -243,22 +253,35 @@
       [(Mbox-set!T (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
                    (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2))
                    t)
-       (let ([e2 (mk-cast e2-src (mk-label "val" e2-src) e2 e2-ty t)])
-         (cond
-           [(Dyn? e1-ty)
-            (let ([addr (next-uid! "addr")])
-              (Let `((,addr
-                      .
-                      ,(mk-cast e1-src (mk-label "mbox-set" e1-src) e1 e1-ty (MRef DYN-TYPE))))
-                (MBoxCastedSet! addr e2 t)))]
-           [(MRef? e1-ty) (match e1
-                            [(Var addr) (MBoxCastedSet! addr e2 t)]
-                            [else (let ([addr (next-uid! "mboxaddr")])
-                                    (Let `((,addr . ,e1))
-                                      (MBoxCastedSet! addr e2 t)))])]
-           [else (error 'insert-casts/Mbox-set!T
-                        "unexpected value for e1-ty: ~a"
-                        e1-ty)]))]
+       (cond
+         [(Dyn? e1-ty)
+          (let ([lbl (mk-label "mbox-set" e1-src)])
+            (cond
+              [(dynamic-operations?)
+               (Dyn-MRef-Set! e1 e2 e2-ty (lbl))]
+              [else
+               (let ([e2 (mk-cast e2-src (mk-label "val" e2-src) e2 e2-ty t)]
+                     [addr (next-uid! "addr")])
+                 (Let `((,addr
+                         .
+                         ,(mk-cast e1-src lbl e1 e1-ty (MRef DYN-TYPE))))
+                   (MBoxCastedSet! addr e2 t)))]))]
+         [(MRef? e1-ty) (match e1
+                          ;; OPTIMIZATION: instead of casting e2 from
+                          ;; e2-ty to t, then cast it again from t to
+                          ;; the runtime type, I cast it from e2-ty to
+                          ;; the runtime type directly.
+                          ;; Justification: the runtime type is at
+                          ;; least as precise as t by semantics.
+                          ;; TODO: remove the type annotation t from
+                          ;; the writing forms.
+                          [(Var addr) (MBoxCastedSet! addr e2 e2-ty)]
+                          [else (let ([addr (next-uid! "mboxaddr")])
+                                  (Let `((,addr . ,e1))
+                                    (MBoxCastedSet! addr e2 e2-ty)))])]
+         [else (error 'insert-casts/Mbox-set!T
+                      "unexpected value for e1-ty: ~a"
+                      e1-ty)])]
       [(Mvector (and (Ann _ (cons size-src size-ty))
                      (app ic-expr size))
                 (app ic-expr e)
@@ -287,11 +310,16 @@
                     i)])
          (cond
            [(Dyn? e-ty)
-            (let ([addr (next-uid! "addr")])
-              (Let `((,addr
-                      .
-                      ,(mk-cast e-src (mk-label "mvector-ref" e-src) e e-ty (MVect DYN-TYPE))))
-                (MVectCastedRef addr i t)))]
+            (let ([lbl (mk-label "mvector-ref" e-src)])
+              (cond
+                [(dynamic-operations?)
+                 (Dyn-MVector-Ref e i (lbl))]
+                [else
+                 (let ([addr (next-uid! "addr")])
+                   (Let `((,addr
+                           .
+                           ,(mk-cast e-src lbl e e-ty (MVect DYN-TYPE))))
+                     (MVectCastedRef addr i t)))]))]
            [(MVect? e-ty) (let ([addr (next-uid! "addr")])
                             (Let `((,addr . ,e))
                               (MVectCastedRef addr i t)))]
@@ -309,15 +337,19 @@
          (define lbl2 (mk-label "mvector-set!" e2-src))
          (cond
            [(Dyn? e1-ty)
-            (let ([addr (next-uid! "addr")])
-              (Let `((,addr
-                      .
-                      ,(mk-cast e1-src (mk-label "mvector-set" e1-src) e1 e1-ty (MVect DYN-TYPE))))
-                (MVectCastedSet! addr i (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE) t)))]
-           [(MVect? e1-ty) (let ([e2c (mk-cast e2-src lbl2 e2 e2-ty (MVect-arg e1-ty))])
-                             (let ([addr (next-uid! "mvectoraddr")])
-                               (Let `((,addr . ,e1))
-                                 (MVectCastedSet! addr i e2c t))))]
+            (let ([lbl (mk-label "mvector-set" e1-src)])
+              (cond
+                [(dynamic-operations?)
+                 (Dyn-MVector-Set! e1 i e2 e2-ty (lbl))]
+                [else
+                 (let ([addr (next-uid! "addr")])
+                   (Let `((,addr
+                           .
+                           ,(mk-cast e1-src lbl e1 e1-ty (MVect DYN-TYPE))))
+                     (MVectCastedSet! addr i (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE) t)))]))]
+           [(MVect? e1-ty) (let ([addr (next-uid! "mvectoraddr")])
+                             (Let `((,addr . ,e1))
+                               (MVectCastedSet! addr i e2 e2-ty)))]
            [else (error 'insert-casts/Mvector-set!T
                         "unexpected value for e1 type: ~a"
                         e1-ty)]))]
@@ -340,10 +372,6 @@
                                  (STuple n (make-list n DYN-TYPE))) i))]
          [(STuple? e-ty) (Tuple-proj e i)]
          [else (error 'schml/insert-casts/ic-expr/Tuple-proj "unmatched: ~a" e-ty)])]
-      ;; TODO add these cases when monotonic is finished
-      ;;[(Mvector e1 e2)         (TODO define vector insert implicit casts)]
-      ;;[(Mvector-ref e1 e2)     (TODO define vector insert implicit casts)]
-      ;;[(Mvector-set! e1 e2 e3) (TODO define vector insert implicit casts)]
       [other (error 'insert-casts/expression "unmatched ~a" other)])))
 
 (: make-list (Integer Schml-Type -> (Listof Schml-Type)))

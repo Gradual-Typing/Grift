@@ -405,8 +405,10 @@
       [(Mbox (app recur e) (app type->imdt t)) (Mbox e t)]
       [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
       [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
-      [(Mbox-rtti-set! u (app recur e)) (Mbox-rtti-set! u e)]
-      [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+      [(Mbox-rtti-set! (app recur addr) (app recur e))
+       (Mbox-rtti-set! addr e)]
+      [(Mbox-rtti-ref (app recur addr))
+       (Mbox-rtti-ref addr)]
       [(Make-Fn-Type e1 (app recur e2) (app recur e3))
        (Make-Fn-Type e1 e2 e3)]
       [(Make-Tuple-Type e1 (app recur e2) (app recur e3))
@@ -423,8 +425,10 @@
        (Mvector e1 e2 t)]
       [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
       [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
-      [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
-      [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+      [(Mvector-rtti-set! (app recur addr) (app recur e))
+       (Mvector-rtti-set! addr e)]
+      [(Mvector-rtti-ref (app recur addr))
+       (Mvector-rtti-ref addr)]
       [(Type-MVect e) (Type-MVect (recur e))]
       [(Type-MVect-Huh e) (Type-MVect-Huh (recur e))]
       [(Type-MVect-Of e) (Type-MVect-Of (recur e))]
@@ -452,8 +456,7 @@
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
       [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
-      [(? string? x) (error 'hoist-types/string)]
-      [other (error 'hoist-types/expr "unmatched ~a" other)]))
+      [(? string? x) (error 'hoist-types/string)]))
   ;; Recur through other type containing ast forms
   (: recur* (CoC3-Expr* -> L0-Expr*))
   (define (recur* e*) (map recur e*))

@@ -392,8 +392,9 @@
         [(Mbox (app recur e) t) (Mbox e t)]
         [(Mbox-val-set! (app recur e1) (app recur e2)) (Mbox-val-set! e1 e2)]
         [(Mbox-val-ref (app recur e)) (Mbox-val-ref e)]
-        [(Mbox-rtti-set! u (app recur e)) (Mbox-rtti-set! u e)]
-        [(Mbox-rtti-ref u) (Mbox-rtti-ref u)]
+        [(Mbox-rtti-set! (app recur addr) (app recur e))
+         (Mbox-rtti-set! addr e)]
+        [(Mbox-rtti-ref (app recur addr)) (Mbox-rtti-ref addr)]
         [(Make-Fn-Type e1 (app recur e2) (app recur e3))
          (Make-Fn-Type e1 e2 e3)]
         [(Make-Tuple-Type e1 (app recur e2) (app recur e3))
@@ -410,8 +411,9 @@
         [(Mvector-length (app recur e)) (Mvector-length e)]
         [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
         [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
-        [(Mvector-rtti-set! u (app recur e)) (Mvector-rtti-set! u e)]
-        [(Mvector-rtti-ref u) (Mvector-rtti-ref u)]
+        [(Mvector-rtti-set! (app recur addr) (app recur e))
+         (Mvector-rtti-set! addr e)]
+        [(Mvector-rtti-ref (app recur addr)) (Mvector-rtti-ref addr)]
         [(Type-MVect e) (Type-MVect (recur e))]
         [(Type-MVect-Huh e) (Type-MVect-Huh (recur e))]
         [(Type-MVect-Of e) (Type-MVect-Of (recur e))]

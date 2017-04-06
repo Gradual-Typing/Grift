@@ -345,6 +345,14 @@ T?l $ (_  ; )  = what here
        (Dyn-GVector-Ref e i l)]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (Dyn-GVector-Set! e1 i e2 t l)]
+      [(Dyn-MRef-Ref e l)
+       (Dyn-MRef-Ref (recur e) l)]
+      [(Dyn-MRef-Set! e1 e2 t l)
+       (Dyn-MRef-Set! (recur e1) (recur e2) t l)]
+      [(Dyn-MVector-Ref e i l)
+       (Dyn-MVector-Ref (recur e) (recur i) l)]
+      [(Dyn-MVector-Set! e1 i e2 t l)
+       (Dyn-MVector-Set! (recur e1) (recur i) (recur e2) t l)]
       [(Create-tuple (app recur* e*))
        (Create-tuple e*)]
       [(Tuple-proj e i) (Tuple-proj (recur e) i)]
