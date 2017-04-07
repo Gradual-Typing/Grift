@@ -50,7 +50,7 @@
 
 
 (define test-cast-representation
-  (make-parameter '(Type-Based Coercions)))
+  (make-parameter '(|Type-Based Casts| Coercions)))
 (define test-blame-semantics
   (make-parameter '(Lazy-D)))
 (define test-dynamic-operations
@@ -162,7 +162,7 @@
  [("-r" "--cast-representation") crep
   "specify which cast representation to use (Type-Based or Coercions)"
   (let ((crep (string->symbol crep)))
-    (if (or (eq? 'Type-Based crep)
+    (if (or (eq? '|Type-Based Casts| crep)
             (eq? 'Coercions crep))
         (test-cast-representation (list crep))
         (error 'tests "--cast-representation given invalid argument ~a" crep)))]

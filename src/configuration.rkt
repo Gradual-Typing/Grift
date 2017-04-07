@@ -8,7 +8,7 @@
   (make-parameter 'Lazy-D))
 
 ;; How casts are represented
-(define-type Cast-Representation (U 'Type-Based 'Coercions))
+(define-type Cast-Representation (U '|Type-Based Casts| 'Coercions))
 (define cast-representation : (Parameterof Cast-Representation)
   (make-parameter 'Coercions))
 
@@ -22,9 +22,9 @@
 ;; Vector Behavior
 (define bounds-checks? : (Parameterof Boolean)
   (make-parameter #t))
-(define-type Ref-Semantics (U 'Monotonic 'Guarded))
-(define reference-semantics : (Parameterof (U 'Monotonic 'Guarded))
-  (make-parameter 'Guarded))
+(define-type Ref-Semantics (U 'Monotonic 'Proxied))
+(define reference-semantics : (Parameterof (U 'Monotonic 'Proxied))
+  (make-parameter 'Proxied))
 (: inline-guarded-branch? (Parameterof Boolean))
 (define inline-guarded-branch? (make-parameter #t))
 

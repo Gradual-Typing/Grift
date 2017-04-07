@@ -33,7 +33,7 @@ This is a micro compiler that removes the cast language form.
   (define c0.5 (define->let c0))
   (define c1
     (case (cast-representation)
-      [(Type-Based)
+      [(|Type-Based Casts|)
        (interpret-casts/twosomes (lower-function-casts c0.5))]
       [(Coercions)
        (interpret-casts/coercions (lower-function-casts (casts->coercions c0.5)))]

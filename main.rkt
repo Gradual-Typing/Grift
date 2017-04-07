@@ -25,13 +25,13 @@
     (cast-representation 'Coercions)]
    ["--type-based-casts"
     "Select the type-based cast representation of casts"
-    (cast-representation 'Type-Based)]
+    (cast-representation '|Type-Based Casts|)]
    [("-R" "--cast-representation")
     cast-rep
     ("select cast runtime representation"
      "default: Coercions")
     (case cast-rep
-      [("Type-Based") (cast-representation 'Type-Based)]
+      [("Type-Based") (cast-representation '|Type-Based Casts|)]
       [("Coercions")  (cast-representation 'Coercions)]
       [("Hyper-Coercions") (error 'schml "Hyper-Coercions not yet supported")]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
@@ -45,10 +45,10 @@
     (print-version-info)]
    #:once-any
    [("--reference-semantics") semantics
-    "Monotonic, Guarded (defualt Guarded)"
+    "Monotonic, Proxied (defualt Proxied)"
     (match semantics
       ["Monotonic" (reference-semantics 'Monotonic)]
-      ["Guarded"   (reference-semantics 'Guarded)]
+      ["Proxied"   (reference-semantics 'Proxied)]
       [other (error 'reference-semantics "flag provided: ~v" other)])]
    [("--monotonic-references")
     "vectors and references default to monotonic semantics"

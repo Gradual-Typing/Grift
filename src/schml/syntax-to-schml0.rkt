@@ -531,7 +531,7 @@ represents types in the schml abstract syntax tree.
              [parse-mvector-length
               (core (parse-simple-form 'mvector-length Mvector-length 1))])
          `(,@(match (reference-semantics)
-               ['Guarded
+               ['Proxied
                 `((Ref            . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
                   (Vect           . ,(core (make-parse-type-w/ctr 'GVect GVect)))
                   (vector         . ,parse-gvector)
