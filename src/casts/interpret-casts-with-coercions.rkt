@@ -237,7 +237,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (: mvec-set! : Mvec-setT)
   (: bindings-needed-for-monotonic-refs : CoC3-Bnd-Code*)
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!
-                           bindings-needed-for-monotonic-refs)
+                  bindings-needed-for-monotonic-refs)
     (let ([gen-mbox-ref-code (make-mbox-ref-code next-uid! interp-cast-call make-coercion)]
           [gen-mbox-set!-code (make-mbox-set!-code next-uid! interp-cast-call make-coercion)]
           [gen-mvec-ref-code (make-mvect-ref-code next-uid! interp-cast-call make-coercion)]
@@ -405,11 +405,11 @@ form, to the shortest branch of the cast tree that is relevant.
            [gen-dyn-mvec-set!
             (make-dyn-mvect-set!-code next-uid! mvec-set! smart-cast)]
            [gen-dyn-mvec-ref
-            (make-dyn-mvect-ref-code next-uid! mvec-ref smart-cast)]
+            (make-dyn-mvect-ref-code next-uid! mvec-ref)]
            [gen-dyn-mbox-set!
             (make-dyn-mbox-set!-code next-uid! mbox-set! smart-cast)]
            [gen-dyn-mbox-ref
-            (make-dyn-mbox-ref-code next-uid! mbox-ref smart-cast)])
+            (make-dyn-mbox-ref-code next-uid! mbox-ref)])
       (define ((th-error [sym : Symbol]) . a)
         (error sym "dynamic-operation? = #f but present in AST"))
       (case (dynamic-operations?)
@@ -468,8 +468,8 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; included as the runtime.
   (define gradual-runtime-bindings : CoC3-Bnd-Code*
     (append
-     bindings-needed-for-monotonic-refs
      bindings-needed-for-fn-dynamic-operations
+     bindings-needed-for-monotonic-refs
      bindings-needed-for-mono-dynamic-operations
      bindings-needed-for-guarded
      bindings-needed-for-guarded-dynamic-operations
@@ -1160,7 +1160,7 @@ form, to the shortest branch of the cast tree that is relevant.
 ;; TODO: fix smart cast to take the mono rt
 
 (define-type Smart-Cast-Type
-  (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
+  (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
        (#:t1-not-dyn Boolean #:t2-not-dyn Boolean)
        CoC3-Expr))
 (: make-smart-cast :
@@ -1169,26 +1169,26 @@ form, to the shortest branch of the cast tree that is relevant.
    Make-Coercion-Type
    -> Smart-Cast-Type)
 (define ((make-smart-cast next-uid! cast mk-coercion)
-         val t1 t2 lbl
+         val t1 t2 lbl mono_type
          #:t1-not-dyn [t1-not-dyn #f]
          #:t2-not-dyn [t2-not-dyn #f])
   (match* (val t1 t2)
     [(val (Type t) (Type t)) val]
     [(val (Type (Dyn)) t2) #:when t2-not-dyn
      (match val
-       [(or (Var _) (Quote _)) (cast val (Project-Coercion t2 lbl) (Quote 0))]
+       [(or (Var _) (Quote _)) (cast val (Project-Coercion t2 lbl) mono_type)]
        [other
         (define u (next-uid! "tmp"))
         (Let (list (cons u val))
-          (cast (Var u) (Project-Coercion t2 lbl) (Quote 0)))])]
+          (cast (Var u) (Project-Coercion t2 lbl) mono_type))])]
     [((or (Var _) (Quote _)) (Type (Dyn)) t2)
-     (If (Type-Dyn-Huh t2) val (cast val (Project-Coercion t2 lbl) (Quote 0)))]
+     (If (Type-Dyn-Huh t2) val (cast val (Project-Coercion t2 lbl) mono_type))]
     [(val t1 (Type (Dyn))) #:when t1-not-dyn
-     (cast val (Inject-Coercion t1) (Quote 0))]
+     (cast val (Inject-Coercion t1) mono_type)]
     [((Var _) t1 (Type (Dyn)))
-     (If (Type-Dyn-Huh t1) val (cast val (Inject-Coercion t1) (Quote 0)))]
+     (If (Type-Dyn-Huh t1) val (cast val (Inject-Coercion t1) mono_type))]
     [(val t1 t2)
-     (cast val (mk-coercion t1 t2 lbl) (Quote 0))]))
+     (cast val (mk-coercion t1 t2 lbl) mono_type)]))
 
 (define-type Dyn-Gbox-refT
   ((Var Uid) (Var Uid) -> CoC3-Expr))
@@ -1199,17 +1199,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define-type Dyn-Gvec-setT
   ((Var Uid) (Var Uid) (Var Uid) (U (Type Schml-Type) (Var Uid)) (Var Uid)
    -> CoC3-Expr))
-(define-type Dyn-Mbox-refT
-  ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-Mbox-setT
-  ((Var Uid) (Var Uid)
-   (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-Mvec-refT
-  ((Var Uid) (Var Uid) (Var Uid)
-   -> CoC3-Expr))
-(define-type Dyn-Mvec-setT
-  ((Var Uid) (Var Uid) (Var Uid)
-   (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
 (define-type Dyn-Fn-AppT
   ((Var Uid) (Listof (Var Uid)) Schml-Type* (Var Uid) -> CoC3-Expr))
 
@@ -1231,26 +1220,7 @@ form, to the shortest branch of the cast tree that is relevant.
     (If (Type-GRef-Huh var-ty)
         (Let `([,tyof . ,(Type-GRef-Of var-ty)]
                [,read-val . ,(gb-ref var-val)])
-          ($cast var-read-val var-tyof (Type DYN-TYPE) lbl))
-        (Blame lbl))))
-
-(: make-dyn-mbox-ref-code :
-   (String -> Uid)
-   Mbox-refT
-   Smart-Cast-Type
-   -> Dyn-Mbox-refT)
-(define ((make-dyn-mbox-ref-code next-uid! mb-ref $cast) dyn lbl)
-  (define-values (val ty dynty)
-    (values (next-uid! "dyn_unbox_val")
-            (next-uid! "dyn_unbox_ty")
-            (next-uid! "dyn_type")))
-  (define-values (var-val var-ty var-dynty)
-    (values (Var val) (Var ty) (Var dynty)))
-  (Let `((,val . ,(Dyn-value dyn))
-         (,ty . ,(Dyn-type dyn)))
-    (If (Type-MRef-Huh var-ty)
-        (Let `([,dynty . ,(Type DYN-TYPE)])
-          (mb-ref var-val var-dynty))
+          ($cast var-read-val var-tyof (Type DYN-TYPE) lbl (Quote 0)))
         (Blame lbl))))
 
 (: make-dyn-gbox-set!-code :
@@ -1272,35 +1242,12 @@ form, to the shortest branch of the cast tree that is relevant.
     (If (Type-GRef-Huh ty-v)
         (Let `([,tyof . ,(Type-GRef-Of ty-v)])
           (If (Type-Dyn-Huh tyof-v)
-              (Let `([,wrt-val2 . ,($cast wrt-val1 t2 (Type DYN-TYPE) info)])
+              (Let `([,wrt-val2 . ,($cast wrt-val1 t2 (Type DYN-TYPE) info (Quote 0))])
                 (gb-set! gbox-v wrt-val2-v))
-              (Let `([,wrt-val3 . ,($cast wrt-val1 t2 tyof-v info #:t2-not-dyn #t)])
+              (Let `([,wrt-val3 . ,($cast wrt-val1 t2 tyof-v info (Quote 0) #:t2-not-dyn #t)])
                 ($cast (gb-set! gbox-v wrt-val3-v)
-                       tyof-v (Type DYN-TYPE) info #:t1-not-dyn #t))))
-        (Blame info))))
-
-(: make-dyn-mbox-set!-code :
-   (String -> Uid)
-   Mbox-setT
-   Smart-Cast-Type
-   -> Dyn-Mbox-setT)
-(define ((make-dyn-mbox-set!-code next-uid! mb-set! $cast) dyn-mbox wrt-val1 t2 info)
-  (define-values (mbox ty tyof t2u)
-    (values (next-uid! "dyn_setbox_mbox")
-            (next-uid! "dyn_setbox_ty")
-            (next-uid! "dyn_setbox_tyof")
-            (next-uid! "t2_type")))
-  (define-values (mbox-v ty-v tyof-v t2u-v)
-    (values (Var mbox) (Var ty) (Var tyof) (Var t2u)))
-  (Let `([,mbox . ,(Dyn-value dyn-mbox)]
-         [,ty   . ,(Dyn-type dyn-mbox)])
-    (If (Type-MRef-Huh ty-v)
-        (Let `([,tyof . ,(Type-MRef-Of ty-v)]
-               [,t2u .  ,t2])
-          (If (Type-Dyn-Huh tyof-v)
-              ($cast (mb-set! mbox-v wrt-val1 t2u-v)
-                     (Type UNIT-TYPE) (Type DYN-TYPE) info)
-              (mb-set! mbox-v wrt-val1 t2u-v)))
+                       tyof-v (Type DYN-TYPE) info (Quote 0)
+                       #:t1-not-dyn #t))))
         (Blame info))))
 
 (: make-dyn-gvect-ref-code :
@@ -1319,24 +1266,7 @@ form, to the shortest branch of the cast tree that is relevant.
     (If (Type-GVect-Huh var-ty)
         (Let `([,tyof . ,(Type-GVect-Of var-ty)]
                [,read-val . ,(gv-ref var-val ind)])
-          ($cast var-read-val var-tyof (Type DYN-TYPE) lbl))
-        (Blame lbl))))
-
-(: make-dyn-mvect-ref-code :
-   (String -> Uid)  Mvec-refT Smart-Cast-Type
-   -> Dyn-Mvec-refT)
-(define ((make-dyn-mvect-ref-code next-uid! mv-ref $cast) dyn ind lbl)
-  (define-values (val ty dynty)
-    (values (next-uid! "dyn_mvec_ref_val")
-            (next-uid! "dyn_mvec_ref_ty")
-            (next-uid! "dyn_type")))
-  (define-values (var-val var-ty var-dynty)
-    (values (Var val) (Var ty) (Var dynty)))
-  (Let `((,val . ,(Dyn-value dyn))
-         (,ty . ,(Dyn-type dyn)))
-    (If (Type-MVect-Huh var-ty)
-        (Let `([,dynty . ,(Type DYN-TYPE)])
-          (mv-ref var-val ind var-dynty))
+          ($cast var-read-val var-tyof (Type DYN-TYPE) lbl (Quote 0)))
         (Blame lbl))))
 
 (: make-dyn-gvect-set!-code :
@@ -1359,12 +1289,88 @@ form, to the shortest branch of the cast tree that is relevant.
     (If (Type-GVect-Huh ty-v)
         (Let `([,tyof . ,(Type-GVect-Of ty-v)])
           (If (Type-Dyn-Huh tyof-v)
-              (Let `([,wrt-val2 . ,($cast wrt-val1 t2 (Type DYN-TYPE) info)])
+              (Let `([,wrt-val2 . ,($cast wrt-val1 t2 (Type DYN-TYPE)
+                                          info (Quote 0))])
                 (gv-set! val-v ind wrt-val2-v))
-              (Let `([,wrt-val3 . ,($cast wrt-val1 t2 tyof-v info #:t2-not-dyn #t)])
+              (Let `([,wrt-val3 . ,($cast wrt-val1 t2 tyof-v
+                                          info (Quote 0) #:t2-not-dyn #t)])
                 ($cast (gv-set! val-v ind wrt-val3-v) 
-                       tyof-v (Type DYN-TYPE) info #:t1-not-dyn #t))))
+                       tyof-v (Type DYN-TYPE) info
+                       (Quote 0) #:t1-not-dyn #t))))
         (Blame info))))
+
+
+(define-type Dyn-Mbox-refT
+  ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Dyn-Mbox-setT
+  ((Var Uid) (Var Uid)
+   (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
+(define-type Dyn-Mvec-refT
+  ((Var Uid) (Var Uid) (Var Uid)
+   -> CoC3-Expr))
+(define-type Dyn-Mvec-setT
+  ((Var Uid) (Var Uid) (Var Uid)
+   (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
+
+(: make-dyn-mbox-ref-code :
+   (String -> Uid)
+   Mbox-refT
+   -> Dyn-Mbox-refT)
+(define ((make-dyn-mbox-ref-code next-uid! mb-ref) dyn lbl)
+  (define-values (val ty dynty)
+    (values (next-uid! "dyn_unbox_val")
+            (next-uid! "dyn_unbox_ty")
+            (next-uid! "dyn_type")))
+  (define-values (var-val var-ty var-dynty)
+    (values (Var val) (Var ty) (Var dynty)))
+  (Let `((,val . ,(Dyn-value dyn))
+         (,ty . ,(Dyn-type dyn)))
+    (If (Type-MRef-Huh var-ty)
+        (Let `([,dynty . ,(Type DYN-TYPE)])
+          (mb-ref var-val var-dynty))
+        (Blame lbl))))
+
+(: make-dyn-mbox-set!-code :
+   (String -> Uid)
+   Mbox-setT
+   Smart-Cast-Type
+   -> Dyn-Mbox-setT)
+(define ((make-dyn-mbox-set!-code next-uid! mb-set! $cast) dyn-mbox wrt-val1 t2 info)
+  (define-values (mbox ty tyof t2u)
+    (values (next-uid! "dyn_setbox_mbox")
+            (next-uid! "dyn_setbox_ty")
+            (next-uid! "dyn_setbox_tyof")
+            (next-uid! "t2_type")))
+  (define-values (mbox-v ty-v tyof-v t2u-v)
+    (values (Var mbox) (Var ty) (Var tyof) (Var t2u)))
+  (Let `([,mbox . ,(Dyn-value dyn-mbox)]
+         [,ty   . ,(Dyn-type dyn-mbox)])
+    (If (Type-MRef-Huh ty-v)
+        (Let `([,tyof . ,(Type-MRef-Of ty-v)]
+               [,t2u .  ,t2])
+          (If (Type-Dyn-Huh tyof-v)
+              ($cast (mb-set! mbox-v wrt-val1 t2u-v)
+                     (Type UNIT-TYPE) (Type DYN-TYPE) info
+                     (Quote 0))
+              (mb-set! mbox-v wrt-val1 t2u-v)))
+        (Blame info))))
+
+(: make-dyn-mvect-ref-code :
+   (String -> Uid)  Mvec-refT
+   -> Dyn-Mvec-refT)
+(define ((make-dyn-mvect-ref-code next-uid! mv-ref) dyn ind lbl)
+  (define-values (val ty dynty)
+    (values (next-uid! "dyn_mvec_ref_val")
+            (next-uid! "dyn_mvec_ref_ty")
+            (next-uid! "dyn_type")))
+  (define-values (var-val var-ty var-dynty)
+    (values (Var val) (Var ty) (Var dynty)))
+  (Let `((,val . ,(Dyn-value dyn))
+         (,ty . ,(Dyn-type dyn)))
+    (If (Type-MVect-Huh var-ty)
+        (Let `([,dynty . ,(Type DYN-TYPE)])
+          (mv-ref var-val ind var-dynty))
+        (Blame lbl))))
 
 (: make-dyn-mvect-set!-code :
    (String -> Uid)
@@ -1387,7 +1393,7 @@ form, to the shortest branch of the cast tree that is relevant.
                [,t2u .  ,t2])
           (If (Type-Dyn-Huh tyof-v)
               ($cast (mv-set! val-v ind wrt-val1 t2u-v)
-                     (Type UNIT-TYPE) (Type DYN-TYPE) info)
+                     (Type UNIT-TYPE) (Type DYN-TYPE) info (Quote 0))
               (mv-set! val-v ind wrt-val1 t2u-v)))
         (Blame info))))
 
@@ -1406,7 +1412,7 @@ form, to the shortest branch of the cast tree that is relevant.
                [i (in-naturals)])
       (define tyi (next-uid! (string-append "dyn_fn_ty" (number->string i))))
       (Let `([,tyi . ,(Type-Fn-arg (Var ty) (Quote i))])
-        ($cast v (Type t) (Var tyi) l))))
+        ($cast v (Type t) (Var tyi) l (Quote 0)))))
   (define casts-apply : CoC3-Expr
     (case (function-cast-representation)
       [(Hybrid) (App-Fn (Var val) arg-casts)]
@@ -1418,7 +1424,8 @@ form, to the shortest branch of the cast tree that is relevant.
     (If (Type-Fn-Huh (Var ty))
         (Let `([,ret-val . ,casts-apply]
                [,ret-ty . ,(Type-Fn-return (Var ty))])
-          ($cast (Var ret-val) (Var ret-ty) (Type DYN-TYPE) l))
+          ($cast (Var ret-val) (Var ret-ty) (Type DYN-TYPE) l
+                 (Quote 0)))
         (Blame l))))
 
 
@@ -1428,10 +1435,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define-type Gvec-refT    ((Var Uid) (Var Uid) -> CoC3-Expr))
 (define-type Gvec-setT    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
 (define-type Gvec-LengthT ((Var Uid) -> CoC3-Expr))
-(define-type Mbox-refT    ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Mbox-setT    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Mvec-refT    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Mvec-setT    ((Var Uid) (Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
 
 (: make-gbox-ref-code ((CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) -> Gbox-refT))
 (define ((make-gbox-ref-code cast) gref)
@@ -1474,6 +1477,11 @@ form, to the shortest branch of the cast tree that is relevant.
        index-exp
        (cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref)) (Quote 0)))
       (Unguarded-Vect-Set! gref index-exp val)))
+
+(define-type Mbox-refT    ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Mbox-setT    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Mvec-refT    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Mvec-setT    ((Var Uid) (Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
 
 (: make-mbox-ref-code
    ((String -> Uid)

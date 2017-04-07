@@ -265,22 +265,85 @@ form, to the shortest branch of the cast tree that is relevant.
         [(inline-guarded-branch?)
          (values gen-gbox-ref gen-gbox-set gen-gvec-ref gen-gvec-set gen-gvec-length bnd*)]
         [else (values gbox-ref gbox-set gvec-ref gvec-set gvec-length bnd*)])))
+
+  (: mbox-ref  : Mbox-refT)
+  (: mbox-set! : Mbox-setT)
+  (: mvec-ref  : Mvec-refT)
+  (: mvec-set! : Mvec-setT)
+  (: bindings-needed-for-monotonic-refs : CoC3-Bnd-Code*)
+  (define-values (mbox-ref mbox-set! mvec-ref mvec-set!
+                           bindings-needed-for-monotonic-refs)
+    (let ([gen-mbox-ref-code (make-mbox-ref-code next-uid! cast)]
+          [gen-mbox-set!-code (make-mbox-set!-code next-uid! cast)]
+          [gen-mvec-ref-code (make-mvec-ref-code next-uid! cast)]
+          [gen-mvec-set!-code (make-mvec-set!-code next-uid! cast)])
+      ;; TODO: move glbt and copy-mono here
+      (cond
+        [(inline-guarded-branch?)
+         (values gen-mbox-ref-code gen-mbox-set!-code
+                 gen-mvec-ref-code gen-mvec-set!-code
+                 `())]
+        [else (let* ([mbr   (next-uid! "rt_mbox_ref")]
+                     [mbr-b (next-uid! "box")]
+                     [mbr-rt (next-uid! "ref_type")]
+                     [mbs   (next-uid! "rt_mbox_set")]
+                     [mbs-b (next-uid! "box")]
+                     [mbs-v (next-uid! "write_val")]
+                     [mbs-rt (next-uid! "ref_type")]
+                     [mvr   (next-uid! "rt_mvec_ref")]
+                     [mvr-r (next-uid! "vec")]
+                     [mvr-i (next-uid! "ind")]
+                     [mvr-rt (next-uid! "ref_type")]
+                     [mvs   (next-uid! "rt_mvec_set")]
+                     [mvs-r (next-uid! "vec")]
+                     [mvs-i (next-uid! "ind")]
+                     [mvs-v (next-uid! "val")]
+                     [mvs-rt (next-uid! "ref_type")])
+                (values
+                 (apply-code mbr) (apply-code mbs)
+                 (apply-code mvr) (apply-code mvs)
+                 `([,mbr
+                    . ,(Code (list mbr-b mbr-rt) (gen-mbox-ref-code (Var mbr-b) (Var mbr-rt)))]
+                   [,mbs
+                    . ,(Code (list mbs-b mbs-v mbs-rt)
+                         (gen-mbox-set!-code (Var mbs-b) (Var mbs-v) (Var mbs-rt)))]
+                   [,mvr
+                    . ,(Code (list mvr-r mvr-i mvr-rt)
+                         (gen-mvec-ref-code (Var mvr-r) (Var mvr-i) (Var mvr-rt)))]
+                   [,mvs
+                    . ,(Code (list mvs-r mvs-i mvs-v mvs-rt)
+                         (gen-mvec-set!-code (Var mvs-r) (Var mvs-i)
+                                             (Var mvs-v) (Var mvs-rt)))])))])))
+
+  (: dyn-fn-app : Dyn-Fn-App-Type)
+  (: bindings-needed-for-fn-dynamic-operations : CoC3-Bnd-Code*)
+  (define-values (dyn-fn-app
+                  bindings-needed-for-fn-dynamic-operations)
+    (let ([gen-dyn-fn-app
+           (make-dyn-fn-app-code next-uid! cast)])
+      (define ((th-error [sym : Symbol]) . a)
+        (error sym "dynamic-operation? = #f but present in AST"))
+      (case (dynamic-operations?)
+        [(#f)
+         (values
+          (th-error 'interpret-cast-with-twosomes/dyn-fn-app)
+          '())]
+        [else
+         (values
+          gen-dyn-fn-app
+          `())])))
   
   ;; TODO if the simple casting interface ends up being competitive
   ;; use project and inject calls in the dynamic operation specialization.
-  (: dyn-fn-app : Dyn-Fn-App-Type)
   (: dyn-gbox-ref : Dyn-GBox-Ref-Type)
   (: dyn-gbox-set! : Dyn-GBox-Set-Type)
   (: dyn-gvec-ref  : Dyn-GVec-Ref-Type)
   (: dyn-gvec-set! : Dyn-GVec-Set-Type)
-  (: bindings-needed-for-dynamic-operations : CoC3-Bnd-Code*)
-  (define-values (dyn-fn-app
-                  dyn-gbox-ref dyn-gbox-set!
-                  dyn-gvec-ref dyn-gvec-set!
-                  bindings-needed-for-dynamic-operations)
-    (let* ([gen-dyn-fn-app
-            (make-dyn-fn-app-code next-uid! cast)]
-           [gen-dyn-gvec-set!
+  (: bindings-needed-for-guarded-dynamic-operations : CoC3-Bnd-Code*)
+  (define-values (dyn-gbox-ref dyn-gbox-set!
+                               dyn-gvec-ref dyn-gvec-set!
+                               bindings-needed-for-guarded-dynamic-operations)
+    (let* ([gen-dyn-gvec-set!
             (make-dyn-gvect-set!-code next-uid! gvec-set! cast)]
            [gen-dyn-gvec-ref
             (make-dyn-gvect-ref-code next-uid! gvec-ref cast)]
@@ -293,15 +356,13 @@ form, to the shortest branch of the cast tree that is relevant.
       (case (dynamic-operations?)
         [(#f)
          (values
-          (th-error 'interpret-cast-with-coercions/dyn-fn-app)
-          (th-error 'interpret-cast-with-coercions/dyn-gbox-ref)
-          (th-error 'interpret-cast-with-coercions/dyn-gbox-set!)
-          (th-error 'interpret-cast-with-coercions/dyn-gvec-ref)
-          (th-error 'interpret-cast-with-coercions/dyn-gvec-set!)
+          (th-error 'interpret-cast-with-twosomes/dyn-gbox-ref)
+          (th-error 'interpret-cast-with-twosomes/dyn-gbox-set!)
+          (th-error 'interpret-cast-with-twosomes/dyn-gvec-ref)
+          (th-error 'interpret-cast-with-twosomes/dyn-gvec-set!)
           '())]
         [(inline)
          (values
-          gen-dyn-fn-app
           gen-dyn-gbox-ref gen-dyn-gbox-set!
           gen-dyn-gvec-ref gen-dyn-gvec-set!
           '())]
@@ -329,7 +390,6 @@ form, to the shortest branch of the cast tree that is relevant.
                    (next-uid! "val_type")
                    (next-uid! "blame_info")))
          (values
-          gen-dyn-fn-app
           (apply-code gbr) (apply-code gbs)
           (apply-code gvr) (apply-code gvs)
           `([,gbr
@@ -348,22 +408,100 @@ form, to the shortest branch of the cast tree that is relevant.
                                      (Var gvs-v) (Var gvs-t)
                                      (Var gvs-l)))]))])))
 
+  (: dyn-mbox-ref : Dyn-Mbox-refT)
+  (: dyn-mbox-set! : Dyn-Mbox-setT)
+  (: dyn-mvec-ref  : Dyn-Mvec-refT)
+  (: dyn-mvec-set! : Dyn-Mvec-setT)
+  (: bindings-needed-for-mono-dynamic-operations : CoC3-Bnd-Code*)
+  (define-values (dyn-mbox-ref dyn-mbox-set!
+                               dyn-mvec-ref dyn-mvec-set!
+                               bindings-needed-for-mono-dynamic-operations)
+    (let* ([gen-dyn-mvec-set!
+            (make-dyn-mvect-set!-code next-uid! mvec-set! cast)]
+           [gen-dyn-mvec-ref
+            (make-dyn-mvect-ref-code next-uid! mvec-ref)]
+           [gen-dyn-mbox-set!
+            (make-dyn-mbox-set!-code next-uid! mbox-set! cast)]
+           [gen-dyn-mbox-ref 
+            (make-dyn-mbox-ref-code next-uid! mbox-ref)])
+      (define ((th-error [sym : Symbol]) . a)
+        (error sym "dynamic-operation? = #f but present in AST"))
+      (case (dynamic-operations?)
+        [(#f)
+         (values
+          (th-error 'interpret-cast-with-twosomes/dyn-mbox-ref)
+          (th-error 'interpret-cast-with-twosomes/dyn-mbox-set!)
+          (th-error 'interpret-cast-with-twosomes/dyn-mvec-ref)
+          (th-error 'interpret-cast-with-twosomes/dyn-mvec-set!)
+          '())]
+        [(inline)
+         (values
+          gen-dyn-mbox-ref gen-dyn-mbox-set!
+          gen-dyn-mvec-ref gen-dyn-mvec-set!
+          '())]
+        [else
+         (define-values (mbr mbr-b mbr-l)
+           (values (next-uid! "dyn_mbox_ref")
+                   (next-uid! "box")
+                   (next-uid! "blame_info")))
+         (define-values (mbs mbs-b mbs-v mbs-t mbs-l)
+           (values (next-uid! "dyn_mbox_set")
+                   (next-uid! "box")
+                   (next-uid! "write_val")
+                   (next-uid! "val_type")
+                   (next-uid! "blame_info")))
+         (define-values (mvr mvr-r mvr-i mvr-l)
+           (values (next-uid! "dyn_mvec_ref")
+                   (next-uid! "vector")
+                   (next-uid! "index") 
+                   (next-uid! "blame_info")))
+         (define-values (mvs mvs-r mvs-i mvs-v mvs-t mvs-l)
+           (values (next-uid! "dyn_mvec_set")
+                   (next-uid! "vector")
+                   (next-uid! "index")
+                   (next-uid! "write_val")
+                   (next-uid! "val_type")
+                   (next-uid! "blame_info")))
+         (values
+          (apply-code mbr) (apply-code mbs)
+          (apply-code mvr) (apply-code mvs)
+          `([,mbr
+             . ,(Code (list mbr-b mbr-l)
+                  (gen-dyn-mbox-ref (Var mbr-b) (Var mbr-l)))]
+            [,mbs
+             . ,(Code (list mbs-b mbs-v mbs-t mbs-l)
+                  (gen-dyn-mbox-set! (Var mbs-b) (Var mbs-v)
+                                     (Var mbs-t) (Var mbs-l)))]
+            [,mvr
+             . ,(Code (list mvr-r mvr-i mvr-l)
+                  (gen-dyn-mvec-ref (Var mvr-r) (Var mvr-i) (Var mvr-l)))]
+            [,mvs
+             . ,(Code (list mvs-r mvs-i mvs-v mvs-t mvs-l)
+                  (gen-dyn-mvec-set! (Var mvs-r) (Var mvs-i)
+                                     (Var mvs-v) (Var mvs-t)
+                                     (Var mvs-l)))]))])))
+
   
   ;; ;; Next we generate the bindings for code that needs to be
   ;; ;; included as the runtime.
   (define gradual-runtime-bindings : CoC3-Bnd-Code*
-    (append bindings-needed-for-dynamic-operations
-            bindings-needed-for-casts
-            bindings-needed-for-guarded))
+    (append
+     bindings-needed-for-fn-dynamic-operations
+     bindings-needed-for-monotonic-refs
+     bindings-needed-for-mono-dynamic-operations
+     bindings-needed-for-guarded
+     bindings-needed-for-guarded-dynamic-operations
+     bindings-needed-for-casts))
 
-
-  
   (define exp-with-lowered-gradual-operations
     (interpret-casts-in-expr
      next-uid!
      #;interp-cast-uid cast 
-     gbox-set! gbox-ref gvec-set! gvec-ref gvec-length
-     dyn-gbox-set! dyn-gbox-ref dyn-gvec-set! dyn-gvec-ref dyn-fn-app
+     gbox-ref gbox-set! gvec-ref gvec-set! gvec-length
+     mbox-ref mbox-set! mvec-ref mvec-set!
+     dyn-gbox-ref dyn-gbox-set! dyn-gvec-ref dyn-gvec-set!
+     dyn-mbox-ref dyn-mbox-set! dyn-mvec-ref dyn-mvec-set!
+     dyn-fn-app
      prgm-exp))
 
   (Prog (list prgm-name (unique-counter-next! unique-counter) prgm-type)
@@ -440,8 +578,8 @@ form, to the shortest branch of the cast tree that is relevant.
                                 cast-mref cast-mvect) v t1 t2 lbl mono-address)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([value v] [type1 t1] [type2 t2])
-   ;; TODO use a switch here or come up with a better
-   ;; dynamic injection behavior
+    ;; TODO use a switch here or come up with a better
+    ;; dynamic injection behavior
     (cond$
      [(op=? type1 (Type INT-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
@@ -788,21 +926,29 @@ form, to the shortest branch of the cast tree that is relevant.
    (String -> Uid)
    #;Uid
    Cast-With-MAddr-Type
-   GBox-Set-Type GBox-Ref-Type GVec-Set-Type GVec-Ref-Type GVec-Length-Type
-   Dyn-GBox-Set-Type Dyn-GBox-Ref-Type
-   Dyn-GVec-Set-Type Dyn-GVec-Ref-Type
+   GBox-Ref-Type GBox-Set-Type GVec-Ref-Type GVec-Set-Type
+   GVec-Length-Type
+   Mbox-refT Mbox-setT Mvec-refT Mvec-setT
+   Dyn-GBox-Ref-Type Dyn-GBox-Set-Type
+   Dyn-GVec-Ref-Type Dyn-GVec-Set-Type
+   Dyn-Mbox-refT Dyn-Mbox-setT
+   Dyn-Mvec-refT Dyn-Mvec-setT
    Dyn-Fn-App-Type
    CoC1-Expr
    ->
    CoC3-Expr)
-(define (interpret-casts-in-expr next-uid!
-                                 interp-cast 
-                                 gbox-set! gbox-ref gvect-set!
-                                 gvect-ref gvect-length
-                                 dyn-gbox-set! dyn-gbox-ref
-                                 dyn-gvec-set! dyn-gvec-ref
-                                 dyn-fn-app
-                                 exp)
+(define (interpret-casts-in-expr
+         next-uid!
+         interp-cast 
+         gbox-ref gbox-set! gvect-ref gvect-set!
+         gvect-length
+         mbox-ref mbox-set! mvect-ref mvect-set!
+         dyn-gbox-ref dyn-gbox-set!
+         dyn-gvec-ref dyn-gvec-set!
+         dyn-mbox-ref dyn-mbox-set!
+         dyn-mvec-ref dyn-mvec-set!
+         dyn-fn-app
+         exp)
   ;; map through a code binding 
   (: recur-through-bndc* : CoC1-Bnd-Code -> CoC3-Bnd-Code)
   (define (recur-through-bndc* b)
@@ -873,86 +1019,33 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Mbox-set! (app recur e1) (app recur e2))
        (Mbox-val-set! e1 e2)]
       [(MBoxCastedRef addr t)
-       (let ([t1 (next-uid! "t1")]
-             [t2 (next-uid! "t2")])
-         (Let (list
-               (cons t1 (Mbox-rtti-ref (Var addr)))
-               (cons t2 (Type t)))
-           (interp-cast (Mbox-val-ref (Var addr)) (Var t1) (Var t2) (Quote "") (Quote 0))))]
+       (match-define-values (b* (list t^))
+         (bnd-non-vars next-uid! (list (Type t)) #:names '("type")))
+       (if (null? b*)
+           (mbox-ref (Var addr) t^)
+           (Let b* (mbox-ref (Var addr) t^)))]
       [(MBoxCastedSet! addr (app recur e) t)
-       (: mbox-set! (Uid
-                     (U (Quote Cast-Literal) (Var Uid))
-                     (Var Uid) ->
-                     CoC3-Expr))
-       (define (mbox-set! addr val t1)
-         (define-syntax-let$* let$* next-uid!)
-         (let$* ([t2 (Mbox-rtti-ref (Var addr))]
-                 [cv (cond$
-                      [(and$ (tupleT?$ t1) (tupleT?$ t2))
-                       (let$* ([n (Type-Tuple-num t2)]
-                               [ctv (Copy-Tuple n val)])
-                         (Begin
-                           (list
-                            (Mbox-val-set! (Var addr) ctv))
-                           ctv))]
-                      [else val])]
-                 [ccv (interp-cast cv t1 t2 (Quote "") (Var addr))]
-                 [t2-new (Mbox-rtti-ref (Var addr))])
-           (if$ (op=? t2 t2-new)
-                (Mbox-val-set! (Var addr) ccv)
-                (Quote 0))))
-       (let ([t1 (next-uid! "t1")])
-         (Let (list (cons t1 (Type t)))
-           (if (or (Var? e) (Quote? e))
-               (mbox-set! addr e (Var t1))
-               (let ([val (next-uid! "write_cv")])
-                 (Let (list (cons val e))
-                   (mbox-set! addr (Var val) (Var t1)))))))]
+       (match-define-values (b* (list e^ t^))
+         (bnd-non-vars next-uid! (list e (Type t)) #:names '("write_val" "type")))
+       (if (null? b*)
+           (mbox-set! (Var addr) e^ t^)
+           (Let b* (mbox-set! (Var addr) e^ t^)))]
       [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
       [(Mvector-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
        (Mvector-val-set! e1 e2 e3)]
       [(MVectCastedRef addr (app recur i) t)
-       (let ([t1 (next-uid! "t1")]
-             [t2 (next-uid! "t2")])
-         (Let (list
-               (cons t1 (Mvector-rtti-ref (Var addr)))
-               (cons t2 (Type t)))
-           (interp-cast (Mvector-val-ref (Var addr) i) (Var t1) (Var t2) (Quote "") (Quote 0))))]
+       (match-define-values (b* (list i^ t^))
+         (bnd-non-vars next-uid! (list i (Type t)) #:names '("index" "type")))
+       (if (null? b*)
+           (mvect-ref (Var addr) i^ t^)
+           (Let b* (mvect-ref (Var addr) i^ t^)))]
       [(MVectCastedSet! addr (app recur i) (app recur e) t)
-       (: mvect-set! (Uid
-                      CoC3-Expr
-                      (U (Quote Cast-Literal) (Var Uid))
-                      (Var Uid) ->
-                      CoC3-Expr))
-       (define (mvect-set! addr i val t1)
-         (define-syntax-let$* let$* next-uid!)
-         (let$* ([t2 (Mvector-rtti-ref (Var addr))])
-           (cond$
-            [(and$ (tupleT?$ t1) (tupleT?$ t2))
-             (let$* ([n (Type-Tuple-num t2)]
-                     [cvi (Copy-Tuple n val)])
-               (Begin
-                 (list
-                  (Mvector-val-set! (Var addr) i cvi))
-                 (let$* ([ccvi (interp-cast cvi t1 t2 (Quote "") (Var addr))]
-                         [t2-new (Mvector-rtti-ref (Var addr))])
-                   (if$ (op=? t2 t2-new)
-                        (Mvector-val-set! (Var addr) i ccvi)
-                        (Quote 0)))))]
-            [else
-             (let$* ([cvi (interp-cast val t1 t2 (Quote "") (Var addr))]
-                     [t2-new (Mvector-rtti-ref (Var addr))])
-               (if$ (op=? t2 t2-new)
-                    (Mvector-val-set! (Var addr) i cvi)
-                    (Quote 0)))])))
-       (let ([t1 (next-uid! "t1")])
-         (Let (list (cons t1 (Type t)))
-           (if (or (Var? e) (Quote? e))
-               (mvect-set! addr i e (Var t1))
-               (let ([val (next-uid! "write_cv")])
-                 (Let (list (cons val e))
-                   (mvect-set! addr i (Var val) (Var t1)))))))]
+       (match-define-values (b* (list i^ e^ t^))
+         (bnd-non-vars next-uid! (list i e (Type t)) #:names '("index" "write_val" "type")))
+       (if (null? b*)
+           (mvect-set! (Var addr) i^ e^ t^)
+           (Let b* (mvect-set! (Var addr) i^ e^ t^)))]
       [(Mvector-length e) (Mvector-length (recur e))]
       
       ;; The translation of the dynamic operation 
@@ -989,33 +1082,25 @@ form, to the shortest branch of the cast tree that is relevant.
                        #:names (list "dyn_gvec" "index" "write_val" "blame_info")))
        (Let b* (dyn-gvec-set! e1^ i^ e2^ (Type t) l^))]
       [(Dyn-MRef-Ref (app recur e) l)
-       (error "monotonic dynamic optimization not implemented yet")
-       ;; (match-define-values (b* (list e^ l^))
-       ;;   (bnd-non-vars next-uid! (list e (Quote l))
-       ;;                 #:names (list "dyn_mbox" "blame_info")))
-       ;; (Let b* (dyn-mbox-ref e^ l^))
-       ]
+       (match-define-values (b* (list e^ l^))
+         (bnd-non-vars next-uid! (list e (Quote l))
+                       #:names (list "dyn_mbox" "blame_info")))
+       (Let b* (dyn-mbox-ref e^ l^))]
       [(Dyn-MRef-Set! (app recur e1) (app recur e2) t l)
-       (error "monotonic dynamic optimization not implemented yet")
-       ;; (match-define-values (b* (list e1^ e2^ l^))
-       ;;   (bnd-non-vars next-uid! (list e1 e2 (Quote l))
-       ;;                 #:names (list "dyn_mbox" "write_val" "blame_info")))
-       ;; (Let b* (dyn-mbox-set! e1^ e2^ (Type t) l^))
-       ]
+       (match-define-values (b* (list e1^ e2^ l^))
+         (bnd-non-vars next-uid! (list e1 e2 (Quote l))
+                       #:names (list "dyn_mbox" "write_val" "blame_info")))
+       (Let b* (dyn-mbox-set! e1^ e2^ (Type t) l^))]
       [(Dyn-MVector-Ref (app recur e) (app recur i) l)
-       (error "monotonic dynamic optimization not implemented yet")
-       ;; (match-define-values (b* (list e^ i^ l^))
-       ;;   (bnd-non-vars next-uid! (list e i (Quote l))
-       ;;                 #:names (list "dyn_mvec" "index" "blame_info")))
-       ;; (Let b* (dyn-mvec-ref e^ i^ l^))
-       ]
+       (match-define-values (b* (list e^ i^ l^))
+         (bnd-non-vars next-uid! (list e i (Quote l))
+                       #:names (list "dyn_mvec" "index" "blame_info")))
+       (Let b* (dyn-mvec-ref e^ i^ l^))]
       [(Dyn-MVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
-       (error "monotonic dynamic optimization not implemented yet")
-       ;; (match-define-values (b* (list e1^ i^ e2^ l^))
-       ;;   (bnd-non-vars next-uid! (list e1 i e2 (Quote l))
-       ;;                 #:names (list "dyn_mvec" "index" "write_val" "blame_info")))
-       ;; (Let b* (dyn-mvec-set! e1^ i^ e2^ (Type t) l^))
-       ]
+       (match-define-values (b* (list e1^ i^ e2^ l^))
+         (bnd-non-vars next-uid! (list e1 i e2 (Quote l))
+                       #:names (list "dyn_mvec" "index" "write_val" "blame_info")))
+       (Let b* (dyn-mvec-set! e1^ i^ e2^ (Type t) l^))]
       ;; We should consider desugaring the data structure rep
       ;; here if we are using it. That translation makes more
       ;; sense but is weird because we defer hybrid until
@@ -1097,10 +1182,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define-type GVec-Set-Type    ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
 (define-type GVec-Length-Type ((Var Uid) -> CoC3-Expr))
 
-(define-type MBox-Ref-Type (Uid (Var Uid) -> CoC3-Expr))
-(define-type MBox-set-Type (Uid (U (Quote Cast-Literal) (Var Uid)) (Var Uid) ->
-                                CoC3-Expr))
-
 (: make-gbox-ref-code ((String -> Uid) Cast-With-MAddr-Type GBox-Ref-Type -> GBox-Ref-Type))
 (define ((make-gbox-ref-code next-uid! cast gbox-ref) b)
   (define-values (b-u s-u t-u i-u r-u)
@@ -1176,6 +1257,68 @@ form, to the shortest branch of the cast tree that is relevant.
         (Let `([,w-u . ,(cast w (Var t-u) (Var s-u) (Var i-u) (Quote 0))])
           (gvec-set! (Var v-u) i (Var w-u))))
       (Unguarded-Vect-Set! v i w)))
+
+;;--------------------------------------------------------------------
+
+(define-type Mbox-refT ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Mbox-setT ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Mvec-refT ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Mvec-setT ((Var Uid) (Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+
+(: make-mbox-ref-code ((String -> Uid) Cast-With-MAddr-Type -> Mbox-refT))
+(define ((make-mbox-ref-code next-uid! cast) mref t2)
+  (let ([t1 (next-uid! "t1")])
+    (Let (list (cons t1 (Mbox-rtti-ref mref)))
+      (cast (Mbox-val-ref mref) (Var t1) t2 (Quote "") (Quote 0)))))
+
+(: make-mbox-set!-code ((String -> Uid) Cast-With-MAddr-Type -> Mbox-setT))
+(define ((make-mbox-set!-code next-uid! cast) mref val t1)
+  (define-syntax-let$* let$* next-uid!)
+  (let$* ([t2 (Mbox-rtti-ref mref)]
+          [cv (cond$
+               [(and$ (tupleT?$ t1) (tupleT?$ t2))
+                (let$* ([n (Type-Tuple-num t2)]
+                        [ctv (Copy-Tuple n val)])
+                  (Begin
+                    (list
+                     (Mbox-val-set! mref ctv))
+                    ctv))]
+               [else val])]
+          [ccv (cast cv t1 t2 (Quote "") mref)]
+          [t2-new (Mbox-rtti-ref mref)])
+    (begin
+      (if$ (op=? t2 t2-new)
+           (Mbox-val-set! mref ccv)
+           (Quote 0)))))
+
+(: make-mvec-ref-code ((String -> Uid) Cast-With-MAddr-Type -> Mvec-refT))
+(define ((make-mvec-ref-code next-uid! cast) mvect i t2)
+  (let ([t1 (next-uid! "t1")])
+    (Let (list (cons t1 (Mvector-rtti-ref mvect)))
+      (cast (Mvector-val-ref mvect i) (Var t1) t2 (Quote "") (Quote 0)))))
+
+(: make-mvec-set!-code ((String -> Uid) Cast-With-MAddr-Type -> Mvec-setT))
+(define ((make-mvec-set!-code next-uid! cast) mvect i val t1)
+  (define-syntax-let$* let$* next-uid!)
+  (let$* ([t2 (Mvector-rtti-ref mvect)])
+    (cond$
+     [(and$ (tupleT?$ t1) (tupleT?$ t2))
+      (let$* ([n (Type-Tuple-num t2)]
+              [cvi (Copy-Tuple n val)])
+        (Begin
+          (list
+           (Mvector-val-set! mvect i cvi))
+          (let$* ([ccvi (cast cvi t1 t2 (Quote "") mvect)]
+                  [t2-new (Mvector-rtti-ref mvect)])
+            (if$ (op=? t2 t2-new)
+                 (Mvector-val-set! mvect i ccvi)
+                 (Quote 0)))))]
+     [else
+      (let$* ([cvi (cast val t1 t2 (Quote "") mvect)]
+              [t2-new (Mvector-rtti-ref mvect)])
+        (if$ (op=? t2 t2-new)
+             (Mvector-val-set! mvect i cvi)
+             (Quote 0)))])))
 
 (define-type Dyn-GBox-Ref-Type
   ((Var Uid) (Var Uid) -> CoC3-Expr))
@@ -1273,6 +1416,104 @@ form, to the shortest branch of the cast tree that is relevant.
           (Let `([,wrt-val3 . ,(cast wrt-val1 t2 tyof-v info (Quote 0))])
             (cast (gv-set! val-v ind wrt-val3-v) tyof-v (Type DYN-TYPE) info (Quote 0))))
         (Blame info))))
+
+(define-type Dyn-Mbox-refT
+  ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type Dyn-Mbox-setT
+  ((Var Uid) (Var Uid)
+   (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
+(define-type Dyn-Mvec-refT
+  ((Var Uid) (Var Uid) (Var Uid)
+   -> CoC3-Expr))
+(define-type Dyn-Mvec-setT
+  ((Var Uid) (Var Uid) (Var Uid)
+   (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
+
+(: make-dyn-mbox-ref-code :
+   (String -> Uid)
+   Mbox-refT
+   -> Dyn-Mbox-refT)
+(define ((make-dyn-mbox-ref-code next-uid! mb-ref) dyn lbl)
+  (define-values (val ty dynty)
+    (values (next-uid! "dyn_unbox_val")
+            (next-uid! "dyn_unbox_ty")
+            (next-uid! "dyn_type")))
+  (define-values (var-val var-ty var-dynty)
+    (values (Var val) (Var ty) (Var dynty)))
+  (Let `((,val . ,(Dyn-value dyn))
+         (,ty . ,(Dyn-type dyn)))
+    (If (Type-MRef-Huh var-ty)
+        (Let `([,dynty . ,(Type DYN-TYPE)])
+          (mb-ref var-val var-dynty))
+        (Blame lbl))))
+
+(: make-dyn-mbox-set!-code :
+   (String -> Uid)
+   Mbox-setT
+   Cast-With-MAddr-Type
+   -> Dyn-Mbox-setT)
+(define ((make-dyn-mbox-set!-code next-uid! mb-set! $cast) dyn-mbox wrt-val1 t2 info)
+  (define-values (mbox ty tyof t2u)
+    (values (next-uid! "dyn_setbox_mbox")
+            (next-uid! "dyn_setbox_ty")
+            (next-uid! "dyn_setbox_tyof")
+            (next-uid! "t2_type")))
+  (define-values (mbox-v ty-v tyof-v t2u-v)
+    (values (Var mbox) (Var ty) (Var tyof) (Var t2u)))
+  (Let `([,mbox . ,(Dyn-value dyn-mbox)]
+         [,ty   . ,(Dyn-type dyn-mbox)])
+    (If (Type-MRef-Huh ty-v)
+        (Let `([,tyof . ,(Type-MRef-Of ty-v)]
+               [,t2u .  ,t2])
+          (If (Type-Dyn-Huh tyof-v)
+              ($cast (mb-set! mbox-v wrt-val1 t2u-v)
+                     (Type UNIT-TYPE) (Type DYN-TYPE) info
+                     (Quote 0))
+              (mb-set! mbox-v wrt-val1 t2u-v)))
+        (Blame info))))
+
+(: make-dyn-mvect-ref-code :
+   (String -> Uid)  Mvec-refT
+   -> Dyn-Mvec-refT)
+(define ((make-dyn-mvect-ref-code next-uid! mv-ref) dyn ind lbl)
+  (define-values (val ty dynty)
+    (values (next-uid! "dyn_mvec_ref_val")
+            (next-uid! "dyn_mvec_ref_ty")
+            (next-uid! "dyn_type")))
+  (define-values (var-val var-ty var-dynty)
+    (values (Var val) (Var ty) (Var dynty)))
+  (Let `((,val . ,(Dyn-value dyn))
+         (,ty . ,(Dyn-type dyn)))
+    (If (Type-MVect-Huh var-ty)
+        (Let `([,dynty . ,(Type DYN-TYPE)])
+          (mv-ref var-val ind var-dynty))
+        (Blame lbl))))
+
+(: make-dyn-mvect-set!-code :
+   (String -> Uid)
+   Mvec-setT
+   Cast-With-MAddr-Type
+   -> Dyn-Mvec-setT)
+(define ((make-dyn-mvect-set!-code next-uid! mv-set! $cast)
+         dyn-mvec ind wrt-val1 t2 info)
+  (define-values (val ty tyof t2u)
+    (values (next-uid! "dyn_setbox_mvect_value")
+            (next-uid! "dyn_setbox_ty")
+            (next-uid! "dyn_setbox_tyof")
+            (next-uid! "t2_type")))
+  (define-values (val-v ty-v tyof-v t2u-v)
+    (values (Var val) (Var ty) (Var tyof) (Var t2u)))
+  (Let `((,val . ,(Dyn-value dyn-mvec))
+         (,ty . ,(Dyn-type dyn-mvec)))
+    (If (Type-MVect-Huh ty-v)
+        (Let `([,tyof . ,(Type-MVect-Of ty-v)]
+               [,t2u .  ,t2])
+          (If (Type-Dyn-Huh tyof-v)
+              ($cast (mv-set! val-v ind wrt-val1 t2u-v)
+                     (Type UNIT-TYPE) (Type DYN-TYPE) info (Quote 0))
+              (mv-set! val-v ind wrt-val1 t2u-v)))
+        (Blame info))))
+
 
 (: make-dyn-fn-app-code : (String -> Uid) Cast-With-MAddr-Type -> Dyn-Fn-App-Type)
 (define ((make-dyn-fn-app-code next-uid! cast) v v* t* l)
