@@ -9,7 +9,8 @@
 | non lexical lambdas
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../helpers.rkt"
+(require #;"../helpers.rkt"
+         (submod "../logging.rkt" typed)
          "../errors.rkt"
          "../language/cast-or-coerce4.rkt"
          "../language/cast-or-coerce5.rkt")
@@ -19,7 +20,7 @@
 
 (: uncover-free (Cast-or-Coerce4-Lang . -> . Cast-or-Coerce5-Lang))
 (define (uncover-free prgm)
-  (logging uncover-free (All) prgm)
+  (debug 'cast/uncover-free prgm)
   (match-define (Prog m (Let-Static* tb* cb* e)) prgm)
   (define-values (new-exp free*) (uf-expr e))
   (unless (set-empty? free*)
@@ -30,7 +31,10 @@
 
 (: uf-expr (CoC4-Expr -> (values CoC5-Expr (Setof Uid))))
 (define (uf-expr e)
-  (match e
+  (: ret-e CoC5-Expr)
+  (: ret-fv (Setof Uid))
+  (define-values (ret-e ret-fv)
+    (match e
     ;; Interesting Cases
     ;; Free variables of an expression are returned in the set
     [(Var u) (values (Var u) (set u))]
@@ -114,6 +118,25 @@
     ;; Coercion Representation Stuff
     [(Quote-Coercion c)
      (values (Quote-Coercion c) mt-set)]
+    [(HC (app uf-expr p? p?-fv) (app uf-expr t1 t1-fv) (app uf-expr l l-fv)
+         (app uf-expr i? i?-fv) (app uf-expr t2 t2-fv)
+         (app uf-expr m  m-fv))
+     (values (HC p? t1 l i? t2 m)
+             (set-union p?-fv t1-fv l-fv i?-fv t2-fv m-fv))]
+    [(HC-Inject-Huh (app uf-expr h h-fv))
+     (values (HC-Inject-Huh h) h-fv)]
+    [(HC-Project-Huh (app uf-expr h h-fv))
+     (values  (HC-Project-Huh h) h-fv)]
+    [(HC-Identity-Huh (app uf-expr h h-fv))
+     (values (HC-Identity-Huh h) h-fv)]
+    [(HC-Label (app uf-expr h h-fv))
+     (values (HC-Label h) h-fv)]
+    [(HC-T1 (app uf-expr h h-fv))
+     (values (HC-T1 h) h-fv)]
+    [(HC-T2 (app uf-expr h h-fv))
+     (values (HC-T2 h) h-fv)]
+    [(HC-Med (app uf-expr h h-fv))
+     (values (HC-Med h) h-fv)]
     [(Id-Coercion-Huh (app uf-expr e fv))
      (values (Id-Coercion-Huh e) fv)]
     [(Fn-Coercion-Huh (app uf-expr e fv))
@@ -125,12 +148,24 @@
     [(Compose-Fn-Coercion u (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Compose-Fn-Coercion u e1 e2)
              (set-union fv1 fv2))]
+    [(Fn-Coercion-Arity (app uf-expr e fv))
+     (values (Fn-Coercion-Arity e) fv)]
     [(Fn-Coercion (app uf-expr* e* fv1) (app uf-expr e fv2))
      (values (Fn-Coercion e* e) (set-union fv1 fv2))]
     [(Fn-Coercion-Arg (app uf-expr e1 fv1)(app uf-expr e2 fv2))
      (values (Fn-Coercion-Arg e1 e2) (set-union fv1 fv2))]
     [(Fn-Coercion-Return (app uf-expr e fv))
      (values (Fn-Coercion-Return e) fv)]
+    [(Id-Fn-Coercion (app uf-expr a a-fv))
+     (values (Id-Fn-Coercion a) a-fv)]
+    [(Fn-Coercion-Arg-Set! (app uf-expr f f-fv) (app uf-expr i i-fv) (app uf-expr a a-fv))
+     (values (Fn-Coercion-Arg-Set! f i a) (set-union f-fv i-fv a-fv))]
+    [(Fn-Coercion-Return-Set! (app uf-expr f f-fv) (app uf-expr r r-fv))
+     (values (Fn-Coercion-Return-Set! f r) (set-union f-fv r-fv))]
+    [(Tuple-Coercion-Item-Set! (app uf-expr t t-fv) (app uf-expr i i-fv) (app uf-expr e e-fv))
+     (values (Tuple-Coercion-Item-Set! t i e) (set-union t-fv i-fv e-fv))]
+    [(Id-Tuple-Coercion (app uf-expr a a-fv))
+     (values (Id-Tuple-Coercion a) a-fv)]
     [(Ref-Coercion (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Ref-Coercion e1 e2) (set-union fv1 fv2))]
     [(Ref-Coercion-Huh (app uf-expr e fv))
@@ -251,10 +286,12 @@
     [(Create-tuple (app uf-expr* e* e*-fvars)) (values (Create-tuple e*) e*-fvars)]
     [(Copy-Tuple (app uf-expr n fv1) (app uf-expr v fv2))
      (values (Copy-Tuple n v) (set-union fv1 fv2))]
-    [(Tuple-proj (app uf-expr e e-fvars) i) (values (Tuple-proj e i) e-fvars)]
+    [(Tuple-proj (app uf-expr e e-fvars) (app uf-expr i i-fvars))
+     (values (Tuple-proj e i) (set-union e-fvars i-fvars))]
     [(Tuple-Coercion-Huh (app uf-expr e e-fvars)) (values (Tuple-Coercion-Huh e) e-fvars)]
     [(Tuple-Coercion-Num (app uf-expr e e-fvars)) (values (Tuple-Coercion-Num e) e-fvars)]
-    [(Tuple-Coercion-Item (app uf-expr e e-fvars) i) (values (Tuple-Coercion-Item e i) e-fvars)]
+    [(Tuple-Coercion-Item (app uf-expr e e-fvars) (app uf-expr i i-fv))
+     (values (Tuple-Coercion-Item e i) (set-union e-fvars i-fv))]
     [(Cast-Tuple uid
                  (app uf-expr e1 fv1) (app uf-expr e2 fv2)
                  (app uf-expr e3 fv3) (app uf-expr e4 fv4))
@@ -270,12 +307,16 @@
      (values (Coerce-Tuple-In-Place uid e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Type-Tuple-Huh (app uf-expr e e-fvars)) (values (Type-Tuple-Huh e) e-fvars)]
     [(Type-Tuple-num (app uf-expr e e-fvars)) (values (Type-Tuple-num e) e-fvars)]
+    [(Type-Tuple-item (app uf-expr e e-fv) (app uf-expr i i-fv))
+     (values (Type-Tuple-item e i) (set-union e-fv i-fv))]
     [(Make-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
      (values (Make-Tuple-Coercion uid e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Compose-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Compose-Tuple-Coercion uid e1 e2) (set-union fv1 fv2))]
     [(Mediating-Coercion-Huh (app uf-expr e fv)) (values (Mediating-Coercion-Huh e) fv)]
     [other (error 'uncover-free "unmatched ~a" other)]))
+  (debug 'cast/uncover-free/uf-expr/e e ret-e ret-fv)
+  (values ret-e ret-fv))
 
 
 (: uf-expr* (-> (Listof CoC4-Expr) (Values (Listof CoC5-Expr) (Setof Uid))))

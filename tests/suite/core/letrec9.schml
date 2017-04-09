@@ -1,0 +1,5 @@
+(letrec ([one : ((Dyn -> Dyn) -> (Dyn -> Dyn)) (lambda (f) f)] 
+         [const  : (-> Dyn) (lambda () one)])
+  (let ([is0  : (-> ((Dyn -> Dyn) -> (Dyn -> Dyn)))
+              const])
+    (is0)))

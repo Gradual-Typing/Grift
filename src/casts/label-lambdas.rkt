@@ -127,6 +127,17 @@
       [(Fn-Proxy-Coercion e) (Fn-Proxy-Coercion (ll-expr e))]
       [(Fn-Caster e) (Fn-Caster (ll-expr e))]
       ;; Coercions manipulation
+      [(HC (app ll-expr p?) (app ll-expr t1) (app ll-expr lbl)
+           (app ll-expr i?) (app ll-expr t2)
+           (app ll-expr m))
+       (HC p? t1 lbl i? t2 m)]
+      [(HC-Inject-Huh (app ll-expr h)) (HC-Inject-Huh h)]
+      [(HC-Project-Huh (app ll-expr h)) (HC-Project-Huh h)]
+      [(HC-Identity-Huh (app ll-expr h)) (HC-Identity-Huh h)]
+      [(HC-Label (app ll-expr h)) (HC-Label h)]
+      [(HC-T1 (app ll-expr h)) (HC-T1 h)]
+      [(HC-T2 (app ll-expr h)) (HC-T2 h)]
+      [(HC-Med (app ll-expr h)) (HC-Med h)]
       [(Type-Dyn-Huh e) (Type-Dyn-Huh (ll-expr e))]
       [(Type-Fn-Huh e) (Type-Fn-Huh (ll-expr e))]
       [(Type-GRef-Huh e) (Type-GRef-Huh (ll-expr e))]
@@ -192,6 +203,8 @@
        (Id-Coercion-Huh (ll-expr e))]
       [(Fn-Coercion e* e)
        (Fn-Coercion (map ll-expr e*) (ll-expr e))]
+      [(Fn-Coercion-Arity (app ll-expr e))
+       (Fn-Coercion-Arity e)]
       [(Make-Fn-Coercion u i t1 t2)
        (Make-Fn-Coercion u (ll-expr i) (ll-expr t1) (ll-expr t2))]
       [(Compose-Fn-Coercion u c1 c2)
@@ -202,6 +215,15 @@
        (Fn-Coercion-Arg (ll-expr e1) (ll-expr e2))]
       [(Fn-Coercion-Return e)
        (Fn-Coercion-Return (ll-expr e))]
+      [(Id-Fn-Coercion (app ll-expr a)) (Id-Fn-Coercion a)]
+      [(Fn-Coercion-Arg-Set! (app ll-expr f) (app ll-expr i) (app ll-expr a))
+       (Fn-Coercion-Arg-Set! f i a)]
+      [(Fn-Coercion-Return-Set! (app ll-expr f) (app ll-expr r))
+       (Fn-Coercion-Return-Set! f r)]
+      [(Tuple-Coercion-Item-Set! (app ll-expr t) (app ll-expr i) (app ll-expr e))
+       (Tuple-Coercion-Item-Set! t i e)]
+      [(Id-Tuple-Coercion (app ll-expr a))
+       (Id-Tuple-Coercion a)]
       [(Ref-Coercion-Huh e)
        (Ref-Coercion-Huh (ll-expr e))]
       [(Ref-Coercion e1 e2)
@@ -246,10 +268,10 @@
       [(Create-tuple e*) (Create-tuple (map ll-expr e*))]
       [(Copy-Tuple n v)
        (Copy-Tuple (ll-expr n) (ll-expr v))]
-      [(Tuple-proj e i) (Tuple-proj (ll-expr e) i)]
+      [(Tuple-proj e i) (Tuple-proj (ll-expr e) (ll-expr i))]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (ll-expr e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (ll-expr e))]
-      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (ll-expr e) i)]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (ll-expr e) (ll-expr i))]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (ll-expr e1) (ll-expr e2))]
       [(Coerce-Tuple-In-Place uid e1 e2 e3)
        (Coerce-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3))]
@@ -258,6 +280,7 @@
        (Cast-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4) (ll-expr e5))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (ll-expr e))]
       [(Type-Tuple-num e) (Type-Tuple-num (ll-expr e))]
+      [(Type-Tuple-item e i) (Type-Tuple-item (ll-expr e) (ll-expr i))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (ll-expr t1) (ll-expr t2) (ll-expr lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (ll-expr e1) (ll-expr e2))]
       [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (ll-expr e))]

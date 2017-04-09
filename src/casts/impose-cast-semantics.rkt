@@ -14,7 +14,7 @@ This is a micro compiler that removes the cast language form.
          "casts-to-coercions.rkt"
          "interpret-casts-with-coercions.rkt"
          #;"casts-to-super-coercions.rkt"
-         #;"interpret-casts-with-super-coercions.rkt"
+         "./interpret-casts-with-hyper-coercions.rkt"
          "label-lambdas.rkt"
          "uncover-free.rkt"
          "convert-closures.rkt"
@@ -37,10 +37,7 @@ This is a micro compiler that removes the cast language form.
        (interpret-casts/twosomes (lower-function-casts c0.5))]
       [(Coercions)
        (interpret-casts/coercions (lower-function-casts (casts->coercions c0.5)))]
-      #;
-      [(Super-Coercions)
-       (define c2 (casts->super-coercions c0))
-       (interpret-casts/super-coercions (error 'impose-cast-semantics/todo))]))
+      [(Hyper-Coercions) (interpret-casts/hyper-coercions c0.5)]))
   (define c5 (hoist-types-and-coercions c1))
   (define c5.5 (purify-letrec c5))
   (define c6 (label-lambdas c5.5))

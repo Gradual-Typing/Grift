@@ -13,7 +13,8 @@
 - [ ] add inlining, constant propagation, common subexpression elimination
       dead code elimination pass. (remove specialization of casts)
 - [?] Start using better timers that measure process time instead of wall-clock time
-- [ ] Lower the letrec purification pass or raise unguarded boxes
+- [ ] Fix letrec pass (I think it is currently broken) and make sure that it 
+      doesn't add overhead when casting an immediate lambda.
 - [ ] Add Lazy Shadow Stack GC + Cheney Copy Collector + Bump Pointer Allocation + GC Statistics
 - [X] Implement a switch construct for multiway branching endemic to gradual typing
 - [?] Add no-optimize annotations for testing purposes
@@ -28,7 +29,7 @@
 - [ ] Custom backend that allows us to play with the return register
 
 # For Language 
-- [ ] add define
+- [x] add define
 - [x] include, define-type,
 - [ ] recursive types
 - [X] product types (tuples and structs)

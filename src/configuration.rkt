@@ -8,7 +8,7 @@
   (make-parameter 'Lazy-D))
 
 ;; How casts are represented
-(define-type Cast-Representation (U '|Type-Based Casts| 'Coercions))
+(define-type Cast-Representation (U '|Type-Based Casts| 'Coercions 'Hyper-Coercions))
 (define cast-representation : (Parameterof Cast-Representation)
   (make-parameter 'Coercions))
 
@@ -18,6 +18,10 @@
 ;; Optimizations options
 (: dynamic-operations? (Parameterof (U Boolean 'inline)))
 (define dynamic-operations? (make-parameter #t))
+(: direct-fn-cast-optimization? (Parameterof Boolean))
+(define direct-fn-cast-optimization? (make-parameter #t))
+(: check-asserts? (Parameterof Boolean))
+(define check-asserts? (make-parameter #f))
 
 ;; Vector Behavior
 (define bounds-checks? : (Parameterof Boolean)
@@ -31,6 +35,10 @@
 ;; Cast behavior 
 (: specialize-cast-code-generation? (Parameterof Boolean))
 (define specialize-cast-code-generation? (make-parameter #f))
+
+(: optimize-first-order-coercions? (Parameterof Boolean))
+(define optimize-first-order-coercions? (make-parameter #t))
+
 
 ;; Default places for everything, but there is no default source
 (define c-path : (Parameterof (Option Path))

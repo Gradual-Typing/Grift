@@ -10,7 +10,8 @@
 (define-predicate schml-primitive? Schml-Primitive)
 
 (define-type Schml-Prim
-  (U IntxInt->Int-Primitive
+  (U Int->Int-Primitive
+     IntxInt->Int-Primitive
      IntxInt->Bool-Primitive
      ->Int-Primitive
      FloatxFloat->Float-Primitive
@@ -20,6 +21,7 @@
      Int->Float-Primitive
      Float->Int-Primitive
      FloatxFloat->Bool-Primitive
+     Bool->Bool-Primitive
      BoolxBool->Bool-Primitive
      Char->Int-Primitive
      Int->Char-Primitive 
@@ -39,8 +41,11 @@
 (define (schml-prim!? x)
   (or (timer-primitive? x)))
 
+(define-type Int->Int-Primitive (U 'binary-not))
+(define-predicate Int->Int-primitive? Int->Int-Primitive)
+
 (define-type IntxInt->Int-Primitive (U '* '+ '-
-                                       'binary-and 'binary-or 'binary-xor
+                                       'binary-and 'binary-or 'binary-xor 
                                        '%/ '%>> '%<< '%%
                                        'quotient))
 
@@ -56,9 +61,12 @@
 
 (define-type IntxInt->Bool-Primitive (U '< '<= '= '> '>=))
 (define-type BoolxBool->Bool-Primitive (U 'and 'or))
+(define-type Bool->Bool-Primitive (U 'not))
 (define-type IxI->B-Prim IntxInt->Bool-Primitive)
 (define-predicate IntxInt->Bool-primitive? IntxInt->Bool-Primitive)
 (define-predicate BoolxBool->Bool-primitive? BoolxBool->Bool-Primitive)
+(define-predicate Bool->Bool-Primitive? Bool->Bool-Primitive)
+
 
 (define-type FloatxFloat->Float-Primitive
   (U 'fl+ 'fl- 'fl* 'fl/ 'flmodulo 'flexpt 'flmin 'flmax))
@@ -102,10 +110,13 @@
 
 (define INTxINT-TYPE (list INT-TYPE INT-TYPE))
 (define BOOLxBOOL-TYPE (list BOOL-TYPE BOOL-TYPE))
-(define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
-(define BOOLxBOOL->BOOL-TYPE (Fn 2 BOOLxBOOL-TYPE BOOL-TYPE))
-(define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
 (define ->INT-TYPE (Fn 0 '() INT-TYPE))
+(define INT->INT-TYPE (Fn 1 (list INT-TYPE) INT-TYPE))
+(define INTxINT->INT-TYPE (Fn 2 INTxINT-TYPE INT-TYPE))
+(define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
+(define BOOL->BOOL-TYPE (Fn 1 (list BOOL-TYPE) BOOL-TYPE))
+(define BOOLxBOOL->BOOL-TYPE (Fn 2 BOOLxBOOL-TYPE BOOL-TYPE))
+
 
 (define FLOATxFLOAT-TYPE (list FLOAT-TYPE FLOAT-TYPE))
 (define FLOATxFLOAT->BOOL-TYPE (Fn 2 FLOATxFLOAT-TYPE BOOL-TYPE))
@@ -150,6 +161,7 @@
      (binary-and . ,INTxINT->INT-TYPE)
      (binary-or  . ,INTxINT->INT-TYPE)
      (binary-xor . ,INTxINT->INT-TYPE)
+     (binary-not . ,INT->INT-TYPE)
      (read-int . ,->INT-TYPE)
      (print-int . ,INT->UNIT-TYPE)
      (<  . ,INTxINT->BOOL-TYPE)
@@ -158,7 +170,8 @@
      (>  . ,INTxINT->BOOL-TYPE)
      (>= . ,INTxINT->BOOL-TYPE)
      (and . ,BOOLxBOOL->BOOL-TYPE)
-     (or . ,BOOLxBOOL->BOOL-TYPE)
+     (or  . ,BOOLxBOOL->BOOL-TYPE)
+     (not . ,BOOL->BOOL-TYPE)
      (quotient . ,INTxINT->INT-TYPE)
      ;; Float operations
      (fl+   . ,FLOATxFLOAT->FLOAT-TYPE)
@@ -226,6 +239,8 @@ We are going to UIL
      FloatxFloat->Float-Primitive
      FloatxFloat->Int-Primitive
      BoolxBool->Bool-Primitive
+     Bool->Bool-Primitive
+     Int->Int-Primitive
      Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim
      ->Char-Primitive Char->Int-Primitive Int->Char-Primitive))
 

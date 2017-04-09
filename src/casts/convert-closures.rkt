@@ -189,7 +189,7 @@
         ;; we need to cast the arguments
         [(App-Fn-or-Proxy cast-uid e e*)
          (case cast-rep
-           [(Coercions)
+           [(Coercions Hyper-Coercions)
             (case fn-proxy-rep
               ;; If it is a hybrid representation then proxies and closures
               ;; are applied the same way.
@@ -225,7 +225,7 @@
            [else (error 'covert-closures "Unkown Cast Representaion")])]
         [(Fn-Proxy (list i cast) (app recur e1)(app recur e2))
          (case cast-rep
-           [(Coercions)
+           [(Coercions Hyper-Coercions)
             (case fn-proxy-rep              
               [(Hybrid) (Hybrid-Proxy (get-apply-uid! i cast) e1 e2)]
               [(Data)   (Fn-Proxy i e1 e2)]
@@ -233,7 +233,7 @@
            [else (error 'convert-closures "unkown cast representation")])]
         [(Fn-Proxy-Huh (app recur e))
          (case cast-rep
-           [(Coercions)
+           [(Coercions Hyper-Coercions)
             (case fn-proxy-rep
               [(Hybrid) (Hybrid-Proxy-Huh e)]
               [(Data)   (Fn-Proxy-Huh e)]
@@ -241,7 +241,7 @@
            [else (error 'convert-closures "unkown cast representation")])]
         [(Fn-Proxy-Closure (app recur e))
          (case cast-rep
-           [(Coercions)
+           [(Coercions Hyper-Coercions)
             (case fn-proxy-rep
               [(Hybrid) (Hybrid-Proxy-Closure e)]
               [(Data)   (Fn-Proxy-Closure e)]
@@ -249,7 +249,7 @@
            [else (error 'convert-closures "unkown cast representation")])]
         [(Fn-Proxy-Coercion (app recur e))
          (case cast-rep
-           [(Coercions)
+           [(Coercions Hyper-Coercions)
             (case fn-proxy-rep
               [(Hybrid) (Hybrid-Proxy-Coercion e)]
               [(Data)   (Fn-Proxy-Coercion e)]
@@ -306,6 +306,17 @@
         ;; Coercion Representation Stuff
         [(Quote-Coercion c)
          (Quote-Coercion c)]
+        [(HC (app recur p?) (app recur t1) (app recur lbl)
+             (app recur i?) (app recur t2)
+             (app recur m))
+         (HC p? t1 lbl i? t2 m)]
+        [(HC-Inject-Huh (app recur h)) (HC-Inject-Huh h)]
+        [(HC-Project-Huh (app recur h)) (HC-Project-Huh h)]
+        [(HC-Identity-Huh (app recur h)) (HC-Identity-Huh h)]
+        [(HC-Label (app recur h)) (HC-Label h)]
+        [(HC-T1 (app recur h)) (HC-T1 h)]
+        [(HC-T2 (app recur h)) (HC-T2 h)]
+        [(HC-Med (app recur h)) (HC-Med h)]
         [(Id-Coercion-Huh (app recur e))
          (Id-Coercion-Huh e)]
         [(Fn-Coercion-Huh (app recur e))
@@ -316,10 +327,21 @@
          (Compose-Fn-Coercion u e1 e2)]
         [(Fn-Coercion (app recur* e*) (app recur e))
          (Fn-Coercion e* e)]
+        [(Fn-Coercion-Arity (app recur e))
+         (Fn-Coercion-Arity e)]
         [(Fn-Coercion-Arg (app recur e1)(app recur e2))
          (Fn-Coercion-Arg e1 e2)]
         [(Fn-Coercion-Return (app recur e))
          (Fn-Coercion-Return e)]
+        [(Id-Fn-Coercion (app recur a)) (Id-Fn-Coercion a)]
+        [(Fn-Coercion-Arg-Set! (app recur f) (app recur i) (app recur a))
+         (Fn-Coercion-Arg-Set! f i a)]
+        [(Fn-Coercion-Return-Set! (app recur f) (app recur r))
+         (Fn-Coercion-Return-Set! f r)]
+        [(Tuple-Coercion-Item-Set! (app recur t) (app recur i) (app recur e))
+         (Tuple-Coercion-Item-Set! t i e)]
+        [(Id-Tuple-Coercion (app recur a))
+         (Id-Tuple-Coercion a)]
         [(Ref-Coercion (app recur e1) (app recur e2))
          (Ref-Coercion e1 e2)]
         [(Ref-Coercion-Huh (app recur e))
@@ -424,10 +446,10 @@
         [(Create-tuple (app recur* e*)) (Create-tuple e*)]
         [(Copy-Tuple (app recur n) (app recur v))
          (Copy-Tuple n v)]
-        [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+        [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
         [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
         [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
-        [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+        [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) (recur i))]
         [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
         [(Coerce-Tuple-In-Place uid e1 e2 e3)
          (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
@@ -436,6 +458,7 @@
          (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
         [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
         [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+        [(Type-Tuple-item e i) (Type-Tuple-item (recur e) (recur i))]
         [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
         [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
         [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]

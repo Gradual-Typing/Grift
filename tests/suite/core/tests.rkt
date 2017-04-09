@@ -103,6 +103,9 @@
    (test-file "core" "letrec6.schml" (int 1))
    (test-file "core" "letrec7.schml" (int 2))
    (test-file "core" "letrec8.schml" (int 0))
+   (test-file "core" "letrec9.schml" (function))
+   (test-file "core" "letrec10.schml" (function))
+   (test-file "core" "letrec11.schml" (function))
    ;; Ascription
    (test-file "core" "int-dyn-int.schml"   (int 1))
    (test-file "core" "ascribe-dyn.schml"       (dyn))

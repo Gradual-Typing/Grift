@@ -329,7 +329,7 @@ run_experiment()
 
 main()
 {
-    USAGE="Usage: $0 nsamples loops [fresh|date] n_1,n_2 ... n_n"
+    USAGE="Usage: $0 nsamples nbins loops [fresh|date] n_1,n_2 ... n_n"
     if [ "$#" == "0" ]; then
 	echo "$USAGE"
 	exit 1

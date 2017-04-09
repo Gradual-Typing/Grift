@@ -798,7 +798,7 @@ form, to the shortest branch of the cast tree that is relevant.
                                    (unless (index? i)
                                      (error 'make-cast-tuple-code "bad index"))
                                    (let ([a (next-uid! "item_type")])
-                                     (values (cons (cons a (let$* ([item (Tuple-proj v i)]
+                                     (values (cons (cons a (let$* ([item (Tuple-proj v (Quote i))]
                                                                    [new-t1t (tuple-type-arg$ t1 i)]
                                                                    [new-t2t (tuple-type-arg$ t2 i)])
                                                              (interpret-cast item new-t1t new-t2t lbl (Quote 0)))) b*)
@@ -1161,7 +1161,7 @@ form, to the shortest branch of the cast tree that is relevant.
        (Fn-Caster (recur e))]
       [(Create-tuple e*)
        (Create-tuple (map recur e*))]
-      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) (Quote i))]
       ;; Coercions manipulation
       [(or (Fn-Proxy-Coercion _) 
            (Compose-Coercions _ _)

@@ -12,6 +12,6 @@ boehm-gc-install :
 	cc $< -c -o $@
 
 clean :
-	cd boehm-gc; make distclean
+	(cd boehm-gc; make distclean) & echo
 	rm -rf boehm-gc-install
 	rm -f *.o

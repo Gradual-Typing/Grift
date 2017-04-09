@@ -47,6 +47,14 @@
   (TYPE-TUPLE-TAG                 #b101)
   (TYPE-TUPLE-COUNT-INDEX         0)
   (TYPE-TUPLE-ELEMENTS-OFFSET     1)
+  ;;
+  (HC-PRJ-TAG-MASK  #b10)
+  (HC-INJ-TAG-MASK  #b01)
+  (HC-TAG-MASK      #b11)
+  (HC-T1-INDEX      0)
+  (HC-LABEL-INDEX   1)
+  (HC-T2-INDEX      2)
+  (HC-MED-INDEX     3)
   ;; coercions
   (COERCION-TAG-MASK              #b111) ;; the same for primary and secondary tags
   ;; project coercion representation
@@ -109,9 +117,13 @@
   (TRUE-IMDT                      #b001)
   ;; unit representation
   (UNIT-IMDT                      #b000)
+  (DYN-UNIT-IMDT                  (bitwise-ior
+                                   (arithmetic-shift data:UNIT-IMDT data:DYN-IMDT-SHIFT)
+                                   data:DYN-UNIT-TAG)) 
   (GREP-TAG-MASK                  #b111)
   ;; 0
   (UNDEF-IMDT                     0)
+  (ZERO-IMDT                      0)
   ;; guarded values representation
   (UGBOX-TAG                      #b000)
   (UGBOX-SIZE                     1)
@@ -146,4 +158,5 @@
   (HYBRID-PROXY-TAG               #b001)
   (HYBRID-PROXY-CRCN-INDEX        2)
   (HYBRID-PROXY-CLOS-INDEX        1))
+
 

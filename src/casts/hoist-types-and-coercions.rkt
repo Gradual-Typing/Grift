@@ -83,6 +83,7 @@
 
 (define-type Sorted-Bnd-Crcn* (GVectorof Bnd-Crcn*))
 
+
 (: make-type-table : -> Type-Table)
 (define (make-type-table)
   (cons (ann (make-hash) Type-Index)
@@ -100,7 +101,6 @@
 (: crcn-table->list : Crcn-Table -> Bnd-Crcn*)
 (define (crcn-table->list x)
   (append* (gvector->list (cdr x))))
-
 
 (define-type (Sorted-Bnd* A) (GVectorof (Listof (Pair Uid A))))
 
@@ -176,8 +176,7 @@
     (let-values ([(t r) (recur type)])
       t)))
 
-(: identify-coercion! : Unique-Counter Type-Table Crcn-Table
-   -> (Schml-Coercion -> Immediate-Coercion))
+(: identify-coercion! : Unique-Counter Type-Table Crcn-Table -> (Mixed-Coercion -> Immediate-Coercion))
 (define (identify-coercion! us tt ct)
   ;; This is basically the same as identify-type! above.
   (match-define (cons ci sb*) ct)
@@ -186,9 +185,9 @@
   (: ci! : Nat Compact-Coercion -> (values (Static-Id Uid) Nat))
   (define ci! (table-identify! us ci sb*))
   
-  (lambda ([crcn : Schml-Coercion])
+  (lambda ([crcn : Mixed-Coercion])
     : Immediate-Coercion
-    (: recur : Schml-Coercion -> (Values Immediate-Coercion Nat))
+    (: recur : Mixed-Coercion -> (Values Immediate-Coercion Nat))
     (define (recur c)
       (match c
         [(Identity)
@@ -201,6 +200,8 @@
          (ci! 0 (Inject t))]
         [(Sequence (app recur f m) (app recur s n))
          (ci! (max m n) (Sequence f s))]
+        [(HC p? (app ti! t1) l? i? (app ti! t2) (app recur m n))
+         (ci! n (HC p? t1 l? i? t2 m))]
         [(Fn i (app recur* a* m) (app recur r n))
          (ci! (max m n) (Fn i a* r))]
         [(Ref (app recur r m) (app recur w n))
@@ -212,7 +213,7 @@
         [(CTuple i (app recur* a* m))
          (ci! m (CTuple i a*))]
         [other (error 'hoist-types/coercion "unmatched ~a" other)]))
-    (: recur* (Schml-Coercion* -> (Values (Listof Immediate-Coercion) Nat)))
+    (: recur* ((Listof Mixed-Coercion) -> (Values (Listof Immediate-Coercion) Nat)))
     (define (recur* t*)
       (match t*
         ['() (values '() 0)]
@@ -222,8 +223,8 @@
       c)))
     
 (: map-hoisting-thru-Expr :
-   (Schml-Type -> Immediate-Type)
-   (Schml-Coercion -> Immediate-Coercion)
+   (Schml-Type     -> Immediate-Type)
+   (Mixed-Coercion -> Immediate-Coercion)
    CoC3-Expr
    -> L0-Expr)
 ;; Recur through all valid language forms collecting the types
@@ -238,6 +239,7 @@
       ;; Interesting cases
       [(Type (app type->imdt t)) (Type t)]
       [(Quote-Coercion (app crcn->imdt c)) (Quote-Coercion c)]
+      [(Quote-HCoercion (app crcn->imdt c)) (Quote-Coercion c)]
       ;; Every other case is just a boring flow agnostic tree traversal
       [(Code-Label u)
        (Code-Label u)]
@@ -263,6 +265,17 @@
        (Fn-Proxy-Coercion e)]
       [(Compose-Coercions (app recur e1) (app recur e2))
        (Compose-Coercions e1 e2)]
+      [(HC (app recur p?) (app recur t1) (app recur lbl)
+           (app recur i?) (app recur t2)
+           (app recur m))
+       (HC p? t1 lbl i? t2 m)]
+      [(HC-Inject-Huh (app recur h)) (HC-Inject-Huh h)]
+      [(HC-Project-Huh (app recur h)) (HC-Project-Huh h)]
+      [(HC-Identity-Huh (app recur h)) (HC-Identity-Huh h)]
+      [(HC-Label (app recur h)) (HC-Label h)]
+      [(HC-T1 (app recur h)) (HC-T1 h)]
+      [(HC-T2 (app recur h)) (HC-T2 h)]
+      [(HC-Med (app recur h)) (HC-Med h)]
       [(Id-Coercion-Huh (app recur e))
        (Id-Coercion-Huh e)]
       [(Fn-Coercion-Huh (app recur e))
@@ -273,10 +286,21 @@
        (Compose-Fn-Coercion u e1 e2)]
       [(Fn-Coercion (app recur* e*)(app recur e))
        (Fn-Coercion e* e)]
+      [(Fn-Coercion-Arity (app recur e))
+       (Fn-Coercion-Arity e)]
       [(Fn-Coercion-Arg (app recur e1)(app recur e2))
        (Fn-Coercion-Arg e1 e2)]
       [(Fn-Coercion-Return (app recur e))
        (Fn-Coercion-Return e)]
+      [(Id-Fn-Coercion (app recur a)) (Id-Fn-Coercion a)]
+      [(Fn-Coercion-Arg-Set! (app recur f) (app recur i) (app recur a))
+       (Fn-Coercion-Arg-Set! f i a)]
+      [(Fn-Coercion-Return-Set! (app recur f) (app recur r))
+       (Fn-Coercion-Return-Set! f r)]
+      [(Tuple-Coercion-Item-Set! (app recur t) (app recur i) (app recur e))
+       (Tuple-Coercion-Item-Set! t i e)]
+      [(Id-Tuple-Coercion (app recur a))
+       (Id-Tuple-Coercion a)]
       [(Ref-Coercion (app recur e1) (app recur e2))
        (Ref-Coercion e1 e2)]
       [(Ref-Coercion-Huh (app recur e))
@@ -441,10 +465,10 @@
        (Create-tuple e*)]
       [(Copy-Tuple (app recur n) (app recur v))
        (Copy-Tuple n v)]
-      [(Tuple-proj e i) (Tuple-proj (recur e) i)]
+      [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
-      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) i)]
+      [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) (recur i))]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
       [(Coerce-Tuple-In-Place uid e1 e2 e3)
        (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
@@ -453,6 +477,7 @@
        (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
       [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
+      [(Type-Tuple-item e i) (Type-Tuple-item (recur e) (recur i))]
       [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
       [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
       [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]

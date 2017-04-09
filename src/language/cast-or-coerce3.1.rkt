@@ -11,7 +11,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 (define-type Cast-or-Coerce3.1-Lang
   (Prog (List String Natural Schml-Type)
         (Let-Static* CoC3.1-Bnd-Type*
-                     CoC3.1-Bnd-Crcn*
+                     CoC3.1-Bnd-Crcn* 
                      CoC3.1-Expr)))
 
 (define-type CoC3.1-Expr
@@ -37,8 +37,12 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Make-Fn-Coercion Uid E E E)
           (Compose-Fn-Coercion Uid E E)
           (Fn-Coercion (Listof E) E)
+          (Fn-Coercion-Arity E)
           (Fn-Coercion-Arg E E)
           (Fn-Coercion-Return E)
+          (Fn-Coercion-Return-Set! E E)
+          (Fn-Coercion-Arg-Set! E E E)
+          (Id-Fn-Coercion E) 
           (Ref-Coercion E E)
           (Ref-Coercion-Huh E)
           (Ref-Coercion-Read E)
@@ -146,20 +150,30 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (MVect-Coercion-Huh E)
           (MVect-Coercion-Type E)
           (MVect-Coercion E)
+          (HC E E E E E E)
+          (HC-Inject-Huh E)
+          (HC-Project-Huh E)
+          (HC-Identity-Huh E)
+          (HC-Label E)
+          (HC-T1 E)
+          (HC-T2 E)
+          (HC-Med E)
           ;;
           (Create-tuple (Listof E))
           (Copy-Tuple E E)
-          (Tuple-proj E Index)
+          (Tuple-proj E E)
           (Tuple-Coercion-Huh E)
           (Tuple-Coercion-Num E)
-          (Tuple-Coercion-Item E Index)
+          (Tuple-Coercion-Item E E)
+          (Tuple-Coercion-Item-Set! E E E)
+          (Id-Tuple-Coercion E)
           (Coerce-Tuple Uid E E)
           (Coerce-Tuple-In-Place Uid E E E)
           (Cast-Tuple Uid E E E E)
           (Cast-Tuple-In-Place Uid E E E E E)
           (Type-Tuple-Huh E)
           (Type-Tuple-num E)
-          (Type-Tuple-item E Index)
+          (Type-Tuple-item E E)
           (Make-Tuple-Coercion Uid E E E)
           (Compose-Tuple-Coercion Uid E E)
           (Mediating-Coercion-Huh E)
@@ -175,3 +189,4 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 (define-type CoC3.1-Bnd-Type* (Listof CoC3.1-Bnd-Type))
 (define-type CoC3.1-Bnd-Crcn (Pairof Uid Compact-Coercion))
 (define-type CoC3.1-Bnd-Crcn* (Listof CoC3.1-Bnd-Crcn))
+

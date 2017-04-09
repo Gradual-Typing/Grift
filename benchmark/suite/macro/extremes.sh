@@ -23,7 +23,7 @@ write_schml_speedups()
     local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
     for config_index in ${configs[@]}; do
 	get_schml_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
-	echo -n ,$RETURN >> $logfile
+	printf ",$RETURN" >> $logfile
     done
 }
 
@@ -59,15 +59,15 @@ run_benchmark()
 	echo "$benchmark_args" > "$benchmark_args_file"
     fi
 
-    echo -n "$name$print_aux_name" >> "$logfile1"
+    printf "$name$print_aux_name" >> "$logfile1"
     write_schml_speedups $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
     printf "\n" >> "$logfile1"
-    echo -n "$name$print_aux_name" >> $logfile2
+    printf "$name$print_aux_name" >> $logfile2
     write_schml_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
     get_speedup racket $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
-    echo -n ,$RETURN >> $logfile2
+    printf ",$RETURN" >> $logfile2
     get_speedup chezscheme $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
-    echo -n ,$RETURN >> $logfile2
+    printf ",$RETURN" >> $logfile2
     printf "\n" >> "$logfile2"
 
     # local partial_path="${TMP_DIR}/partial/${name}"
@@ -154,8 +154,8 @@ run_experiment()
 
 main()
 {
-    USAGE="Usage: $0 loops"
-    if [ "$#" == "0" ]; then
+    USAGE="Usage: $0 loops date"
+    if [ "$#" != "2" ]; then
 	echo "$USAGE"
 	exit 1
     fi

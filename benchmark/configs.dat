@@ -1,1 +1,1 @@
-#hash((1 . (Coercions Proxied)) (2 . (|Type-Based Casts| Proxied)) (3 . (Coercions Monotonic)) (4 . (|Type-Based Casts| Monotonic)))
+#hash((1 . (|Type-Based Casts| Proxied)) (2 . (Coercions Proxied)) (3 . (Hyper-Coercions Proxied)) (4 . (|Type-Based Casts| Monotonic)) (5 . (Coercions Monotonic)) (6 . (Hyper-Coercions Monotonic)))

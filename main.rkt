@@ -1,3 +1,4 @@
+#!/usr/bin/env racket
 #lang racket/base
 
 (require "src/compile.rkt"
@@ -23,6 +24,9 @@
    ["--coercions"
     "Select the coercions representation of casts"
     (cast-representation 'Coercions)]
+   ["--hyper-coercions"
+    "Select the coercions representation of casts"
+    (cast-representation 'Hyper-Coercions)]
    ["--type-based-casts"
     "Select the type-based cast representation of casts"
     (cast-representation '|Type-Based Casts|)]
@@ -36,6 +40,9 @@
       [("Hyper-Coercions") (error 'schml "Hyper-Coercions not yet supported")]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
+   [("--check-asserts")
+    "Compile coded with assertions"
+    (check-asserts? #t)]
    [("--assert-statically-typed")
     "Raise an error unless the program is statically typed"
     (program-must-be-statically-typed?)]
@@ -60,6 +67,9 @@
    [("--keep-c") name
     "keep the c intermediate representation"
     (c-path (build-path name))]
+   [("--keep-s") name
+    "keep the assembly representation"
+    (s-path (build-path name))]
    ["--c-flag" flag
      "pass extra c flag to the C compiler"
     (c-flags (cons flag (c-flags)))]

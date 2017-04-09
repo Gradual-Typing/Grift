@@ -223,7 +223,10 @@ T?l $ (_  ; )  = what here
       [(Coercions)
        (define get-fn-cast!/coercion
          (get-fn-cast! ucount fn-casts "fn_coerce_" build-fn-cast/coercion))
-       (lfc-expr get-fn-cast!/coercion build-apply/coercion exp)]))
+       (lfc-expr get-fn-cast!/coercion build-apply/coercion exp)]
+      [else
+       (error 'schml/casts/lower-function-casts
+              "This pass only works for type-based cast and coercions")]))
 
   (Prog (list name (unique-counter-next! ucount) type)
         (Labels (hash-values fn-casts) new-expression)))
