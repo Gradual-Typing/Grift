@@ -1,3 +1,10 @@
+#|
+Author:      Deyaaeldeen Almahallawi (dalmahal@indiana.edu)
+Description: Facilitates a user-friendly interface for Schml
+             configurations. It is used mainly by the benchmarking
+             scripts.
+|#
+
 #lang racket
 (require racket/runtime-path)
 ;; Why are we writing this data structure to
@@ -46,7 +53,7 @@
              (range 1 (+ 1 (hash-count cs)))) " ")))]
    [("--contrast" "-c") c1 c2
     "compare two configurations by indice"
-    (define n1 (string->number c2))
+    (define n1 (string->number c1))
     (define n2 (string->number c2))
     (cond
       [(and n1 n2)
@@ -58,8 +65,14 @@
          (cond
            [(= (set-count s) 1) (symbol->string (set-first s))]
            [else
-            (error (string-append "you should compare configurations that "
-                                  "differ in exactly one parameter"))]))
+            (error (string-append
+                    "you should compare configurations that "
+                    "differ in exactly one parameter but the difference is: "
+                    (number->string (set-count s))
+                    " and they are: "
+                    (string-join (map symbol->string (set->list s1)))
+                    " and "
+                    (string-join (map symbol->string (set->list s2)))))]))
        (printf "~a,~a,~a"
                (f s1 s2)
                (f s2 s1)
