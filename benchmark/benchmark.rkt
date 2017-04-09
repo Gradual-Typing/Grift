@@ -21,16 +21,7 @@
       (if (not (file-exists? exe))
           (begin
             (printf "~a\n" exe)
-            (compile src
-                     #:output exe
-                     #:cast
-                     (case cast
-                       [(|Type-Based Casts|) 'Type-Based]
-                       [else cast])
-                     #:ref
-                     (case ref
-                       [(Proxied) 'Guarded] 
-                       [else ref])))
+            (compile src #:output exe #:cast cast #:ref ref))
           (void)))))
 
 (define configs
