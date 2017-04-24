@@ -259,10 +259,10 @@ form, to the shortest branch of the cast tree that is relevant.
   (: bindings-needed-for-monotonic-refs : CoC3-Bnd-Code*)
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!
                   bindings-needed-for-monotonic-refs)
-    (let ([gen-mbox-ref-code (make-mbox-ref-code next-uid! interp-coercion-call make-coercion)]
-          [gen-mbox-set!-code (make-mbox-set!-code next-uid! interp-cast-call make-coercion)]
-          [gen-mvec-ref-code (make-mvect-ref-code next-uid! interp-coercion-call make-coercion)]
-          [gen-mvec-set!-code (make-mvect-set!-code next-uid! interp-cast-call make-coercion)]
+    (let ([gen-mbox-ref-code (make-mbox-ref-code next-uid! interp-cast-call)]
+          [gen-mbox-set!-code (make-mbox-set!-code next-uid! interp-cast-call)]
+          [gen-mvec-ref-code (make-mvect-ref-code next-uid! interp-cast-call)]
+          [gen-mvec-set!-code (make-mvect-set!-code next-uid! interp-cast-call)]
           [interp-v (next-uid! "value")]
           [interp-t1 (next-uid! "t1")]
           [interp-t2 (next-uid! "t2")]
@@ -1742,22 +1742,19 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (: make-mbox-ref-code
    ((String -> Uid)
-    Coerce-Type
-    Make-Coercion-Type
+    Cast-With-MAddr-Type
     -> Mbox-refT))
-(define ((make-mbox-ref-code next-uid! cast mk-coercion) mref t2)
+(define ((make-mbox-ref-code next-uid! cast) mref t2)
   (let ([t1 (next-uid! "t1")]
         [c  (next-uid! "crcn")])
     (Let (list (cons t1 (Mbox-rtti-ref mref)))
-      (Let (list (cons c (mk-coercion (Var t1) t2 (Quote ""))))
-        (cast (Mbox-val-ref mref) (Var c) (Quote 0))))))
+      (cast (Mbox-val-ref mref) (Var t1) t2 (Quote "") (Quote 0)))))
 
 (: make-mbox-set!-code
    ((String -> Uid)
     Cast-With-MAddr-Type
-    Make-Coercion-Type
     -> Mbox-setT))
-(define ((make-mbox-set!-code next-uid! cast mk-coercion) mref val t1)
+(define ((make-mbox-set!-code next-uid! cast) mref val t1)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([t2 (Mbox-rtti-ref mref)]
           [cv (cond$
@@ -1778,22 +1775,19 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (: make-mvect-ref-code
    ((String -> Uid)
-    Coerce-Type
-    Make-Coercion-Type
+    Cast-With-MAddr-Type
     -> Mvec-refT))
-(define ((make-mvect-ref-code next-uid! cast mk-coercion) mvect i t2)
+(define ((make-mvect-ref-code next-uid! cast) mvect i t2)
   (let ([t1 (next-uid! "t1")]
         [c  (next-uid! "crcn")])
     (Let (list (cons t1 (Mvector-rtti-ref mvect)))
-      (Let (list (cons c (mk-coercion (Var t1) t2 (Quote ""))))
-        (cast (Mvector-val-ref mvect i) (Var c) (Quote 0))))))
+      (cast (Mvector-val-ref mvect i) (Var t1) t2 (Quote "") (Quote 0)))))
 
 (: make-mvect-set!-code
    ((String -> Uid)
     Cast-With-MAddr-Type
-    Make-Coercion-Type
     -> Mvec-setT))
-(define ((make-mvect-set!-code next-uid! cast mk-coercion) mvect i val t1)
+(define ((make-mvect-set!-code next-uid! cast) mvect i val t1)
   (define-syntax-let$* let$* next-uid!)
   (let$* ([t2 (Mvector-rtti-ref mvect)])
     (cond$
