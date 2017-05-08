@@ -42,13 +42,13 @@
           (Mbox E Schml-Type)
           (Munbox E) ;; fast read
           (Mbox-set! E E) ;; fast write
-          (MBoxCastedRef Uid Schml-Type)
-          (MBoxCastedSet! Uid E Schml-Type)
+          (MBoxCastedRef E Schml-Type)
+          (MBoxCastedSet! E E Schml-Type)
           (Mvector E E Schml-Type)
           (Mvector-ref E E) ;; fast read
           (Mvector-set! E E E) ;; fast write
-          (MVectCastedRef Uid E Schml-Type)
-          (MVectCastedSet! Uid E E Schml-Type)
+          (MVectCastedRef E E Schml-Type)
+          (MVectCastedSet! E E E Schml-Type)
           (Mvector-length E)
           ;;
           (Create-tuple (Listof E))

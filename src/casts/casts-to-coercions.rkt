@@ -115,16 +115,17 @@ should be able to compile programs this the twosome casts for future comparison.
     [(Mbox e t) (Mbox (c2c-expr e) t)]
     [(Munbox e) (Munbox (c2c-expr e))]
     [(Mbox-set! e1 e2) (Mbox-set! (c2c-expr e1) (c2c-expr e2))]
-    [(MBoxCastedRef u t) (MBoxCastedRef u t)]
-    [(MBoxCastedSet! u (app c2c-expr e) t) (MBoxCastedSet! u e t)]
+    [(MBoxCastedRef (app c2c-expr e) t) (MBoxCastedRef e t)]
+    [(MBoxCastedSet! (app c2c-expr e1) (app c2c-expr e2) t)
+     (MBoxCastedSet! e1 e2 t)]
     [(Mvector e1 e2 t) (Mvector (c2c-expr e1) (c2c-expr e2) t)]
     [(Mvector-ref e1 e2) (Mvector-ref (c2c-expr e1) (c2c-expr e2))]
     [(Mvector-set! e1 e2 e3)
      (Mvector-set! (c2c-expr e1) (c2c-expr e2) (c2c-expr e3))]
-    [(MVectCastedRef u i t)
-     (MVectCastedRef u (c2c-expr i) t)]
-    [(MVectCastedSet! u (app c2c-expr i) (app c2c-expr e) t)
-     (MVectCastedSet! u i e t)]
+    [(MVectCastedRef (app c2c-expr e) i t)
+     (MVectCastedRef e (c2c-expr i) t)]
+    [(MVectCastedSet! (app c2c-expr e1) (app c2c-expr i) (app c2c-expr e2) t)
+     (MVectCastedSet! e1 i e2 t)]
     [(Mvector-length e) (Mvector-length (c2c-expr e))]
     [(Var id) (Var id)]
     ;; While each of these forms implicitly have coercive behavior
