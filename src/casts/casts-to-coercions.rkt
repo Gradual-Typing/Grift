@@ -24,9 +24,6 @@ should be able to compile programs this the twosome casts for future comparison.
          (all-from-out "../language/cast0.rkt"
                        "../language/coercion.rkt"))
 
-(define space-efficient? (make-parameter #t))
-(define optimize-first-order-coercions? (make-parameter #t))
-
 ;; The entry point for this pass it is called by impose-casting semantics
 (: casts->coercions (Cast0.5-Lang . -> . Coercion-Lang))
 (define (casts->coercions prgm)
@@ -38,10 +35,10 @@ should be able to compile programs this the twosome casts for future comparison.
 (: make-coercion (->* (String) (Boolean) (Schml-Type Schml-Type -> Schml-Coercion)))
 (define ((make-coercion lbl
                         [space-efficient-normal-form?
-                         (and (space-efficient?)
+                         (and (coercions-are-space-efficient?)
                               (not (optimize-first-order-coercions?)))])
          t1 t2)
-  (define recur (make-coercion lbl (space-efficient?)))
+  (define recur (make-coercion lbl (coercions-are-space-efficient?)))
   ;; (logging make-coercion () "t1 ~a\n\t t2 ~a\n" t1 t2)
   (define result : Schml-Coercion
     (match* (t1 t2)

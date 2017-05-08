@@ -38,6 +38,9 @@
 
 (: optimize-first-order-coercions? (Parameterof Boolean))
 (define optimize-first-order-coercions? (make-parameter #t))
+(: coercions-are-space-efficient? (Parameterof Boolean))
+(define coercions-are-space-efficient? (make-parameter #t))
+
 
 
 ;; Default places for everything, but there is no default source
