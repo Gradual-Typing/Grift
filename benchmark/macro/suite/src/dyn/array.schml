@@ -1,0 +1,28 @@
+;;; ARRAY1 -- One of the Kernighan and Van Wyk benchmarks.
+
+(define (create-x [n : Dyn]) : Dyn
+  (let ([result : Dyn (vector n (: 0 Dyn))])
+    (begin
+      (repeat (i 0 n) (_ : Dyn ())
+	      (vector-set! result i i))
+      result)))
+
+(define (create-y [x : Dyn]) : Dyn
+  (let ([n : Dyn (vector-length x)])
+    (let ([result : Dyn (vector n (: 0 Dyn))])
+      (begin
+	(repeat (i 0 n) (_ : Dyn ())
+		(vector-set! result (- (- n i) 1) (vector-ref x (- (- n i) 1))))
+	result))))
+
+(define (my-try [n : Dyn]) : Dyn
+  (vector-length (create-y (create-x n))))
+
+(define (go [m : Dyn] [n : Dyn] [r : Dyn]) : Dyn
+  (if (> m 0)
+      (go (- m 1) n (my-try n))
+      r))
+
+(let ([input1 : Dyn (read-int)])
+  (let ([input2 : Dyn (read-int)])
+    (: (go input1 input2 0) Int)))

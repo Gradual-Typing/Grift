@@ -3,7 +3,7 @@ WORK:=$(shell date +%Y_%m_%d_%H_%M_%S)
 TEST:=test
 
 .PHONY: all
-all: $(WORK) $(WORK)/make.log $(WORK).tgz
+all: $(WORK).tgz
 
 .PHONY: test
 test:
@@ -11,11 +11,6 @@ test:
 	$(MAKE) -C $(SRC) clean
 	cp -r $(SRC) $(TEST)
 	(export RUNS=1; export LATTICE_SIZE=2; $(MAKE) -C $(TEST) | tee $(TEST)/test.log)
-
-
-.PHONY: quick
-quick:
-	(export RUNS=3; export LATTICE_SIZE=10; $(MAKE) all)
 
 .PHONY: clean
 clean:
@@ -25,9 +20,9 @@ $(WORK):
 	$(MAKE) -C $(SRC) clean
 	cp -r $(SRC) $(WORK)
 
-%/make.log:
+$(WORK)/make.log: $(WORK)
 	$(MAKE) -C $* | tee $*/make.log
 
-%.tgz: 
+$(WORK).tgz: $(WORK)/make.log
 	echo archived on `date -Iseconds` >> $*/archive.log
 	tar -acf $*.tbz $*

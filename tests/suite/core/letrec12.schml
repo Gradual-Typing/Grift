@@ -1,7 +1,5 @@
-(letrec ([one
-          : ((Dyn -> Dyn) -> (Dyn -> Dyn))
-          #;((! (⋆ -> ⋆)) -> (? (⋆ -> ⋆)))
-          (lambda (f) f)] 
+(letrec ([one : ((Dyn -> Dyn) -> (Dyn -> Dyn))
+          (lambda ([f : (Dyn -> Dyn)]) f)] 
          [const
           : ((-> Dyn) -> Dyn)
           #;((! (-> ⋆)) -> ı)
