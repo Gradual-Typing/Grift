@@ -14,7 +14,11 @@
                      CoC5-Expr)))
 
 (define-type CoC5-Expr
-  (Rec E (U ;; Code Labels
+  (Rec E (U
+          (Construct CoC5-Gen-Data CoC5-Gen-Ctor (Listof E))
+          (Access CoC5-Gen-Data CoC5-Gen-Access E (Option E))
+          (Check CoC5-Gen-Data CoC5-Gen-Pred E (Listof E))
+          ;; Code Labels
           (Code-Label Uid)
           (Labels CoC5-Bnd-Code* E)
           (App-Code E (Listof E))
@@ -84,13 +88,6 @@
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC5-Bnd-Lambda* E)
 	  (Let CoC5-Bnd-Data* E)
@@ -194,3 +191,12 @@
 (define-type CoC5-Bnd-Crcn  (Pairof Uid Compact-Coercion))
 (define-type CoC5-Bnd-Crcn* (Listof CoC5-Bnd-Crcn))
 
+
+(define-type CoC5-Gen-Data
+  (U Dyn))
+(define-type CoC5-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type CoC5-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type CoC5-Gen-Pred
+  (U Dyn-Repr-Pred))

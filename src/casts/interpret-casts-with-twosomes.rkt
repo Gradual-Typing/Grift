@@ -583,23 +583,23 @@ form, to the shortest branch of the cast tree that is relevant.
     (cond$
      [(op=? type1 (Type INT-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
-           (Dyn-make value (Type INT-TYPE))
+           (dyn-make$ value (Type INT-TYPE))
            (Blame lbl))]
      [(op=? type1 (Type BOOL-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
-           (Dyn-make value (Type BOOL-TYPE))
+           (dyn-make$ value (Type BOOL-TYPE))
            (Blame lbl))]
      [(op=? type1 (Type FLOAT-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
-           (Dyn-make value (Type FLOAT-TYPE))
+           (dyn-make$ value (Type FLOAT-TYPE))
            (Blame lbl))]
      [(op=? type1 (Type CHAR-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
-           (Dyn-make value (Type CHAR-TYPE))
+           (dyn-make$ value (Type CHAR-TYPE))
            (Blame lbl))]
      [(op=? type1 (Type UNIT-TYPE))
       (if$ (op=? (Type DYN-TYPE) type2)
-           (Dyn-make value (Type UNIT-TYPE))
+           (dyn-make$ value (Type UNIT-TYPE))
            (Blame lbl))]
      [else
       (let$* ([tag1 (type-tag type1)])
@@ -642,7 +642,7 @@ form, to the shortest branch of the cast tree that is relevant.
            (Blame lbl))))
   (let$* ([val v] [type1 t1] [type2 t2] [label lbl])
     (if$ (op=? (Type DYN-TYPE) type2)
-         (Dyn-make val type1)
+         (dyn-make$ val type1)
          (proxy-gref val type1 type2 label))))
 
 ;; How to Cast a Guarded Vector to some other type
@@ -674,7 +674,7 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; Otherwise either cast to a gvector type or blame the label.
   (let$* ([val v] [type1 t1] [type2 t2] [label lbl])
     (if$ (op=? (Type DYN-TYPE) type2)
-         (Dyn-make val type1)
+         (dyn-make$ val type1)
          (proxy-gvect val type1 type2 label))))
 
 ;; How to cast a Monotonic Reference to some other type
@@ -686,7 +686,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (define-syntax-let$* let$* next-uid!)
   (let$* ([val v] [type1 t1] [type2 t2] [tag_mref (type-tag type2)])
     (if$ (op=? (Type DYN-TYPE) type2)
-         (Dyn-make val type1)
+         (dyn-make$ val type1)
          (if$ (op=? tag_mref (Tag 'MRef))
               (match val
                 [(Var a)
@@ -718,7 +718,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (define-syntax-let$* let$* next-uid!)
   (let$* ([val v] [type1 t1] [type2 t2] [tag_mvect (type-tag type2)])
     (if$ (op=? (Type DYN-TYPE) type2)
-         (Dyn-make val type1)
+         (dyn-make$ val type1)
          (if$ (op=? tag_mvect (Tag 'MVect))
               (match val
                 [(Var a)
@@ -769,7 +769,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (define-syntax-let$* let$* next-uid!)
   (let$* ([value v] [type1 t1] [type2 t2])
     (if$ (op=? (Type DYN-TYPE) type2)
-         (Dyn-make value type1)
+         (dyn-make$ value type1)
          (let$* ([tag2 (type-tag type2)])
            (if$ (op=? tag2 (Tag 'Fn))
                 (let$* ([type1_arity (type-fn-arity type1)]
@@ -785,7 +785,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (define-syntax-let$* let$* next-uid!)
   (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
     (if$ (op=? (Type DYN-TYPE) type2)
-         (Dyn-make value type1)
+         (dyn-make$ value type1)
          ;; Todo Reformat this code
          (if #f #;(and (Type? t1) (Type? t2))
              (let ([t1t (Type-type t1)]
@@ -832,18 +832,18 @@ form, to the shortest branch of the cast tree that is relevant.
   (dyn-destruct v (v^ t1)
   (cast-undyned v^ t1^ t2 lbl))
   |#
-  (let$* ([val v] [tag (Dyn-tag val)])
+  (let$* ([val v] [tag (dyn-immediate-tag$ val)])
     (cond$
      [(op=? (Tag 'Int) tag)
-      (cast-undyned (Dyn-immediate val) (Type INT-TYPE) t2 lbl mono-address)]
+      (cast-undyned (dyn-immediate-value$ val) (Type INT-TYPE) t2 lbl mono-address)]
      [(op=? (Tag 'Bool) tag)
-      (cast-undyned (Dyn-immediate val) (Type BOOL-TYPE) t2 lbl mono-address)]
+      (cast-undyned (dyn-immediate-value$ val) (Type BOOL-TYPE) t2 lbl mono-address)]
      [(op=? (Tag 'Unit) tag)
       (cast-undyned (Quote '()) (Type UNIT-TYPE) t2 lbl mono-address)]
      [(op=? (Tag 'Char) tag)
-      (cast-undyned (Dyn-immediate val) (Type CHAR-TYPE) t2 lbl mono-address)]
+      (cast-undyned (dyn-immediate-value$ val) (Type CHAR-TYPE) t2 lbl mono-address)]
      [(op=? (Tag 'Boxed) tag)
-      (cast-undyned (Dyn-value val) (Dyn-type val) t2 lbl mono-address)]
+      (cast-undyned (dyn-value$ val) (dyn-type$ val) t2 lbl mono-address)]
      [else (Blame (Quote "Unexpected value in cast tree"))])))
 
 ;; How to cast a non dynamic value to another type
@@ -881,12 +881,12 @@ form, to the shortest branch of the cast tree that is relevant.
 (define-type Inject-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (: make-inject-code : Inject-Type)
 (define (make-inject-code v t)
-  (Dyn-make v t))
+  (dyn-make$ v t))
 
 (define-type Project-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (: make-project-code : Cast-With-MAddr-Type -> Project-Type)
 (define ((make-project-code cast) v t l mono-address)
-  (cast (Dyn-value v) (Dyn-type v) t l mono-address))
+  (cast (dyn-value$ v) (dyn-type$ v) t l mono-address))
 
 ;; TODO: why we pass in cast?
 (: make-higher-order-cast-code : (String -> Uid) Uid Cast-With-MAddr-Type -> Cast-With-MAddr-Type)
@@ -1345,8 +1345,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "dyn_unbox_read_val")))
   (define-values (var-val var-ty var-tyof var-read-val)
     (values (Var val) (Var ty) (Var tyof) (Var read-val)))
-  (Let `((,val . ,(Dyn-value dyn))
-         (,ty . ,(Dyn-type dyn)))
+  (Let `((,val . ,(dyn-value$ dyn))
+         (,ty . ,(dyn-type$ dyn)))
     (If (Type-GRef-Huh var-ty)
         (Let `([,tyof . ,(Type-GRef-Of var-ty)]
                [,read-val . ,(gbox-ref var-val)])
@@ -1367,8 +1367,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "dyn_setbox_wrt_val3")))
   (define-values (gbox-v ty-v tyof-v wrt-val2-v wrt-val3-v)
     (values (Var gbox) (Var ty) (Var tyof) (Var wrt-val2) (Var wrt-val3)))
-  (Let `((,gbox . ,(Dyn-value dyn-gbox))
-         (,ty   . ,(Dyn-type dyn-gbox)))
+  (Let `((,gbox . ,(dyn-value$ dyn-gbox))
+         (,ty   . ,(dyn-type$ dyn-gbox)))
     (If (Type-GRef-Huh ty-v)
         (Let `([,tyof . ,(Type-GRef-Of ty-v)])
           (Let `([,wrt-val3 . ,(cast wrt-val1 t2 tyof-v info (Quote 0))])
@@ -1386,8 +1386,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "dyn_gvec_ref_read_val")))
   (define-values (var-val var-ty var-tyof var-read-val)
     (values (Var val) (Var ty) (Var tyof) (Var read-val)))
-  (Let `((,val . ,(Dyn-value dyn))
-         (,ty . ,(Dyn-type dyn)))
+  (Let `((,val . ,(dyn-value$ dyn))
+         (,ty . ,(dyn-type$ dyn)))
     (If (Type-GVect-Huh var-ty)
         (Let `([,tyof . ,(Type-GVect-Of var-ty)]
                [,read-val . ,(gv-ref var-val ind)])
@@ -1409,8 +1409,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "dyn_setbox_write_value3")))
   (define-values (val-v ty-v tyof-v wrt-val2-v wrt-val3-v)
     (values (Var val) (Var ty) (Var tyof) (Var wrt-val2) (Var wrt-val3)))
-  (Let `((,val . ,(Dyn-value dyn-gvec))
-         (,ty . ,(Dyn-type dyn-gvec)))
+  (Let `((,val . ,(dyn-value$ dyn-gvec))
+         (,ty . ,(dyn-type$ dyn-gvec)))
     (If (Type-GVect-Huh ty-v)
         (Let `([,tyof . ,(Type-GVect-Of ty-v)])
           (Let `([,wrt-val3 . ,(cast wrt-val1 t2 tyof-v info (Quote 0))])
@@ -1440,8 +1440,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "dyn_type")))
   (define-values (var-val var-ty var-dynty)
     (values (Var val) (Var ty) (Var dynty)))
-  (Let `((,val . ,(Dyn-value dyn))
-         (,ty . ,(Dyn-type dyn)))
+  (Let `((,val . ,(dyn-value$ dyn))
+         (,ty . ,(dyn-type$ dyn)))
     (If (Type-MRef-Huh var-ty)
         (Let `([,dynty . ,(Type DYN-TYPE)])
           (mb-ref var-val var-dynty))
@@ -1460,8 +1460,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "t2_type")))
   (define-values (mbox-v ty-v tyof-v t2u-v)
     (values (Var mbox) (Var ty) (Var tyof) (Var t2u)))
-  (Let `([,mbox . ,(Dyn-value dyn-mbox)]
-         [,ty   . ,(Dyn-type dyn-mbox)])
+  (Let `([,mbox . ,(dyn-value$ dyn-mbox)]
+         [,ty   . ,(dyn-type$ dyn-mbox)])
     (If (Type-MRef-Huh ty-v)
         (Let `([,tyof . ,(Type-MRef-Of ty-v)]
                [,t2u .  ,t2])
@@ -1482,8 +1482,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "dyn_type")))
   (define-values (var-val var-ty var-dynty)
     (values (Var val) (Var ty) (Var dynty)))
-  (Let `((,val . ,(Dyn-value dyn))
-         (,ty . ,(Dyn-type dyn)))
+  (Let `((,val . ,(dyn-value$ dyn))
+         (,ty . ,(dyn-type$ dyn)))
     (If (Type-MVect-Huh var-ty)
         (Let `([,dynty . ,(Type DYN-TYPE)])
           (mv-ref var-val ind var-dynty))
@@ -1503,8 +1503,8 @@ form, to the shortest branch of the cast tree that is relevant.
             (next-uid! "t2_type")))
   (define-values (val-v ty-v tyof-v t2u-v)
     (values (Var val) (Var ty) (Var tyof) (Var t2u)))
-  (Let `((,val . ,(Dyn-value dyn-mvec))
-         (,ty . ,(Dyn-type dyn-mvec)))
+  (Let `((,val . ,(dyn-value$ dyn-mvec))
+         (,ty . ,(dyn-type$ dyn-mvec)))
     (If (Type-MVect-Huh ty-v)
         (Let `([,tyof . ,(Type-MVect-Of ty-v)]
                [,t2u .  ,t2])
@@ -1537,8 +1537,8 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Data) (error 'todo "implement coercions data representation")]
       [(Functional) (error 'todo "incompatible with coercions")]
       [else (error 'interp-cast-with-coercions/dyn-fn-app "unexpected value")]))
-  (Let `([,val . ,(Dyn-value v)]
-         [,ty . ,(Dyn-type v)])
+  (Let `([,val . ,(dyn-value$ v)]
+         [,ty . ,(dyn-type$ v)])
     (If (If (Type-Fn-Huh (Var ty))
             (Op '= (list (Type-Fn-arity (Var ty)) (Quote arity)))
             (Quote #f))

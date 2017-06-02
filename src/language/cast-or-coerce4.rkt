@@ -14,7 +14,11 @@
                      CoC4-Expr)))
 
 (define-type CoC4-Expr
-  (Rec E (U ;; Code Labels 
+  (Rec E (U
+          (Construct CoC4-Gen-Data CoC4-Gen-Ctor (Listof E))
+          (Access CoC4-Gen-Data CoC4-Gen-Access E (Option E))
+          (Check CoC4-Gen-Data CoC4-Gen-Pred E (Listof E))
+          ;; Code Labels 
           (Code-Label Uid)
           (Labels CoC4-Bnd-Code* E)
           (App-Code E (Listof E))
@@ -84,13 +88,6 @@
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC4-Bnd-Lambda* E)
 	  (Let CoC4-Bnd-Data* E)
@@ -195,4 +192,11 @@
 (define-type CoC4-Bnd-Crcn* (Listof CoC4-Bnd-Crcn))
 
 
-
+(define-type CoC4-Gen-Data
+  (U Dyn))
+(define-type CoC4-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type CoC4-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type CoC4-Gen-Pred
+  (U Dyn-Repr-Pred))

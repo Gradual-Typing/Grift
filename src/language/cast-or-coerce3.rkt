@@ -12,8 +12,11 @@
 
 
 (define-type CoC3-Expr
-  (Rec E (U 
-          (Observe E Schml-Type)
+  (Rec E (U
+          (Construct CoC3-Gen-Data CoC3-Gen-Ctor (Listof E))
+          (Access CoC3-Gen-Data CoC3-Gen-Access E (Option E))
+          (Check CoC3-Gen-Data CoC3-Gen-Pred E (Listof E))
+          (Observe E Schml-Type) 
           No-Op
           ;; Code Labels
           (Code-Label Uid)
@@ -85,14 +88,6 @@
           ;; TODO fix this after the deadline
           (Type-Tag E)
           (Tag Tag-Symbol)
-          ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC3-Bnd* E)
 	  (Let CoC3-Bnd* E)
@@ -186,3 +181,12 @@
 (define-type CoC3-Bnd* (Listof CoC3-Bnd))
 (define-type CoC3-Bnd-Code (Pairof Uid CoC3-Code))
 (define-type CoC3-Bnd-Code* (Listof CoC3-Bnd-Code))
+
+(define-type CoC3-Gen-Data
+  (U Dyn))
+(define-type CoC3-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type CoC3-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type CoC3-Gen-Pred
+  (U Dyn-Repr-Pred))

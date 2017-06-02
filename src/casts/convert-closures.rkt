@@ -273,12 +273,6 @@
         ;; Observables Representation
         [(Blame (app recur e)) (Blame e)]
         [(Observe (app recur e) t) (Observe e t)]
-        ;; Dynamic Representation
-        [(Dyn-tag (app recur e)) (Dyn-tag e)]
-        [(Dyn-immediate (app recur e)) (Dyn-immediate e)]
-        [(Dyn-type (app recur e)) (Dyn-type e)]
-        [(Dyn-value (app recur e)) (Dyn-value e)]
-        [(Dyn-make (app recur e1) (app recur e2)) (Dyn-make e1 e2)]
         ;; control flow for effects
         [(Begin (app recur* e*) (app recur e)) (Begin e* e)]
         [(Repeat i (app recur e1) (app recur e2) a (app recur e3) (app recur e4))
@@ -462,6 +456,12 @@
         [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (recur t1) (recur t2) (recur lbl))]
         [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (recur e1) (recur e2))]
         [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
+        [(Construct t v (app recur* e*))
+         (Construct t v e*)]
+        [(Access t f (app recur e) i?)
+         (Access t f e (if i? (recur i?) #f))]
+        [(Check t p (app recur e) (app recur* e*))
+         (Check t p e e*)]
         [other (error 'Convert-Closures "unmatched ~a" other)]))
 
     ;; recur through a list of expressions

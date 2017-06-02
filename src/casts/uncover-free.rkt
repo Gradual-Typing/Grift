@@ -72,17 +72,6 @@
     ;; Observables Representation
     [(Blame (app uf-expr e f)) (values (Blame e) f)]
     [(Observe (app uf-expr e f) t) (values (Observe e t) f)]
-    ;; Dynamic Representation
-    [(Dyn-tag (app uf-expr e fv))
-     (values (Dyn-tag e) fv)]
-    [(Dyn-immediate (app uf-expr e e-fv))
-     (values (Dyn-immediate e) e-fv)]
-    [(Dyn-type (app uf-expr e e-fv))
-     (values (Dyn-type e) e-fv)]
-    [(Dyn-value (app uf-expr e e-fvars)) (values (Dyn-value e) e-fvars)]
-    [(Dyn-make (app uf-expr e1 e1-fvars)
-               (app uf-expr e2 e2-fvars))
-     (values (Dyn-make e1 e2) (set-union e1-fvars e2-fvars))]
     ;; Function Representation Primitives
     [(Fn-Caster (app uf-expr e e-fvars)) (values (Fn-Caster e) e-fvars)]
     ;; control flow for effects
@@ -314,6 +303,15 @@
     [(Compose-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Compose-Tuple-Coercion uid e1 e2) (set-union fv1 fv2))]
     [(Mediating-Coercion-Huh (app uf-expr e fv)) (values (Mediating-Coercion-Huh e) fv)]
+    [(Construct t v (app uf-expr* e* fv))
+     (values (Construct t v e*) fv)]
+    [(Access t f (app uf-expr e e-fv) i?)
+     (if i?
+         (let-values ([(i i-fv) (uf-expr i?)])
+           (values (Access t f e i) (set-union e-fv i-fv)))
+         (values (Access t f e #f) e-fv))]
+    [(Check t p (app uf-expr e e-fv) (app uf-expr* e* e*-fv))
+     (values (Check t p e e*) (set-union e-fv e*-fv))]
     [other (error 'uncover-free "unmatched ~a" other)]))
   (debug 'cast/uncover-free/uf-expr/e e ret-e ret-fv)
   (values ret-e ret-fv))

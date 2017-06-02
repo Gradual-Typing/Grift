@@ -15,7 +15,11 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
                      CoC3.1-Expr)))
 
 (define-type CoC3.1-Expr
-  (Rec E (U ;; Code Labels
+  (Rec E (U
+          (Construct CoC3.1-Gen-Data CoC3.1-Gen-Ctor (Listof E))
+          (Access CoC3.1-Gen-Data CoC3.1-Gen-Access E (Option E))
+          (Check CoC3.1-Gen-Data CoC3.1-Gen-Pred E (Listof E))
+          ;; Code Labels
           (Code-Label Uid)
           (Labels CoC3.1-Bnd-Code* E)
           (App-Code E (Listof E))
@@ -77,13 +81,6 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC3.1-Bnd* E)
 	  (Let CoC3.1-Bnd* E)
@@ -190,3 +187,11 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 (define-type CoC3.1-Bnd-Crcn (Pairof Uid Compact-Coercion))
 (define-type CoC3.1-Bnd-Crcn* (Listof CoC3.1-Bnd-Crcn))
 
+(define-type CoC3.1-Gen-Data
+  (U Dyn))
+(define-type CoC3.1-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type CoC3.1-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type CoC3.1-Gen-Pred
+  (U Dyn-Repr-Pred))          

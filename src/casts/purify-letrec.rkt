@@ -145,11 +145,6 @@
     [(Type-GRef-Huh e) (recur e)]
     [(Type-GVect-Huh e) (recur e)]
     [(Type-Tag e) (recur e)]
-    [(Dyn-tag e) (recur e)]
-    [(Dyn-immediate e) (recur e)]
-    [(Dyn-type e) (recur e)]
-    [(Dyn-value e) (recur e)]
-    [(Dyn-make e1 e2) (recur-all e1 e2)]
     [(Blame e) (recur e)]
     [(Observe e t) (recur e)]
     [(Unguarded-Box e) (recur e)]
@@ -213,6 +208,10 @@
     [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
     [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
     [(Mediating-Coercion-Huh e) (recur e)]
+    [(Construct t v e*) (recur* e*)]
+    [(Access t f e i?)
+     (if i? (recur-all e i?) (recur e))]
+    [(Check t p e e*) (and (recur e) (recur* e*))]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
 
 ;; A specialized version of replace-ref that knows it takes and recieves
@@ -398,16 +397,12 @@
      (Type-GVect-Huh e)]
     [(Type-Tag (app recur e))
      (Type-Tag e)]
-    [(Dyn-tag (app recur e))
-     (Dyn-tag e)]
-    [(Dyn-immediate (app recur e))
-     (Dyn-immediate e)]
-    [(Dyn-type (app recur e))
-     (Dyn-type e)]
-    [(Dyn-value (app recur e))
-     (Dyn-value e)]
-    [(Dyn-make (app recur e1) (app recur e2))
-     (Dyn-make e1 e2)]
+    [(Construct t v (app recur* e*))
+     (Construct t v e*)]
+    [(Access t f (app recur e) i?)
+     (Access t f e (if i? (recur i?) #f))]
+    [(Check t p (app recur e) (app recur* e*))
+     (Check t p e e*)]
     [(If (app recur t) (app recur c) (app recur a))
      (If t c a)]
     [(Switch e c* d)
@@ -744,16 +739,12 @@
      (Type-Tag e)]
     [(Tag s)
      (Tag s)]
-    [(Dyn-tag (app pl-expr e))
-     (Dyn-tag e)]
-    [(Dyn-immediate (app pl-expr e))
-     (Dyn-immediate e)]
-    [(Dyn-type (app pl-expr e))
-     (Dyn-type e)]
-    [(Dyn-value (app pl-expr e))
-     (Dyn-value e)]
-    [(Dyn-make (app pl-expr e1) (app pl-expr e2))
-     (Dyn-make e1 e2)]
+    [(Construct t v (app pl-expr* e*))
+     (Construct t v e*)]
+    [(Access t f (app pl-expr e) i?)
+     (Access t f e (if i? (pl-expr i?) i?))]
+    [(Check t p (app pl-expr e) (app pl-expr* e*))
+     (Check t p e e*)]
     [(Let (app pl-expr-bnd* b*) (app pl-expr e))
      (Let b* e)]
     [(Var i)

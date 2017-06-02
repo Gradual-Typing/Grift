@@ -69,10 +69,13 @@
       [(null? bd*) (Letrec bp* e)]
       [else (Let bd* (Letrec bp* e))])))
 
+(: ll-expr* : CoC3.1-Expr* -> CoC4-Expr*)
+(define (ll-expr* exp*) (map ll-expr exp*))
 
 (: ll-expr (CoC3.1-Expr -> CoC4-Expr))
 (define (ll-expr exp)
-   (match exp
+  
+  (match exp
       ;; The tiny core
       ;; This line should only be reached if the lambda
       ;; is not being bound by a let or a letrec
@@ -108,11 +111,12 @@
       [(Repeat i e1 e2 a e3 e4) (Repeat i (ll-expr e1) (ll-expr e2) a (ll-expr e3) (ll-expr e4))]
       [(Break-Repeat) (Break-Repeat)]
       [(Tag s) (Tag s)]
-      [(Dyn-tag e) (Dyn-tag (ll-expr e))]
-      [(Dyn-immediate e) (Dyn-immediate (ll-expr e))]
-      [(Dyn-type e) (Dyn-type (ll-expr e))]
-      [(Dyn-value e) (Dyn-value (ll-expr e))]
-      [(Dyn-make e1 e2) (Dyn-make (ll-expr e1) (ll-expr e2))]
+      [(Construct t v (app ll-expr* e*))
+       (Construct t v e*)]
+      [(Access t f (app ll-expr e) i?) 
+       (Access t f e (if i? (ll-expr i?) #f))]
+      [(Check t p (app ll-expr e) (app ll-expr* e*))
+       (Check t p e e*)]
       ;; newer stuff
       [(Observe e t) (Observe (ll-expr e) t)]
       [(Code-Label u) (Code-Label u)]

@@ -19,14 +19,18 @@ TODO: implement optimizer.
          "../language/syntax.rkt"
          "../configuration.rkt"
          (except-in "./interpret-casts-help.rkt"
-                    cond$ op=? and$ or$)
+                    let$* cond$ op=? and$ or$)
          (submod "../logging.rkt" typed)
          racket/match
          racket/list
          (for-syntax syntax/parse typed/racket/base))
 
 
-
+;; Type Constants To Hoist Into forms
+(define UNIT-EXPR (Type UNIT-TYPE))
+(define DYN-EXPR (Type DYN-TYPE))
+(define PBOX-DYN-TYPE (GRef DYN-TYPE))
+(define PBOX-DYN-EXPR (Type PBOX-DYN-TYPE))
 
 (: interpret-casts/hyper-coercions
    : Cast0.5-Lang -> Cast-or-Coerce3-Lang)
@@ -48,7 +52,9 @@ that can be located throughout this file:
 |#
 
 (define-type Compile-Cast-Type
-  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+  (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
+       (#:t1-not-dyn Boolean #:t2-not-dyn Boolean)
+       CoC3-Expr))
 
 (define-type Compile-Make-Coercion-Type
   (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
@@ -56,6 +62,50 @@ that can be located throughout this file:
 (define-type Compile-Lambda-Type (Uid* CoC3-Expr -> CoC3-Expr)) 
 (define-type Compile-App-Type (CoC3-Expr CoC3-Expr* -> CoC3-Expr))
 
+(define-type Dyn-PBox-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PBox-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PVec-Ref-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PVec-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MBox-Ref-Type
+  (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MBox-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MVec-Ref-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MVec-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PVec-Len-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-Fn-App-Type
+  (CoC3-Expr CoC3-Expr* Schml-Type* CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-Tup-Prj-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
+(define-type MBox-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type MBox-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type MVec-Ref-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type MVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
+
+;; This next section of code are the procedures that build all
+;; of the runtime code for hyper coercions based casting.
+
+(define-type Interp-Compose-Coercions-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Interp-Cast-Type (->* (CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
+(define-type Interp-Make-Coercion-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Greatest-Lower-Bound-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Copy-Mref-Type (CoC3-Expr -> CoC3-Expr))
+(define-type Make-Coercion-Type (Schml-Type Schml-Type Blame-Label -> CoC3-Expr))
+
+;; Functions for use sites of guarded references with coercions
+(define-type PBox-Ref-Type ((Var Uid) -> CoC3-Expr))
+(define-type PBox-Set-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type PVec-Ref-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type PVec-Set-Type ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
+(define-type PVec-Len-Type ((Var Uid) -> CoC3-Expr))
 
 (define (interpret-casts/hyper-coercions prgm)
   (match-define (Prog (list name next type) e) prgm)
@@ -85,6 +135,8 @@ that can be located throughout this file:
       (next-uid! "greatest_lower_bound"))
     (define copy-mref-uid
       (next-uid! "copy_mref_value"))
+    (define interp-projection-uid
+      (next-uid! "project_dynamic"))
     ;; Generate calls to runtime procedures
     (define interp-compose-coercions : Interp-Compose-Coercions-Type
       (apply-code interp-compose-coercions-uid))
@@ -113,24 +165,44 @@ that can be located throughout this file:
     (: interp-med-cast : Interp-Cast-Type)
     (define (interp-med-cast e c [m (Quote 0)])
       (((inst apply-code CoC3-Expr) interp-med-cast-uid) e c m))
+    (: interp-projection : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
+    (define (interp-projection e t2 l)
+      (((inst apply-code CoC3-Expr) interp-projection-uid) e t2 l))
     ;; Code Generators for the various casts
-    ;; TODO: add option for close coding these casts
     (: compile-projection : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
     (define (compile-projection e t2 l)
-      ;; TODO  consider this interface to fast projection
-      ;; (Dyn-Repr-SConsist-Huh v t2)
-      ;; (Dyn-Repr-Project t2)
       ;; incoming expression let-bound to prevent expression duplication      
-      (let$* ([v e] [t2 t2] [l l])
-        (let$* ([dv (Dyn-value v)] [t1 (Dyn-type v)])
-          (If (op=? t1 t2)
-              dv
-              ;; t1 != t2 -> < t1 =>^l t2> != Id
-              ;; therefore no need to make Id case fast 
-              (interp-med-cast dv (interp-make-med-coercion t1 t2 l))))))
+      (let* ([v e] [l l])
+        (match t2
+          [(Type (or (Int) (Character) (Unit) (Bool)))
+           (If (dyn-immediate-tag=?$ v t2)
+               (dyn-immediate-value$ v)
+               (interp-projection v t2 l))]
+          [(Type _) 
+           (If (dyn-immediate-tag=?$ v t2)
+               (let*$ ([u  (dyn-box-value$ v)]
+                       [t1 (dyn-box-type$ v)])
+                 (If (op=? t1 t2)
+                     u
+                     ;; TODO: compile-med-cast should exists
+                     (interp-med-cast u (interp-make-med-coercion t1 t2 l))))
+               (interp-projection v t2 l))]
+        [otherwise
+         (let$ ([t2 t2])
+           (let*$ ([dv (dyn-value$ v)]
+                   [t1 (dyn-type$ v)])
+             (If (op=? t1 t2)
+                 dv
+                 ;; t1 != t2 -> < t1 =>^l t2> != Id
+                 ;; therefore no need to make Id case fast 
+                 (interp-med-cast dv (interp-make-med-coercion t1 t2 l)))))])))
+    (: interp-projection-code  (Code Uid* CoC3-Expr))
+    (define interp-projection-code
+      (code$ (v t2 l)
+        (compile-projection v t2 l)))
     (: compile-injection : CoC3-Expr CoC3-Expr -> CoC3-Expr)
     (define (compile-injection e t)
-      (Dyn-make e t))
+      (dyn-make$ e t))
     (: compile-fn-cast : CoC3-Expr CoC3-Expr -> CoC3-Expr)
     (define (compile-fn-cast e m)
       ;; Let binding to provent expression duplication
@@ -218,7 +290,7 @@ that can be located throughout this file:
                      [len (Mvector-length v)])
                 (cond$
                  [(Type-Tuple-Huh t3)
-                  (let$* ([n (Type-Tuple-num t3)])
+                  (let*$ ([n (Type-Tuple-num t3)])
                     (repeat$ (i (Quote 0) len) ()
                       (let*$ ([vi (Mvector-val-ref v i)]
                               [cvi (Copy-Tuple n vi)])
@@ -333,37 +405,8 @@ that can be located throughout this file:
          [(Type-Dyn-Huh t2)
           (ann (HC (Quote #f) t1 (Quote #f) (Quote #t) t1 Id) CoC3-Expr)]
          [else
-          (let* ([med (interp-make-med-coercion t1 t2 l)]) 
-            (ann (HC (Quote #f) t1 (Quote #f) (Quote #f) t2 med) CoC3-Expr))
-          #;(cond$
-             [(and$ (Type-Fn-Huh t1) (Type-Fn-Huh t2)
-                    (op=? (Type-Fn-arity t1) (Type-Fn-arity t2)))
-              ;; This line is a little tricky because unless we have actual
-              ;; types for this at compile time we have to generate code that
-              ;; can handle arbitry fn-arity.  We delegate this task to specify
-              ;; representation because it involves safely allocating an object
-              ;; whos size cannot be determined until run-time.
-              (Make-Fn-Coercion interp-make-coercion-uid t1 t2 l)]
-             [(and$ (Type-Tuple-Huh t1) (Type-Tuple-Huh t2)
-                    (op<=? (tupleT-num$ t2) (tupleT-num$ t1)))
-              (Make-Tuple-Coercion interp-make-coercion-uid t1 t2 l)]
-             [(and$ (Type-GVect-Huh t1) (Type-GVect-Huh t2))
-              (let$* ([gv1_of (Type-GVect-Of t1)]
-                      [gv2_of (Type-GVect-Of t2)]
-                      [write_crcn (interp-make-coercion gv2_of gv1_of l)]
-                      [read_crcn  (interp-make-coercion gv1_of gv2_of l)])
-                (Ref-Coercion read_crcn write_crcn))]
-             [(and$ (Type-GRef-Huh t1) (Type-GRef-Huh t2))
-              (let$* ([gr1_of (Type-GRef-Of t1)]
-                      [gr2_of (Type-GRef-Of t2)]
-                      [read_crcn  (interp-make-coercion gr1_of gr2_of l)]
-                      [write_crcn (interp-make-coercion gr2_of gr1_of l)])
-                (Ref-Coercion read_crcn write_crcn))]
-             [(and$ (Type-MRef-Huh t1) (Type-MRef-Huh t2))
-              (MRef-Coercion (mref-of$ t2))]
-             [(and$ (Type-MRef-Huh t1) (Type-MRef-Huh t2))
-              (MVect-Coercion (mvect-of$ t2))]
-             [else (Failed-Coercion l)])])))
+          (let$ ([med (interp-make-med-coercion t1 t2 l)]) 
+            (ann (HC (Quote #f) t1 (Quote #f) (Quote #f) t2 med) CoC3-Expr))])))
     (: interp-make-med-coercion-code
        (Code Uid* CoC3-Expr))
     (define interp-make-med-coercion-code
@@ -384,13 +427,13 @@ that can be located throughout this file:
                   (op<=? (tupleT-num$ t2) (tupleT-num$ t1)))
             (Make-Tuple-Coercion interp-make-coercion-uid t1 t2 l)]
            [(and$ (Type-GVect-Huh t1) (Type-GVect-Huh t2))
-            (let$* ([gv1_of (Type-GVect-Of t1)]
+            (let*$ ([gv1_of (Type-GVect-Of t1)]
                     [gv2_of (Type-GVect-Of t2)]
                     [write_crcn (interp-make-coercion gv2_of gv1_of l)]
                     [read_crcn  (interp-make-coercion gv1_of gv2_of l)])
               (Ref-Coercion read_crcn write_crcn))]
            [(and$ (Type-GRef-Huh t1) (Type-GRef-Huh t2))
-            (let$* ([gr1_of (Type-GRef-Of t1)]
+            (let*$ ([gr1_of (Type-GRef-Of t1)]
                     [gr2_of (Type-GRef-Of t2)]
                     [write_crcn (interp-make-coercion gr2_of gr1_of l)]
                     [read_crcn  (interp-make-coercion gr1_of gr2_of l)])
@@ -412,7 +455,7 @@ that can be located throughout this file:
             (or$ (op=? (HC-T2 fst) (HC-T1 snd))
                  (and$ (or$ (Type-Dyn-Huh (HC-T2 fst)) (HC-Inject-Huh fst))
                        (or$ (Type-Dyn-Huh (HC-T1 snd)) (HC-Project-Huh snd))))
-          (let$* ([fst-t2 (HC-T2 fst)]
+          (let*$ ([fst-t2 (HC-T2 fst)]
                   [snd-t1 (HC-T1 snd)])
             (cond$
              ;; These first two cases rule out dynamic identity casts
@@ -420,17 +463,17 @@ that can be located throughout this file:
              ;; These cannot be composed under the following rules because
              ;; the usual invarient of all code following is that Dyn
              ;; isn't present as t1 or t2 in any coercion.
-             [(Type-Dyn-Huh fst-t2) snd]
-             [(Type-Dyn-Huh snd-t1) fst]
+             [(HC-Identity-Huh fst) snd]
+             [(HC-Identity-Huh snd) fst]
              [else
-              (let$* ([fst-med (HC-Med fst)]
+              (let*$ ([fst-med (HC-Med fst)]
                       [mid-med
                        (cond$
                         [(and$ (HC-Inject-Huh fst)
                                (HC-Project-Huh snd)
                                ;; interp-make-med-coercion assumes that fst-t2 != snd-t1
                                (not$ (op=? fst-t2 snd-t1)))
-                         (let$* ([mid (interp-make-med-coercion
+                         (let*$ ([mid (interp-make-med-coercion
                                        fst-t2 snd-t1 (HC-Label snd))])
                            ;; we know these won't be Id
                            (interp-compose-med-coercions fst-med mid))]
@@ -559,43 +602,69 @@ that can be located throughout this file:
         [((Type t1) (Type t2) (Quote (? blame-label? l)))
          (make-coercion t1 t2 l)]
         [(t1 t2 l) (interp-make-coercion t1 t2 l)]))
+
     (: compile-cast Compile-Cast-Type)
-    (define (compile-cast e t1 t2 l)
-      (define hc : CoC3-Expr (compile-make-coercion t1 t2 l))
-      (debug 'compile-cast/hyper-coercions hc)
-      (match hc
-        [hc
-         #:when (not (optimize-first-order-coercions?))
-         (interp-cast e hc)]
-        ;; Hyper-Coercion is Identity
-        [(Quote-HCoercion (HC #f _ #f #f _ (Identity)))
-         e]
-        ;; Hyper-Coercion is Projection 
-        [(Quote-HCoercion (HC #t t1 (? blame-label? l) #f _ (Identity)))
-         (compile-projection e (Type t1) (Quote l))] 
-        ;; Hyper-Coercion is Injection
-        [(Quote-HCoercion (HC #f _ #f #t t2 (Identity)))
-         (compile-injection e (Type t2))]
-        ;; Hyper-Coercion is a Funtion Coercion
-        [(Quote-HCoercion (HC #f _ #f #f _ (and m (Fn a _ _))))
-         #:when (direct-fn-cast-optimization?)
-         ;; Fn-casts use specialize code for their arity
-         ;; Since we are generating it here it is trivial to
-         ;; directly call that code.
-         (let ([caster (get-fn-cast! a)])
-           (App-Code (Code-Label caster)
-                     (list e (Quote-HCoercion m))))]
-        [(Quote-HCoercion (HC #f _ #f #f _ (and m (Ref c1 c2))))
-         (compile-ref-cast e (Quote-HCoercion m))]
-        [(Quote-HCoercion (HC #f _ #f #f _ (and m (CTuple n c*))))
-         (compile-tup-cast e (Quote-HCoercion m))]
-        [(Quote-HCoercion (HC #f _ #f #f _ (MonoRef t2)))
-         (compile-mref-cast e (Type t2))]
-        [(Quote-HCoercion (HC #f _ #f #f _ (MonoVect t2)))
-         (compile-mvec-cast e (Type t2))]
-        [(Quote-HCoercion (HC #f _ #f #f _ m))
-         (interp-med-cast e (Quote-HCoercion m))]
-        [hc (interp-cast e hc)]))
+    (define (compile-cast e t1 t2 l
+                          #:t1-not-dyn [t1-not-dyn : Boolean #f]
+                          #:t2-not-dyn [t2-not-dyn : Boolean #f])
+      (let*$ ([v e])
+        (match* (t1 t2)
+          [((Type t) (Type t)) v]
+          ;; We don't have to check not Dyn here because t1 <> t2
+          [((Type (Dyn)) (Type _))
+           (compile-projection v t2 l)]
+          [((Type (Dyn)) t2)
+           (cond
+             [t2-not-dyn (compile-projection v t2 l)]
+             [else
+              (If (Type-Dyn-Huh t2)
+                  v
+                  (compile-projection v t2 l))])]
+          ;; We don't have to check not dyn here because t1 <> t2
+          [((Type _) (Type (Dyn))) (compile-injection v t1)]
+          [(t1 (Type (Dyn)))
+           (cond
+             [t1-not-dyn (compile-injection v t1)]
+             [else
+              (If (Type-Dyn-Huh t1)
+                  v
+                  (compile-injection v t1))])]
+          [(t1 t2)
+           (define hc : CoC3-Expr (compile-make-coercion t1 t2 l))
+           (debug 'compile-cast/hyper-coercions hc)
+           (match hc
+             [hc #:when (not (optimize-first-order-coercions?))
+                 (interp-cast v hc)]
+             ;; The next cases should never occur because the previous
+             ;; code handles them without a call to make-coercion.
+             [(Quote-HCoercion (HC #f _ #f #f _ (Identity)))
+              e]
+             ;; Hyper-Coercion is Projection 
+             [(Quote-HCoercion (HC #t t1 (? blame-label? l) #f _ (Identity)))
+              (compile-projection v (Type t1) (Quote l))] 
+             ;; Hyper-Coercion is Injection
+             [(Quote-HCoercion (HC #f _ #f #t t2 (Identity)))
+              (compile-injection v (Type t2))]
+             ;; Hyper-Coercion is a Funtion Coercion
+             [(Quote-HCoercion (HC #f _ #f #f _ (and m (Fn a _ _))))
+              #:when (direct-fn-cast-optimization?)
+              ;; Fn-casts use specialize code for their arity
+              ;; Since we are generating it here it is trivial to
+              ;; directly call that code.
+              (let ([caster (get-fn-cast! a)])
+                (App-Code (Code-Label caster)
+                          (list v (Quote-HCoercion m))))]
+             [(Quote-HCoercion (HC #f _ #f #f _ (and m (Ref c1 c2))))
+              (compile-ref-cast v (Quote-HCoercion m))]
+             [(Quote-HCoercion (HC #f _ #f #f _ (and m (CTuple n c*))))
+              (compile-tup-cast v (Quote-HCoercion m))]
+             [(Quote-HCoercion (HC #f _ #f #f _ (MonoRef t2)))
+              (compile-mref-cast v (Type t2))]
+             [(Quote-HCoercion (HC #f _ #f #f _ (MonoVect t2)))
+              (compile-mvec-cast v (Type t2))]
+             [(Quote-HCoercion (HC #f _ #f #f _ m))
+              (interp-med-cast v (Quote-HCoercion m))]
+             [hc (interp-cast v hc)])])))
     ;; The function cast machinery
     ;; Internal State: map of arity specific casters
     (define fn-casts : (HashTable Nat CoC3-Bnd-Code)
@@ -718,25 +787,471 @@ that can be located throughout this file:
     (define (compile-app e e*)
       (App-Fn-or-Proxy interp-cast-uid e e*))
 
+
+    ;; Proxied References Implementation
+    (: make-gbox-ref-code PBox-Ref-Type)
+    (define (make-gbox-ref-code gref)
+      (If (Guarded-Proxy-Huh gref)
+          (interp-cast
+           (Unguarded-Box-Ref (Guarded-Proxy-Ref gref))
+           (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
+          (Unguarded-Box-Ref gref)))
+
+    (: make-gbox-set!-code  PBox-Set-Type)
+    (define (make-gbox-set!-code gref val)
+      (If (Guarded-Proxy-Huh gref)
+          (Unguarded-Box-Set!
+           (Guarded-Proxy-Ref gref)
+           (interp-cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
+          (Unguarded-Box-Set! gref val)))
+
+    (: make-gvect-ref-code  PVec-Ref-Type)
+    (define (make-gvect-ref-code gref index)
+      (If (Guarded-Proxy-Huh gref)
+          (interp-cast (Unguarded-Vect-Ref (Guarded-Proxy-Ref gref) index)
+                       (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
+          (Unguarded-Vect-Ref gref index)))
+
+    (: make-gvect-length-code PVec-Len-Type)
+    (define (make-gvect-length-code gvect)
+      (If (Guarded-Proxy-Huh gvect)
+          (Unguarded-Vect-length (Guarded-Proxy-Ref gvect))
+          (Unguarded-Vect-length gvect)))
+
+    (: make-gvect-set!-code PVec-Set-Type)
+    (define (make-gvect-set!-code gref index val)
+      (: index-exp CoC3-Expr)
+      (define index-exp (if (integer? index) (Quote index) index))
+      (If (Guarded-Proxy-Huh gref)
+          (Unguarded-Vect-Set!
+           (Guarded-Proxy-Ref gref)
+           index-exp
+           (interp-cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
+          (Unguarded-Vect-Set! gref index-exp val)))
+
+    ;; Proxied References implementation
+    ;; In general each operation has to check if the reference is proxied.
+    ;; Then depending on whether it is a read or write operation cast the read
+    ;; or written value using the read or write coercion in the reference coercion
+    ;; contained by the proxy. 
+    ;; Because hyper-coercions are space-efficient we know that at most
+    ;; one layer of proxying will be present. This is ensured by the reference
+    ;; casting operation which check for proxies on values before casting them. 
+    ;; This is very similar to the coercions implementation
+    ;; TODO: Abstract the common code between coercions and hyper-coercions
+    (: pbox-ref  PBox-Ref-Type)
+    (: pbox-set! PBox-Set-Type)
+    (: pvec-ref  PVec-Ref-Type)
+    (: pvec-set! PVec-Set-Type)
+    (: pvec-len  PVec-Len-Type)
+    (: proxied-operations-bindings CoC3-Bnd-Code*)
     (define-values (pbox-ref pbox-set!
-                    pvec-ref pvec-set! pvec-len
-                    proxied-operations-bindings)
-      (make-proxied-reference-helpers! interp-cast))
+                             pvec-ref pvec-set! pvec-len
+                             proxied-operations-bindings)
+      (cond
+        [(inline-guarded-branch?)
+         ;; we just hand back the code generators to build
+         ;; inline code everywhere.
+         (values make-gbox-ref-code
+                 make-gbox-set!-code
+                 make-gvect-ref-code
+                 make-gvect-set!-code
+                 make-gvect-length-code
+                 '())]
+        [else
+         ;; If they are not inlined then the compiler we generate
+         ;; the runtime binding and returns procedures that builds
+         ;; invokations of this runtime code.
+         (let ([pbr   (next-uid! "rt_pbox_ref")] 
+               [pbs   (next-uid! "rt_pbox_set")]
+               [pvr   (next-uid! "rt_pvec_ref")]
+               [pvs   (next-uid! "rt_pvec_set")]
+               [pvl   (next-uid! "rt_pvec_len")])
+           (values
+            (apply-code pbr) (apply-code pbs)
+            (apply-code pvr) (apply-code pvs) (apply-code pvl)
+            `([,pbr . ,(code$ (pbox) (make-gbox-ref-code pbox))]
+              [,pbs . ,(code$ (pbox value) (make-gbox-set!-code pbox value))]
+              [,pvr . ,(code$ (pvec index) (make-gvect-ref-code pvec index))]
+              [,pvs . ,(code$ (pvec index value)
+                         (make-gvect-set!-code pvec index value))]
+              [,pvl . ,(code$ (pvec) (make-gvect-length-code pvec))])))]))
+
+    ;; Monotonic Reference Types Implementation
+    (: make-mbox-ref-code MBox-Ref-Type)
+    (define (make-mbox-ref-code mref t2)
+      (let*$ ([mref mref] 
+              [t1 (Mbox-rtti-ref mref)]
+              [crcn (interp-make-coercion t1 t2 (Quote ""))])
+        (interp-cast (Mbox-val-ref mref) crcn)))
+
+    
+    (: make-mbox-set!-code  MBox-Set-Type)
+    (define (make-mbox-set!-code mref val t1)
+      (let*$ ([mref mref] [val  val] [t1 t1]
+              [t2 (Mbox-rtti-ref mref)]
+              [c (interp-make-coercion t1 t2 (Quote ""))]
+              [cv (cond$
+                   [(and$ (tupleT?$ t1) (tupleT?$ t2))
+                    (let*$ ([n (Type-Tuple-num t2)]
+                            [ctv (Copy-Tuple n val)])
+                      (begin$
+                        (Mbox-val-set! mref ctv)
+                        ctv))]
+                   [else val])]
+              [ccv (interp-cast cv c mref)]
+              [t2-new (Mbox-rtti-ref mref)])
+        (If (op=? t2 t2-new)
+            (Mbox-val-set! mref ccv)
+            (Quote '()))))
+    (: make-mvect-ref-code  MVec-Ref-Type)
+    (define (make-mvect-ref-code mvect i t2)
+      (let*$ ([mvect mvect] [i i] [t2 t2]
+              [t1 (Mvector-rtti-ref mvect)]
+              [crcn (interp-make-coercion t1 t2 (Quote ""))])
+        (interp-cast (Mvector-val-ref mvect i) crcn)))
+    
+    (: make-mvect-set!-code MVec-Set-Type)
+    (define (make-mvect-set!-code mvect i val t1)
+      (let*$ ([mvect mvect]
+              [i i]
+              [val val]
+              [t1 t1]
+              [t2 (Mvector-rtti-ref mvect)]
+              [c (interp-make-coercion t1 t2 (Quote ""))])
+        (cond$
+         [(and$ (tupleT?$ t1) (tupleT?$ t2))
+          (let*$ ([n (Type-Tuple-num t2)]
+                  [cvi (Copy-Tuple n val)])
+            (begin$
+              (Mvector-val-set! mvect i cvi)
+              (let*$ ([ccvi (interp-cast cvi c mvect)]
+                      [t2-new (Mvector-rtti-ref mvect)])
+                (If (op=? t2 t2-new)
+                    (Mvector-val-set! mvect i ccvi)
+                    (Quote 0)))))]
+         [else
+          (let*$ ([cvi (interp-cast val c mvect)]
+                  [t2-new (Mvector-rtti-ref mvect)])
+            (If (op=? t2 t2-new)
+                (Mvector-val-set! mvect i cvi)
+                (Quote 0)))])))
+    
+    (: mbox-set! MBox-Set-Type)
+    (: mbox-ref MBox-Ref-Type)
+    (: mvec-ref MVec-Ref-Type)
+    (: mvec-set! MVec-Set-Type)
+    (: monotonic-operations-bindings CoC3-Bnd-Code*)
     (define-values (mbox-ref mbox-set! mvec-ref mvec-set! monotonic-operations-bindings)
-      (make-mono-reference-helpers! interp-cast interp-make-coercion))
+      (cond
+        [(inline-guarded-branch?)
+         (values make-mbox-ref-code
+                 make-mbox-set!-code
+                 make-mvect-ref-code
+                 make-mvect-set!-code
+                 '())]
+        [else
+         ;; If they are not inlined then the compiler we generate
+         ;; the runtime binding and returns procedures that builds
+         ;; invokations of this runtime code.
+         (let ([mbr   (next-uid! "rt_mbox_ref")]
+               [mbs   (next-uid! "rt_mbox_set")]
+               [mvr   (next-uid! "rt_mvec_ref")]
+               [mvs   (next-uid! "rt_mvec_set")])
+           (values
+            (apply-code mbr) (apply-code mbs)
+            (apply-code mvr) (apply-code mvs)
+            `([,mbr . ,(code$ (mbox type) (make-mbox-ref-code mbox type))]
+              [,mbs . ,(code$ (mbox value type) (make-mbox-set!-code mbox value type))]
+              [,mvr . ,(code$ (mvec index type) (make-mvect-ref-code mvec index type))]
+              [,mvs . ,(code$ (mvec index value type)
+                         (make-mvect-set!-code mvec index value type))])))]))
+    
+    
+    ;; Dynamic Operation Specialization
+    
+    (: make-dyn-pbox-ref-code Dyn-PBox-Ref-Type)
+    (define (make-dyn-pbox-ref-code dyn lbl)
+      (let*$ ([v dyn] [l lbl])
+        (If (dyn-immediate-tag=?$ v PBOX-DYN-EXPR)
+            (let*$ ([val (dyn-value$ v)]
+                    [ty  (dyn-type$ v)])
+              (If (Type-GRef-Huh ty)
+                  (let*$ ([tyof (Type-GRef-Of ty)]
+                          [read-val (pbox-ref val)])
+                    (compile-cast read-val tyof DYN-EXPR l))
+                  (Blame l)))
+            (Blame l))))  
+    (: make-dyn-pbox-set!-code Dyn-PBox-Set-Type)
+    (define (make-dyn-pbox-set!-code dyn-gbox wrt-val1 t2 lbl)
+      (let*$ ([dyn-gbox dyn-gbox]
+              [wrt-val1 wrt-val1]
+              [t2 t2]
+              [lbl lbl])
+        (If (ann (dyn-immediate-tag=?$ dyn-gbox PBOX-DYN-EXPR) CoC3-Expr)
+            (let$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
+                   [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)])
+              (If (Type-GRef-Huh ty)
+                  (let$ ([tyof (Type-GRef-Of ty)])
+                    (cond$
+                     [(op=? tyof t2)
+                      (pbox-set! gbox wrt-val1)]
+                     [else
+                      (let$ ([wrt-val2 (compile-cast wrt-val1 t2 tyof lbl)])
+                        (pbox-set! gbox wrt-val2))])
+                    (compile-cast (Quote '()) UNIT-EXPR DYN-EXPR lbl))
+                  (Blame lbl)))
+            (Blame lbl))))
+    (: make-dyn-pvec-ref-code Dyn-PVec-Ref-Type)
+    (define (make-dyn-pvec-ref-code dyn ind lbl)
+      (let*$ ([dyn dyn][ind ind][lbl lbl]
+              [maybe-pvec-val (dyn-value$ dyn)]
+              [maybe-pvec-ty  (dyn-type$ dyn)])
+        (cond$
+         [(not$ (Type-GVect-Huh maybe-pvec-ty))  (Blame lbl)]
+         [else
+          (let$ ([elem-ty (Type-GVect-Of maybe-pvec-ty)]
+                 [elem-val (pvec-ref maybe-pvec-val ind)])
+            (compile-cast elem-val elem-ty DYN-EXPR lbl))])))
+    (: make-dyn-pvec-set!-code Dyn-PVec-Set-Type)
+    (define (make-dyn-pvec-set!-code dyn-gvec ind wrt-val1 t2 lbl) 
+      (let*$ ([dyn-gvec dyn-gvec]
+              [ind ind]
+              [wrt-val1 wrt-val1]
+              [t2 t2]
+              [lbl lbl] 
+              [maybe-vec      (dyn-value$ dyn-gvec)]
+              [maybe-vec-type (dyn-type$  dyn-gvec)])
+        (cond$
+         [(not$ (Type-GVect-Huh maybe-vec-type)) (Blame lbl)]
+         [else
+          (let*$ ([elem-type (Type-GVect-Of maybe-vec-type)]
+                  [new-elem (If (op=? elem-type t2)
+                                wrt-val1
+                                (compile-cast wrt-val1 t2 elem-type lbl))])
+            (pvec-set! maybe-vec ind new-elem)
+            (compile-cast (Quote '()) UNIT-EXPR DYN-EXPR lbl))])))
+    (: make-dyn-pvec-len-code Dyn-PVec-Len-Type)
+    (define (make-dyn-pvec-len-code dyn lbl)
+      (let*$ ([dyn dyn]
+              [lbl lbl]
+              [val (dyn-value$ dyn)]
+              [ty  (dyn-type$ dyn)])
+        (If (Type-GVect-Huh ty)
+            (pvec-len val)
+            (Blame lbl))))
+
+    (: make-dyn-mbox-ref-code Dyn-MBox-Ref-Type)
+    (define (make-dyn-mbox-ref-code dyn lbl)
+      (let*$ ([dyn dyn]
+              [lbl lbl]
+              [val (dyn-value$ dyn)]
+              [ty  (dyn-type$ dyn)])
+        (If (Type-MRef-Huh ty)
+            (mbox-ref val DYN-EXPR)
+            (Blame lbl))))
+    
+    (: make-dyn-mbox-set!-code Dyn-MBox-Set-Type)
+    (define (make-dyn-mbox-set!-code dyn-mbox wrt-val1 t2 lbl)
+      (let*$ ([dyn-mbox dyn-mbox]
+              [wrt-val1 wrt-val1]
+              [t2 t2]
+              [lbl lbl]
+              [mbox (dyn-value$ dyn-mbox)]
+              [t1  (dyn-type$ dyn-mbox)])
+        (If (Type-MRef-Huh t1)
+            (let$ ([tyof (Type-MRef-Of t1)])
+              (If (Type-Dyn-Huh tyof)
+                  (compile-cast (mbox-set! mbox wrt-val1 t2) UNIT-EXPR DYN-EXPR lbl)
+                  (mbox-set! mbox wrt-val1 t2)))
+            (Blame lbl))))
+    (: make-dyn-mvec-ref-code Dyn-MVec-Ref-Type)
+    (define (make-dyn-mvec-ref-code dyn ind lbl)
+      (define-values (val ty dynty)
+        (values (next-uid! "dyn_mvec_ref_val")
+                (next-uid! "dyn_mvec_ref_ty")
+                (next-uid! "dyn_type")))
+      (define-values (var-val var-ty var-dynty)
+        (values (Var val) (Var ty) (Var dynty)))
+      (Let `((,val . ,(dyn-value$ dyn))
+             (,ty . ,(dyn-type$ dyn)))
+        (If (Type-MVect-Huh var-ty)
+            (Let `([,dynty . ,(Type DYN-TYPE)])
+              (mvec-ref var-val ind var-dynty))
+            (Blame lbl))))
+    (: make-dyn-mvec-set!-code Dyn-MVec-Set-Type)
+    (define (make-dyn-mvec-set!-code dyn-mvec ind wrt-val1 t2 lbl) 
+      (let$ ([dyn-mvec dyn-mvec]
+             [ind ind]
+             [wrt-val1 wrt-val1]
+             [t2 t2]
+             [lbl lbl])
+        (let$ ([val (dyn-value$ dyn-mvec)]
+               [ty  (dyn-type$ dyn-mvec)])
+          (If (Type-MVect-Huh ty)
+              (let$ ([tyof (Type-MVect-Of ty)])
+                (If (Type-Dyn-Huh tyof)
+                    (compile-cast (mvec-set! val ind wrt-val1 t2) UNIT-EXPR DYN-EXPR lbl)
+                    (mvec-set! val ind wrt-val1 t2)))
+              (Blame lbl)))))
+    
+    (: make-dyn-fn-app-code Dyn-Fn-App-Type)
+    (define (make-dyn-fn-app-code e e* t* le)
+      ;; Variable are created here instead of using let$
+      ;; because they appear in sub-expressions that
+      ;; are programmatically generated.
+      (define lu  (next-uid! "dyn-fn-blame-info"))
+      (define l (Var lu))
+      (define tyu (next-uid! "dyn_fn_ty"))
+      (define ty  (Var tyu))
+      (define vu (next-uid! "dyn-fn"))
+      (define v  (Var vu))
+      (define uu (next-uid! "prj-fn"))
+      (define u  (Var uu))
+      (define-values (vu* v*)
+        (for/lists ([vu* : Uid*] [v* : CoC3-Expr*]) ([e : CoC3-Expr e*])
+          (define u (next-uid! "dyn_fn_arg"))
+          (values u (Var u))))
+      (define arg-casts : CoC3-Expr*
+        (for/list : (Listof CoC3-Expr)
+                  ([v : CoC3-Expr v*]
+                   [t : Schml-Type t*]
+                   [i (in-naturals)])
+          (let$ ([dyn-fn-arg-type (Type-Fn-arg ty (Quote i))])
+            (compile-cast v (Type t) dyn-fn-arg-type l))))
+      (define casts-apply : CoC3-Expr
+        (case (function-cast-representation)
+          [(Hybrid) (App-Fn-or-Proxy interp-cast-uid u arg-casts)]
+          [(Data)   (error 'todo "implement coercions data representation")]
+          [(Functional) (error 'todo "incompatible with coercions")]
+          [else (error 'interp-cast-with-coercions/dyn-fn-app "unexpected value")]))
+      (Let `([,lu . ,le]
+             [,vu . ,e]
+             . ,(map (inst cons Uid CoC3-Expr) vu* e*))
+        (Let `([,uu . ,(dyn-value$ v)]
+               [,tyu . ,(dyn-type$ v)])
+          (If (Type-Fn-Huh ty)
+              (let$ ([ret-val casts-apply]
+                     [ret-ty  (Type-Fn-return ty)])
+                (compile-cast ret-val ret-ty DYN-EXPR l))
+              (Blame l)))))
+    
+    (: make-dyn-tup-prj-code Dyn-Tup-Prj-Type)
+    (define (make-dyn-tup-prj-code e ie le)
+      (let$ ([v e] [i ie] [l le])
+        (let$ ([u  (dyn-value$ v)]
+               [ty (dyn-type$ v)])
+          (cond$
+           [(ann (not$ (and$ (Type-Tuple-Huh ty) (Op '> (list (Type-Tuple-num ty) i))))
+                 CoC3-Expr)
+            (Blame l)]
+           [else
+            (ann (let$ ([prj-val (Tuple-proj u i)]
+                        [prj-ty  (Type-Tuple-item ty i)])
+                   (compile-cast prj-val prj-ty DYN-EXPR l))
+                 CoC3-Expr)]))))
+
+    (: dyn-pbox-ref Dyn-PBox-Ref-Type)
+    (: dyn-pbox-set! Dyn-PBox-Set-Type)
+    (: dyn-pvec-ref Dyn-PVec-Ref-Type)
+    (: dyn-pvec-set! Dyn-PVec-Set-Type)
+    (: dyn-pvec-len Dyn-PVec-Len-Type)
+    (: dyn-mbox-ref Dyn-MBox-Ref-Type)
+    (: dyn-mbox-set! Dyn-MBox-Set-Type)
+    (: dyn-mvec-ref Dyn-MVec-Ref-Type)
+    (: dyn-mvec-set! Dyn-MVec-Set-Type)
+    (: dyn-fn-app Dyn-Fn-App-Type)
+    (: dyn-tup-prj Dyn-Tup-Prj-Type)
+    (: dynamic-operations-bindings CoC3-Bnd-Code*)
     (define-values (dyn-pbox-ref dyn-pbox-set!
-                    dyn-pvec-ref dyn-pvec-set! dyn-pvec-len
-                    dyn-mbox-ref dyn-mbox-set!
-                    dyn-mvec-ref dyn-mvec-set!
-                    dyn-fn-app dyn-tup-prj
-                    dynamic-operations-bindings)
-      (make-dynamic-operations-helpers! interp-cast-uid
-                                        interp-cast
-                                        interp-make-coercion
-                                        pbox-ref pbox-set!
-                                        pvec-ref pvec-set! pvec-len
-                                        mbox-ref mbox-set!
-                                        mvec-ref mvec-set!))
+                                 dyn-pvec-ref dyn-pvec-set! dyn-pvec-len
+                                 dyn-mbox-ref dyn-mbox-set!
+                                 dyn-mvec-ref dyn-mvec-set!
+                                 dyn-fn-app dyn-tup-prj
+                                 dynamic-operations-bindings)
+      (case (dynamic-operations?)
+        ;; In the case that dynamic operations specialization isn't
+        ;; enabled we should raise an error if any of the helpers
+        ;; are ever invoked.
+        [(#f)
+         (define ((th-error [sym : Symbol]) . a)
+           (error sym "dynamic-operation? = #f but present in AST"))
+         (values
+          (th-error 'interpret-cast-with-coercions/dyn-gbox-ref)
+          (th-error 'interpret-cast-with-coercions/dyn-gbox-set!)
+          (th-error 'interpret-cast-with-coercions/dyn-gvec-ref)
+          (th-error 'interpret-cast-with-coercions/dyn-gvec-set!)
+          (th-error 'interpret-cast-with-coercions/dyn-gvec-len)
+          (th-error 'interpret-cast-with-coercions/dyn-mbox-ref)
+          (th-error 'interpret-cast-with-coercions/dyn-mbox-set!)
+          (th-error 'interpret-cast-with-coercions/dyn-mvec-ref)
+          (th-error 'interpret-cast-with-coercions/dyn-mvec-set!)
+          (th-error 'interpret-cast-with-coercions/dyn-fn-app)
+          (th-error 'interpret-cast-with-hyper-coercions/dyn-tup-prj)
+          '())]
+        ;; In the case that dynamic operations are inlined we should
+        ;; generate the code in-place and therefore do not need any
+        ;; runtime support for dynamic-operations.
+        ;; no code bindings returned.
+        [(inline)
+         (values
+          make-dyn-pbox-ref-code
+          make-dyn-pbox-set!-code
+          make-dyn-pvec-ref-code
+          make-dyn-pvec-set!-code
+          make-dyn-pvec-len-code
+          make-dyn-mbox-ref-code
+          make-dyn-mbox-set!-code
+          make-dyn-mvec-ref-code
+          make-dyn-mvec-set!-code
+          make-dyn-fn-app-code
+          make-dyn-tup-prj-code
+          '())]
+        [else
+         (define dpbr   (next-uid! "rt_dyn_pbox_ref"))
+         (define dpbs   (next-uid! "rt_dyn_pbox_set"))
+         (define dpvr   (next-uid! "rt_dyn_pvec_ref"))
+         (define dpvs   (next-uid! "rt_dyn_pvec_set"))
+         (define dpvl   (next-uid! "rt_dyn_pvec_len"))
+         (define dmbr   (next-uid! "rt_dyn_mbox_ref"))
+         (define dmbs   (next-uid! "rt_dyn_mbox_set"))
+         (define dmvr   (next-uid! "rt_dyn_mvec_ref"))
+         (define dmvs   (next-uid! "rt_dyn_mvec_set"))
+         (define dtp    (next-uid! "rt_dyn_tuple_project"))
+         (values 
+          (apply-code dpbr)
+          (apply-code dpbs)
+          (apply-code dpvr)
+          (apply-code dpvs)
+          (apply-code dpvl)
+          (apply-code dmbr)
+          (apply-code dmbs)
+          (apply-code dmvr)
+          (apply-code dmvs)
+          make-dyn-fn-app-code ;; Always inline since code is arity dependent
+          (apply-code dtp)
+          `([,dpbr . ,(code$ (ref lbl)
+                        (make-dyn-pbox-ref-code ref lbl))]
+            [,dpbs . ,(code$ (ref val ty lbl)
+                        (make-dyn-pbox-set!-code ref val ty lbl))]
+            [,dpvr . ,(code$ (vec ind lbl)
+                        (make-dyn-pvec-ref-code vec ind lbl))]
+            [,dpvs . ,(code$ (vec ind val ty lbl)
+                        (make-dyn-pvec-set!-code vec ind val ty lbl))]
+            [,dpvl . ,(code$ (vec lbl) (make-dyn-pvec-len-code vec lbl))]
+            [,dmbr . ,(code$ (ref lbl)
+                        (make-dyn-mbox-ref-code ref lbl))]
+            [,dmbs . ,(code$ (ref val ty lbl)
+                        (make-dyn-mbox-set!-code ref val ty lbl))]
+            [,dmvr . ,(code$ (vec ind lbl)
+                        (make-dyn-mvec-ref-code vec ind lbl))]
+            [,dmvs . ,(code$ (vec ind val ty lbl)
+                        (make-dyn-mvec-set!-code vec ind val ty lbl))]
+            [,dtp . ,(code$ (tup ind lbl)
+                       (make-dyn-tup-prj-code tup ind lbl))]))]))
+    
+
+    
     (define-type Get-Cast-Code-Bindings-Type (-> CoC3-Bnd-Code*))
     (: get-cast-code-bindings! Get-Cast-Code-Bindings-Type)
     (define (get-cast-code-bindings!)
@@ -745,7 +1260,8 @@ that can be located throughout this file:
        proxied-operations-bindings
        monotonic-operations-bindings
        dynamic-operations-bindings
-       `([,interp-cast-uid . ,interp-cast-code]
+       `([,interp-projection-uid . ,interp-projection-code]
+         [,interp-cast-uid . ,interp-cast-code]
          [,interp-med-cast-uid . ,interp-med-cast-code]
          [,interp-make-coercion-uid . ,interp-make-coercion-code]
          [,interp-make-med-coercion-uid . ,interp-make-med-coercion-code]
@@ -848,13 +1364,7 @@ that can be located throughout this file:
       ;; Use make coercion to implement dynamic application without
       ;; allocating a one time use coercion.
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
-       (define arg-names
-         `("blame_info" "dyn_fn" . ,(make-list (length e*) "dyn_fn_arg")))
-       (match-define-values (b* (cons lbl (cons v v*)))
-        (bnd-non-vars next-uid! (cons (Quote l) (cons e e*)) #:names arg-names))
-       (cond
-         [(null? b*) (dyn-fn-app v v* t* lbl)]
-         [else (Let b* (dyn-fn-app v v* t* lbl))])]
+       (dyn-fn-app e e* t* (Quote l))]
       ;; Transformation to lower guarded reference types
       ;; Guarded Operations on Guarded values are turned into
       ;; calls/inlinings of the runtime proceedures that perform
@@ -1023,577 +1533,4 @@ that can be located throughout this file:
   ;; just return the recursion procedure
   recur)
 
-;; This next section of code are the procedures that build all
-;; of the runtime code for hyper coercions based casting.
 
-(define-type Interp-Compose-Coercions-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Interp-Cast-Type (->* (CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
-(define-type Interp-Make-Coercion-Type
-  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Greatest-Lower-Bound-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Copy-Mref-Type (CoC3-Expr -> CoC3-Expr))
-(define-type Make-Coercion-Type (Schml-Type Schml-Type Blame-Label -> CoC3-Expr))
-
-;; Functions for use sites of guarded references with coercions
-(define-type PBox-Ref-Type ((Var Uid) -> CoC3-Expr))
-(define-type PBox-Set-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type PVec-Ref-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type PVec-Set-Type ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type PVec-Len-Type ((Var Uid) -> CoC3-Expr))
-;; This is abstracted for two reasons
-;; 1) There isn't a good reason to check the inlining-proxied-reference-branch
-;;    more than once.
-;; 2) If it isn't inlined then the code needs to be registered the runtime
-;;    procedures which can be done from the mapping context, but it is
-;;    easier from the top-level. 
-(define (make-proxied-reference-helpers! [interp-cast : Interp-Cast-Type])
-  : (Values PBox-Ref-Type PBox-Set-Type PVec-Ref-Type PVec-Set-Type
-            PVec-Len-Type CoC3-Bnd-Code*)
-  (: make-gbox-ref-code PBox-Ref-Type)
-  (define (make-gbox-ref-code gref)
-    (If (Guarded-Proxy-Huh gref)
-        (interp-cast
-         (Unguarded-Box-Ref (Guarded-Proxy-Ref gref))
-         (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
-        (Unguarded-Box-Ref gref)))
-  (: make-gbox-set!-code  PBox-Set-Type)
-  (define (make-gbox-set!-code gref val)
-    (If (Guarded-Proxy-Huh gref)
-        (Unguarded-Box-Set!
-         (Guarded-Proxy-Ref gref)
-         (interp-cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
-        (Unguarded-Box-Set! gref val)))
-  (: make-gvect-ref-code  PVec-Ref-Type)
-  (define (make-gvect-ref-code gref index)
-    (If (Guarded-Proxy-Huh gref)
-        (interp-cast (Unguarded-Vect-Ref (Guarded-Proxy-Ref gref) index)
-                     (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
-        (Unguarded-Vect-Ref gref index)))
-  (: make-gvect-length-code PVec-Len-Type)
-  (define (make-gvect-length-code gvect)
-    (If (Guarded-Proxy-Huh gvect)
-        (Unguarded-Vect-length (Guarded-Proxy-Ref gvect))
-        (Unguarded-Vect-length gvect)))
-  (: make-gvect-set!-code PVec-Set-Type)
-  (define (make-gvect-set!-code gref index val)
-    (: index-exp CoC3-Expr)
-    (define index-exp (if (integer? index) (Quote index) index))
-    (If (Guarded-Proxy-Huh gref)
-        (Unguarded-Vect-Set!
-         (Guarded-Proxy-Ref gref)
-         index-exp
-         (interp-cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
-        (Unguarded-Vect-Set! gref index-exp val)))
-  (cond
-    [(inline-guarded-branch?)
-     ;; we just hand back the code generators to build
-     ;; inline code everywhere.
-     (values make-gbox-ref-code
-             make-gbox-set!-code
-             make-gvect-ref-code
-             make-gvect-set!-code
-             make-gvect-length-code
-             '())]
-    [else
-     ;; If they are not inlined then the compiler we generate
-     ;; the runtime binding and returns procedures that builds
-     ;; invokations of this runtime code.
-     (let ([gbr   (next-uid! "rt_gbox_ref")]
-           [gbr-b (next-uid! "box")]
-           [gbs   (next-uid! "rt_gbox_set")]
-           [gbs-b (next-uid! "box")]
-           [gbs-v (next-uid! "write_val")]
-           [gvr   (next-uid! "rt_gvec_ref")]
-           [gvr-r (next-uid! "vec")]
-           [gvr-i (next-uid! "ind")]
-           [gvs   (next-uid! "rt_gvec_set")]
-           [gvs-r (next-uid! "vec")]
-           [gvs-i (next-uid! "ind")]
-           [gvs-v (next-uid! "val")]
-           [gvl   (next-uid! "rt_gvec_len")]
-           [gvl-r (next-uid! "vec")])
-       (values
-        (apply-code gbr)
-        (apply-code gbs)
-        (apply-code gvr)
-        (apply-code gvs)
-        (apply-code gvl)
-        `([,gbr . ,(Code (list gbr-b)
-                     (make-gbox-ref-code (Var gbr-b)))]
-          [,gbs . ,(Code (list gbs-b gbs-v)
-                     (make-gbox-set!-code (Var gbs-b) (Var gbs-v)))]
-          [,gvr . ,(Code (list gvr-r gvr-i)
-                     (make-gvect-ref-code (Var gvr-r) (Var gvr-i)))]
-          [,gvs . ,(Code (list gvs-r gvs-i gvs-v)
-                     (make-gvect-set!-code (Var gvs-r) (Var gvs-i)
-                                           (Var gvs-v)))]
-          [,gvl . ,(Code (list gvl-r)
-                     (make-gvect-length-code (Var gvl-r)))])))]))
-
-
-(define-type MBox-Ref-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type MBox-Set-Type ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type MVec-Ref-Type ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type MVec-Set-Type ((Var Uid) (Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-
-(define (make-mono-reference-helpers!
-         [interp-cast : Interp-Cast-Type]
-         [interp-make-coercion : Interp-Make-Coercion-Type])
-  : (Values MBox-Ref-Type MBox-Set-Type MVec-Ref-Type MVec-Set-Type
-            CoC3-Bnd-Code*)
-  (: make-mbox-ref-code MBox-Ref-Type)
-  (define (make-mbox-ref-code mref t2)
-    (let ([t1 (next-uid! "t1")]
-          [c  (next-uid! "crcn")])
-      (Let (list (cons t1 (Mbox-rtti-ref mref)))
-        (Let (list (cons c (interp-make-coercion (Var t1) t2 (Quote ""))))
-          (interp-cast (Mbox-val-ref mref) (Var c) (Quote 0))))))
-  (: make-mbox-set!-code  MBox-Set-Type)
-  (define (make-mbox-set!-code mref val t1)
-    (define-syntax-let$* let$* next-uid!)
-    (let$* ([t2 (Mbox-rtti-ref mref)]
-            [c (interp-make-coercion t1 t2 (Quote ""))]
-            [cv (cond$
-                 [(and$ (tupleT?$ t1) (tupleT?$ t2))
-                  (let$* ([n (Type-Tuple-num t2)]
-                          [ctv (Copy-Tuple n val)])
-                    (Begin
-                      (list
-                       (Mbox-val-set! mref ctv))
-                      ctv))]
-                 [else val])]
-            [ccv (interp-cast cv c mref)]
-            [t2-new (Mbox-rtti-ref mref)])
-      (begin
-        (if$ (op=? t2 t2-new)
-             (Mbox-val-set! mref ccv)
-             (Quote 0)))))
-  (: make-mvect-ref-code  MVec-Ref-Type)
-  (define (make-mvect-ref-code mvect i t2)
-    (let ([t1 (next-uid! "t1")]
-          [c  (next-uid! "crcn")])
-      (Let (list (cons t1 (Mvector-rtti-ref mvect)))
-        (Let (list (cons c (interp-make-coercion (Var t1) t2 (Quote ""))))
-          (interp-cast (Mvector-val-ref mvect i) (Var c) (Quote 0))))))
-  (: make-mvect-set!-code MVec-Set-Type)
-  (define (make-mvect-set!-code mvect i val t1)
-    (define-syntax-let$* let$* next-uid!)
-    (let$* ([t2 (Mvector-rtti-ref mvect)]
-            [c (interp-make-coercion t1 t2 (Quote ""))])
-      (cond$
-       [(and$ (tupleT?$ t1) (tupleT?$ t2))
-        (let$* ([n (Type-Tuple-num t2)]
-                [cvi (Copy-Tuple n val)])
-          (Begin
-            (list
-             (Mvector-val-set! mvect i cvi))
-            (let$* ([ccvi (interp-cast cvi c mvect)]
-                    [t2-new (Mvector-rtti-ref mvect)])
-              (if$ (op=? t2 t2-new)
-                   (Mvector-val-set! mvect i ccvi)
-                   (Quote 0)))))]
-       [else
-        (let$* ([cvi (interp-cast val c mvect)]
-                [t2-new (Mvector-rtti-ref mvect)])
-          (if$ (op=? t2 t2-new)
-               (Mvector-val-set! mvect i cvi)
-               (Quote 0)))])))
-  (cond
-    [(inline-guarded-branch?)
-     (values make-mbox-ref-code
-             make-mbox-set!-code
-             make-mvect-ref-code
-             make-mvect-set!-code
-             '())]
-    [else
-     ;; If they are not inlined then the compiler we generate
-     ;; the runtime binding and returns procedures that builds
-     ;; invokations of this runtime code.
-     (let ([mbr   (next-uid! "rt_mbox_ref")]
-           [mbr-b (next-uid! "box")]
-           [mbr-rt (next-uid! "ref_type")]
-           [mbs   (next-uid! "rt_mbox_set")]
-           [mbs-b (next-uid! "box")]
-           [mbs-v (next-uid! "write_val")]
-           [mbs-rt (next-uid! "ref_type")]
-           [mvr   (next-uid! "rt_mvec_ref")]
-           [mvr-r (next-uid! "vec")]
-           [mvr-i (next-uid! "ind")]
-           [mvr-rt (next-uid! "ref_type")]
-           [mvs   (next-uid! "rt_mvec_set")]
-           [mvs-r (next-uid! "vec")]
-           [mvs-i (next-uid! "ind")]
-           [mvs-v (next-uid! "val")]
-           [mvs-rt (next-uid! "ref_type")])
-       (values
-        (apply-code mbr) (apply-code mbs)
-        (apply-code mvr) (apply-code mvs)
-        `([,mbr
-           . ,(Code (list mbr-b mbr-rt) (make-mbox-ref-code (Var mbr-b) (Var mbr-rt)))]
-          [,mbs
-           . ,(Code (list mbs-b mbs-v mbs-rt)
-                (make-mbox-set!-code (Var mbs-b) (Var mbs-v) (Var mbs-rt)))]
-          [,mvr
-           . ,(Code (list mvr-r mvr-i mvr-rt)
-                (make-mvect-ref-code (Var mvr-r) (Var mvr-i) (Var mvr-rt)))]
-          [,mvs
-           . ,(Code (list mvs-r mvs-i mvs-v mvs-rt)
-                (make-mvect-set!-code (Var mvs-r) (Var mvs-i)
-                                      (Var mvs-v) (Var mvs-rt)))])))]))
-
-(define-type Dyn-PBox-Ref-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-PBox-Set-Type
-  ((Var Uid) (Var Uid) (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-PVec-Ref-Type
-  ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-PVec-Set-Type
-  ((Var Uid) (Var Uid) (Var Uid) (U (Type Schml-Type) (Var Uid)) (Var Uid)
-   -> CoC3-Expr))
-(define-type Dyn-MBox-Ref-Type ((Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-MBox-Set-Type
-  ((Var Uid) (Var Uid) (U (Type Schml-Type) (Var Uid)) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-MVec-Ref-Type
-  ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-(define-type Dyn-MVec-Set-Type
-  ((Var Uid) (Var Uid) (Var Uid) (U (Type Schml-Type) (Var Uid)) (Var Uid)
-   -> CoC3-Expr))
-(define-type Dyn-PVec-Len-Type ((Var Uid)  (Var Uid) -> CoC3-Expr))
-(define-type Dyn-Fn-App-Type
-  ((Var Uid) (Listof (Var Uid)) Schml-Type* (Var Uid) -> CoC3-Expr))
-(define-type Dyn-Tup-Prj-Type ((Var Uid) (Var Uid) (Var Uid) -> CoC3-Expr))
-
-;; Creates a set of functions that given the set of arguments to a dynamic
-;; operation generates an expression that handles that operation.
-;; Also returns a possibly empty set of binding for runtime functions
-;; necisarry to make the generated expressions work.
-(define (make-dynamic-operations-helpers!
-         [interp-cast-uid : Uid]
-         [interp-cast : Interp-Cast-Type]
-         [interp-make-coercion : Interp-Make-Coercion-Type]
-         [pbox-ref  : PBox-Ref-Type]
-         [pbox-set! : PBox-Set-Type]
-         [pvec-ref  : PVec-Ref-Type]
-         [pvec-set! : PVec-Set-Type]
-         [pvec-len  : PVec-Len-Type]
-         [mbox-ref  : MBox-Ref-Type]
-         [mbox-set! : MBox-Set-Type]
-         [mvec-ref  : MVec-Ref-Type]
-         [mvec-set! : MVec-Set-Type])
-  : (Values Dyn-PBox-Ref-Type Dyn-PBox-Set-Type
-            Dyn-PVec-Ref-Type Dyn-PVec-Set-Type Dyn-PVec-Len-Type
-            Dyn-MBox-Ref-Type Dyn-MBox-Set-Type
-            Dyn-MVec-Ref-Type Dyn-MVec-Set-Type
-            Dyn-Fn-App-Type Dyn-Tup-Prj-Type
-            CoC3-Bnd-Code*)
-  ;; smart-cast generates calls to interp-cast only when it is non-obvious
-  ;; what coercions is going to be the result of the cast.
-  ;; This tends to be the common case in Dynamic operations.
-  ;; Viewed from another light smart-casts encodes some, but not all of
-  ;; the behavior of casting with coercions into the compiler. 
-  (define dyn-type (Type DYN-TYPE))
-  (define (smart-cast [val : CoC3-Expr]
-                      [t1 : CoC3-Expr] [t2 : CoC3-Expr] [lbl : CoC3-Expr]
-                      [mono_type : CoC3-Expr]
-                      #:t1-not-dyn [t1-not-dyn : Boolean #f]
-                      #:t2-not-dyn [t2-not-dyn : Boolean #f])
-    (match* (val t1 t2)
-      [(val (Type t) (Type t)) val]
-      [(val (Type (Dyn)) t2) #:when t2-not-dyn
-       (interp-cast val (HC (Quote #t) t2 lbl (Quote #f) t2
-                            (Quote-Coercion IDENTITY))
-                    mono_type)]
-      [((or (Var _) (Quote _)) (Type (Dyn)) t2)
-       (If (Type-Dyn-Huh t2)
-           val
-           (interp-cast val (HC (Quote #t) t2 (Quote #f) (Quote #f) t2
-                                (Quote-Coercion IDENTITY))
-                        mono_type))]
-      [(val t1 (Type (Dyn))) #:when t1-not-dyn 
-       (interp-cast val (HC (Quote #t) t2 lbl (Quote #f) t2
-                            (Quote-Coercion IDENTITY))
-                    mono_type)]
-      [((Var _) t1 (Type (Dyn)))
-       (If (Type-Dyn-Huh t1)
-           val
-           (interp-cast val (HC (Quote #f) t1 (Quote #f) (Quote #t) t1
-                                (Quote-Coercion IDENTITY))
-                        mono_type))]
-      [(val t1 t2)
-       (interp-cast val (interp-make-coercion t1 t2 lbl) mono_type)]))
-  (: make-dyn-pbox-ref-code Dyn-PBox-Ref-Type)
-  (define (make-dyn-pbox-ref-code dyn lbl)
-    (define-values (val ty tyof read-val)
-      (values (next-uid! "dyn_unbox_val")
-              (next-uid! "dyn_unbox_ty")
-              (next-uid! "dyn_unbox_tyof")
-              (next-uid! "dyn_unbox_read_val")))
-    (define-values (var-val var-ty var-tyof var-read-val)
-      (values (Var val) (Var ty) (Var tyof) (Var read-val)))
-    (Let `((,val . ,(Dyn-value dyn))
-           (,ty . ,(Dyn-type dyn)))
-         (If (Type-GRef-Huh var-ty)
-             (Let `([,tyof . ,(Type-GRef-Of var-ty)]
-                    [,read-val . ,(pbox-ref var-val)])
-                  (smart-cast var-read-val var-tyof (Type DYN-TYPE) lbl (Quote 0)))
-             (Blame lbl))))
-  
-  (: make-dyn-pbox-set!-code Dyn-PBox-Set-Type)
-  (define (make-dyn-pbox-set!-code dyn-gbox wrt-val1 t2 lbl)
-    (let$ ([gbox (Dyn-value dyn-gbox)]
-           [ty  (Dyn-type dyn-gbox)])
-      (If (Type-GRef-Huh ty)
-          (let$ ([tyof (Type-GRef-Of ty)])
-            (cond$
-             [(op=? tyof t2)
-              (pbox-set! gbox wrt-val1)]
-             [else
-              (let$ ([wrt-val2 (smart-cast wrt-val1 t2 tyof lbl (Quote 0))])
-                (pbox-set! gbox wrt-val2))])
-            (smart-cast (Quote '()) (Type UNIT-TYPE) dyn-type lbl (Quote 0)))
-          (Blame lbl))))
-  (: make-dyn-pvec-ref-code Dyn-PVec-Ref-Type)
-  (define (make-dyn-pvec-ref-code dyn ind lbl)
-    (let$ ([maybe-pvec-val (Dyn-value dyn)]
-           [maybe-pvec-ty  (Dyn-type dyn)])
-      (cond$
-       [(not$ (Type-GVect-Huh maybe-pvec-ty))  (Blame lbl)]
-       [else
-        (let$ ([elem-ty (Type-GVect-Of maybe-pvec-ty)]
-               [elem-val (pvec-ref maybe-pvec-val ind)])
-          (smart-cast elem-val elem-ty dyn-type lbl (Quote 0)))])))
-  (: make-dyn-pvec-set!-code Dyn-PVec-Set-Type)
-  (define (make-dyn-pvec-set!-code dyn-gvec ind wrt-val1 t2 lbl) 
-    (let$ ([maybe-vec      (Dyn-value dyn-gvec)]
-           [maybe-vec-type (Dyn-type  dyn-gvec)])
-      (cond$
-       [(not$ (Type-GVect-Huh maybe-vec-type)) (Blame lbl)]
-       [else
-        (let*$ ([elem-type (Type-GVect-Of maybe-vec-type)]
-                [new-elem (If (op=? elem-type t2)
-                              wrt-val1
-                              (smart-cast wrt-val1 t2 elem-type lbl (Quote 0)))])
-          (pvec-set! maybe-vec ind new-elem)
-          (smart-cast (Quote '()) (Type UNIT-TYPE) dyn-type lbl (Quote 0)))])))
-  #| TODO delete this once this code passes the test-suite 
-  (let$ [ (Type-GVect-Huh ty-v)
-  (Let `([,tyof . ,(Type-GVect-Of ty-v)])
-  (If (Type-Dyn-Huh tyof-v)
-  (Let `([,wrt-val2 . ,(smart-cast wrt-val1 t2 dyn-type lbl)])
-  (pvec-set! val-v ind wrt-val2-v))
-  (Let `([,wrt-val3
-  . ,(smart-cast wrt-val1 t2 tyof-v lbl #:t2-not-dyn #t)])
-  (smart-cast (pvec-set! val-v ind wrt-val3-v) 
-  tyof-v (Type DYN-TYPE) lbl
-  #:t1-not-dyn #t))))
-  (Blame lbl))))
-  |#
-  (: make-dyn-pvec-len-code Dyn-PVec-Len-Type)
-  (define (make-dyn-pvec-len-code dyn lbl)
-    (define-values (val ty)
-      (values (next-uid! "dyn_pvec_ref_val")
-              (next-uid! "dyn_pvec_ref_ty")))
-    (define-values (var-val var-ty) (values (Var val) (Var ty)))
-    (Let `((,val . ,(Dyn-value dyn))
-           (,ty . ,(Dyn-type dyn)))
-         (If (Type-GVect-Huh var-ty)
-             (pvec-len var-val)
-             (Blame lbl))))
-
-  (: make-dyn-mbox-ref-code Dyn-MBox-Ref-Type)
-  (define (make-dyn-mbox-ref-code dyn lbl)
-    (define-values (val ty dynty)
-      (values (next-uid! "dyn_unbox_val")
-              (next-uid! "dyn_unbox_ty")
-              (next-uid! "dyn_type")))
-    (define-values (var-val var-ty var-dynty)
-      (values (Var val) (Var ty) (Var dynty)))
-    (Let `((,val . ,(Dyn-value dyn))
-           (,ty . ,(Dyn-type dyn)))
-      (If (Type-MRef-Huh var-ty)
-          (Let `([,dynty . ,(Type DYN-TYPE)])
-            (mbox-ref var-val var-dynty))
-          (Blame lbl))))
-  
-  (: make-dyn-mbox-set!-code Dyn-MBox-Set-Type)
-  (define (make-dyn-mbox-set!-code dyn-mbox wrt-val1 t2 lbl)
-    (define-values (mbox ty tyof t2u)
-      (values (next-uid! "dyn_setbox_mbox")
-              (next-uid! "dyn_setbox_ty")
-              (next-uid! "dyn_setbox_tyof")
-              (next-uid! "t2_type")))
-    (define-values (mbox-v ty-v tyof-v t2u-v)
-      (values (Var mbox) (Var ty) (Var tyof) (Var t2u)))
-    (Let `([,mbox . ,(Dyn-value dyn-mbox)]
-           [,ty   . ,(Dyn-type dyn-mbox)])
-      (If (Type-MRef-Huh ty-v)
-          (Let `([,tyof . ,(Type-MRef-Of ty-v)]
-                 [,t2u .  ,t2])
-            (If (Type-Dyn-Huh tyof-v)
-                (smart-cast (mbox-set! mbox-v wrt-val1 t2u-v)
-                       (Type UNIT-TYPE) (Type DYN-TYPE) lbl
-                       (Quote 0))
-                (mbox-set! mbox-v wrt-val1 t2u-v)))
-          (Blame lbl))))
-  (: make-dyn-mvec-ref-code Dyn-MVec-Ref-Type)
-  (define (make-dyn-mvec-ref-code dyn ind lbl)
-    (define-values (val ty dynty)
-      (values (next-uid! "dyn_mvec_ref_val")
-              (next-uid! "dyn_mvec_ref_ty")
-              (next-uid! "dyn_type")))
-    (define-values (var-val var-ty var-dynty)
-      (values (Var val) (Var ty) (Var dynty)))
-    (Let `((,val . ,(Dyn-value dyn))
-           (,ty . ,(Dyn-type dyn)))
-      (If (Type-MVect-Huh var-ty)
-          (Let `([,dynty . ,(Type DYN-TYPE)])
-            (mvec-ref var-val ind var-dynty))
-          (Blame lbl))))
-  (: make-dyn-mvec-set!-code Dyn-MVec-Set-Type)
-  (define (make-dyn-mvec-set!-code dyn-mvec ind wrt-val1 t2 lbl) 
-    (define-values (val ty tyof t2u)
-      (values (next-uid! "dyn_setbox_mvect_value")
-              (next-uid! "dyn_setbox_ty")
-              (next-uid! "dyn_setbox_tyof")
-              (next-uid! "t2_type")))
-    (define-values (val-v ty-v tyof-v t2u-v)
-      (values (Var val) (Var ty) (Var tyof) (Var t2u)))
-    (Let `((,val . ,(Dyn-value dyn-mvec))
-           (,ty . ,(Dyn-type dyn-mvec)))
-      (If (Type-MVect-Huh ty-v)
-          (Let `([,tyof . ,(Type-MVect-Of ty-v)]
-                 [,t2u .  ,t2])
-            (If (Type-Dyn-Huh tyof-v)
-                (smart-cast (mvec-set! val-v ind wrt-val1 t2u-v)
-                       (Type UNIT-TYPE) (Type DYN-TYPE) lbl (Quote 0))
-                (mvec-set! val-v ind wrt-val1 t2u-v)))
-          (Blame lbl))))
-  
-  (: make-dyn-fn-app-code Dyn-Fn-App-Type)
-  (define (make-dyn-fn-app-code v v* t* l)
-    (define-values (val ty ret-val ret-ty)
-      (values (next-uid! "dyn_fn_val")
-              (next-uid! "dyn_fn_ty")
-              (next-uid! "dyn_fn_ret_val")
-              (next-uid! "dyn_fn_ret_ty")))
-    (define arg-casts : CoC3-Expr*
-      (for/list : (Listof CoC3-Expr)
-                ([v : CoC3-Expr v*]
-                 [t : Schml-Type t*]
-                 [i (in-naturals)])
-        (let$ ([dyn-fn-arg-type (Type-Fn-arg (Var ty) (Quote i))])
-          (smart-cast v (Type t) dyn-fn-arg-type l (Quote 0)))))
-    (define casts-apply : CoC3-Expr
-      (case (function-cast-representation)
-        [(Hybrid) (App-Fn-or-Proxy interp-cast-uid (Var val) arg-casts)]
-        [(Data) (error 'todo "implement coercions data representation")]
-        [(Functional) (error 'todo "incompatible with coercions")]
-      [else (error 'interp-cast-with-coercions/dyn-fn-app "unexpected value")]))
-    (Let `([,val . ,(Dyn-value v)]
-           [,ty . ,(Dyn-type v)])
-     (If (Type-Fn-Huh (Var ty))
-         (Let `([,ret-val . ,casts-apply]
-                [,ret-ty . ,(Type-Fn-return (Var ty))])
-           (smart-cast (Var ret-val) (Var ret-ty) (Type DYN-TYPE) l (Quote 0)))
-         (Blame l))))
-  (: make-dyn-tup-prj-code Dyn-Tup-Prj-Type)
-  (define (make-dyn-tup-prj-code v i l)
-    (define-values (val ty prj-val prj-ty)
-      (values (next-uid! "dyn_tup_val")
-              (next-uid! "dyn_tup_ty")
-              (next-uid! "dyn_tup_prj_val")
-              (next-uid! "dyn_tup_prj_ty")))
-    (let$ ([val (Dyn-value v)]
-           [ty  (ann (Dyn-type v) CoC3-Expr)])
-          (cond$
-           [(ann (or$ (not$ (Type-Tuple-Huh ty))
-                      (not$ (Op '> (list (Type-Tuple-num ty) i))))
-                 CoC3-Expr)
-            (Blame l)]
-           [else
-            (ann (let$ ([prj-val (Tuple-proj val i)]
-                        [prj-ty  (Type-Tuple-item ty i)])
-                   (smart-cast prj-val prj-ty (Type DYN-TYPE) l (Quote 0)))
-                 CoC3-Expr)])))
-  ;; Body of Make dynamic operations helpers!
-  (case (dynamic-operations?)
-    ;; In the case that dynamic operations specialization isn't
-    ;; enabled we should raise an error if any of the helpers
-    ;; are ever invoked.
-    [(#f)
-     (define ((th-error [sym : Symbol]) . a)
-       (error sym "dynamic-operation? = #f but present in AST"))
-     (values
-      (th-error 'interpret-cast-with-coercions/dyn-gbox-ref)
-      (th-error 'interpret-cast-with-coercions/dyn-gbox-set!)
-      (th-error 'interpret-cast-with-coercions/dyn-gvec-ref)
-      (th-error 'interpret-cast-with-coercions/dyn-gvec-set!)
-      (th-error 'interpret-cast-with-coercions/dyn-gvec-len)
-      (th-error 'interpret-cast-with-coercions/dyn-mbox-ref)
-      (th-error 'interpret-cast-with-coercions/dyn-mbox-set!)
-      (th-error 'interpret-cast-with-coercions/dyn-mvec-ref)
-      (th-error 'interpret-cast-with-coercions/dyn-mvec-set!)
-      (th-error 'interpret-cast-with-coercions/dyn-fn-app)
-      (th-error 'interpret-cast-with-hyper-coercions/dyn-tup-prj)
-      '())]
-    ;; In the case that dynamic operations are inlined we should
-    ;; generate the code in-place and therefore do not need any
-    ;; runtime support for dynamic-operations.
-    ;; no code bindings returned.
-    [(inline)
-     (values
-      make-dyn-pbox-ref-code
-      make-dyn-pbox-set!-code
-      make-dyn-pvec-ref-code
-      make-dyn-pvec-set!-code
-      make-dyn-pvec-len-code
-      make-dyn-mbox-ref-code
-      make-dyn-mbox-set!-code
-      make-dyn-mvec-ref-code
-      make-dyn-mvec-set!-code
-      make-dyn-fn-app-code
-      make-dyn-tup-prj-code
-      '())]
-    [else
-     (define dpbr   (next-uid! "rt_dyn_pbox_ref"))
-     (define dpbs   (next-uid! "rt_dyn_pbox_set"))
-     (define dpvr   (next-uid! "rt_dyn_pvec_ref"))
-     (define dpvs   (next-uid! "rt_dyn_pvec_set"))
-     (define dpvl   (next-uid! "rt_dyn_pvec_len"))
-     (define dmbr   (next-uid! "rt_dyn_mbox_ref"))
-     (define dmbs   (next-uid! "rt_dyn_mbox_set"))
-     (define dmvr   (next-uid! "rt_dyn_mvec_ref"))
-     (define dmvs   (next-uid! "rt_dyn_mvec_set"))
-     (define dtp   (next-uid! "rt_dyn_tuple_project"))
-     (values 
-      (apply-code dpbr)
-      (apply-code dpbs)
-      (apply-code dpvr)
-      (apply-code dpvs)
-      (apply-code dpvl)
-      (apply-code dmbr)
-      (apply-code dmbs)
-      (apply-code dmvr)
-      (apply-code dmvs)
-      ;; Since the code for dynamic function application is arity
-      ;; dependent we are inlining the code.
-      make-dyn-fn-app-code 
-      (apply-code dtp)
-      `([,dpbr . ,(code$ (ref lbl)
-                    (make-dyn-pbox-ref-code ref lbl))]
-        [,dpbs . ,(code$ (ref val ty lbl)
-                    (make-dyn-pbox-set!-code ref val ty lbl))]
-        [,dpvr . ,(code$ (vec ind lbl)
-                    (make-dyn-pvec-ref-code vec ind lbl))]
-        [,dpvs . ,(code$ (vec ind val ty lbl)
-                    (make-dyn-pvec-set!-code vec ind val ty lbl))]
-        [,dpvl . ,(code$ (vec lbl) (make-dyn-pvec-len-code vec lbl))]
-        [,dmbr . ,(code$ (ref lbl)
-                    (make-dyn-mbox-ref-code ref lbl))]
-        [,dmbs . ,(code$ (ref val ty lbl)
-                    (make-dyn-mbox-set!-code ref val ty lbl))]
-        [,dmvr . ,(code$ (vec ind lbl)
-                    (make-dyn-mvec-ref-code vec ind lbl))]
-        [,dmvs . ,(code$ (vec ind val ty lbl)
-                    (make-dyn-mvec-set!-code vec ind val ty lbl))]
-        [,dtp . ,(code$ (tup ind lbl)
-                   (make-dyn-tup-prj-code tup ind lbl))]))]))

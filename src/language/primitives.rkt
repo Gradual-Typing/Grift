@@ -223,6 +223,34 @@
   (hash-ref schml-primitive-type-table p err))
 
 
+(define-type Dyn-Repr-Ctor
+  (U 'make))
+(define-type Dyn-Repr-Access
+  (U 'value
+     'type
+     'immediate-value
+     'immediate-tag
+     'box-value
+     'box-type))
+(define-type Dyn-Repr-Pred
+  (U 'immediate-tag=?))
+
+(define-syntax-rule (dyn-make$ value type)
+  (Construct DYN-TYPE 'make (list value type)))
+(define-syntax-rule (dyn-value$ v)
+  (Access DYN-TYPE 'value v #f))
+(define-syntax-rule (dyn-type$ v)
+  (Access DYN-TYPE 'type v #f))
+(define-syntax-rule (dyn-immediate-value$ v)
+  (Access DYN-TYPE 'immediate-value v #f))
+(define-syntax-rule (dyn-immediate-tag$ v)
+  (Access DYN-TYPE 'immediate-tag v #f))
+(define-syntax-rule (dyn-immediate-tag=?$ v t)
+  (Check DYN-TYPE 'immediate-tag=? v (list t)))
+(define-syntax-rule (dyn-box-value$ v)
+  (Access DYN-TYPE 'box-value v #f))
+(define-syntax-rule (dyn-box-type$ v)
+  (Access DYN-TYPE 'box-type v #f))
 
 
 #|-----------------------------------------------------------------------------
@@ -257,4 +285,8 @@ We are going to UIL
 
 (define-type (UIL-Op E) (Op UIL-Prim (Listof E)))
 (define-type (UIL-Op! E) (Op UIL-Prim! (Listof E)))
+
+
+
+
 

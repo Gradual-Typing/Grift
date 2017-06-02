@@ -37,7 +37,7 @@
     (case cast-rep
       [("Type-Based") (cast-representation '|Type-Based Casts|)]
       [("Coercions")  (cast-representation 'Coercions)]
-      [("Hyper-Coercions") (error 'schml "Hyper-Coercions not yet supported")]
+      [("Hyper-Coercions") (cast-representation 'Hyper-Coercions)]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
    [("--check-asserts")

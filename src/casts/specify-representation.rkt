@@ -89,9 +89,11 @@ but a static single assignment is implicitly maintained.
 
   (: comp-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
   (define comp-tuple-coercion-code-label? (box #f))
+
   
-  
-  ;; The way that boxed immediate work currently bothers me.
+    ;; The way that boxed immediate work currently bothers me.)
+
+    
   ;; Since we have access to unboxed static ints should we just
   ;; abandon the unboxed dyn integers another a mixture of static
   ;; allocation and and constant lifting could be used to make all
@@ -1060,58 +1062,53 @@ but a static single assignment is implicitly maintained.
          (sr-tagged-array-ref e HYBRID-PROXY-TAG HYBRID-PROXY-CLOS-INDEX)]
         [(Hybrid-Proxy-Coercion (app recur e))
          (sr-tagged-array-ref e HYBRID-PROXY-TAG HYBRID-PROXY-CRCN-INDEX)]
-
         ;; TODO Fix me TAG should never have been exposed
         [(Tag t) (sr-tag t)]
         ;; Dynamic Values Representation
-        [(Dyn-tag (app recur e))
-         (Op 'binary-and (list e DYN-TAG-MASK))]
-        [(Dyn-immediate (app recur e))
-         (Op '%>> (list e DYN-IMDT-SHIFT))]
-        [(Dyn-make (app recur e1) e2)
-         (sr-dyn-make recur e1 e2)]
-        [(Dyn-type (app recur e))
-         (define tmp (next-uid! "tmp"))
-         (define tag (next-uid! "tag"))
-         (define tagv (Var tag))
-         (define tmpv (Var tmp))
+        [(Construct (Dyn) 'make (list e t))
+         (sr-dyn-make recur (recur e) t)]
+        [(Access (Dyn) 'value (app recur e) #f)
+         (begin$
+           (assign$ tmp e)
+           (assign$ tag (Op 'binary-and `(,tmp ,DYN-TAG-MASK)))
+           (If (Op '= (list tag DYN-BOXED-TAG))
+               (Op 'Array-ref (list tmp DYN-VALUE-INDEX))
+               (Op '%>> (list tmp DYN-IMDT-SHIFT))))]
+        [(Access (Dyn) 'type (app recur e) #f)
          (define err-msg
            (Quote "specify-representation/Dyn-type: switch failure"))
-         (Begin
-           (list (Assign tmp e)
-                 (Assign tag (Op 'binary-and `(,tmpv ,DYN-TAG-MASK))))
-           ;; TODO this could be a switch
-           (Switch
-            tagv
-            `([(,data:DYN-BOXED-TAG) .
-               ,(Op 'Array-ref (list tmpv DYN-TYPE-INDEX))]
-              [(,data:DYN-INT-TAG) . ,TYPE-INT-RT-VALUE]
-              [(,data:DYN-BOOL-TAG) . ,TYPE-BOOL-RT-VALUE]
-              [(,data:DYN-UNIT-TAG) . ,TYPE-UNIT-RT-VALUE]
-              [(,data:DYN-CHAR-TAG) . ,TYPE-CHAR-RT-VALUE])
-            (Begin
-              (list (Op 'Print (list err-msg))
-                    (Op 'Exit  (list (Quote 1))))
-              UNDEF-IMDT))
-           #;
-           (If (Op '= `(,tagv ,DYN-BOXED-TAG))
-               (Op 'Array-ref (list tmpv DYN-TYPE-INDEX))
-               (If (Op '= `(,tagv ,DYN-INT-TAG))
-                   TYPE-INT-RT-VALUE
-                   (If (Op '= `(,tagv ,DYN-BOOL-TAG))
-                       TYPE-BOOL-RT-VALUE
-                       TYPE-UNIT-RT-VALUE))))]
-        [(Dyn-value (app recur e))
-         (define tmp (next-uid! "dyn_value_tmp"))
-         (define tag (next-uid! "dyn_value_tag"))
-         (define tmp-var (Var tmp))
-         (define tag-var (Var tag))
-         (Begin
-           (list (Assign tmp e)
-                 (Assign tag (Op 'binary-and `(,tmp-var ,DYN-TAG-MASK))))
-           (If (Op '= (list tag-var DYN-BOXED-TAG))
-               (Op 'Array-ref (list tmp-var DYN-VALUE-INDEX))
-               (Op '%>> (list tmp-var DYN-IMDT-SHIFT))))]
+         (begin$
+           (assign$ tmp e)
+           (assign$ tag (Op 'binary-and `(,tmp ,DYN-TAG-MASK)))
+           (Switch tag
+             `([(,data:DYN-BOXED-TAG) . ,(Op 'Array-ref (list tmp DYN-TYPE-INDEX))]
+               [(,data:DYN-INT-TAG) . ,TYPE-INT-RT-VALUE]
+               [(,data:DYN-BOOL-TAG) . ,TYPE-BOOL-RT-VALUE]
+               [(,data:DYN-UNIT-TAG) . ,TYPE-UNIT-RT-VALUE]
+               [(,data:DYN-CHAR-TAG) . ,TYPE-CHAR-RT-VALUE])
+             (begin$ (Op 'Print (list err-msg))
+                     (Op 'Exit  (list (Quote 1)))
+                     UNDEF-IMDT)))]
+        [(Access (Dyn) 'immediate-value (app recur e) #f)
+         (Op '%>> (list e DYN-IMDT-SHIFT))]
+        [(Access (Dyn) 'immediate-tag (app recur e) #f)
+         (Op 'binary-and (list e DYN-TAG-MASK))]
+        [(Access (Dyn) 'box-value (app recur e) #f)
+         (Op 'Array-ref (list e DYN-VALUE-INDEX))]
+        [(Access (Dyn) 'box-type (app recur e) #f)
+         (Op 'Array-ref (list e DYN-TYPE-INDEX))]
+        [(Check (Dyn) 'immediate-tag=? (app recur e) `(,t))
+         (match t
+           [(Type t)
+            (define tag
+              (match t
+                [(Int)  DYN-INT-TAG]
+                [(Bool) DYN-BOOL-TAG]
+                [(Unit) DYN-UNIT-TAG]
+                [(Character) DYN-CHAR-TAG]
+                [other  DYN-BOXED-TAG]))
+            (Op '= `(,tag ,(Op 'binary-and `(,e ,DYN-TAG-MASK))))]
+           [other (error 'dyn-immediate-tag=? "expected type literal: ~a" t)])]
         ;; Observable Results Representation
         [(Blame (app recur e))
          (Begin
@@ -1527,6 +1524,7 @@ but a static single assignment is implicitly maintained.
 
 
   (recur/env exp env cenv))
+  
 
 
 (define (build-id-coercion-huh [e : D0-Expr]) : D0-Expr

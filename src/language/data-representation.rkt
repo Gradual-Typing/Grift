@@ -102,6 +102,8 @@
   ;; values
   ;; simple dynamic value representation
   (DYN-TAG-MASK                   #b111)
+  ;; Note: specify representation relies on the fact that boxes are tagged zero and
+  ;; do not clear this tag. (If this changes that will also need to change)
   (DYN-BOXED-TAG                  #b000)
   (DYN-INT-TAG                    #b001)
   (DYN-BOOL-TAG                   #b111)

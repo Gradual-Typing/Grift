@@ -14,7 +14,11 @@
 (define-type L1-Lambda (Lambda Uid* (Castable (Option Uid) L1-Expr)))
 
 (define-type L1-Expr
-  (Rec E (U ;; Code Labels
+  (Rec E (U
+          (Construct L1-Gen-Data L1-Gen-Ctor (Listof E))
+          (Access L1-Gen-Data L1-Gen-Access E (Option E))
+          (Check L1-Gen-Data L1-Gen-Pred E (Listof E))
+          ;; Code Labels
           (Code-Label Uid)
           (Labels L1-Bnd-Code* E)
           (App-Code E (Listof E))
@@ -84,13 +88,6 @@
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; Binding Forms - Lambda
 	  (Letrec L1-Bnd-Lambda* E)
 	  (Let L1-Bnd* E)
@@ -186,3 +183,12 @@
 (define-type L1-Bnd-Code* (Listof L1-Bnd-Code))
 (define-type L1-Bnd-Lambda (Pairof Uid L1-Lambda))
 (define-type L1-Bnd-Lambda* (Listof L1-Bnd-Lambda))
+
+(define-type L1-Gen-Data
+  (U Dyn))
+(define-type L1-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type L1-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type L1-Gen-Pred
+  (U Dyn-Repr-Pred))

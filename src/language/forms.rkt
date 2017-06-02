@@ -66,6 +66,10 @@ And a type constructor "name" expecting the types of field1 and field2
   (Switch expr cases default)
   ;; Perform a No Operation
   (No-Op)
+  ;; Generic Data-Type
+  (Construct type varient args)
+  (Access type base field index)
+  (Check type prim object args)
   ;; Effect operations
   (Gvector-length vect)
   (Unguarded-Vect-length vect)
@@ -165,12 +169,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (Procedure this params code caster bound-vars body)
   ;; represents a set of moves to initialize variables before
   (Code variables body)
-  ;; Dyn operations
-  (Dyn-tag expression)
-  (Dyn-immediate expression)
-  (Dyn-type expression)
-  (Dyn-value expression)
-  (Dyn-make expression type)
   (Dyn-Fn-App expr expr* type* label)
   (Dyn-GRef-Ref expr label)
   (Dyn-GRef-Set! expr1 expr2 type label)

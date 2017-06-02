@@ -15,7 +15,12 @@
                      L0-Expr)))
 
 (define-type L0-Expr
-  (Rec E (U ;; Code Labels
+  (Rec E (U
+          (Construct L0-Gen-Data L0-Gen-Ctor (Listof E))
+          (Access L0-Gen-Data L0-Gen-Access E (Option E))
+          (Check L0-Gen-Data L0-Gen-Pred E (Listof E))
+          (Observe E Schml-Type) 
+          ;; Code Labels
           No-Op
           (Code-Label Uid)
           (Labels L0-Bnd-Code* E)
@@ -86,13 +91,6 @@
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; Binding Forms - Lambda
 	  (Letrec L0-Bnd* E)
 	  (Let L0-Bnd* E)
@@ -186,3 +184,11 @@
 (define-type L0-Bnd-Code (Pairof Uid L0-Code))
 (define-type L0-Bnd-Code* (Listof L0-Bnd-Code))
 
+(define-type L0-Gen-Data
+  (U Dyn))
+(define-type L0-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type L0-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type L0-Gen-Pred
+  (U Dyn-Repr-Pred))

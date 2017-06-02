@@ -15,7 +15,10 @@
 
 (define-type CoC6-Expr
   (Rec E (U
-          ;; Closure-Operations
+
+          (Construct CoC6-Gen-Data CoC6-Gen-Ctor (Listof E))
+          (Access CoC6-Gen-Data CoC6-Gen-Access E (Option E))
+          (Check CoC6-Gen-Data CoC6-Gen-Pred E (Listof E))
           (LetP CoC6-Bnd-Procedure* (LetC CoC6-Bnd-Closure* E))
           (LetP CoC6-Bnd-Procedure* E)
           (Closure-code E)
@@ -96,13 +99,6 @@
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;;(Dyn-Case E Type-Ctr-Clause* E)
-          ;; Dynamic as a value
-          (Dyn-tag E)
-          (Dyn-immediate E)
-          (Dyn-type E)
-          (Dyn-value E)
-          (Dyn-make E E)
           ;; binding 
 	  (Let CoC6-Bnd-Data* E)
           (Var Uid)
@@ -210,6 +206,17 @@
 (define-type CoC6-Bnd-Type* (Listof CoC6-Bnd-Type))
 (define-type CoC6-Bnd-Crcn  (Pairof Uid Compact-Coercion))
 (define-type CoC6-Bnd-Crcn* (Listof CoC6-Bnd-Crcn))
+
+(define-type CoC6-Gen-Data
+  (U Dyn))
+(define-type CoC6-Gen-Ctor
+  (U Dyn-Repr-Ctor))
+(define-type CoC6-Gen-Access
+  (U Dyn-Repr-Access))
+(define-type CoC6-Gen-Pred
+  (U Dyn-Repr-Pred))
+
+
 
 ;; TODO Many of these forms static forms are identical accrose passes
 ;; should we lift them into a seperate file so they can be used

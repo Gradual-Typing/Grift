@@ -241,6 +241,12 @@
       [(Quote-Coercion (app crcn->imdt c)) (Quote-Coercion c)]
       [(Quote-HCoercion (app crcn->imdt c)) (Quote-Coercion c)]
       ;; Every other case is just a boring flow agnostic tree traversal
+      [(Construct t v (app recur* e*))
+       (Construct t v e*)]
+      [(Access t f (app recur e) i?)
+       (Access t f e (if i? (recur i?) #f))]
+      [(Check t p (app recur e) (app recur* e*))
+       (Check t p e e*)]
       [(Code-Label u)
        (Code-Label u)]
       [(Labels (app recur-bnd-code* b*) (app recur e))
@@ -359,16 +365,6 @@
        (Type-Tag e)]
       [(Tag s)
        (Tag s)]
-      [(Dyn-tag (app recur e))
-       (Dyn-tag e)]
-      [(Dyn-immediate (app recur e))
-       (Dyn-immediate e)]
-      [(Dyn-type (app recur e))
-       (Dyn-type e)]
-      [(Dyn-value (app recur e))
-       (Dyn-value e)]
-      [(Dyn-make (app recur e1) (app recur e2))
-       (Dyn-make e1 e2)]
       [(Letrec (app recur-bnd* b*) (app recur e))
        (Letrec b* e)]
       [(Let (app recur-bnd* b*) (app recur e))
