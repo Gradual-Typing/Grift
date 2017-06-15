@@ -1355,6 +1355,8 @@ that can be located throughout this file:
        (dyn-pbox-set! e1 e2 (Type t) (Quote l))]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (dyn-pvec-set! e1 i e2 (Type t) (Quote l))]
+      [(Dyn-GVector-Len (app recur e) (app recur l))
+       (dyn-pvec-len e l)]
       [(Gvector-length (app recur e))
        (pvec-len e)]
       [(MBoxCastedRef addr t)
