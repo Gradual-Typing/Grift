@@ -253,6 +253,30 @@
   (Access DYN-TYPE 'box-type v #f))
 
 
+#|
+(define-type Dyn-Repr-Op
+  (U 'fn-app
+     'tuple-ref
+     'pbox-ref
+     'pbox-set!
+     'pvec-len
+     'pvec-ref
+     'pvec-set!
+     'mbox-ref
+     'mbox-set!
+     'mvec-ref
+     'mvec-set!))
+
+(define-syntax-rule (dyn-fn-app$ e e* t l)
+  (Do (Dyn) 'fn-app e (append e* (list t l))))
+(define-syntax-rule (dyn-tuple-ref$ e i l)
+  (Do (Dyn) 'tuple-ref e (list i l)))
+(define-syntax-rule (dyn-pbox-ref$ e)
+  (Do (Dyn) 'pbox-ref e '()))
+(define-syntax-rule (dyn-pbox-set!$ e v)
+  (Do (Dyn) 'pbox-set! e (list v)))
+|#
+
 #|-----------------------------------------------------------------------------
 We are going to UIL
 -----------------------------------------------------------------------------|#

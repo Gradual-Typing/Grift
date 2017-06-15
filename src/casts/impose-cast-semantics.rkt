@@ -28,16 +28,26 @@ This is a micro compiler that removes the cast language form.
           "../language/cast0.rkt"
           "../language/data0.rkt"))
 
+(: statically-typed-program? : Cast0.5-Lang -> Boolean : Cast-or-Coerce3-Lang)
+(define (statically-typed-program? x)
+  (error 'todo))
+
 (: impose-cast-semantics : Cast0-Lang -> Data0-Lang)
 (define (impose-cast-semantics c0)
   (define c0.5 (define->let c0))
-  (define c1
-    (case (cast-representation)
+  (define c1 : Cast-or-Coerce3-Lang
+    (case (cast-representation) 
       [(|Type-Based Casts|)
-       (interpret-casts/twosomes (lower-function-casts c0.5))]
+       (interpret-casts/twosomes c0.5)]
       [(Coercions)
-       (interpret-casts/coercions (lower-function-casts (casts->coercions c0.5)))]
-      [(Hyper-Coercions) (interpret-casts/hyper-coercions c0.5)]))
+       (interpret-casts/coercions c0.5)]
+      [(Hyper-Coercions)
+       (interpret-casts/hyper-coercions c0.5)]
+      [(Static)
+       (cond
+         ;; Effectively Cast Programs 
+         [(statically-typed-program? c0.5) c0.5]
+         [else (error 'schml "tried to compile non-static program with static types")])]))
   (define c5 (hoist-types-and-coercions c1))
   (define c5.5 (purify-letrec c5))
   (define c6 (label-lambdas c5.5))

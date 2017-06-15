@@ -29,10 +29,12 @@ form, to the shortest branch of the cast tree that is relevant.
  "../unique-identifiers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
+ "../language/syntax.rkt"
  "../language/cast-or-coerce1.rkt"
  "../language/cast-or-coerce3.rkt"
  "../language/data-representation.rkt"
- "./interpret-casts-help.rkt")
+ (except-in "./interpret-casts-help.rkt"
+            or$ and$ op=? cond$))
 
 (provide
  interpret-casts/coercions
@@ -43,15 +45,21 @@ form, to the shortest branch of the cast tree that is relevant.
 (: space-efficient? (Parameterof Boolean))
 (define space-efficient? (make-parameter #t))
 
-(: interpret-casts/coercions : Cast-or-Coerce1-Lang ->  Cast-or-Coerce3-Lang)
+(require "casts-to-coercions.rkt"
+         "lower-function-casts.rkt")
+
+(: interpret-casts/coercions : Cast0.5-Lang ->  Cast-or-Coerce3-Lang)
 (define (interpret-casts/coercions prgm)
+  (define cprgm (casts->coercions prgm))
+  (define fprgm (lower-function-casts cprgm))
   ;; Desugaring the input program into its constituents 
   (match-define (Prog (list prgm-name prgm-next prgm-type) prgm-exp)
-    prgm)
-
+    fprgm)
+  
   (define unique-counter (make-unique-counter prgm-next))
-  (define next-uid! (make-next-uid! unique-counter))
 
+  (parameterize ([current-unique-counter unique-counter])
+    
   (define open-coded? : (Symbol -> Boolean)
     (if (specialize-cast-code-generation?)
         (let ([open-coded-set  (set 'make-coercion 'interp-cast)])
@@ -517,7 +525,7 @@ form, to the shortest branch of the cast tree that is relevant.
      prgm-exp))
   
   (Prog (list prgm-name (unique-counter-next! unique-counter) prgm-type)
-    (Labels gradual-runtime-bindings exp-with-lowered-gradual-operations)))
+    (Labels gradual-runtime-bindings exp-with-lowered-gradual-operations))))
 
 ;; These templates are used to build the code that performs
 ;; casting at runtime. The templates are a little over
@@ -541,12 +549,10 @@ form, to the shortest branch of the cast tree that is relevant.
           glbt copy-val-monoref) v c mono_type)
   (define who 'make-coerce-code)
   (debug who v c)
-
-  (define-syntax-let$* let$* next-uid!)
   ;; apply-cast is normally specified in terms of inspecting the
   ;; value. But in a world were value reflection on values is limited
   ;; the coercions can drive the casting process.
-  (let$* ([val v] [crcn c])
+  (let*$ ([val v] [crcn c])
     (cond$
      [(id?$ crcn) val]
      [(seq?$ crcn)
@@ -557,13 +563,13 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; This may be getting in the way of simple specializations
       ;; May want come up with smaller versions of the cast/function
       ;; For the specialized sub grammers.
-      (let$* ([seq_fst (seq-fst$ crcn)]
+      (let*$ ([seq_fst (seq-fst$ crcn)]
               [seq_snd (seq-snd$ crcn)]
               [fst_cast_value (coerce val seq_fst mono_type)])
         (coerce fst_cast_value seq_snd mono_type))]
      ;; By the typing rules of coercions we know v must be a dyn value
      [(prj?$ crcn)
-      (let$* ([prj_type  (prj-type$ crcn)]
+      (let*$ ([prj_type  (prj-type$ crcn)]
               [prj_label (prj-label$ crcn)]
               ;; The current implementation of the dyn interface is not a good one
               ;; this line is going to have to recover the type from dyn twice
@@ -574,7 +580,7 @@ form, to the shortest branch of the cast tree that is relevant.
         ;; this line across two functions
         ;; I did it this way because I know this code won't build
         ;; the injection coercion
-        (let$* ([projected_type (mk-crcn dyn_type prj_type prj_label)])
+        (let*$ ([projected_type (mk-crcn dyn_type prj_type prj_label)])
           (coerce dyn_value projected_type mono_type)))]
      [(inj?$ crcn) (dyn-make$ val (inj-type$ crcn))]
      [(mediating-crcn?$ crcn)
@@ -585,9 +591,9 @@ form, to the shortest branch of the cast tree that is relevant.
             (App-Code (Fn-Caster val) (list val crcn)))]
        [(ref?$ crcn)
         (if$ (Guarded-Proxy-Huh val)
-             (let$* ([old_val  (Guarded-Proxy-Ref val)]
+             (let*$ ([old_val  (Guarded-Proxy-Ref val)]
                      [old_crcn (Guarded-Proxy-Coercion val)])
-               (let$* ([composed_crcn (comp-crcn old_crcn crcn)])
+               (let*$ ([composed_crcn (comp-crcn old_crcn crcn)])
                  (if$ (id?$ composed_crcn)
                       old_val
                       (Guarded-Proxy
@@ -597,17 +603,17 @@ form, to the shortest branch of the cast tree that is relevant.
        [(mrefC?$ crcn)
         (match val
           [(Var a)
-           (let$* ([t2 (mrefC-type$ crcn)])
+           (let*$ ([t2 (mrefC-type$ crcn)])
              (if$ (dyn?$ t2)
                   val
-                  (let$* ([t1 (Mbox-rtti-ref val)]
+                  (let*$ ([t1 (Mbox-rtti-ref val)]
                           [t3 (glbt t1 t2)])
                     (if$ (op=? t1 t3)
                          val
                          (Begin
                            (list
                             (Mbox-rtti-set! val t3))
-                           (let$* ([vv (copy-val-monoref val)]
+                           (let*$ ([vv (copy-val-monoref val)]
                                    [cv (cast
                                         vv t1 t3
                                         (Quote "Monotonic references currently does not track blame")
@@ -622,30 +628,30 @@ form, to the shortest branch of the cast tree that is relevant.
        [(mvectC?$ crcn)
         (match val
           [(Var a)
-           (let$* ([t2 (mvectC-type$ crcn)])
+           (let*$ ([t2 (mvectC-type$ crcn)])
              (if$ (dyn?$ t2)
                   val
-                  (let$* ([t1 (Mvector-rtti-ref val)]
+                  (let*$ ([t1 (Mvector-rtti-ref val)]
                           [t3 (glbt t1 t2)])
                     (if$ (op=? t1 t3)
                          val
                          (Begin
                            (list
                             (Mvector-rtti-set! val t3)
-                            (let$* ([vn (Mvector-length val)])
+                            (let*$ ([vn (Mvector-length val)])
                               (let* ([i-u (next-uid! "index")]
                                      [i (Var i-u)]
                                      [x (next-uid! "_")])
                                 (cond$
                                  [(tupleT?$ t3)
-                                  (let$* ([n (Type-Tuple-num t3)])
+                                  (let*$ ([n (Type-Tuple-num t3)])
                                     (Repeat i-u (Quote 0) vn x UNIT-IMDT
-                                            (let$* ([vi (Mvector-val-ref val i)]
+                                            (let*$ ([vi (Mvector-val-ref val i)]
                                                     [cvi (Copy-Tuple n vi)])
                                               (Begin
                                                 (list
                                                  (Mvector-val-set! val i cvi))
-                                                (let$* ([ccvi (cast
+                                                (let*$ ([ccvi (cast
                                                                cvi t1 t3
                                                                (Quote "Monotonic references currently does not track blame")
                                                                val)]
@@ -655,7 +661,7 @@ form, to the shortest branch of the cast tree that is relevant.
                                                        (Break-Repeat)))))))]
                                  [else
                                   (Repeat i-u (Quote 0) vn x UNIT-IMDT
-                                          (let$* ([vi (Mvector-val-ref val i)]
+                                          (let*$ ([vi (Mvector-val-ref val i)]
                                                   [cvi (cast
                                                         vi t1 t3
                                                         (Quote "Monotonic references currently does not track blame")
@@ -704,12 +710,9 @@ form, to the shortest branch of the cast tree that is relevant.
           cast cast-u
           mk-crcn
           glbt copy-val-monoref) v type1 type2 lbl mono-address)
-
-  (define-syntax-let$* let$* next-uid!)
-
   (: cast-dyn : Cast-With-MAddr-Type)
   (define (cast-dyn  v t1 t2 lbl mono-address)
-    (let$* ([val v] [tag (dyn-immediate-tag$ val)])
+    (let*$ ([val v] [tag (dyn-immediate-tag$ val)])
       (cond$
        [(op=? (Tag 'Int) tag)
         (cast-undyned (dyn-immediate-value$ val) (Type INT-TYPE) t2 lbl mono-address)]
@@ -725,14 +728,14 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (: cast-undyned : Cast-With-MAddr-Type)
   (define (cast-undyned v t1 t2 l mono-address)
-    (let$* ([value v] [type1 t1] [type2 t2] [label l])
+    (let*$ ([value v] [type1 t1] [type2 t2] [label l])
       (cond$
        [(op=? type1 type2) value]
        [else (cast-ground value type1 type2 label mono-address)])))
 
   (: cast-ground : Cast-With-MAddr-Type)
   (define (cast-ground v t1 t2 lbl mono-address)
-    (let$* ([value v] [type1 t1] [type2 t2])
+    (let*$ ([value v] [type1 t1] [type2 t2])
       (cond$
        [(op=? type1 (Type INT-TYPE))
         (if$ (op=? (Type DYN-TYPE) type2)
@@ -755,7 +758,7 @@ form, to the shortest branch of the cast tree that is relevant.
              (dyn-make$ value (Type UNIT-TYPE))
              (Blame lbl))]
        [else
-        (let$* ([tag1 (type-tag type1)])
+        (let*$ ([tag1 (type-tag type1)])
           (cond$
            [(op=? (Tag 'Fn) tag1)
             (cast-fn value type1 type2 lbl)]
@@ -771,33 +774,33 @@ form, to the shortest branch of the cast tree that is relevant.
   
   (: cast-fn : Cast-Type)
   (define (cast-fn v t1 t2 lbl)
-    (let$* ([value v] [type1 t1] [type2 t2] [l lbl])
+    (let*$ ([value v] [type1 t1] [type2 t2] [l lbl])
       (if$ (op=? (Type DYN-TYPE) type2)
            (dyn-make$ value type1)
-           (let$* ([crcn (mk-crcn type1 type2 l)])
+           (let*$ ([crcn (mk-crcn type1 type2 l)])
              (If (Fn-Proxy-Huh value)
                  (App-Code (Fn-Caster (Fn-Proxy-Closure value)) (list value crcn))
                  (App-Code (Fn-Caster value) (list value crcn)))))))
 
   (: cast-mbox : Cast-Type)
   (define (cast-mbox v t1 t2 lbl)
-    (let$* ([val v] [type1 t1] [type2 t2] [tag_mref (type-tag type2)])
+    (let*$ ([val v] [type1 t1] [type2 t2] [tag_mref (type-tag type2)])
       (if$ (op=? (Type DYN-TYPE) type2)
            (dyn-make$ val type1)
            (if$ (op=? tag_mref (Tag 'MRef))
                 (match val
                   [(Var a)
-                   (let$* ([t2 (mref-of$ type2)])
+                   (let*$ ([t2 (mref-of$ type2)])
                      (if$ (dyn?$ t2)
                           val
-                          (let$* ([t1 (Mbox-rtti-ref val)]
+                          (let*$ ([t1 (Mbox-rtti-ref val)]
                                   [t3 (glbt t1 t2)])
                             (if$ (op=? t1 t3)
                                  val
                                  (Begin
                                    (list
                                     (Mbox-rtti-set! val t3))
-                                   (let$* ([vv (copy-val-monoref val)]
+                                   (let*$ ([vv (copy-val-monoref val)]
                                            [cv (cast vv t1 t3
                                                      (Quote "Monotonic references currently does not track blame")
                                                      val)]
@@ -812,16 +815,16 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (: cast-mvect : Cast-Type)
   (define (cast-mvect v t1 t2 lbl)
-    (let$* ([val v] [type1 t1] [type2 t2] [tag_mvect (type-tag type2)])
+    (let*$ ([val v] [type1 t1] [type2 t2] [tag_mvect (type-tag type2)])
       (if$ (op=? (Type DYN-TYPE) type2)
            (dyn-make$ val type1)
            (if$ (op=? tag_mvect (Tag 'MVect))
                 (match val
                   [(Var a)
-                   (let$* ([t2 (mvect-of$ type2)])
+                   (let*$ ([t2 (mvect-of$ type2)])
                      (if$ (dyn?$ t2)
                           val
-                          (let$* ([t1 (Mvector-rtti-ref val)]
+                          (let*$ ([t1 (Mvector-rtti-ref val)]
                                   [t3 (glbt t1 t2)])
                             (if$ (op=? t1 t3)
                                  val
@@ -831,17 +834,17 @@ form, to the shortest branch of the cast tree that is relevant.
                                     (let* ([i-u (next-uid! "index")]
                                            [i (Var i-u)]
                                            [x (next-uid! "_")])
-                                      (let$* ([vn (Mvector-length val)])
+                                      (let*$ ([vn (Mvector-length val)])
                                         (cond$
                                          [(tupleT?$ t3)
-                                          (let$* ([n (Type-Tuple-num t3)])
+                                          (let*$ ([n (Type-Tuple-num t3)])
                                             (Repeat i-u (Quote 0) vn x UNIT-IMDT
-                                                    (let$* ([vi (Mvector-val-ref val i)]
+                                                    (let*$ ([vi (Mvector-val-ref val i)]
                                                             [cvi (Copy-Tuple n vi)])
                                                       (Begin
                                                         (list
                                                          (Mvector-val-set! val i cvi))
-                                                        (let$* ([ccvi (cast cvi t1 t3
+                                                        (let*$ ([ccvi (cast cvi t1 t3
                                                                             (Quote "Monotonic references currently does not track blame")
                                                                             val)]
                                                                 [t4 (Mvector-rtti-ref val)])
@@ -851,7 +854,7 @@ form, to the shortest branch of the cast tree that is relevant.
                                          [else
                                           ;; TODO: checking if t3=t4 is unneeded in this case, prove it!
                                           (Repeat i-u (Quote 0) vn x UNIT-IMDT
-                                                  (let$* ([vi (Mvector-val-ref val i)]
+                                                  (let*$ ([vi (Mvector-val-ref val i)]
                                                           [cvi (cast vi t1 t3
                                                                      (Quote "Monotonic references currently does not track blame")
                                                                      val)]
@@ -865,7 +868,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (: cast-tuple : Cast-Type)
   (define (cast-tuple v t1 t2 lbl)
-    (let$* ([value v] [type1 t1] [type2 t2] [label lbl])
+    (let*$ ([value v] [type1 t1] [type2 t2] [label lbl])
       (if$ (op=? (Type DYN-TYPE) type2)
            (dyn-make$ value type1)
            ;; Todo Reformat this code
@@ -880,23 +883,23 @@ form, to the shortest branch of the cast tree that is relevant.
                                      (unless (index? i)
                                        (error 'make-cast-tuple-code "bad index"))
                                      (let ([a (next-uid! "item_type")])
-                                       (values (cons (cons a (let$* ([item (Tuple-proj v (Quote i))]
+                                       (values (cons (cons a (let*$ ([item (Tuple-proj v (Quote i))]
                                                                      [new-t1t (tuple-type-arg$ t1 i)]
                                                                      [new-t2t (tuple-type-arg$ t2 i)])
                                                                (cast item new-t1t new-t2t lbl (Quote 0)))) b*)
                                                (cons a arg*))))])
                        (Let bnd* (Create-tuple (map (inst Var Uid) arg*))))
                      (error 'make-cast-tuple-code)))
-               (let$* ([tag2 (type-tag type2)])
+               (let*$ ([tag2 (type-tag type2)])
                  (if$ (op=? tag2 (Tag 'STuple))
-                      (let$* ([type1_num (type-tuple-num type1)]
+                      (let*$ ([type1_num (type-tuple-num type1)]
                               [type2_num (type-tuple-num type2)])
                         (if$ (op<=? type2_num type1_num)
                              (Cast-Tuple cast-u v t1 t2 lbl)
                              (Blame type2_num)))
                       (Blame lbl)))))))
   
-  (let$* ([val v] [t1 type1] [t2 type2])
+  (let*$ ([val v] [t1 type1] [t2 type2])
     (cond$
      [(op=? type1 type2) v]
      [(op=? type1 (Type DYN-TYPE)) (cast-dyn v type1 type2 lbl mono-address)]
@@ -910,7 +913,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define ((make-make-coercion-code next-uid! mk-crcn mk-crcn-uid) t1 t2 lbl)
   (define who 'make-make-coercion-code)
   (debug who t1 t2 lbl)
-  (define-syntax-let$* let$* next-uid!)
   (: help-comp :
      CoC3-Trivial -> (Schml-Type Schml-Type -> Schml-Coercion))
   (define ((help-comp lbl) t g)
@@ -946,7 +948,7 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; specify representation were the language is a little
       ;; more flexible.
       [else (Make-Fn-Coercion mk-crcn-uid t1 t2 lbl)]))
-  (let$* ([t1 t1] [t2 t2] [lbl lbl])
+  (let*$ ([t1 t1] [t2 t2] [lbl lbl])
     (cond$
      [(op=? t1 t2) (Quote-Coercion (Identity))]
      [(and$ (fnT?$ t1) (fnT?$ t2))
@@ -961,22 +963,22 @@ form, to the shortest branch of the cast tree that is relevant.
            (make-make-fn-crcn-code t1 t2 lbl)
            (Blame lbl))]
      [(and$ (gvect?$ t1) (gvect?$ t2))
-      (let$* ([gv1_of (gvect-of$ t1)]
+      (let*$ ([gv1_of (gvect-of$ t1)]
               [gv2_of (gvect-of$ t2)]
               [read_crcn  (mk-crcn gv1_of gv2_of lbl)]
               [write_crcn (mk-crcn gv2_of gv1_of lbl)])
         (ref$ read_crcn write_crcn))]
      [(and$ (gref?$ t1) (gref?$ t2))
-      (let$* ([gr1_of (gref-of$ t1)]
+      (let*$ ([gr1_of (gref-of$ t1)]
               [gr2_of (gref-of$ t2)]
               [read_crcn  (mk-crcn gr1_of gr2_of lbl)]
               [write_crcn (mk-crcn gr2_of gr1_of lbl)])
         (ref$ read_crcn write_crcn))]
      [(and$ (mref?$ t1) (mref?$ t2))
-      (let$* ([t (mref-of$ t2)])
+      (let*$ ([t (mref-of$ t2)])
         (mrefC$ t))]
      [(and$ (mvect?$ t1) (mvect?$ t2))
-      (let$* ([t (mvect-of$ t2)])
+      (let*$ ([t (mvect-of$ t2)])
         (mvectC$ t))]
      [(and$ (tupleT?$ t1) (tupleT?$ t2))
       (if$ (op<=? (tupleT-num$ t2) (tupleT-num$ t1))
@@ -1009,7 +1011,6 @@ form, to the shortest branch of the cast tree that is relevant.
    GreatestLowerBound-Type
    -> Compose-Coercions-Type)
 (define ((make-compose-coercions-code next-uid! compose compose-uid mk-crcn mk-glbt) c1 c2)
-  (define-syntax-let$* let$* next-uid!)
   (: help-comp : Schml-Coercion Schml-Coercion -> Schml-Coercion)
   (define (help-comp s t)
     (let ([c (compose (Quote-Coercion s) (Quote-Coercion t))])
@@ -1024,11 +1025,11 @@ form, to the shortest branch of the cast tree that is relevant.
    ;; We could elminate failure on the left next, but we choose to make
    ;; success as fast as possible even if it introduces more branches overall.
    [(seq?$ c1)
-    (let$* ([seq_fst (seq-fst$ c1)]
+    (let*$ ([seq_fst (seq-fst$ c1)]
             [seq_snd (seq-snd$ c1)])
       (cond$
        [(prj?$ seq_fst)
-        (let$* ([comp_seq_snd (compose seq_snd c2)])
+        (let*$ ([comp_seq_snd (compose seq_snd c2)])
           (seq$ seq_fst comp_seq_snd))]
        ;; We have to priority failure on the right over injection
        [(fail?$ c2) c2]
@@ -1036,7 +1037,7 @@ form, to the shortest branch of the cast tree that is relevant.
        ;; c2 must be a (I?;i) aka projection sequence because
        ;; it must have the type dyn => I.
        [else ;;  (inj?$ seq_snd) only thing that is left in normal form
-        (let$* ([proj  (seq-fst$ c2)]
+        (let*$ ([proj  (seq-fst$ c2)]
                 [final (seq-snd$ c2)]
                 [t1    (inj-type$ seq_snd)]
                 [t2    (prj-type$ proj)]
@@ -1049,7 +1050,7 @@ form, to the shortest branch of the cast tree that is relevant.
      [(fail?$ c1) c1]
      [else
       ;; must be c1 & (g;I?)
-      (let$* ([seq_fst (seq-fst$ c2)]
+      (let*$ ([seq_fst (seq-fst$ c2)]
               [seq_snd (seq-snd$ c2)]
               [comp_c1_final (compose c1 seq_fst)])
         (seq$ comp_c1_final seq_snd))])]
@@ -1072,7 +1073,7 @@ form, to the shortest branch of the cast tree that is relevant.
            (Quote-Coercion (Fn (Fn-arity c1) arg* ret)))]
         [else (Compose-Fn-Coercion compose-uid c1 c2)])]
      [(ref?$ c1) ;; c2 must also be a reference coercion
-      (let$* ([ref1_read  (ref-read$  c1)]
+      (let*$ ([ref1_read  (ref-read$  c1)]
               [ref1_write (ref-write$ c1)]
               [ref2_read  (ref-read$  c2)]
               [ref2_write (ref-write$ c2)]
@@ -1093,12 +1094,12 @@ form, to the shortest branch of the cast tree that is relevant.
                 (error 'compose-coercions "given ~a ~a" c1 c2)))
           (Compose-Tuple-Coercion compose-uid c1 c2))]
      [(mrefC?$ c1)
-      (let$* ([ref1_type  (mrefC-type$ c1)]
+      (let*$ ([ref1_type  (mrefC-type$ c1)]
               [ref2_type  (mrefC-type$ c2)]
               [type3  (mk-glbt ref1_type  ref2_type)])
         (mrefC$ type3))]
      [(mvectC?$ c1)
-      (let$* ([ref1_type  (mvectC-type$ c1)]
+      (let*$ ([ref1_type  (mvectC-type$ c1)]
               [ref2_type  (mvectC-type$ c2)]
               [type3  (mk-glbt ref1_type  ref2_type)])
         (mvectC$ type3))]
@@ -1286,6 +1287,17 @@ form, to the shortest branch of the cast tree that is relevant.
        (define r (Let b* (dyn-fn-app v v* t* lbl)))
        #;(printf "r=~a" r)
        r]
+      [(Dyn-Tuple-Proj (app recur e) (app recur i) (app recur l))
+       (let*$ ([v e] [i i] [l l]
+               [u  (ann (dyn-value$ v) CoC3-Expr)]
+               [ty (ann (dyn-type$ v) CoC3-Expr)])
+         (cond$
+          [(ann (and$ (Type-Tuple-Huh ty) (Op '> (list (Type-Tuple-num ty) i)))
+                CoC3-Expr)
+           (let$ ([prj-val (ann (Tuple-proj u i) CoC3-Expr)]
+                  [prj-ty  (ann (Type-Tuple-item ty i) CoC3-Expr)])
+             (ann (interp-coercion prj-val (mk-coercion prj-ty DYN-EXPR l) (Quote 0)) CoC3-Expr))]
+          [else (Blame l)]))]
       [(Dyn-GRef-Ref (app recur e) l)
        (match-define-values (b* (list e^ l^))
          (bnd-non-vars next-uid! (list e (Quote l))
@@ -1755,11 +1767,10 @@ form, to the shortest branch of the cast tree that is relevant.
     Cast-With-MAddr-Type
     -> Mbox-setT))
 (define ((make-mbox-set!-code next-uid! cast) mref val t1)
-  (define-syntax-let$* let$* next-uid!)
-  (let$* ([t2 (Mbox-rtti-ref mref)]
+  (let*$ ([t2 (Mbox-rtti-ref mref)]
           [cv (cond$
                [(and$ (tupleT?$ t1) (tupleT?$ t2))
-                (let$* ([n (Type-Tuple-num t2)]
+                (let*$ ([n (Type-Tuple-num t2)]
                         [ctv (Copy-Tuple n val)])
                   (Begin
                     (list
@@ -1788,16 +1799,15 @@ form, to the shortest branch of the cast tree that is relevant.
     Cast-With-MAddr-Type
     -> Mvec-setT))
 (define ((make-mvect-set!-code next-uid! cast) mvect i val t1)
-  (define-syntax-let$* let$* next-uid!)
-  (let$* ([t2 (Mvector-rtti-ref mvect)])
+  (let*$ ([t2 (Mvector-rtti-ref mvect)])
     (cond$
      [(and$ (tupleT?$ t1) (tupleT?$ t2))
-      (let$* ([n (Type-Tuple-num t2)]
+      (let*$ ([n (Type-Tuple-num t2)]
               [cvi (Copy-Tuple n val)])
         (Begin
           (list
            (Mvector-val-set! mvect i cvi))
-          (let$* ([ccvi (cast
+          (let*$ ([ccvi (cast
                          cvi t1 t2
                          (Quote "monotonic references currently does not track blame")
                          mvect)]
@@ -1806,7 +1816,7 @@ form, to the shortest branch of the cast tree that is relevant.
                  (Mvector-val-set! mvect i ccvi)
                  (Quote 0)))))]
      [else
-      (let$* ([cvi (cast
+      (let*$ ([cvi (cast
                     val t1 t2
                     (Quote "monotonic references currently does not track blame")
                     mvect)]

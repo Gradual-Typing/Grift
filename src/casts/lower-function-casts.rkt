@@ -340,6 +340,8 @@ T?l $ (_  ; )  = what here
       [(Mvector-length e) (Mvector-length (recur e))]
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
        (Dyn-Fn-App e e* t* l)]
+      [(Dyn-Tuple-Proj (app recur e) (app recur i) (app recur l))
+       (Dyn-Tuple-Proj e i l)]
       [(Dyn-GRef-Ref (app recur e) l)
        (Dyn-GRef-Ref e l)]
       [(Dyn-GRef-Set! (app recur e1) (app recur e2) t l)
@@ -348,6 +350,8 @@ T?l $ (_  ; )  = what here
        (Dyn-GVector-Ref e i l)]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (Dyn-GVector-Set! e1 i e2 t l)]
+      [(Dyn-GVector-Len (app recur e) (app recur l))
+       (Dyn-GVector-Len e l)]
       [(Dyn-MRef-Ref e l)
        (Dyn-MRef-Ref (recur e) l)]
       [(Dyn-MRef-Set! e1 e2 t l)

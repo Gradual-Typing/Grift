@@ -76,8 +76,10 @@
           (MVectCastedSet! Uid E E Schml-Type)
           (Mvector-length E)
           ;; Dynamic Operations
+          (Dyn-Tuple-Proj E E E)
           (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
           (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GVector-Len E E)
           (Dyn-GRef-Set! E E Schml-Type Blame-Label)
           (Dyn-GRef-Ref E Blame-Label)
           (Dyn-MVector-Set! E E E Schml-Type Blame-Label)

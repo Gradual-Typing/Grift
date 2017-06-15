@@ -54,7 +54,12 @@
 (define-syntax cond$
   (syntax-rules (else)
     [(_ [else e* ... e]) (begin$ e* ... e)]
-    [(_ [c e* ... e] [c* e** ...] ...) (If c (begin$ e* ... e) (cond$ [c* e** ...] ...))]))
+    [(_ [c e* ... e] [c* e** ...] ...)
+     (If c
+         (begin$ e* ... e)
+         (cond$
+          [c* e** ...]
+          ...))]))
 
 (define-syntax-rule (case$ e [(p** ...) e*] ... [else d])
   (Switch e `([(,p** ...) . ,e*] ...) d))

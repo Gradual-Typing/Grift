@@ -33,6 +33,10 @@
 (define-syntax-rule (ann e t ...) e)
 (define-syntax-rule (inst e t ...) e)
 
+;; TODO move these to forms
+(define PVEC-DYN-TYPE (GVect DYN-TYPE))
+(define MVEC-DYN-TYPE (MVect DYN-TYPE))
+
 ;; A list of casts that are inserted and there source location
 (: casts-inserted (Boxof (Listof (cons srcloc C0-Expr))))
 (define casts-inserted (box '()))
@@ -143,7 +147,7 @@
              ;; but don't have the infrastructure.
              (Dyn-GRef-Ref e (lbl))]
             [else             
-             (Gunbox (mk-cast e-src lbl e e-ty (GRef DYN-TYPE)))])]
+             (Gunbox (mk-cast e-src lbl e e-ty PBOX-DYN-TYPE))])]
          [else
           (error 'insert-casts/gunbox
                  "unexexpected value for e-ty: ~a" e-ty)])]
@@ -160,7 +164,7 @@
              ;; TODO register dynamic operation as a cast
              (Dyn-GRef-Set! e1 e2 e2-ty (lbl1))]
             [else
-             (Gbox-set! (mk-cast e1-src lbl1 e1 DYN-TYPE REF-DYN-TYPE)
+             (Gbox-set! (mk-cast e1-src lbl1 e1 DYN-TYPE PBOX-DYN-TYPE)
                         (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE))])]
          [else
           (error 'insert-casts/gbox-set!
@@ -318,7 +322,7 @@
                  (let ([addr (next-uid! "addr")])
                    (Let `((,addr
                            .
-                           ,(mk-cast e-src lbl e e-ty (MVect DYN-TYPE))))
+                           ,(mk-cast e-src lbl e e-ty MVEC-DYN-TYPE)))
                      (MVectCastedRef addr i t)))]))]
            [(MVect? e-ty) (let ([addr (next-uid! "addr")])
                             (Let `((,addr . ,e))
@@ -353,25 +357,29 @@
            [else (error 'insert-casts/Mvector-set!T
                         "unexpected value for e1 type: ~a"
                         e1-ty)]))]
-      [(Mvector-length (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
-       (if (Dyn? e-ty)
-           (Mvector-length (mk-cast e-src (mk-label "mvector-length" e-src) e e-ty (MVect DYN-TYPE)))
-           (Mvector-length e))]
-      [(Gvector-length (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
-       (if (Dyn? e-ty)
-           (Gvector-length (mk-cast e-src (mk-label "gvector-length" e-src) e e-ty (GVect DYN-TYPE)))
-           (Gvector-length e))]
-      [(Create-tuple e*) (Create-tuple (map ic-expr e*))]
-      [(Tuple-proj (and (Ann _ (cons e-src e-ty)) (app ic-expr e)) i)
+      [(Mvector-length (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)))
+       (define l-th (mk-label "mvector-length" e-src))
+       (Mvector-length (mk-cast e-src l-th e DYN-TYPE MVEC-DYN-TYPE))]
+      [(Mvector-length (and (Ann _ (cons _ (MVect _))) (app ic-expr e)))
+       (Mvector-length e)]
+      [(Gvector-length (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)))
+       (define l-th (mk-label "gvector-length" e-src))
        (cond
-         [(Dyn? e-ty)
-          (let ([n (+ i 1)])
-            #;(unless (index? n) (error 'ic-expr "bad index"))
-            (Tuple-proj (mk-cast e-src (mk-label "tuple-proj" e-src)
-                                 e DYN-TYPE
-                                 (STuple n (make-list n DYN-TYPE))) i))]
-         [(STuple? e-ty) (Tuple-proj e i)]
-         [else (error 'schml/insert-casts/ic-expr/Tuple-proj "unmatched: ~a" e-ty)])]
+         [(dynamic-operations?) (Dyn-GVector-Len e (Quote (l-th)))]
+         [else (Gvector-length (mk-cast e-src l-th e DYN-TYPE PVEC-DYN-TYPE))])]
+      [(Gvector-length (and (Ann _ (cons _ (GVect _))) (app ic-expr e)))
+       (Gvector-length e)]
+      [(Create-tuple e*) (Create-tuple (map ic-expr e*))]
+      [(Tuple-proj (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)) i)
+       (define l-th (mk-label "tuple-proj" e-src))
+       (cond
+         [(dynamic-operations?) (Dyn-Tuple-Proj e (Quote i) (Quote (l-th)))]
+         [else
+          (define n (+ n 1))
+          (define tgt-ty (STuple n (make-list n DYN-TYPE)))
+          (Tuple-proj (mk-cast e-src l-th e DYN-TYPE tgt-ty) i)])]
+      [(Tuple-proj (and (Ann _ (cons e-src (STuple _ _))) (app ic-expr e)) i)
+       (Tuple-proj e i)]
       [other (error 'insert-casts/expression "unmatched ~a" other)])))
 
 (: make-list (Integer Schml-Type -> (Listof Schml-Type)))

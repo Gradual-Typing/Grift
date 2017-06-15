@@ -57,6 +57,8 @@
 	  (Var Uid)
 	  (Quote Cast-Literal)
           ;; Dynamic Operations
+          (Dyn-Tuple-Proj E E E)
+          (Dyn-GVector-Len E E)
           (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
           (Dyn-GVector-Ref E E Blame-Label)
           (Dyn-GRef-Set! E E Schml-Type Blame-Label)

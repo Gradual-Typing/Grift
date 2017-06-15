@@ -175,7 +175,7 @@
   "add a cast representation to the tests"
   (let ((crep (string->symbol crep)))
     (case crep 
-      [(Type-Base Coercions Hyper-Coercions)
+      [(|Type-Based Casts| Coercions Hyper-Coercions)
        (define current-test-cast-representation (test-cast-representation))
        (test-cast-representation
         (if (eq? default-test-cast-representation

@@ -3,11 +3,15 @@
  racket/match
  racket/format
  racket/list
- "../helpers.rkt"
+ "../language/cast-or-coerce3.rkt"
+
+ "../language/cast0.rkt"
+;; "../helpers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
  "../unique-identifiers.rkt"
- "../language/cast-or-coerce3.rkt")
+ "../language/cast-or-coerce3.rkt"
+ (submod "../logging.rkt" typed))
 
 (provide (all-defined-out))
 
@@ -488,3 +492,208 @@
                      cv))]
                 [else v]))]
     [other (error 'copy-value-in-monoref "unmatched value ~a" other)]))
+
+
+(define-type Compile-Cast-Type
+  (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
+       (#:t1-not-dyn Boolean #:t2-not-dyn Boolean)
+       CoC3-Expr))
+
+(define-type Compile-Make-Coercion-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
+(define-type Compile-Lambda-Type (Uid* CoC3-Expr -> CoC3-Expr)) 
+(define-type Compile-App-Type (CoC3-Expr CoC3-Expr* -> CoC3-Expr))
+
+(define-type Dyn-PBox-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PBox-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PVec-Ref-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PVec-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MBox-Ref-Type
+  (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MBox-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MVec-Ref-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-MVec-Set-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-PVec-Len-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-Fn-App-Type
+  (CoC3-Expr CoC3-Expr* Schml-Type* CoC3-Expr -> CoC3-Expr))
+(define-type Dyn-Tup-Prj-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
+(define-type MBox-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type MBox-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type MVec-Ref-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type MVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
+
+;; This next section of code are the procedures that build all
+;; of the runtime code for hyper coercions based casting.
+
+(define-type Interp-Compose-Coercions-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Interp-Cast-Type (->* (CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
+(define-type Interp-Make-Coercion-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Greatest-Lower-Bound-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Copy-Mref-Type (CoC3-Expr -> CoC3-Expr))
+(define-type Make-Coercion-Type (Schml-Type Schml-Type Blame-Label -> CoC3-Expr))
+
+;; Functions for use sites of guarded references with coercions
+(define-type PBox-Ref-Type (CoC3-Expr -> CoC3-Expr))
+(define-type PBox-Set-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type PVec-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type PVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type PVec-Len-Type (CoC3-Expr -> CoC3-Expr))
+
+(define (make-map-expr
+         #:compile-cast    [compile-cast : Compile-Cast-Type]
+         #:compile-lambda  [compile-lambda : Compile-Lambda-Type]
+         #:compile-app     [compile-app : Compile-App-Type]
+         #:pbox-ref [pbox-ref  : PBox-Ref-Type]
+         #:pbox-set [pbox-set! : PBox-Set-Type]
+         #:pvec-ref [pvec-ref  : PVec-Ref-Type]
+         #:pvec-set [pvec-set! : PVec-Set-Type]
+         #:pvec-len [pvec-len  : PVec-Len-Type]
+         #:mbox-ref [mbox-ref  : MBox-Ref-Type]
+         #:mbox-set [mbox-set! : MBox-Set-Type]
+         #:mvec-ref [mvec-ref  : MVec-Ref-Type]
+         #:mvec-set [mvec-set! : MVec-Set-Type]
+         #:dyn-pbox-ref [dyn-pbox-ref  : Dyn-PBox-Ref-Type]
+         #:dyn-pbox-set [dyn-pbox-set! : Dyn-PBox-Set-Type]
+         #:dyn-pvec-ref [dyn-pvec-ref  : Dyn-PVec-Ref-Type]
+         #:dyn-pvec-set [dyn-pvec-set! : Dyn-PVec-Set-Type]
+         #:dyn-pvec-len [dyn-pvec-len  : Dyn-PVec-Len-Type]
+         #:dyn-mbox-ref [dyn-mbox-ref  : Dyn-MBox-Ref-Type]
+         #:dyn-mbox-set [dyn-mbox-set! : Dyn-MBox-Set-Type]
+         #:dyn-mvec-ref [dyn-mvec-ref  : Dyn-MVec-Ref-Type]
+         #:dyn-mvec-set [dyn-mvec-set! : Dyn-MVec-Set-Type]
+         #:dyn-fn-app   [dyn-fn-app    : Dyn-Fn-App-Type]
+         #:dyn-tup-prj  [dyn-tup-prj   : Dyn-Tup-Prj-Type])
+  : (C0-Expr -> CoC3-Expr) 
+  ;; map the pass through lists of expressions
+  (: recur* (C0-Expr* -> CoC3-Expr*))
+  (define (recur* e*) (map recur e*))
+  ;; map the pass through lists of bindings
+  (: recur-bnd* (C0-Bnd* -> CoC3-Bnd*))
+  (define (recur-bnd* b*)
+    (map (λ ([b : C0-Bnd]) (cons (car b) (recur (cdr b)))) b*))
+  (: recur : C0-Expr -> CoC3-Expr)
+  (define (recur e)
+    (debug 'interpret-cast-with-hyper-coercions/map-expr e)
+    (match e
+      ;; Casts get turned into calls to the cast interpreter with
+      ;; hyper-coercion. The later pass makes this slightly more
+      ;; efficient by statically allocating the coercion object.
+      [(Cast (app recur e) (Twosome t1 t2 l))
+       (compile-cast e (Type t1) (Type t2) (Quote l))]
+      ;; Lambdas add a extra meta information field that ultimately
+      ;; turns into a method for casting a particular arrity at runtime.
+      [(Lambda f* (app recur exp)) (compile-lambda f* exp)]
+      ;; Applications get turned into an application that "checks for the
+      ;; the presence of proxies" This eventually gets optimized aways
+      ;; into a functional proxy representation. 
+      [(App (app recur e) (app recur* e*)) (compile-app e e*)]
+      ;; Use make coercion to implement dynamic application without
+      ;; allocating a one time use coercion.
+      [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
+       (dyn-fn-app e e* t* (Quote l))]
+      ;; Transformation to lower guarded reference types
+      ;; Guarded Operations on Guarded values are turned into
+      ;; calls/inlinings of the runtime proceedures that perform
+      ;; proxied reads and writes.
+      ;;-------------------------------------------------------------------
+      ;; Every Guarded Reference Starts As an Unguarded box
+      [(Gbox (app recur e)) (Unguarded-Box e)]
+      [(Gvector (app recur n) (app recur init)) (Unguarded-Vect n init)]
+      ;; Unboxing calls off to the helpers we have defined
+      [(Gvector-ref (app recur v) (app recur i))
+       (pvec-ref v i)]
+      [(Gunbox (app recur b))
+       (pbox-ref b)]
+      [(Dyn-GRef-Ref (app recur e) l)
+       (dyn-pbox-ref e (Quote l))]
+      [(Dyn-GVector-Ref (app recur e) (app recur i) l)
+       (dyn-pvec-ref e i (Quote l))]
+      ;; Setting a Gaurded reference results in iteratively applying
+      ;; all the guarding casts to the value to be written.
+      ;; Most of the work is already done but the code requires values
+      ;; so there is a little repetative to let bind any values that
+      ;; haven't been evaluated.
+      [(Gbox-set! (app recur b) (app recur w))
+       (pbox-set! b w)]
+      [(Gvector-set! (app recur v) (app recur i) (app recur w))
+       (pvec-set! v i w)]
+      [(Dyn-GRef-Set! (app recur e1) (app recur e2) t l)
+       (dyn-pbox-set! e1 e2 (Type t) (Quote l))]
+      [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
+       (dyn-pvec-set! e1 i e2 (Type t) (Quote l))]
+      [(Gvector-length (app recur e))
+       (pvec-len e)]
+      [(MBoxCastedRef addr t)
+       (mbox-ref (Var addr) (Type t))]
+      [(MBoxCastedSet! addr (app recur e) t)
+       (mbox-set! (Var addr) e (Type t))]
+      [(MVectCastedRef addr (app recur i) t)
+       (mvec-ref (Var addr) i (Type t))]
+      [(MVectCastedSet! addr (app recur i) (app recur e) t)
+       (mvec-set! (Var addr) i e (Type t))]
+      [(Dyn-MRef-Ref (app recur e) l)
+       (dyn-mbox-ref e (Quote l))]
+      [(Dyn-MRef-Set! (app recur e1) (app recur e2) t l)
+       (dyn-mbox-set! e1 e2 (Type t) (Quote l))]
+      [(Dyn-MVector-Ref (app recur e) (app recur i) l)
+       (dyn-mvec-ref e i (Quote l))]
+      [(Dyn-MVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
+       (dyn-mvec-set! e1 i e2 (Type t) (Quote l))]
+      ;; Completely statically typed monotonic need no runtime proceedures.
+      ;; They are only kept different seperate from unguarded ops because
+      ;; there layout is slightly different latter. 
+      ;; Long-Term TODO: Why does the name ove these change?
+      ;; Does their semantics change?
+      [(Mvector-ref (app recur e1) (app recur e2))
+       (Mvector-val-ref e1 e2)]
+      [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
+       (Mvector-val-set! e1 e2 e3)]
+      [(Munbox (app recur e))
+       (Mbox-val-ref e)]
+      [(Mbox-set! (app recur e1) (app recur e2))
+       (Mbox-val-set! e1 e2)]
+      [(Mvector-length e) (Mvector-length (recur e))]
+      [(Mbox (app recur e) t) (Mbox e t)]
+      [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]      
+      ;; While tuples don't get any special attention in this pass
+      ;; dynamic tuple projection needs to get dusugared
+      [(Create-tuple e*) (Create-tuple (recur* e*))]
+      [(Tuple-proj e i) (Tuple-proj (recur e) (Quote i))]
+      [(Dyn-Tuple-Proj (app recur e) (app recur i) (app recur l))
+       (dyn-tup-prj e i l)]
+      ;; Simple Recursion Patterns
+      [(Observe (app recur e) t)
+       (Observe e t)]
+      [(Letrec bnd* exp)
+       (Letrec (recur-bnd* bnd*) (recur exp))]
+      [(Let bnd* exp)
+       (Let (recur-bnd* bnd*) (recur exp))]
+      [(Op p exp*)
+       (Op p (recur* exp*))]
+      [(If tst csq alt)
+       (If (recur tst) (recur csq) (recur alt))]
+      [(Switch e c* d)
+       (Switch (recur e) (map-switch-case* recur c*) (recur d))]
+      [(Begin e* e)
+       (Begin (recur* e*) (recur e))]
+      [(Repeat i e1 e2 a e3 e4)
+       (Repeat i (recur e1) (recur e2) a (recur e3) (recur e4))]
+      [(Var id)    (Var id)]
+      [(Quote lit) (Quote lit)]
+      [(and noop (No-Op)) noop]      
+      [other
+       (error 'cast/interp-casts-with-hyper-coercion "unmatched ~a" other)]))
+  ;; Body of map-expr
+  ;; just return the recursion procedure
+  recur)

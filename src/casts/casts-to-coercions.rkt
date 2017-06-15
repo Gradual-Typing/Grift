@@ -131,6 +131,8 @@ should be able to compile programs this the twosome casts for future comparison.
     ;; this will be exposed when we have make coercion
     [(Dyn-Fn-App e e* t* l)
      (Dyn-Fn-App (c2c-expr e) (c2c-expr* e*) t* l)]
+    [(Dyn-Tuple-Proj (app c2c-expr e) (app c2c-expr i) (app c2c-expr l))
+     (Dyn-Tuple-Proj e i l)]
     [(Dyn-GRef-Ref e l)
      (Dyn-GRef-Ref (c2c-expr e) l)]
     [(Dyn-GRef-Set! e1 e2 t l)
@@ -139,6 +141,8 @@ should be able to compile programs this the twosome casts for future comparison.
      (Dyn-GVector-Ref (c2c-expr e) (c2c-expr i) l)]
     [(Dyn-GVector-Set! e1 i e2 t l)
      (Dyn-GVector-Set! (c2c-expr e1) (c2c-expr i) (c2c-expr e2) t l)]
+    [(Dyn-GVector-Len e l)
+     (Dyn-GVector-Len (c2c-expr e) (c2c-expr l))]
     [(Dyn-MRef-Ref e l)
      (Dyn-MRef-Ref (c2c-expr e) l)]
     [(Dyn-MRef-Set! e1 e2 t l)

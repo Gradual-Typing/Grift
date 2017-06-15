@@ -174,10 +174,12 @@ And a type constructor "name" expecting the types of field1 and field2
   (Dyn-GRef-Set! expr1 expr2 type label)
   (Dyn-GVector-Ref expr index label)
   (Dyn-GVector-Set! expr1 index expr2 type label)
+  (Dyn-GVector-Len vec label)
   (Dyn-MVector-Set! e1 i e2 e2-ty label)
   (Dyn-MVector-Ref e i label)
   (Dyn-MRef-Set! e1 e2 e2-ty label)
   (Dyn-MRef-Ref e label)
+  (Dyn-Tuple-Proj tuple index label)
   ;; Observational Operations
   (Blame expression)
   (Observe expression type)
@@ -281,12 +283,40 @@ And a type constructor "name" expecting the types of field1 and field2
 
 ;;Constants for the types
 (define UNIT-TYPE (Unit))
+(define UNIT-EXPR (Type UNIT-TYPE))
+
 (define INT-TYPE (Int))
+(define INT-EXPR (Type INT-TYPE))
+
 (define FLOAT-TYPE (Float))
+(define FLOAT-EXPR (Type FLOAT-TYPE))
+
 (define BOOL-TYPE (Bool))
+(define BOOL-EXPR (Type BOOL-TYPE))
+
 (define CHAR-TYPE (Character))
+(define CHAR-EXPR (Type CHAR-TYPE))
+
 (define DYN-TYPE (Dyn))
-(define REF-DYN-TYPE (GRef DYN-TYPE))
+(define DYN-EXPR (Type DYN-TYPE))
+
+(define PBOX-DYN-TYPE (GRef DYN-TYPE))
+(define PBOX-DYN-EXPR (Type PBOX-DYN-TYPE))
+
+(define PVEC-DYN-TYPE (GVect DYN-TYPE))
+(define PVEC-DYN-EXPR (Type PVEC-DYN-TYPE))
+
+(define MBOX-DYN-TYPE (MRef DYN-TYPE))
+(define MBOX-DYN-EXPR (Type MBOX-DYN-TYPE))
+
+(define MVEC-DYN-TYPE (MVect DYN-TYPE))
+(define MVEC-DYN-EXPR (Type MVEC-DYN-TYPE))
+
+(define FN-DYN-DYN-TYPE (Fn 1 (list DYN-TYPE) DYN-TYPE))
+(define FN-DYN-DYN-EXPR (Type FN-DYN-DYN-TYPE))
+
+(define TUPLE-DYN-TYPE (STuple 1 (list DYN-TYPE)))
+(define TUPLE-DYN-EXPR (Type TUPLE-DYN-TYPE))
 
 ;; define type id = t and id* = (c* t) ...
 (define-syntax-rule (define-type+ id ([id* c*] ...) t)
