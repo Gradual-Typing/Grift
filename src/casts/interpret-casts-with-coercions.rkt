@@ -1320,6 +1320,13 @@ form, to the shortest branch of the cast tree that is relevant.
          (bnd-non-vars next-uid! (list e1 i e2 (Quote l))
                        #:names (list "dyn_gvec" "index" "write_val" "blame_info")))
        (Let b* (dyn-gvec-set! e1^ i^ e2^ (Type t) l^))]
+      [(Dyn-GVector-Len (app recur e) (app recur l))
+       (let*$ ([v e] [l l]
+               [u (dyn-value$ v)]
+               [t (dyn-type$ v)])
+         (If (Type-GVect-Huh t)
+             (gvect-length u)
+             (Blame l)))]
       [(Dyn-MRef-Ref (app recur e) l)
        (match-define-values (b* (list e^ l^))
          (bnd-non-vars next-uid! (list e (Quote l))
