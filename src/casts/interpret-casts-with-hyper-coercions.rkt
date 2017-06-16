@@ -601,8 +601,7 @@ that can be located throughout this file:
               ;; Since we are generating it here it is trivial to
               ;; directly call that code.
               (let ([caster (get-fn-cast! a)])
-                (App-Code (Code-Label caster)
-                          (list v (Quote-HCoercion m))))]
+                (App-Code (Code-Label caster) (list v (Quote-HCoercion m))))]
              [(Quote-HCoercion (HC #f _ #f #f _ (and m (Ref c1 c2))))
               (compile-ref-cast v (Quote-HCoercion m))]
              [(Quote-HCoercion (HC #f _ #f #f _ (and m (CTuple n c*))))
@@ -732,6 +731,7 @@ that can be located throughout this file:
     (define (compile-lambda f* expr)
       (let ([caster (get-fn-cast! (length f*))])
         (Lambda f* (Castable caster expr))))
+    
     (: compile-app Compile-App-Type)
     (define (compile-app e e*)
       (App-Fn-or-Proxy interp-cast-uid e e*))
@@ -739,45 +739,47 @@ that can be located throughout this file:
 
     ;; Proxied References Implementation
     (: make-gbox-ref-code PBox-Ref-Type)
-    (define (make-gbox-ref-code gref)
-      (If (Guarded-Proxy-Huh gref)
-          (interp-cast
-           (Unguarded-Box-Ref (Guarded-Proxy-Ref gref))
-           (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
-          (Unguarded-Box-Ref gref)))
+    (define (make-gbox-ref-code e-gref)
+      (let$ ([v e-gref])
+        (If (Guarded-Proxy-Huh v)
+            (let$ ([u (Guarded-Proxy-Ref v)]
+                   [c (Guarded-Proxy-Coercion v)])
+              (interp-cast (Unguarded-Box-Ref u) (Ref-Coercion-Read c)))
+            (Unguarded-Box-Ref v))))
 
     (: make-gbox-set!-code  PBox-Set-Type)
-    (define (make-gbox-set!-code gref val)
-      (If (Guarded-Proxy-Huh gref)
-          (Unguarded-Box-Set!
-           (Guarded-Proxy-Ref gref)
-           (interp-cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
-          (Unguarded-Box-Set! gref val)))
+    (define (make-gbox-set!-code e-gref w-val)
+      (let$ ([v e-gref][w w-val])
+        (If (Guarded-Proxy-Huh v)
+            (let$ ([u (Guarded-Proxy-Ref v)]
+                   [c (Ref-Coercion-Write (Guarded-Proxy-Coercion v))])
+              (Unguarded-Box-Set! u (interp-cast w c)))
+            (Unguarded-Box-Set! v w))))
 
     (: make-gvect-ref-code  PVec-Ref-Type)
-    (define (make-gvect-ref-code gref index)
-      (If (Guarded-Proxy-Huh gref)
-          (interp-cast (Unguarded-Vect-Ref (Guarded-Proxy-Ref gref) index)
-                       (Ref-Coercion-Read (Guarded-Proxy-Coercion gref)))
-          (Unguarded-Vect-Ref gref index)))
+    (define (make-gvect-ref-code e-gref i-index)
+      (let$ ([v e-gref][i i-index])
+        (If (Guarded-Proxy-Huh v)
+            (let$ ([u (Unguarded-Vect-Ref (Guarded-Proxy-Ref v) i)]
+                   [c (Ref-Coercion-Read (Guarded-Proxy-Coercion v))])
+              (interp-cast u c))
+            (Unguarded-Vect-Ref v i))))
 
     (: make-gvect-length-code PVec-Len-Type)
-    (define (make-gvect-length-code gvect)
-      (If (Guarded-Proxy-Huh gvect)
-          (Unguarded-Vect-length (Guarded-Proxy-Ref gvect))
-          (Unguarded-Vect-length gvect)))
+    (define (make-gvect-length-code e-gvec)
+      (let$ ([v e-gvec])
+        (If (Guarded-Proxy-Huh v)
+            (Unguarded-Vect-length (Guarded-Proxy-Ref v))
+            (Unguarded-Vect-length v))))
 
     (: make-gvect-set!-code PVec-Set-Type)
-    (define (make-gvect-set!-code gref index val)
-      (: index-exp CoC3-Expr)
-      (define index-exp (if (integer? index) (Quote index) index))
-      (If (Guarded-Proxy-Huh gref)
-          (Unguarded-Vect-Set!
-           (Guarded-Proxy-Ref gref)
-           index-exp
-           (interp-cast val (Ref-Coercion-Write (Guarded-Proxy-Coercion gref))))
-          (Unguarded-Vect-Set! gref index-exp val)))
-
+    (define (make-gvect-set!-code e-gref i-index w-val)
+      (let$ ([v e-gref][i i-index][w w-val])
+        (If (Guarded-Proxy-Huh v)
+            (let$ ([u (Guarded-Proxy-Ref v)]
+                   [w (interp-cast w (Ref-Coercion-Write (Guarded-Proxy-Coercion v)))])
+              (Unguarded-Vect-Set! u i w))
+            (Unguarded-Vect-Set! v i w))))
     ;; Proxied References implementation
     ;; In general each operation has to check if the reference is proxied.
     ;; Then depending on whether it is a read or write operation cast the read
@@ -988,13 +990,13 @@ that can be located throughout this file:
          [else (Blame lbl)])))
     
     (: make-dyn-pvec-len-code Dyn-PVec-Len-Type)
-    (define (make-dyn-pvec-len-code dyn lbl)
-      (let*$ ([dyn dyn] [lbl lbl])
+    (define (make-dyn-pvec-len-code expr lbl)
+      (let*$ ([v expr] [l lbl])
         (cond$
-         [(and$ (dyn-immediate-tag=?$ dyn PVEC-DYN-EXPR)
-                (Type-GVect-Huh (dyn-box-type$ dyn)))
-          (pvec-len (dyn-box-value$ dyn))]
-         [else (Blame lbl)])))
+         [(and$ (dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
+                (Type-GVect-Huh (dyn-box-type$ v)))
+          (pvec-len (dyn-box-value$ v))]
+         [else (Blame l)])))
 
     (: make-dyn-mbox-ref-code Dyn-MBox-Ref-Type)
     (define (make-dyn-mbox-ref-code dyn lbl)
