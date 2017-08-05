@@ -22,9 +22,18 @@
          (log-schml-debug (with-output-to-string (lambda () (display a) ...)))))]))
 
 (define-syntax (debug stx)
-  (syntax-case stx (off)
+  (syntax-case stx (off std)
     [(debug off e* ... e)
      #'(begin e* ... e)]
+    [(debug std e* ... e)
+     (with-syntax ([(t* ... t) (generate-temporaries #'(e* ... e))])
+       #`(let ([t* e*] ... [t e])
+           (printf "~a:\n" (srcloc->string (quote-srcloc #,stx)))
+           (printf "  ~a=~v\n" 'e* t*)
+           ...
+           (printf "  ~a=~v\n" 'e t)
+           (newline)
+           t))]
     [(_ e* ... e)
      (with-syntax ([(t* ... t) (generate-temporaries #'(e* ... e))])
        #`(let ([t* e*] ... [t e])
@@ -63,9 +72,18 @@
             (with-output-to-string (lambda () (display a) ...)))))]))
 
   (define-syntax (debug stx)
-    (syntax-case stx (off)
+    (syntax-case stx (off std)
       [(debug off e* ... e)
        #'(begin e* ... e)]
+      [(debug std e* ... e)
+       (with-syntax ([(t* ... t) (generate-temporaries #'(e* ... e))])
+         #`(let ([t* e*] ... [t e])
+             (printf "~a:\n" (srcloc->string (quote-srcloc #,stx)))
+             (printf "  ~a=~v\n" 'e* t*)
+             ...
+             (printf "  ~a=~v\n" 'e t)
+             (newline)
+             t))]
       [(_ e* ... e)
        (with-syntax ([(t* ... t) (generate-temporaries #'(e* ... e))])
          #`(let ([t* e*] ... [t e])

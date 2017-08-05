@@ -828,6 +828,9 @@ Dyn
 
 
 (define IDENTITY : Identity (Identity))
+(define ID-EXPR (Quote-Coercion IDENTITY))
+(define ZERO-EXPR (Quote 0))
+
 
 (define-type Schml-Coercion* (Listof Schml-Coercion))
 

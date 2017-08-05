@@ -100,6 +100,18 @@
    [("-r" "--recursive")
     "recursively compile directory"
     (recursive-parameter #t)]
+   [("-d" "--debug-logging") debug-file
+    "enable debuging logging to file (1=stdout, 2=stderr)"
+    (begin
+      (schml-log-level 'debug)
+      (match debug-file
+        ["1" (schml-log-port (current-output-port))]
+        ["2" (schml-log-port (current-error-port))]
+        [other
+         (define of-port (open-output-file other
+                                           #:mode 'text
+                                           #:exists 'replace))
+         (schml-log-port of-port)]))]
    [("-g" "--with-debug-symbols")
     "Invoke c compiler so that debugging symbols are retained."
     (c-flags (cons "-g" (c-flags)))]

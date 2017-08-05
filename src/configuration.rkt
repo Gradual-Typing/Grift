@@ -34,12 +34,13 @@
 
 ;; Cast behavior 
 (: specialize-cast-code-generation? (Parameterof Boolean))
-(define specialize-cast-code-generation? (make-parameter #f))
-
+(define specialize-cast-code-generation? (make-parameter #t))
 (: optimize-first-order-coercions? (Parameterof Boolean))
 (define optimize-first-order-coercions? (make-parameter #t))
 (: coercions-are-space-efficient? (Parameterof Boolean))
 (define coercions-are-space-efficient? (make-parameter #t))
+(define hybrid-cast/coercion-runtime? : (Parameterof Boolean)
+  (make-parameter #t))
 
 
 
