@@ -13,16 +13,24 @@
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
-(define (guarded-compile src i cast ref)
-  (let* ([exe (path-replace-extension
-               src
-               (string-append ".o" (number->string i)))])
-    (parameterize ([specialize-cast-code-generation? #f])
-      (if (not (file-exists? exe))
-          (begin
-            (printf "~a\n" exe)
-            (compile src #:output exe #:cast cast #:ref ref))
-          (void)))))
+(define (guarded-compile src i cast ref specialize)
+  (define specialize-casts?
+    (match specialize
+      ['Interpreted #f]
+      ['Specialized #t]
+      [_ (error 'benchmark/guarded-compile
+                "invalid specialization: ~a"
+                specialize)]))
+  (define exe
+    (path-replace-extension
+     src
+     (string-append ".o" (number->string i))))
+  (parameterize ([specialize-cast-code-generation? specialize-casts?])
+    (if (not (file-exists? exe))
+        (begin
+          (printf "~a\n" exe)
+          (compile src #:output exe #:cast cast #:ref ref))
+        (void))))
 
 (define configs
   (call-with-input-file "benchmark/configs.dat"

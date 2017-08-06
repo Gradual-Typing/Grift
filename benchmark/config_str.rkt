@@ -22,12 +22,19 @@ Description: Facilitates a user-friendly interface for Schml
       (lambda (in)
         (write
          (make-hash
-          '((1 |Type-Based Casts| Proxied)
-            (2 Coercions Proxied)
-            (3 Hyper-Coercions Proxied)
-            (4 |Type-Based Casts| Monotonic)
-            (5 Coercions Monotonic)
-            (6 Hyper-Coercions Monotonic)))
+          ;; Index Cast-Mechinism Ref-Mechinism Cast-Specialization
+          '((1 |Type-Based Casts| Proxied Interpreted)
+            (2 Coercions Proxied Interpreted)
+            (3 Hyper-Coercions Proxied Interpreted)
+            (4 |Type-Based Casts| Monotonic Interpreted)
+            (5 Coercions Monotonic Interpreted)
+            (6 Hyper-Coercions Monotonic Interpreted)
+            (7 |Type-Based Casts| Proxied Specialized)
+            (8 Coercions Proxied Specialized)
+            (9 Hyper-Coercions Proxied Specialized) 
+            (10 |Type-Based Casts| Monotonic Specialized)
+            (11 Coercions Monotonic Specialized)
+            (12 Hyper-Coercions Monotonic Specialized)))
          in))))
 
 (module+ main  
