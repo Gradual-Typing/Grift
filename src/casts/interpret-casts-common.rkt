@@ -283,7 +283,7 @@ TODO write unit tests
     (map (λ ([b : C0-Bnd]) (cons (car b) (recur (cdr b)))) b*))
   (: recur : C0-Expr -> CoC3-Expr)
   (define (recur e)
-    (debug 'interpret-cast-with-hyper-coercions/map-expr e)
+    (debug 'interpret-cast-common/map-expr e)
     (match e
       ;; Casts get turned into calls to the cast interpreter with
       ;; hyper-coercion. The later pass makes this slightly more
@@ -331,6 +331,9 @@ TODO write unit tests
        (dyn-pbox-set! e1 e2 (Type t) (Quote l))]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (dyn-pvec-set! e1 i e2 (Type t) (Quote l))]
+      ;; TODO add tests for dyn-gvector-len
+      [(Dyn-GVector-Len (app recur e) (app recur l))
+       (dyn-pvec-len e l)]
       [(Gvector-length (app recur e))
        (pvec-len e)]
       [(MBoxCastedRef addr t)
@@ -390,9 +393,7 @@ TODO write unit tests
        (Repeat i (recur e1) (recur e2) a (recur e3) (recur e4))]
       [(Var id)    (Var id)]
       [(Quote lit) (Quote lit)]
-      [(and noop (No-Op)) noop]      
-      [other
-       (error 'cast/interp-casts-with-hyper-coercion "unmatched ~a" other)]))
+      [(and noop (No-Op)) noop]))
   ;; Body of map-expr
   ;; just return the recursion procedure
   recur)
@@ -1174,6 +1175,7 @@ TODO write unit tests
    (: aux : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
     (define (aux v t1 t2 l mt)
       (match* (t1 t2)
+        ;; TODO add tests that specifically target each of these cases
         [((Type t1-t) (Type t2-t))
          (match* (t1-t t2-t)
            [((Fn a _ _) (Fn a _ _))
