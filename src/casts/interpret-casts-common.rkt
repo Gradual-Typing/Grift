@@ -1222,11 +1222,11 @@ TODO write unit tests
             (If (and$ (Type-Fn-Huh t1) (op=? (Quote a) (Type-Fn-arity t1)))
                 (compile-fn-cast v t1 t2 l)
                 (Blame l))]
-           [(GRef t1-t)
+           [(GRef t2-t)
             (If (Type-GRef-Huh t1)
                 (compile-ref-cast v (Type-GRef-Of t1) (Type t2-t) l)
                 (Blame l))]
-           [(GVect t1-t)
+           [(GVect t2-t)
             (If (Type-GVect-Huh t1)
                 (compile-ref-cast v (Type-GVect-Of t1) (Type t2-t) l)
                 (Blame l))]
