@@ -35,7 +35,7 @@ Description: Facilitates a user-friendly interface for Schml
             (10 |Type-Based Casts| Monotonic Specialized Pure)
             (11 Coercions Monotonic Specialized Pure)
             (12 Hyper-Coercions Monotonic Specialized Pure)
-            (13 Coercions Proxied Interpreted Monotonic Hybrid)
+            (13 Coercions Proxied Interpreted Hybrid)
             (14 Hyper-Coercions Proxied Interpreted Hybrid)
             (15 Coercions Monotonic Interpreted Hybrid)
             (16 Hyper-Coercions Monotonic Interpreted Hybrid)
