@@ -22,19 +22,27 @@ Description: Facilitates a user-friendly interface for Schml
       (lambda (in)
         (write
          (make-hash
-          ;; Index Cast-Mechinism Ref-Mechinism Cast-Specialization
-          '((1 |Type-Based Casts| Proxied Interpreted)
-            (2 Coercions Proxied Interpreted)
-            (3 Hyper-Coercions Proxied Interpreted)
-            (4 |Type-Based Casts| Monotonic Interpreted)
-            (5 Coercions Monotonic Interpreted)
-            (6 Hyper-Coercions Monotonic Interpreted)
-            (7 |Type-Based Casts| Proxied Specialized)
-            (8 Coercions Proxied Specialized)
-            (9 Hyper-Coercions Proxied Specialized) 
-            (10 |Type-Based Casts| Monotonic Specialized)
-            (11 Coercions Monotonic Specialized)
-            (12 Hyper-Coercions Monotonic Specialized)))
+          ;; Index Cast-Mechinism Ref-Mechinism Cast-Specialization Hybrid/Pure-Cast Runtime
+          '((1 |Type-Based Casts| Proxied Interpreted Pure)
+            (2 Coercions Proxied Interpreted Pure)
+            (3 Hyper-Coercions Proxied Interpreted Pure)
+            (4 |Type-Based Casts| Monotonic Interpreted Pure)
+            (5 Coercions Monotonic Interpreted Pure)
+            (6 Hyper-Coercions Monotonic Interpreted Pure)
+            (7 |Type-Based Casts| Proxied Specialized Pure)
+            (8 Coercions Proxied Specialized Pure)
+            (9 Hyper-Coercions Proxied Specialized Pure) 
+            (10 |Type-Based Casts| Monotonic Specialized Pure)
+            (11 Coercions Monotonic Specialized Pure)
+            (12 Hyper-Coercions Monotonic Specialized Pure)
+            (13 Coercions Proxied Interpreted Monotonic Hybrid)
+            (14 Hyper-Coercions Proxied Interpreted Hybrid)
+            (15 Coercions Monotonic Interpreted Hybrid)
+            (16 Hyper-Coercions Monotonic Interpreted Hybrid)
+            (17 Coercions Proxied Specialized Hybrid)
+            (18 Hyper-Coercions Proxied Specialized Hybrid) 
+            (19 Coercions Monotonic Specialized Hybrid)
+            (20 Hyper-Coercions Monotonic Specialized Hybrid)))
          in))))
 
 (module+ main  
@@ -71,6 +79,8 @@ Description: Facilitates a user-friendly interface for Schml
          (define s (set-subtract s1 s2))
          (cond
            [(= (set-count s) 1) (symbol->string (set-first s))]
+           [(and (set-member? s '|Type-Based Casts|) (set-member? s 'Pure)) "Pure Type-Based Casts"]
+           [(and (set-member? s 'Coercions) (set-member? s 'Hybrid)) "Hybrid Coercions"]
            [else
             (error (string-append
                     "you should compare configurations that "

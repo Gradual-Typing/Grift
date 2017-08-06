@@ -32,15 +32,23 @@
 (: inline-guarded-branch? (Parameterof Boolean))
 (define inline-guarded-branch? (make-parameter #t))
 
-;; Cast behavior 
+;; Cast behavior
+;; TODO this is largely setup based on how the main
+;; function is designed we should edit this and the
+;; main function to give the best performance by default
+;; and options to enable non-optimized configurations
 (: specialize-cast-code-generation? (Parameterof Boolean))
-(define specialize-cast-code-generation? (make-parameter #t))
+;; TODO if this is faster we should default to this
+(define specialize-cast-code-generation?
+  (make-parameter #f))
 (: optimize-first-order-coercions? (Parameterof Boolean))
+;; TODO if this doesn't matter anymore we should nix it
 (define optimize-first-order-coercions? (make-parameter #t))
 (: coercions-are-space-efficient? (Parameterof Boolean))
 (define coercions-are-space-efficient? (make-parameter #t))
+;; TODO if this is faster we should default to this
 (define hybrid-cast/coercion-runtime? : (Parameterof Boolean)
-  (make-parameter #t))
+  (make-parameter #f))
 
 
 

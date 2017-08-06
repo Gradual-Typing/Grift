@@ -60,7 +60,35 @@
    [("--monotonic-references")
     "vectors and references default to monotonic semantics"
     (reference-semantics 'Monotonic)]
+   #:once-any
+   ;; TODO find out if anyone is relying on this flag
+   [("--open-coded-casts")
+    "turn on cast specialization"
+    (specialize-cast-code-generation? #t)]
+   [("-S" "--specialize-casts") bool
+    "enable(#t)/disable(#f) specializing the code generation of casts"
+    (specialize-cast-code-generation?
+     (match bool
+       ["#t" #t] ["#f" #f]
+       [_ (error 'grift "expected boolean flag -S/--specialize-casts")]))]
+   #:once-any
+   ["--no-dyn-operations"
+    "disable optimization of dynamic function, reference, and tuples usage"
+    (dynamic-operations? #f)]
+   [("-D" "--dyn-operations") bool
+    "enable(#t)/disable(#f) optimized code on operators acting on dynamic values"
+    (dynamic-operations?
+     (match bool
+       ["#t" #t] ["#f" #f]
+       [_ (error 'grift "expected boolean flag -D/--dyn-operations")]))]
    #:once-each
+   [("-H" "--hybrid-coercions") bool
+    ("enable(#t)/disable(#f) using mixed cast/coercion runtime"
+     "not applicable to type-based casts")
+    (hybrid-cast/coercion-runtime?
+     (match bool
+       ["#t" #t] ["#f" #f]
+       [_ (error 'grift "expected boolean flag -H/--hybrid-coercions")]))]
    [("-o") output-str
     "specify output path for executable"
     (output-path (string->path output-str))]
@@ -80,12 +108,6 @@
    [("--disable-bounds-checks")
     "code genererated won't check if indices are in bounds"
     (bounds-checks? #f)]
-   [("--open-coded-casts")
-    "turn on cast specialization"
-    (specialize-cast-code-generation? #t)]
-   ["--no-dyn-operations"
-    "disable optimization of dynamic function, reference, and tuples usage"
-    (dynamic-operations? #f)]
    [("-m" "--start-memory")
     kilobytes
     "select the runtime's starting heap size"

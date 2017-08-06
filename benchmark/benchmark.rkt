@@ -13,7 +13,14 @@
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
-(define (guarded-compile src i cast ref specialize)
+(define (guarded-compile src i cast ref specialize hybrid-runtime)
+  (define hybrid-runtime?
+    (match hybrid-runtime
+      ['Pure #f]
+      ['Hybrid #t]
+      [_ (error 'benchmark/guarded-compile
+                "invalid specialization: ~a"
+                specialize)]))
   (define specialize-casts?
     (match specialize
       ['Interpreted #f]
@@ -25,7 +32,8 @@
     (path-replace-extension
      src
      (string-append ".o" (number->string i))))
-  (parameterize ([specialize-cast-code-generation? specialize-casts?])
+  (parameterize ([specialize-cast-code-generation? specialize-casts?]
+                 [hybrid-cast/coercion-runtime? hybrid-runtime?])
     (if (not (file-exists? exe))
         (begin
           (printf "~a\n" exe)
