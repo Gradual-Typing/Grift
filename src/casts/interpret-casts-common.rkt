@@ -272,7 +272,15 @@ TODO write unit tests
          #:dyn-mvec-ref [dyn-mvec-ref  : Dyn-MVec-Ref-Type]
          #:dyn-mvec-set [dyn-mvec-set! : Dyn-MVec-Set-Type]
          #:dyn-fn-app   [dyn-fn-app    : Dyn-Fn-App-Type]
-         #:dyn-tup-prj  [dyn-tup-prj   : Dyn-Tup-Prj-Type])
+         #:dyn-tup-prj  [dyn-tup-prj   : Dyn-Tup-Prj-Type]
+         ;; These are node that may get compiled differently for static
+         #:mbox         [mbox : (CoC3-Expr Schml-Type -> CoC3-Expr) Mbox]
+         #:stc-mbox-ref [stc-mbox-ref : (CoC3-Expr -> CoC3-Expr) Mbox-val-ref]
+         #:stc-mbox-set [stc-mbox-set! : (CoC3-Expr CoC3-Expr -> CoC3-Expr) Mbox-val-set!]
+         #:mvec         [mvec : (CoC3-Expr CoC3-Expr Schml-Type -> CoC3-Expr) Mvector]
+         #:stc-mvec-ref [stc-mvec-ref : (CoC3-Expr CoC3-Expr -> CoC3-Expr) Mvector-val-ref]
+         #:stc-mvec-set [stc-mvec-set! : (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) Mvector-val-set!]
+         #:mvec-len     [mvec-len : (CoC3-Expr -> CoC3-Expr) Mvector-length])
   : (C0-Expr -> CoC3-Expr) 
   ;; map the pass through lists of expressions
   (: recur* (C0-Expr* -> CoC3-Expr*))
@@ -358,16 +366,19 @@ TODO write unit tests
       ;; Long-Term TODO: Why does the name ove these change?
       ;; Does their semantics change?
       [(Mvector-ref (app recur e1) (app recur e2))
-       (Mvector-val-ref e1 e2)]
+       (stc-mvec-ref e1 e2)]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
-       (Mvector-val-set! e1 e2 e3)]
+       (stc-mvec-set! e1 e2 e3)]
       [(Munbox (app recur e))
-       (Mbox-val-ref e)]
+       (stc-mbox-ref e)]
       [(Mbox-set! (app recur e1) (app recur e2))
-       (Mbox-val-set! e1 e2)]
-      [(Mvector-length e) (Mvector-length (recur e))]
-      [(Mbox (app recur e) t) (Mbox e t)]
-      [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]      
+       (stc-mbox-set! e1 e2)]
+      [(Mvector-length (app recur e)) 
+       (mvec-len e)]
+      [(Mbox (app recur e) t)
+       (mbox e t)]
+      [(Mvector (app recur e1) (app recur e2) t)
+       (mvec e1 e2 t)]      
       ;; While tuples don't get any special attention in this pass
       ;; dynamic tuple projection needs to get dusugared
       [(Create-tuple e*) (Create-tuple (recur* e*))]

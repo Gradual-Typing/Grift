@@ -11,11 +11,13 @@
 +-------------------------------------------------------------------------------+
 |Input Grammar                                                                  |
 +------------------------------------------------------------------------------|#
-(require racket/match
+(require (for-syntax racket/base)
+         racket/match
          "../errors.rkt"
          "../logging.rkt"
          "../configuration.rkt"
          "../language/forms.rkt")
+
 
 ;; Only the pass is provided by this module
 (provide insert-casts)
@@ -60,9 +62,12 @@
           [(Define r? id t2 (and (Ann _ (cons s t1)) (app ic-expr e)))
            (Define r? id t2 (mk-cast s (mk-label "Define" s) e t1 t2))]
           [(Observe e t) (Observe (ic-expr e) t)]))))
-  (when (and (program-must-be-statically-typed?)
+  (when (and (or (program-must-be-statically-typed?)
+                 (eq? (cast-representation) 'Static)) 
              (not (null? (unbox casts-inserted))))
-    (error 'insert-casts "asserted program was static: it is not"))
+    ;; Todo print out cast locations
+    (error 'type-error
+           "program is not statically typed"))
   (debug (Prog (list name (unique-counter-next! uc) type) new-tl*)))
 
 (: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type -> C0-Expr))
@@ -143,9 +148,9 @@
           (define lbl (mk-label "guarded unbox" e-src))
           (cond
             [(dynamic-operations?)
-             ;; TODO we should record this as being a cast
-             ;; but don't have the infrastructure.
-             (Dyn-GRef-Ref e (lbl))]
+             (define dop (Dyn-GRef-Ref e (lbl)))
+             (add-cast! e-src dop)
+             dop]
             [else             
              (Gunbox (mk-cast e-src lbl e e-ty PBOX-DYN-TYPE))])]
          [else
@@ -161,8 +166,9 @@
          [(Dyn? e1-ty)
           (cond
             [(dynamic-operations?)
-             ;; TODO register dynamic operation as a cast
-             (Dyn-GRef-Set! e1 e2 e2-ty (lbl1))]
+             (define dop (Dyn-GRef-Set! e1 e2 e2-ty (lbl1)))
+             (add-cast! e1-src dop)
+             dop]
             [else
              (Gbox-set! (mk-cast e1-src lbl1 e1 DYN-TYPE PBOX-DYN-TYPE)
                         (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE))])]
@@ -191,8 +197,9 @@
           (define lbl (mk-label "gvector-ref" e-src))
           (cond
             [(dynamic-operations?)
-             ;; TODO
-             (Dyn-GVector-Ref e i-exp (lbl))]
+             (define dop (Dyn-GVector-Ref e i-exp (lbl)))
+             (add-cast! e-src dop)
+             dop]
             [else
              (Gvector-ref (mk-cast e-src lbl e e-ty (GVect DYN-TYPE)) i-exp)])])]
       [(Gvector-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
@@ -212,8 +219,9 @@
          [(Dyn? e1-ty)
           (cond
             [(dynamic-operations?)
-             ;; TODO
-             (Dyn-GVector-Set! e1 i-exp e2 e2-ty (lbl1))]
+             (define dop (Dyn-GVector-Set! e1 i-exp e2 e2-ty (lbl1)))
+             (add-cast! e1-src dop)
+             dop]
             [else
              (Gvector-set! (mk-cast e1-src lbl1 e1 DYN-TYPE (GVect DYN-TYPE))
                            i-exp
@@ -235,22 +243,21 @@
        ;; later by some cast optimizer.
        (cond
          [(Dyn? e-ty)
-          (let ([lbl (mk-label "munbox" e-src)])
-            (cond
-              [(dynamic-operations?)
-               (Dyn-MRef-Ref e (lbl))]
-              [else
-               (let ([addr (next-uid! "addr")])
-                 (Let `((,addr
-                         .
-                         ,(mk-cast e-src lbl e e-ty (MRef DYN-TYPE))))
-                   (MBoxCastedRef addr t)))]))]
+          (define lbl (mk-label "munbox" e-src)) 
+          (cond
+            [(dynamic-operations?)
+             (define dop (Dyn-MRef-Ref e (lbl)))
+             (add-cast! e-src dop)
+             dop]
+            [else
+             (let$ ([addr (mk-cast e-src lbl e e-ty (MRef DYN-TYPE))])
+               (MBoxCastedRef (Var-id addr) t))])]
          [(MRef? e-ty)
           (match e
             [(Var addr) (MBoxCastedRef addr t)]
-            [else (let ([addr (next-uid! "addr")])
-                    (Let `((,addr . ,e))
-                      (MBoxCastedRef addr t)))])]
+            [else
+             (let$ ([addr e])
+               (MBoxCastedRef (Var-id addr) t))])]
          [else (error 'insert-casts/MunboxT
                       "unexpected value for e-ty: ~a"
                       e-ty)])]
@@ -259,30 +266,30 @@
                    t)
        (cond
          [(Dyn? e1-ty)
-          (let ([lbl (mk-label "mbox-set" e1-src)])
-            (cond
-              [(dynamic-operations?)
-               (Dyn-MRef-Set! e1 e2 e2-ty (lbl))]
-              [else
-               (let ([e2 (mk-cast e2-src (mk-label "val" e2-src) e2 e2-ty t)]
-                     [addr (next-uid! "addr")])
-                 (Let `((,addr
-                         .
-                         ,(mk-cast e1-src lbl e1 e1-ty (MRef DYN-TYPE))))
-                   (MBoxCastedSet! addr e2 t)))]))]
-         [(MRef? e1-ty) (match e1
-                          ;; OPTIMIZATION: instead of casting e2 from
-                          ;; e2-ty to t, then cast it again from t to
-                          ;; the runtime type, I cast it from e2-ty to
-                          ;; the runtime type directly.
-                          ;; Justification: the runtime type is at
-                          ;; least as precise as t by semantics.
-                          ;; TODO: remove the type annotation t from
-                          ;; the writing forms.
-                          [(Var addr) (MBoxCastedSet! addr e2 e2-ty)]
-                          [else (let ([addr (next-uid! "mboxaddr")])
-                                  (Let `((,addr . ,e1))
-                                    (MBoxCastedSet! addr e2 e2-ty)))])]
+          (define lbl (mk-label "mbox-set" e1-src))
+          (cond
+            [(dynamic-operations?)
+             (define dop (Dyn-MRef-Set! e1 e2 e2-ty (lbl)))
+             (add-cast! e1-src dop)
+             dop]
+            [else
+             (define e2^ (mk-cast e2-src (mk-label "val" e2-src) e2 e2-ty t))
+             (let$ ([addr (mk-cast e1-src lbl e1 e1-ty (MRef DYN-TYPE))])
+               (MBoxCastedSet! (Var-id addr) e2^ t))])]
+         [(MRef? e1-ty)
+          (match e1
+            ;; OPTIMIZATION: instead of casting e2 from
+            ;; e2-ty to t, then cast it again from t to
+            ;; the runtime type, I cast it from e2-ty to
+            ;; the runtime type directly.
+            ;; Justification: the runtime type is at
+            ;; least as precise as t by semantics.
+            ;; TODO: remove the type annotation t from
+            ;; the writing forms.
+            [(Var addr) (MBoxCastedSet! addr e2 e2-ty)]
+            [else
+             (let$ ([addr e1])
+               (MBoxCastedSet! (Var-id addr) e2 e2-ty))])]
          [else (error 'insert-casts/Mbox-set!T
                       "unexpected value for e1-ty: ~a"
                       e1-ty)])]
@@ -317,7 +324,9 @@
             (let ([lbl (mk-label "mvector-ref" e-src)])
               (cond
                 [(dynamic-operations?)
-                 (Dyn-MVector-Ref e i (lbl))]
+                 (define dop (Dyn-MVector-Ref e i (lbl)))
+                 (add-cast! e-src dop)
+                 dop]
                 [else
                  (let ([addr (next-uid! "addr")])
                    (Let `((,addr
@@ -344,7 +353,9 @@
             (let ([lbl (mk-label "mvector-set" e1-src)])
               (cond
                 [(dynamic-operations?)
-                 (Dyn-MVector-Set! e1 i e2 e2-ty (lbl))]
+                 (define dop (Dyn-MVector-Set! e1 i e2 e2-ty (lbl)))
+                 (add-cast! e1-src dop)
+                 dop]
                 [else
                  (let ([addr (next-uid! "addr")])
                    (Let `((,addr
@@ -365,7 +376,10 @@
       [(Gvector-length (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)))
        (define l-th (mk-label "gvector-length" e-src))
        (cond
-         [(dynamic-operations?) (Dyn-GVector-Len e (Quote (l-th)))]
+         [(dynamic-operations?) 
+          (define dop (Dyn-GVector-Len e (Quote (l-th))))
+          (add-cast! e-src dop)
+          dop]
          [else (Gvector-length (mk-cast e-src l-th e DYN-TYPE PVEC-DYN-TYPE))])]
       [(Gvector-length (and (Ann _ (cons _ (GVect _))) (app ic-expr e)))
        (Gvector-length e)]
@@ -373,7 +387,10 @@
       [(Tuple-proj (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)) i)
        (define l-th (mk-label "tuple-proj" e-src))
        (cond
-         [(dynamic-operations?) (Dyn-Tuple-Proj e (Quote i) (Quote (l-th)))]
+         [(dynamic-operations?)
+          (define dop (Dyn-Tuple-Proj e (Quote i) (Quote (l-th))))
+          (add-cast! e-src dop)
+          dop]
          [else
           (define n (+ n 1))
           (define tgt-ty (STuple n (make-list n DYN-TYPE)))
@@ -405,7 +422,9 @@
          [(dynamic-operations?)
           (define-values (expr* type*) (ic-operands rand*))
           (define expr (ic-expr rator))
-          (Dyn-Fn-App expr expr* type* ((mk-label "Application" src)))]
+          (define dop (Dyn-Fn-App expr expr* type* ((mk-label "Application" src))))
+          (add-cast! rator-src dop)
+          dop]
          [else
           (let*-values ([(exp* ty*) (ic-operands rand*)]
                         [(needed-rator-type) (Fn (length ty*) ty* DYN-TYPE)]
@@ -456,3 +475,14 @@
     [(_ pos sup-src sub-src)
      (mk-label (format "~a at ~a\n" pos (srcloc->string sup-src))
                sub-src)]))
+
+(define-syntax (let$ stx)
+  (syntax-case stx ()
+    [(_ ([i* e*] ...) b)
+     (with-syntax ([(u* ...) (generate-temporaries #'(i* ...))])
+       #'(let ([u* (next-uid! 'i*)] ...)
+           (Let `([,u* . ,e*] ...)
+             (let ([i* (Var u*)] ...)
+               b))))]))
+
+

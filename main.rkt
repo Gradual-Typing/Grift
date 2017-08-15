@@ -21,6 +21,9 @@
   (command-line
    #:program "schml"
    #:once-any
+   ["--static"
+    "Static varient of lambda calculus" 
+    (cast-representation 'Static)]
    ["--coercions"
     "Select the coercions representation of casts"
     (cast-representation 'Coercions)]
@@ -32,16 +35,20 @@
     (cast-representation '|Type-Based Casts|)]
    [("-R" "--cast-representation")
     cast-rep
-    ("select cast runtime representation"
-     "default: Coercions")
+    ((format "select cast representation: (~a)" (cast-representation)))
     (case cast-rep
-      [("Type-Based") (cast-representation '|Type-Based Casts|)]
-      [("Coercions")  (cast-representation 'Coercions)]
-      [("Hyper-Coercions") (cast-representation 'Hyper-Coercions)]
+      [("Static")
+       (cast-representation 'Static)]
+      [("Type-Based Casts")
+       (cast-representation '|Type-Based Casts|)]
+      [("Coercions")
+       (cast-representation 'Coercions)]
+      [("Hyper-Coercions")
+       (cast-representation 'Hyper-Coercions)]
       [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
    [("--check-asserts")
-    "Compile coded with assertions"
+    ((format "Compile coded with assertions (~a)" (check-asserts?)))
     (check-asserts? #t)]
    [("--assert-statically-typed")
     "Raise an error unless the program is statically typed"
