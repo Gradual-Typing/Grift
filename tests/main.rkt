@@ -8,7 +8,6 @@
          racket/file
          racket/format
          racket/system
-         ;;"../src/helpers.rkt"
          (except-in "./test-compile.rkt" debug)
          "./paths.rkt"
          "./test-compile-file.rkt"

@@ -10,7 +10,7 @@
  "interpret-casts-with-type-based-casts.rkt"
  "interpret-casts-with-coercions.rkt"
  "interpret-casts-with-hyper-coercions.rkt"
- )
+ "interpret-casts-with-error.rkt")
 
 (provide
  interpret-casts
@@ -26,15 +26,13 @@
   
   (parameterize ([cast-runtime-code-bindings '()]
                  [current-unique-counter next-unique])
+
     (define ic-expr! : (C0-Expr -> CoC3-Expr)
       (case (cast-representation) 
         [(|Type-Based Casts|) (interpret-casts/type-based-casts)]
         [(Coercions) (interpret-casts/coercions)]
-        [(Hyper-Coercions)
-         #;(error 'uncomment-include/hyper-coercions)
-         (interpret-casts/hyper-coercions)]
-        [(Static) (error 'todo)]
-        [else (error 'todo)]))
+        [(Hyper-Coercions) (interpret-casts/hyper-coercions)]
+        [(Static) (interpret-casts/error)]))
     
     (define new-e (ic-expr! e))
 

@@ -1,4 +1,5 @@
 #lang typed/racket
+
 (require typed/racket/class
          typed/private/utils
          typed/private/rewriter
@@ -325,3 +326,4 @@
     (Test Verbosity -> Natural))])
 
 (provide Verbosity)
+
