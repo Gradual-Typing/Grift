@@ -32,14 +32,10 @@
                   ;; Monotonic effects
                   (Mbox E Schml-Type)
                   (Munbox E)
-                  (MunboxT E Schml-Type)
                   (Mbox-set! E E)
-                  (Mbox-set!T E E Schml-Type)
                   (Mvector E E Schml-Type)
                   (Mvector-ref E E)
-                  (Mvector-refT E E Schml-Type)
                   (Mvector-set! E E E)
-                  (Mvector-set!T E E E Schml-Type)
                   ;; Guarded effects
                   (Gbox E)
                   (Gunbox E)

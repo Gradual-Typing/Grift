@@ -501,22 +501,20 @@ The type rules for core forms that have interesting type rules
          (values (Mbox e t) (mbox-type-rule t))]
         [(Munbox (app recur e t))
          (let ([ty (munbox-type-rule t)])
-           (values (if (completely-static-type? ty) (Munbox e) (MunboxT e ty)) ty))]
+           (values (Munbox e) ty))]
         ;; move it to insert casts
         [(Mbox-set! (app recur e1 t1) (app recur e2 t2))
-         (let ([ty (mbox-set!-type-rule t1 t2)]
-               [T  (mbox-val-type t1)])
-           (values (if (completely-static-type? T) (Mbox-set! e1 e2) (Mbox-set!T e1 e2 T)) ty))]
+         (let ([ty (mbox-set!-type-rule t1 t2)])
+           (values (Mbox-set! e1 e2) ty))]
         [(MvectorS (app recur e1 t1) (app recur e2 t2))
          (let ([ty (mvector-type-rule t1 t2)])
            (values (Mvector e1 e2 t2) ty))]
         [(Mvector-ref (app recur e1 t1) (app recur e2 t2))
          (let ([ty (mvector-ref-type-rule t1 t2)])
-           (values (if (completely-static-type? ty) (Mvector-ref e1 e2) (Mvector-refT e1 e2 ty)) ty))]
+           (values (Mvector-ref e1 e2) ty))]
         [(Mvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
-         (let ([ty (mvector-set!-type-rule t1 t2 t3)]
-               [T  (mvector-val-type t1)])
-           (values (if (completely-static-type? T) (Mvector-set! e1 e2 e3) (Mvector-set!T e1 e2 e3 T)) ty))]
+         (let ([ty (mvector-set!-type-rule t1 t2 t3)])
+           (values (Mvector-set! e1 e2 e3) ty))]
         [(Mvector-length (app recur e t))
          (values (Mvector-length e) (mvector-length-type-rule t))]
         [(Gvector (app recur e1 t1) (app recur e2 t2))

@@ -336,14 +336,14 @@ TODO write unit tests
        (dyn-pvec-len e l)]
       [(Gvector-length (app recur e))
        (pvec-len e)]
-      [(MBoxCastedRef addr t)
-       (mbox-ref (Var addr) (Type t))]
-      [(MBoxCastedSet! addr (app recur e) t)
-       (mbox-set! (Var addr) e (Type t))]
-      [(MVectCastedRef addr (app recur i) t)
-       (mvec-ref (Var addr) i (Type t))]
-      [(MVectCastedSet! addr (app recur i) (app recur e) t)
-       (mvec-set! (Var addr) i e (Type t))]
+      [(MBoxCastedRef (app recur e) t)
+       (mbox-ref e (Type t))]
+      [(MBoxCastedSet! (app recur e1) (app recur e2) t)
+       (mbox-set! e1 e2 (Type t))]
+      [(MVectCastedRef (app recur e) (app recur i) t)
+       (mvec-ref e i (Type t))]
+      [(MVectCastedSet! (app recur e1) (app recur i) (app recur e2) t)
+       (mvec-set! e1 i e2 (Type t))]
       [(Dyn-MRef-Ref (app recur e) l)
        (dyn-mbox-ref e (Quote l))]
       [(Dyn-MRef-Set! (app recur e1) (app recur e2) t l)

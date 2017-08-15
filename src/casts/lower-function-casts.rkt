@@ -324,19 +324,19 @@ T?l $ (_  ; )  = what here
       [(Munbox (app recur e)) (Munbox e)]
       [(Mbox-set! (app recur e1) (app recur e2))
        (Mbox-set! e1 e2)]
-      [(MBoxCastedRef u t) (MBoxCastedRef u t)]
-      [(MBoxCastedSet! u (app recur e) t)
-       (MBoxCastedSet! u e t)]
+      [(MBoxCastedRef (app recur e) t) (MBoxCastedRef e t)]
+      [(MBoxCastedSet! (app recur e1) (app recur e2) t)
+       (MBoxCastedSet! e1 e2 t)]
       [(Mvector (app recur e1) (app recur e2) t)
        (Mvector e1 e2 t)]
       [(Mvector-ref (app recur e1) (app recur e2))
        (Mvector-ref e1 e2)]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
        (Mvector-set! e1 e2 e3)]
-      [(MVectCastedRef u (app recur i) t)
-       (MVectCastedRef u i t)]
-      [(MVectCastedSet! u (app recur i) (app recur e) t)
-       (MVectCastedSet! u i e t)]
+      [(MVectCastedRef (app recur e) (app recur i) t)
+       (MVectCastedRef e i t)]
+      [(MVectCastedSet! (app recur e1) (app recur i) (app recur e2) t)
+       (MVectCastedSet! e1 i e2 t)]
       [(Mvector-length e) (Mvector-length (recur e))]
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
        (Dyn-Fn-App e e* t* l)]
