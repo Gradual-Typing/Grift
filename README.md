@@ -1,5 +1,4 @@
 # Schml A GTLC Compiler
-[![Build Status](https://travis-ci.org/akuhlens/schml.svg?branch=master)](https://travis-ci.org/akuhlens/schml)
 
 Welcome to the home of a compiler for the Gradually Typed Lambda 
 Calculus (GTLC). The compiler is intended to explore how different
