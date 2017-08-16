@@ -22,7 +22,7 @@
 - [ ] look at the code function casts created by extracting a dynamic
       value and make sure that (Id -> Id) is getting collapsed to Id
       this may be implicitly occuring due to pointer equality of types.
-- [ ] Manually specialize the code for the fast cases of make coercion
+- [X] Manually specialize the code for the fast cases of make coercion
       in compose.
 - [ ] Add hoisting of constants in general
 - [ ] Tail coercions optimization.
