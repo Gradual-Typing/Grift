@@ -105,6 +105,7 @@ get_static_schml_runtime()
     local benchmark_path="${TMP_DIR}/static/${benchmark}"
     local runtimes_file="${benchmark_path}${disk_aux_name}.static.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.static.runtime"
+
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else

@@ -9,6 +9,7 @@ Description: Facilitates a user-friendly interface for Grift
 (require racket/runtime-path)
 
 (provide configs)
+
 (define configs
   (make-hash
    ;; Index Cast-Mechinism
@@ -85,7 +86,6 @@ Description: Facilitates a user-friendly interface for Grift
     (define ss (map symbol->string sls)) 
     (string-join ss sep #:after-last end))
 
-  
   (command-line
    #:once-each
    [("--name-sep") sep
