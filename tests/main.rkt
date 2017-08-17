@@ -8,6 +8,7 @@
          racket/file
          racket/format
          racket/system
+         racket/match
          (except-in "./test-compile.rkt" debug)
          "./paths.rkt"
          "./test-compile-file.rkt"
@@ -37,7 +38,7 @@
 (define suite-choices 
   `((all     . ,all-tests)
     (most    . ,most-tests)
-    (tiny    . ,tiny-tests)
+    (static  . ,statically-typed-gradual-tests)
     (core    . ,core-tests)
     (box     . ,box-tests)
     (monobox . ,monobox-tests)
@@ -51,7 +52,7 @@
 ;; The value of the test-cast-representations parameter
 ;; before alterations to the configuration.
 (define default-test-cast-representation
-  '(|Type-Based Casts| Coercions Hyper-Coercions))
+  '(Static |Type-Based Casts| Coercions Hyper-Coercions))
 
 ;; Parameter Specifying which cast-representation variables
 ;; get tested when running the test suite
@@ -132,7 +133,7 @@
     [else d]))
 
 
-(define (old-run-tests) 
+(define (old-run-tests)
   (for ([cast-rep (test-cast-representation)])
     (parameterize ([cast-representation cast-rep]
                    [output-path (build-path test-tmp-path "t.out")]
@@ -141,7 +142,9 @@
                    [specialize-cast-code-generation? #t]
                    [check-asserts? #t])
       (printf "~a tests running:\n" cast-rep)
-      (run-tests (suite)))))
+      (match cast-rep
+        ['Static (run-tests static-tests)]
+        [_ (run-tests (suite))]))))
 
 
 ;; Parse the command line arguments
@@ -170,18 +173,18 @@
         (error 'tests "--suite given invalid argument ~a" choice)))]
  ;; Compiler Configuration
  #:multi
- [("-r" "--cast-representation") crep
+ [("-R" "--cast-representation") crep
   "add a cast representation to the tests"
   (let ((crep (string->symbol crep)))
     (case crep 
-      [(|Type-Based Casts| Coercions Hyper-Coercions)
+      [(Static |Type-Based Casts| Coercions Hyper-Coercions)
        (define current-test-cast-representation (test-cast-representation))
        (test-cast-representation
         (if (eq? default-test-cast-representation
                  current-test-cast-representation)
-           ;; Reset to empty and add
-           (list crep)
-           (cons crep current-test-cast-representation)))]
+            ;; Reset to empty and add
+            (list crep)
+            (cons crep current-test-cast-representation)))]
       [else 
        (error 'tests
               "--cast-representation given invalid argument ~a" crep)]))]

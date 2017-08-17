@@ -1,0 +1,6 @@
+(letrec ([f : (Int Int -> Int)
+	  (lambda ([p : Dyn] [r : Dyn])
+            (if (< p r)
+            	(f p (- r 1))
+                0))])
+  (f 0 9))

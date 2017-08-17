@@ -1,0 +1,5 @@
+((: (: (lambda ([f : (Int -> Int)]) (f 777))
+       ((Dyn -> Dyn) -> Int))
+    ((Bool -> Bool) -> Int)
+    "Pass")
+ (: (lambda (x) x) (Bool -> Bool))) 

@@ -1,0 +1,3 @@
+(let ([foo : Dyn #f])
+  (let ([bing (: foo (Int -> Int) "Pass")])
+    (bing 100)))

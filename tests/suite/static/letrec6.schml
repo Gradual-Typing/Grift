@@ -1,0 +1,5 @@
+(letrec ([o (lambda () : Int
+                (+ 1 (z)))]
+         [z (lambda () : Int
+                0)])
+  (o))

@@ -1,0 +1,1 @@
+(letrec ([a : (-> Int) (lambda () 1)]) a)

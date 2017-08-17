@@ -11,7 +11,8 @@
          "tuples/tests.rkt"
          "tools/tests.rkt"
          "program/tests.rkt"
-         "large/tests.rkt")
+         "large/tests.rkt"
+         "static/tests.rkt")
 
 (provide (all-defined-out)
          (all-from-out
@@ -23,12 +24,13 @@
           "tuples/tests.rkt"
           "tools/tests.rkt"
           "program/tests.rkt"
-          "large/tests.rkt"))
+          "large/tests.rkt"
+          "static/tests.rkt"))
 
 (define most-tests : Test
   (test-suite
    "most tests"
-   tiny-tests
+   statically-typed-gradual-tests
    core-tests
    box-tests
    monobox-tests
@@ -36,8 +38,7 @@
    vector-tests
    tuple-tests
    tool-tests
-   program-tests
-   ))
+   program-tests))
 
 (define all-tests : Test
   (test-suite "all tests"

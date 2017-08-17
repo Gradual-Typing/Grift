@@ -1,0 +1,6 @@
+((lambda ((x : Bool))
+   (if x
+       0
+       0))
+ (: 1 Dyn "Fail"))
+

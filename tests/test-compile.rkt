@@ -22,16 +22,20 @@
 (define-syntax-rule (test-compile name path expected)
   (test-case name 
     (with-handlers ([exn:break? abort] 
+                    [exn:test?
+                     (lambda ([e : exn:test])
+                       (raise e))]
                     [exn?
                      (lambda ([e : exn])
-                       (let ([t? (value=? expected (blame #t (exn-message e)))])
-                         (unless t?
-                           (display (exn->string e))
-                           (check value=?
-                                  expected
-                                  (blame #t (exn-message e))
-                                  "static type error"))
-                         (void)))])
+                       (define t?
+                         (value=? expected (blame #t (exn-message e))))
+                       (unless t?
+                         (display (exn->string e))
+                         (check value=?
+                                expected
+                                (blame #t (exn-message e))
+                                "static type error"))
+                       (void))])
       (define f
         (compile path))
       (parameterize ([current-input-port (open-test-input path)])

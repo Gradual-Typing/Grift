@@ -1,0 +1,3 @@
+(let ((l (lambda (l) 1)))
+  ((lambda (l) (l))
+   (lambda () (l l))))

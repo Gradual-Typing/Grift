@@ -1,0 +1,2 @@
+(let ((f (lambda ((a : Int)) (+ a a))))
+  ((: (: f Dyn "Fails") (Bool -> Dyn) "Pass") #t))
