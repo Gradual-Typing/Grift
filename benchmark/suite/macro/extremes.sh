@@ -20,7 +20,6 @@ write_grift_speedups()
     local dir="$1";             shift
     local logfile="$1";         shift
     
-    local configs=($(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -i))
     for config_index in ${configs[@]}; do
 	get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
 	printf ",$RETURN" >> $logfile
@@ -122,7 +121,8 @@ run_experiment()
     local logfile2="${DATA_DIR}/dyn.log"
     local logfile3="${DATA_DIR}/partial.log"
 
-    local config_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -a)
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" --indices-to-names "$configs")
+
     echo "name,${config_str}" > "$logfile1"
     echo "name,${config_str},racket,chezscheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
@@ -147,21 +147,23 @@ run_experiment()
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "n-body" "100000" ""
 
-    gen_fig static C
+    gen_fig static STLC
     gen_fig dyn Gambit
     # gen_fig partial
 }
 
 main()
 {
-    USAGE="Usage: $0 loops date"
-    if [ "$#" != "2" ]; then
-	echo "$USAGE"
-	exit 1
+    USAGE="Usage: $0 loops date config_n ..."
+    if [ "$#" -le "2" ]; then
+        echo "$USAGE"
+        exit 1
     fi
     LOOPS="$1";          shift
     local date="$1";     shift
+    configs=("$@")
 
+    
     if [ "$date" == "fresh" ]; then
 	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
     else
@@ -213,7 +215,7 @@ main()
 	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
     fi
 
-    run_experiment get_c_runtime get_gambit_runtime
+    run_experiment get_static_schml_runtime get_gambit_runtime
     echo "done."
 }
 

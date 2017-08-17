@@ -42,6 +42,37 @@ get_chezscheme_runtime()
     fi
 }
 
+
+# run the static variant of the schml compiler on a static
+# benchmark and return the average runtime creating
+# a couple utility files along the way.
+# $1 - benchmark filename without extension
+# $2 - space-separated benchmark arguments
+# $3 - disk aux name
+# $RETURN - the average runtime
+get_static_schml_runtime()
+{
+    local benchmark="$1";      shift
+    local benchmark_args="$1"; shift
+    local disk_aux_name="$1";  shift
+    
+    local benchmark_path="${TMP_DIR}/static/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
+    local cache_file="${benchmark_path}${disk_aux_name}.runtime"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+        "${SCHML_DIR}/main.rkt" \
+               --static \
+               -o "${benchmark_path}.o" \
+               "${benchmark_path}.schml"
+        
+	local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+        avg "${benchmark_path}.o" "$benchmark_args" "$runtimes_file"
+        echo "$RETURN" > "$cache_file"
+    fi
+}
+
 # $1 - benchmark file path without extension
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
@@ -205,7 +236,8 @@ get_grift_speedup()
     local benchmark_args="$1";  shift
     local disk_aux_name="$1";   shift
     local config_index="$1";    shift
-    
+
+    # Is this cache_file supose to be called .slowdown_ ?
     local cache_file="${benchmark_path}${disk_aux_name}${config_index}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
