@@ -173,7 +173,6 @@ main()
     LOOPS="$1";          shift
     local date="$1";     shift
     configs="$@"
-
     echo "$configs"
     
     if [ "$date" == "fresh" ]; then
