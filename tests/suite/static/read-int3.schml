@@ -1,0 +1,1 @@
+(read-int) ;; The input file is empty this should error with a nice message

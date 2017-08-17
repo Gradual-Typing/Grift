@@ -1,0 +1,3 @@
+(let ([add1 : (Int -> Int) (lambda ([x : Int]) (+ x 1))])
+ (let ([f : (Dyn -> Dyn) add1])
+  (: (f 41) Int)))

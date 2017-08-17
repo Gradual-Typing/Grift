@@ -1,0 +1,3 @@
+(let ((l (lambda (f) (lambda ((n : Int)) (f n))))
+      (m (lambda (n) (: n Int "Fooey"))))
+  (: ((l m) 5) Int "Hooey"))

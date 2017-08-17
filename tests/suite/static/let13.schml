@@ -1,0 +1,4 @@
+(let ((l (lambda ([f : (Int -> Int)])
+           (lambda ((n : Int)) (f n))))
+      (m (lambda ([n : Int]) n)))
+  ((l m) 5))

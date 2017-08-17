@@ -22,6 +22,4 @@ compiled/
 
 # ignore model folder for now
 models
-# ignore boehm directory that gets generated
-src/backend-c/runtime/boehm-gc
-src/backend-c/runtime/boehm-gc/libatomic_ops
+

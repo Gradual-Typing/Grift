@@ -1,0 +1,3 @@
+(letrec ([a : (Dyn -> Dyn) (lambda (a) a)]
+         [b : (Bool -> Bool) (lambda (a) a)])
+  (b (a #t)))

@@ -68,8 +68,16 @@
    (test-file "core" "let7.schml" (dyn))
    (test-file "core" "let8.schml" (int 0))
    (test-file "core" "let9.schml" (int 100))
-   (test-file "core" "let10.schml" (dyn))
    (test-file "core" "let11.schml" (bool #f))
+   ))
+
+(define core-tests : Test
+  (test-suite
+   "core tests"
+   #:before (lambda () (display "core test running ... "))
+   #:after (lambda () (display "done\n"))
+   ;; Let
+   (test-file "core" "let10.schml" (dyn))
    (test-file "core" "let12.1.schml" (dyn))
    (test-file "core" "let12.2.schml" (dyn))
    (test-file "core" "let12.3.schml" (blame #f #f))
@@ -79,21 +87,7 @@
    (test-file "core" "let15.schml" (function))
    (test-file "core" "let16.schml" (int 7))
    (test-file "core" "let17.schml" (bool #f))
-   (test-file "core" "let18.schml" (bool #f))
-   (test-file "core" "let19.schml" (bool #f))
    (test-file "core" "let20.schml" (bool #t))
-   ;; Read - Int
-   (test-file "core" "read-int0.schml" (int 42))
-   (test-file "core" "read-int1.schml" (bool #t))
-   (test-file "core" "read-int2.schml" (int 42))
-   (test-file "core" "read-int3.schml" (blame #f #f))
-   ))
-
-(define core-tests : Test
-  (test-suite
-   "core tests"
-   #:before (lambda () (display "core test running ... "))
-   #:after (lambda () (display "done\n"))
    ;; Letrec
    (test-file "core" "letrec1.schml" (dyn))
    (test-file "core" "letrec2.schml" (function))

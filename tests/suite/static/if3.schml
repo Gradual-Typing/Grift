@@ -1,0 +1,17 @@
+(if (<= 0 0);; true 
+    (if (>= 0 0);; true
+        (if (> 0 0) ;; false
+            0
+            (if (< 0 0);; false
+                1
+                (if (>= 15 10) ;; true
+                    (if (>= 16 20) ;; false
+                        2
+                        (if (<= 10 15) ;; true
+                            (if (<= 20 16) ;; false
+                                3
+                                4);; should be 4 
+                            5))
+                    7)))
+        10)
+    11)

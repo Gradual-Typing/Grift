@@ -1,0 +1,2 @@
+(switch 10
+ [else #t])

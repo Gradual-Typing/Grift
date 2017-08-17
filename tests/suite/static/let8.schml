@@ -1,0 +1,4 @@
+(let ((a (lambda ((i : Int)): Int i)))
+  (if (= 0 0)
+      (a 0)
+      (a 1)))

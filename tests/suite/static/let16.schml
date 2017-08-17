@@ -1,0 +1,3 @@
+(let ((a (lambda (i): Int i)) 
+      (b 7)) 
+ (a b))
