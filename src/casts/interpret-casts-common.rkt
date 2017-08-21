@@ -163,7 +163,7 @@ TODO write unit tests
        [(type-dyn?$  t2) t1]
        [(and$ (type-fn?$ t1) (type-fn?$ t2)
               (op=? (type-fn-arity$ t1) (type-fn-arity$ t2)))
-        (Make-Fn-Type tglb-uid t1 t2)]
+        (Make-GLB-Two-Fn-Types tglb-uid t1 t2)]
        [(and$ (type-pbox?$ t1) (type-pbox?$ t2))
         (Type-GRef (interp-tglb (type-pbox-of$ t1) (type-pbox-of$ t2)))]
        [(and$ (type-pvec?$ t1) (type-pvec?$ t2))

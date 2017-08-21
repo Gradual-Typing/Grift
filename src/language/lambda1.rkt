@@ -131,7 +131,7 @@
           (Mbox-val-ref E)
           (Mbox-rtti-set! E E)
           (Mbox-rtti-ref E)
-          (Make-Fn-Type Uid E E)
+          (Make-GLB-Two-Fn-Types Uid E E)
           (Make-Tuple-Type Uid E E)
           (MRef-Coercion-Huh E)
           (MRef-Coercion-Type E)

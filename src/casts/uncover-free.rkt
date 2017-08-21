@@ -259,8 +259,8 @@
     [(MVect-Coercion-Huh (app uf-expr e fv)) (values (MVect-Coercion-Huh e) fv)]
     [(MVect-Coercion-Type (app uf-expr e fv)) (values (MVect-Coercion-Type e) fv)]
     [(MVect-Coercion (app uf-expr e fv)) (values (MVect-Coercion e) fv)]
-    [(Make-Fn-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
-     (values (Make-Fn-Type e1 e2 e3) (set-union fv1 fv2))]
+    [(Make-GLB-Two-Fn-Types e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
+     (values (Make-GLB-Two-Fn-Types e1 e2 e3) (set-union fv1 fv2))]
     [(Make-Tuple-Type e1 (app uf-expr e2 fv1) (app uf-expr e3 fv2))
      (values (Make-Tuple-Type e1 e2 e3) (set-union fv1 fv2))]
     [(MRef-Coercion-Huh (app uf-expr e fv)) (values (MRef-Coercion-Huh e) fv)]

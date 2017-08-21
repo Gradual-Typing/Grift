@@ -429,8 +429,8 @@
        (Mbox-rtti-set! addr e)]
       [(Mbox-rtti-ref (app recur addr))
        (Mbox-rtti-ref addr)]
-      [(Make-Fn-Type e1 (app recur e2) (app recur e3))
-       (Make-Fn-Type e1 e2 e3)]
+      [(Make-GLB-Two-Fn-Types e1 (app recur e2) (app recur e3))
+       (Make-GLB-Two-Fn-Types e1 e2 e3)]
       [(Make-Tuple-Type e1 (app recur e2) (app recur e3))
        (Make-Tuple-Type e1 e2 e3)]
       [(MRef-Coercion-Huh (app recur e)) (MRef-Coercion-Huh e)]

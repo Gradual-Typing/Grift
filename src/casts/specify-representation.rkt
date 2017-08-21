@@ -1343,7 +1343,7 @@ but a static single assignment is implicitly maintained.
            (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
                      `(("tag" . ,(Var st-u))
                        ("type" . ,t))))]
-        [(Make-Fn-Type mk-glb (app recur t1) (app recur t2))
+        [(Make-GLB-Two-Fn-Types mk-glb (app recur t1) (app recur t2))
          (: invoke-mk-fn-type ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
          (define (invoke-mk-fn-type mk-fn t1 t2)
            (App-Code
