@@ -169,7 +169,7 @@
     [(Mbox-val-ref e) (recur e)]
     [(Mbox-rtti-set! addr e) (recur-all addr e)]
     [(Mbox-rtti-ref addr) (recur addr)]
-    [(Make-Fn-Type u e1 e2) (recur-all e1 e2)]
+    [(Make-GLB-Two-Fn-Types u e1 e2) (recur-all e1 e2)]
     [(Make-Tuple-Type u e1 e2) (recur-all e1 e2)]
     [(MRef-Coercion-Huh e) (recur e)]
     [(MRef-Coercion-Type e) (recur e)]
@@ -458,8 +458,8 @@
     [(Mbox-rtti-set! (app recur addr) (app recur e))
      (Mbox-rtti-set! addr e)]
     [(Mbox-rtti-ref (app recur addr)) (Mbox-rtti-ref addr)]
-    [(Make-Fn-Type e1 (app recur e2) (app recur e3))
-     (Make-Fn-Type e1 e2 e3)]
+    [(Make-GLB-Two-Fn-Types e1 (app recur e2) (app recur e3))
+     (Make-GLB-Two-Fn-Types e1 e2 e3)]
     [(Make-Tuple-Type e1 (app recur e2) (app recur e3))
      (Make-Tuple-Type e1 e2 e3)]
     [(MRef-Coercion-Huh (app recur e)) (MRef-Coercion-Huh e)]
@@ -807,8 +807,8 @@
     [(Mbox-rtti-set! (app pl-expr addr) (app pl-expr e))
      (Mbox-rtti-set! addr e)]
     [(Mbox-rtti-ref (app pl-expr addr)) (Mbox-rtti-ref addr)]
-    [(Make-Fn-Type e1 (app pl-expr e2) (app pl-expr e3))
-     (Make-Fn-Type e1 e2 e3)]
+    [(Make-GLB-Two-Fn-Types e1 (app pl-expr e2) (app pl-expr e3))
+     (Make-GLB-Two-Fn-Types e1 e2 e3)]
     [(Make-Tuple-Type e1 (app pl-expr e2) (app pl-expr e3))
      (Make-Tuple-Type e1 e2 e3)]
     [(MRef-Coercion-Huh (app pl-expr e)) (MRef-Coercion-Huh e)]
