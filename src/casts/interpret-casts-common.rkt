@@ -174,7 +174,7 @@ TODO write unit tests
         (Type-MVect (interp-tglb (type-mvec-of$ t1) (type-mvec-of$ t2)))]
        [(and$ (type-tup?$ t1) (type-tup?$ t2)
               (op<=? (type-tup-arity$ t2) (type-tup-arity$ t1)))
-        (Make-Tuple-Type tglb-uid t1 t2)]
+        (Make-GLB-Two-Tuple-Types tglb-uid t1 t2)]
        [else (Error (Quote "inconsistent types"))])))
   (: tglb : Schml-Type Schml-Type -> (Option Schml-Type))
   (define (tglb t1 t2)

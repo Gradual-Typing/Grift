@@ -125,7 +125,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Mbox-rtti-set! E E)
           (Mbox-rtti-ref E)
           (Make-GLB-Two-Fn-Types Uid E E)
-          (Make-Tuple-Type Uid E E)
+          (Make-GLB-Two-Tuple-Types Uid E E)
           (MRef-Coercion-Huh E)
           (MRef-Coercion-Type E)
           (MRef-Coercion E)

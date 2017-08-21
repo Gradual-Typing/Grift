@@ -1357,7 +1357,7 @@ but a static single assignment is implicitly maintained.
                  (Begin
                    (list (Assign u t1))
                    (invoke-mk-fn-type mk-fn-type (Var u) t2)))))]
-        [(Make-Tuple-Type mk-glb (app recur t1) (app recur t2))
+        [(Make-GLB-Two-Tuple-Types mk-glb (app recur t1) (app recur t2))
          (: invoke-mk-tuple-type ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
          (define (invoke-mk-tuple-type mk-tuple t1 t2)
            (App-Code

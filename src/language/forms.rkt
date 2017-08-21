@@ -86,7 +86,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Mbox-rtti-ref expr)
   (Mbox-rtti-set! expression1 expression2)
   (Make-GLB-Two-Fn-Types expression1 expression2 expression3) ;; create meeted function type in runtime
-  (Make-Tuple-Type expression1 expression2 expression3)
+  (Make-GLB-Two-Tuple-Types expression1 expression2 expression3)
   ;; the underlying value can be accessed by the location encoded in the type
   ;; What is the meaning of the above comment? - Andre (TODO)
   (MBoxCastedRef addr type)
