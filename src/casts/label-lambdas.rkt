@@ -244,8 +244,8 @@
       [(Mbox-rtti-ref (app ll-expr addr)) (Mbox-rtti-ref addr)]
       [(Make-GLB-Two-Fn-Types e1 (app ll-expr e2) (app ll-expr e3))
        (Make-GLB-Two-Fn-Types e1 e2 e3)]
-      [(Make-Tuple-Type e1 (app ll-expr e2) (app ll-expr e3))
-       (Make-Tuple-Type e1 e2 e3)]
+      [(Make-GLB-Two-Tuple-Types e1 (app ll-expr e2) (app ll-expr e3))
+       (Make-GLB-Two-Tuple-Types e1 e2 e3)]
       [(MRef-Coercion-Huh (app ll-expr e)) (MRef-Coercion-Huh e)]
       [(MRef-Coercion-Type (app ll-expr e)) (MRef-Coercion-Type e)]
       [(MRef-Coercion (app ll-expr e)) (MRef-Coercion e)]
