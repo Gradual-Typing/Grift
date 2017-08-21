@@ -1294,8 +1294,7 @@ but a static single assignment is implicitly maintained.
                (Begin
                  `(,(Op 'Printf (list (Quote "index out of bound %ld\n") ind-var)))
                  (Op 'Exit (list (Quote -1))))))]
-        [(Type-MVect (app recur e))
-         (sr-alloc "MVectT" TYPE-MVECT-TAG `(("type" . ,e)))]
+        [(Type-MVect e) (sr-type-mvect recur e)]
         [(Type-MVect-Huh (app recur e))
          (sr-check-tag=? e TYPE-TAG-MASK TYPE-MVECT-TAG)]
         [(Type-MVect-Of (app recur e))
@@ -1372,12 +1371,9 @@ but a static single assignment is implicitly maintained.
                  (Begin
                    (list (Assign u t1))
                    (invoke-mk-tuple-type mk-tuple-type (Var u) t2)))))]
-        [(Type-GRef (app recur e))
-         (sr-alloc "GRefT" TYPE-GREF-TAG `(("type" . ,e)))]
-        [(Type-GVect (app recur e))
-         (sr-alloc "GVectT" TYPE-GVECT-TAG `(("type" . ,e)))]
-        [(Type-MRef (app recur e))
-         (sr-alloc "MRefT" TYPE-MREF-TAG `(("type" . ,e)))]
+        [(Type-GRef e) (sr-type-gref recur e)]
+        [(Type-GVect e) (sr-type-gvect recur e)]
+        [(Type-MRef e) (sr-type-mref recur e)]
         [(Type-MRef-Huh (app recur e))
          (sr-check-tag=? e TYPE-TAG-MASK TYPE-MREF-TAG)]
         [(Type-MRef-Of (app recur e))
@@ -1593,23 +1589,40 @@ but a static single assignment is implicitly maintained.
     [(Static-Id u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
+
+;; The following functions specify the types runtime layout,
+;; parameterized on whether the type is known in compile-time or
+;; run-time
+
+(: sr-type-gref (All (A) (A -> D0-Expr) A -> D0-Expr))
+(define (sr-type-gref compile-type-static/dynamic ty)
+  (sr-alloc "GRefT" TYPE-GREF-TAG
+            `(("type" . ,(compile-type-static/dynamic ty)))))
+
+(: sr-type-gvect (All (A) (A -> D0-Expr) A -> D0-Expr))
+(define (sr-type-gvect compile-type-static/dynamic ty)
+  (sr-alloc "GVectT" TYPE-GVECT-TAG
+            `(("type" . ,(compile-type-static/dynamic ty)))))
+
+(: sr-type-mref (All (A) (A -> D0-Expr) A -> D0-Expr))
+(define (sr-type-mref compile-type-static/dynamic ty)
+  (sr-alloc "MRefT" TYPE-MREF-TAG
+            `(("type" . ,(compile-type-static/dynamic ty)))))
+
+(: sr-type-mvect (All (A) (A -> D0-Expr) A -> D0-Expr))
+(define (sr-type-mvect compile-type-static/dynamic ty)
+  (sr-alloc "MVectT" TYPE-MVECT-TAG
+            `(("type" . ,(compile-type-static/dynamic ty)))))
+
 (: allocate-bound-type (CoC6-Bnd-Type -> D0-Expr))
 (define (allocate-bound-type bnd)
   (: sr-type (Compact-Type -> D0-Expr))
   (define (sr-type t)
     (match t
-      [(GRef t)
-       (sr-alloc "GRefT" TYPE-GREF-TAG
-                 `(("type" . ,(sr-prim-type t))))]
-      [(GVect t)
-       (sr-alloc "GVect_Type" TYPE-GVECT-TAG
-                 `(("type" . ,(sr-prim-type t))))]
-      [(MRef t)
-       (sr-alloc "MRefT" TYPE-MREF-TAG
-                 `(("type" . ,(sr-prim-type t))))]
-      [(MVect t)
-       (sr-alloc "MVectT" TYPE-MVECT-TAG
-                 `(("type" . ,(sr-prim-type t))))]
+      [(GRef t) (sr-type-gref sr-prim-type t)]
+      [(GVect t) (sr-type-gvect sr-prim-type t)]
+      [(MRef t) (sr-type-mref sr-prim-type t)]
+      [(MVect t) (sr-type-mvect sr-prim-type t)]
       [(Fn a f* r)
        (sr-alloc "Fun_Type" TYPE-FN-TAG
                  `(("arity" . ,(Quote a))
