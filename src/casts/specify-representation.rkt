@@ -134,7 +134,6 @@ but a static single assignment is implicitly maintained.
           (Assign val  e1)
           (Assign type (sr-expr e2))
           (Assign tag (Op 'binary-and `(,type-var ,TYPE-TAG-MASK))))
-         ;; TODO use a switch here!
          (Switch type-var
           `([(,data:TYPE-INT-RT-VALUE)  . ,(tag-shifted-imm DYN-INT-TAG)]
             [(,data:TYPE-BOOL-RT-VALUE) . ,(tag-shifted-imm DYN-BOOL-TAG)]
@@ -142,19 +141,7 @@ but a static single assignment is implicitly maintained.
             [(,data:TYPE-CHAR-RT-VALUE) . ,(tag-shifted-imm DYN-CHAR-TAG)])
           ;; Notice that float types fall into this case also
            (sr-alloc "dynamic_boxed" DYN-BOXED-TAG
-                     `(("" . ,val-var) ("" . ,type-var))))
-         #;
-         (If (Op '= `(,tag-var ,TYPE-ATOMIC-TAG))
-             (If (Op '= `(,type-var ,TYPE-INT-RT-VALUE))
-                 (Op 'binary-or `(,(Op '%<< (list val-var DYN-IMDT-SHIFT)) ,DYN-INT-TAG))
-                 (If (Op '= `(,type-var ,TYPE-BOOL-RT-VALUE))
-                     (Op 'binary-or `(,(Op '%<< (list val-var DYN-IMDT-SHIFT)) ,DYN-BOOL-TAG))
-                     (If (Op '= `(,type-var ,TYPE-UNIT-RT-VALUE))
-                         (Op 'binary-or `(,(Op '%<< (list val-var DYN-IMDT-SHIFT)) ,DYN-UNIT-TAG))
-                         (sr-alloc "float_dynamic_boxed" data:DYN-BOXED-TAG
-                                   `(("" . ,val-var) ("" . ,type-var))))))
-             (sr-alloc "dynamic_boxed" data:DYN-BOXED-TAG
-                       `(("" . ,val-var) ("" . ,type-var)))))]))
+                     `(("" . ,val-var) ("" . ,type-var)))))]))
   
   (: get-mk-tuple-type! (Uid -> (Code-Label Uid)))
   (define (get-mk-tuple-type! mk-glb)
@@ -226,9 +213,6 @@ but a static single assignment is implicitly maintained.
       (define a       (Var a-u))
       (define mk-fn   (Code-Label mk-fn-u))
       (define mk-g    (Code-Label mk-glb))
-      ;; This code is carfully crafted so that the allocation occurs after
-      ;; all of the coercion have been made this ensures that there isn't the
-      ;; possibility of collecting while there is unitialized data in the heap.
       (define mk-fn-t : D0-Code
         (Code `(,t1-u ,t2-u ,i-u ,a-u)
           (If (Op '= `(,i ,a))
@@ -284,9 +268,6 @@ but a static single assignment is implicitly maintained.
       (define st      (Var st-u))
       (define mk-fn   (Code-Label mk-fn-u))
       (define mk-c    (Code-Label mk-crcn))
-      ;; This code is carfully crafted so that the allocation occurs after
-      ;; all of the coercion have been made this ensures that there isn't the
-      ;; possibility of collecting while there is unitialized data in the heap.
       (define mk-fn-c : D0-Code
         (Code `(,t1-u ,t2-u ,l-u ,i-u ,a-u)
           (If (Op '= `(,i ,a))
@@ -349,9 +330,6 @@ but a static single assignment is implicitly maintained.
       (define st        (Var st-u))
       (define comp-fn   (Code-Label comp-fn-u))
       (define comp-c    (Code-Label comp-crcn))
-      ;; This code is carfully crafted so that the allocation occurs after
-      ;; all of the coercion have been made this ensures that there isn't the
-      ;; possibility of collecting while there is unitialized data in the heap.
       (define comp-fn-c : D0-Code
         (Code `(,c1-u ,c2-u ,i-u ,a-u ,id?1-u)
           (If (Op '= `(,i ,a))
@@ -703,62 +681,9 @@ but a static single assignment is implicitly maintained.
     (let ([cl? (unbox comp-tuple-coercion-code-label?)])
       (or cl? (make-code! comp-crcn))))
 
-
-  ;; (: sr-coercion (Coercion/Immediate-Type -> D0-Expr))
-  ;; (define (sr-coercion c)
-  ;;   (match c
-  ;;     [(Identity) COERCION-IDENTITY-IMDT]
-  ;;     [(Project (app sr-prim-type t) l)
-  ;;      (sr-alloc "project_coercion" data:COERCION-PROJECT-TAG
-  ;;                `(("type" . ,t) ("label" . ,(Quote l))))]
-  ;;     [(Inject (app sr-prim-type t))
-  ;;      (sr-alloc "inject-coercion" data:COERCION-INJECT-TAG
-  ;;                `(("type" . ,t)))]
-  ;;     [(Sequence (app sr-coercion f) (app sr-coercion s))
-  ;;      (sr-alloc "sequence_coecion" data:COERCION-SEQUENCE-TAG
-  ;;                `(("first" . ,f) (,"second" . ,s)))]
-  ;;     [(Fn _ a* (app sr-coercion r))
-  ;;      (define st-u      (next-uid! "second-tagged"))
-  ;;      (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote (length a*)) COERCION-SECOND-TAG-SHIFT))
-  ;;                                  COERCION-FN-SECOND-TAG))))
-  ;;           (sr-alloc "fn_coercion" data:COERCION-MEDIATING-TAG
-  ;;                     `(("arity"  . ,(Var st-u))
-  ;;                       ("return" . ,r) .
-  ;;                       ,(map (lambda ([a : Coercion/Immediate-Type])
-  ;;                               (cons "argument" (sr-coercion a)))
-  ;;                             a*))))]
-  ;;     [(Ref (app sr-coercion r) (app sr-coercion w))
-  ;;      (define st-u    (next-uid! "second-tagged"))
-  ;;      (Let `((,st-u . ,(Op '+ (list (Op '%<< (list ZERO-IMDT COERCION-SECOND-TAG-SHIFT))
-  ;;                                    COERCION-REF-SECOND-TAG))))
-  ;;           (sr-alloc "ref-coercion" data:COERCION-MEDIATING-TAG
-  ;;                     `(("tag" . ,(Var st-u))
-  ;;                       ("read-coercion" . ,r)
-  ;;                       ("write-coercion" . ,w))))]
-  ;;      [(MonoRef (app sr-prim-type t))
-  ;;       (sr-alloc "mref-coercion" data:COERCION-MREF-SECOND-TAG
-  ;;                `(("type" . ,t)))]
-  ;;     [(CTuple _ a*)
-  ;;      (define st-u      (next-uid! "second-tagged"))
-  ;;      (Let `((,st-u . ,(Op '+ (list (Op '%<< (list (Quote (length a*)) COERCION-SECOND-TAG-SHIFT))
-  ;;                                    COERCION-TUPLE-SECOND-TAG))))
-  ;;           (sr-alloc "tuple_coercion" data:COERCION-MEDIATING-TAG
-  ;;                     `(("num"  . ,(Var st-u))
-  ;;                       .
-  ;;                       ,(map (lambda ([a : Coercion/Immediate-Type])
-  ;;                               (cons "item" (sr-coercion a)))
-  ;;                             a*))))]
-  ;;     [(Failed l)
-  ;;      (sr-alloc "failed-coercion" data:COERCION-FAILED-TAG
-  ;;                `(("label" . ,(Quote l))))]
-  ;;     [other (error 'specify-representation/coercion "unmatched ~a" other)]))
-
   (: recur-curry-env (Env IndexMap -> (CoC6-Expr -> D0-Expr)))
   (define ((recur-curry-env env cenv) exp)
     (recur/env exp env cenv))
-
-
-
 
   (: recur/env (CoC6-Expr Env IndexMap -> D0-Expr))
   (define (recur/env exp env cenv)
@@ -938,7 +863,7 @@ but a static single assignment is implicitly maintained.
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG (sr-plus COERCION-FN-FMLS-OFFSET i))]
         [(Fn-Coercion-Return (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX)]
-        ;; TODO either repurpose or get rid of the arrity field
+        ;; TODO either repurpose or get rid of the arity field
         ;; One could immagine that we use it to dynamically dispatch on compose
         [(Fn-Coercion (app recur* e*) (app recur e))
          (begin$
@@ -1517,12 +1442,8 @@ but a static single assignment is implicitly maintained.
 
     (recur exp))
 
-
-
   (recur/env exp env cenv))
   
-
-
 (define (build-id-coercion-huh [e : D0-Expr]) : D0-Expr
   (sr-check-tag=? e COERCION-TAG-MASK COERCION-IDENTITY-TAG))
 
@@ -1648,9 +1569,6 @@ but a static single assignment is implicitly maintained.
     [(Static-Id id) (Var id)]
     [else (error 'sr-immediate-coercion "unhandled case in match")]))
 
-
-
-  
 (: sr-coercion (Compact-Coercion -> D0-Expr))
 (define (sr-coercion t)
   (match t
@@ -1805,9 +1723,6 @@ but a static single assignment is implicitly maintained.
         (cons u (Code u* (sr-expr/env e env empty-index-map))))))
   (map sr-bnd b*))
 
-
-
-
 (: sr-observe ((String -> Uid) D0-Expr Schml-Type -> D0-Expr))
 (define (sr-observe uid! e t)
   (: generate-print (Uid Schml-Type -> D0-Expr))
@@ -1857,8 +1772,6 @@ but a static single assignment is implicitly maintained.
     [(STuple) TYPE-TUPLE-TAG]
     [else (error 'sr-tag "invalid: ~a" t)]))
 
-
-
 (: sr-bndp* ((CoC6-Expr Env IndexMap -> D0-Expr)
              -> (CoC6-Bnd-Procedure* -> D0-Bnd-Code*)))
 (define ((sr-bndp* sr-expr) b*)
@@ -1893,7 +1806,6 @@ but a static single assignment is implicitly maintained.
                 (hash-ref map f (fvar-err f))
                 (clos-err c f)))))
 
-
 (: sr-bndc* ((CoC6-Expr -> D0-Expr) CoC6-Bnd-Closure* -> D0-Expr*))
 (define (sr-bndc* sr-expr b*)
   (: sr-bndc (CoC6-Bnd-Closure -> (Pair Uid (Pair D0-Expr D0-Expr*))))
@@ -1919,8 +1831,6 @@ but a static single assignment is implicitly maintained.
     ;; This code implies that the tag of a closure is #b000
     (append a* e*)))
 
-
-
 (: sr-clos-ref-code (-> D0-Expr D0-Expr))
 (define (sr-clos-ref-code clos)
   (Op 'Array-ref  (list clos CLOS-CODE-INDEX)))
@@ -1928,7 +1838,6 @@ but a static single assignment is implicitly maintained.
 (: sr-clos-ref-caster (-> D0-Expr D0-Expr))
 (define (sr-clos-ref-caster clos)
   (Op 'Array-ref  (list clos CLOS-CSTR-INDEX)))
-
 
 (define-type Env (HashTable Uid D0-Expr))
 
@@ -2016,4 +1925,3 @@ but a static single assignment is implicitly maintained.
 (: sr-plus (D0-Expr D0-Expr -> D0-Expr))
 (define (sr-plus f s)
   (Op '+ (list f s)))
-
