@@ -148,7 +148,7 @@ but a static single assignment is implicitly maintained.
         (code$ (t1 t2 i count)
                (If (Op '= `(,i ,count))
                    (begin$
-                     (assign$ t (Op 'Alloc (list (sr-plus count (Quote 1)))))
+                     (assign$ t (Op 'Alloc (list (sr-plus count TYPE-TUPLE-ELEMENTS-OFFSET))))
                      (sr-array-set! t TYPE-TUPLE-COUNT-INDEX count)
                      (sr-tag-value t TYPE-TUPLE-TAG))
                    (begin$
@@ -200,7 +200,7 @@ but a static single assignment is implicitly maintained.
                       t2r
                       (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
                      (assign$ rt (App-Code mk-tglb-label `(,t1r ,t2r)))
-                     (assign$ t (Op 'Alloc (list (sr-plus arity (Quote 2)))))
+                     (assign$ t (Op 'Alloc (list (sr-plus arity TYPE-FN-FMLS-OFFSET))))
                      (sr-array-set! t TYPE-FN-ARITY-INDEX arity)
                      (sr-array-set! t TYPE-FN-RETURN-INDEX rt)
                      (sr-tag-value t TYPE-FN-TAG))
@@ -249,7 +249,7 @@ but a static single assignment is implicitly maintained.
                       t2r
                       (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
                      (assign$ cr (App-Code mk-crcn-label `(,t1r ,t2r ,l)))
-                     (assign$ crcn (Op 'Alloc (list (sr-plus arity (Quote 2)))))
+                     (assign$ crcn (Op 'Alloc (list (sr-plus arity COERCION-FN-FMLS-OFFSET))))
                      (assign$
                       tagged-arity
                       (Op
@@ -313,7 +313,7 @@ but a static single assignment is implicitly maintained.
                          (begin$
                            (assign$
                             crcn
-                            (Op 'Alloc (list (sr-plus arity (Quote 2)))))
+                            (Op 'Alloc (list (sr-plus arity COERCION-FN-FMLS-OFFSET))))
                            (assign$
                             tagged-arity
                             (Op
@@ -545,7 +545,7 @@ but a static single assignment is implicitly maintained.
         (code$ (t1 t2 l i count)
                (If (Op '= `(,i ,count))
                    (begin$
-                     (assign$ crcn (Op 'Alloc (list (sr-plus count (Quote 1)))))
+                     (assign$ crcn (Op 'Alloc (list (sr-plus count COERCION-TUPLE-ELEMENTS-OFFSET))))
                      (assign$
                       tagged-count
                       (Op
@@ -597,7 +597,7 @@ but a static single assignment is implicitly maintained.
         (code$ (crcn1 crcn2 i count id?1)
                (If (Op '= `(,i ,count))
                    (begin$
-                     (assign$ crcn (Op 'Alloc (list (sr-plus count (Quote 1)))))
+                     (assign$ crcn (Op 'Alloc (list (sr-plus count COERCION-TUPLE-ELEMENTS-OFFSET))))
                      (assign$
                       tagged-count
                       (Op
