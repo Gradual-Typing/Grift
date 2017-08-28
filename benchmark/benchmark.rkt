@@ -16,8 +16,8 @@
 (define (guarded-compile src i cast ref specialize hybrid-runtime)
   (define hybrid-runtime?
     (match hybrid-runtime
-      ['Pure #f]
-      ['Hybrid #t]
+      ['Strict   #f]
+      ['Lazy     #t]
       [_ (error 'benchmark/guarded-compile
                 "invalid specialization: ~a"
                 specialize)]))
