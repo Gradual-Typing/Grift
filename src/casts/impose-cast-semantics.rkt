@@ -8,7 +8,6 @@ This is a micro compiler that removes the cast language form.
          "./hoist-types-and-coercions.rkt"
          "define-to-let.rkt" 
          "interpret-casts.rkt"
-         "casts-to-coercions.rkt"
          "label-lambdas.rkt"
          "uncover-free.rkt"
          "convert-closures.rkt"
