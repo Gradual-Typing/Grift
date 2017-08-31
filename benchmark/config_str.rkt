@@ -79,8 +79,10 @@ Description: Facilitates a user-friendly interface for Schml
          (define s (set-subtract s1 s2))
          (cond
            [(= (set-count s) 1) (symbol->string (set-first s))]
-           [(and (set-member? s '|Type-Based Casts|) (set-member? s 'Pure)) "Pure Type-Based Casts"]
-           [(and (set-member? s 'Coercions) (set-member? s 'Hybrid)) "Hybrid Coercions"]
+           [(and (set-member? s '|Type-Based Casts|) (set-member? s 'Strict))
+            "Strict Type-Based Casts"]
+           [(and (set-member? s 'Coercions) (set-member? s 'Lazy))
+            "Lazy Coercions"]
            [else
             (error (string-append
                     "you should compare configurations that "
