@@ -27,6 +27,8 @@
 ;; Vector Behavior
 (define bounds-checks? : (Parameterof Boolean)
   (make-parameter #t))
+(define emit-vars-with-original-source-location? : (Parameterof Boolean)
+  (make-parameter #f))
 (define-type Ref-Semantics (U 'Monotonic 'Proxied))
 (define reference-semantics : (Parameterof (U 'Monotonic 'Proxied))
   (make-parameter 'Proxied))

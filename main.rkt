@@ -115,6 +115,9 @@
    [("--disable-bounds-checks")
     "code genererated won't check if indices are in bounds"
     (bounds-checks? #f)]
+   [("--emit-vars-with-original-source-location")
+    "rename compiled variables so that they have the source location that generated them"
+    (emit-vars-with-original-source-location? #t)]
    [("-m" "--start-memory")
     kilobytes
     "select the runtime's starting heap size"

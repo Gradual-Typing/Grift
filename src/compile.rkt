@@ -36,34 +36,36 @@
 ;; compile file at path
 ;; exec-path = path/name of final executable
 (: compile (->* ((U String Path))
-                (#:output   (Option (U String Path))
-                 #:keep-c   (Option (U String Path)) 
-                 #:keep-s   (Option (U String Path))
-                 #:blame    Blame-Semantics
-                 #:cast     Cast-Representation
-                 #:cc-opts  (U String (Listof String))
-                 #:mem      Natural
-                 #:rt       (Option (U String Path))
-                 #:log-level Log-Level
-                 #:log-port  (Option (U String Path Output-Port))
-                 #:gc       GC
-                 #:ck-bounds Boolean
-                 #:ref       Ref-Semantics)
+                (#:output     (Option (U String Path))
+                 #:keep-c     (Option (U String Path)) 
+                 #:keep-s     (Option (U String Path))
+                 #:blame      Blame-Semantics
+                 #:cast       Cast-Representation
+                 #:cc-opts    (U String (Listof String))
+                 #:mem        Natural
+                 #:rt         (Option (U String Path))
+                 #:log-level  Log-Level
+                 #:log-port   (Option (U String Path Output-Port))
+                 #:gc         GC
+                 #:ck-bounds  Boolean
+                 #:track-vars Boolean
+                 #:ref        Ref-Semantics)
                 Path))
 (define (compile target
-                 #:output    [output    (output-path)]
-                 #:keep-c    [keep-c    (c-path)]
-                 #:keep-s    [keep-s    (s-path)]
-                 #:blame     [blame     (blame-semantics)]
-                 #:cast      [cast      (cast-representation)]
-                 #:cc-opts   [cc-opts   (c-flags)]
-                 #:mem       [mem       (init-heap-kilobytes)]
-                 #:rt        [rt        (runtime-path)]
-                 #:log-level [log-level (schml-log-level)]
-                 #:log-port  [log-port  (schml-log-port)]
-                 #:gc        [gc        (garbage-collector)]
-                 #:ck-bounds [ckbs      (bounds-checks?)]
-                 #:ref       [rs        (reference-semantics)])
+                 #:output     [output     (output-path)]
+                 #:keep-c     [keep-c     (c-path)]
+                 #:keep-s     [keep-s     (s-path)]
+                 #:blame      [blame      (blame-semantics)]
+                 #:cast       [cast       (cast-representation)]
+                 #:cc-opts    [cc-opts    (c-flags)]
+                 #:mem        [mem        (init-heap-kilobytes)]
+                 #:rt         [rt         (runtime-path)]
+                 #:log-level  [log-level  (schml-log-level)]
+                 #:log-port   [log-port   (schml-log-port)]
+                 #:gc         [gc         (garbage-collector)]
+                 #:ck-bounds  [ckbs       (bounds-checks?)]
+                 #:track-vars [track-vars (emit-vars-with-original-source-location?)]
+                 #:ref        [rs         (reference-semantics)])
   ;; convert all convience types to internal API
   (let* ([target  (if (string? target) (build-path target) target)]
          [output  (if (string? output) (build-path output) output)]
