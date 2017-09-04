@@ -19,3 +19,6 @@ script:
 - make test
 
 after_script:
+
+notifications:
+    slack: grift-compiler:k9oxE7yBAUYy2D51Yywu6CjU
