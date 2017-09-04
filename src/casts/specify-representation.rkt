@@ -1097,12 +1097,12 @@ but a static single assignment is implicitly maintained.
         [(Unguarded-Vect-length (app recur e))
          (Op 'Array-ref (list e UGVECT-SIZE-INDEX))]
         [(Guarded-Proxy (app recur e) r)
-         ;; Consider using sr-alloc here
          (match r
            [(Twosome (app recur t1) (app recur t2) (app recur l))
-            (alloc-tag-set-gproxy/twosome next-uid! e t1 t2 l)]
+            (sr-alloc "proxied-ref" GPROXY-TAG
+                      `(("ref" . ,e) ("from" . ,t1) ("to" . ,t2) ("label" . ,l)))]
            [(Coercion (app recur c))
-            (alloc-tag-set-gproxy/coercion next-uid! e c)])]
+            (sr-alloc "proxied-ref" GPROXY-TAG `(("ref" . ,e) ("crcn" . ,c)))])]
         [(Guarded-Proxy-Ref (app recur e))
          ((untag-deref-gproxy GPROXY-FOR-INDEX) e)]
         [(Guarded-Proxy-Source (app recur e))
@@ -1403,8 +1403,6 @@ but a static single assignment is implicitly maintained.
 (define (build-hc-med [e : D0-Expr]) : D0-Expr
   (tagged-array-ref e HC-TAG-MASK HC-MED-INDEX))
 
-
-
 ;; Allocate without forgetting to lift evaluating subterms first
 ;; this prevents evaluating terms which may cause more allocation
 ;; will initializing the values of an allocation
@@ -1444,12 +1442,8 @@ but a static single assignment is implicitly maintained.
   (define tag-return : D0-Expr
     (cond
       [(not tag?) alloc-var]
-      [else
-       (match tag?
-         [(Quote 0) alloc-var]
-         [tag (Op 'binary-or (list alloc-var tag))])]))
-  (define result (Begin (append ass* (cons alloc-ass set*)) tag-return))
-  (debug off name tag? slots result))
+      [else (sr-tag-value alloc-var tag?)]))
+  (Begin (append ass* (cons alloc-ass set*)) tag-return))
 
 (: sr-prim-type (Immediate-Type -> D0-Expr))
 (define (sr-prim-type t)
@@ -1625,33 +1619,6 @@ but a static single assignment is implicitly maintained.
   (Op 'Array-ref
       (list (Op 'binary-xor (list proxy GPROXY-TAG))
             index)))
-
-(: alloc-tag-set-gproxy/twosome
-   ((String -> Uid) D0-Expr D0-Expr D0-Expr D0-Expr -> D0-Expr))
-(define (alloc-tag-set-gproxy/twosome next-uid! ref-e src-e tar-e lbl-e)
-  ;; TODO Consider using sr-alloc here
-  (begin$
-    (assign$ ref ref-e)
-    (assign$ src src-e)
-    (assign$ tar tar-e)
-    (assign$ lbl lbl-e)
-    (assign$ proxy (Op 'Alloc (list GPROXY/TWOSOME-SIZE)))
-    (Op 'Array-set! (list proxy GPROXY-FOR-INDEX ref))
-    (Op 'Array-set! (list proxy GPROXY-FROM-INDEX src))
-    (Op 'Array-set! (list proxy GPROXY-TO-INDEX tar))
-    (Op 'Array-set! (list proxy GPROXY-BLAMES-INDEX lbl))
-    (Op 'binary-or (list proxy GPROXY-TAG))))
-
-(: alloc-tag-set-gproxy/coercion
-   ((String -> Uid) D0-Expr D0-Expr -> D0-Expr))
-(define (alloc-tag-set-gproxy/coercion next-uid! ref-e crcn-e)
-  (begin$
-    (assign$ ref ref-e)
-    (assign$ crcn crcn-e)
-    (assign$ proxy (Op 'Alloc (list GPROXY/COERCION-SIZE)))
-    (Op 'Array-set! (list proxy GPROXY-FOR-INDEX ref))
-    (Op 'Array-set! (list proxy GPROXY-COERCION-INDEX crcn))
-    (Op 'binary-or (list proxy GPROXY-TAG))))
 
 ;; fold map through bindings
 (: sr-bnd* ((CoC6-Expr -> D0-Expr) -> (CoC6-Bnd-Data* -> D0-Bnd*)))
@@ -1860,11 +1827,11 @@ but a static single assignment is implicitly maintained.
 (define (check-tag? e m)
   (Op 'not `(,(Op '= `(,ZERO-IMDT ,(Op 'binary-and `(,e ,m)))))))
 
-;; there is some naming conflicts that must be taken care of
-;; in this file
 (: sr-tag-value (D0-Expr D0-Expr -> D0-Expr))
 (define (sr-tag-value e t)
-  (Op 'binary-or `(,e ,t)))
+  (match t
+    [(Quote 0) e]
+    [tag (Op 'binary-or `(,e ,tag))]))
 
 (: sr-check-tag=? (D0-Expr D0-Expr D0-Expr -> D0-Expr))
 (define (sr-check-tag=? e mask tag)
