@@ -24,30 +24,7 @@
   (TYPE-UNIT-RT-VALUE  #b011111)
   (TYPE-FLOAT-RT-VALUE #b100111)
   (TYPE-CHAR-RT-VALUE  #b101111)
-  ;; function type representation
-  (TYPE-FN-TAG                    #b000)
-  (TYPE-FN-ARITY-INDEX            0)
-  (TYPE-FN-RETURN-INDEX           1)
-  (TYPE-FN-FMLS-OFFSET            2)
-  ;; guarded types representation
-  (TYPE-GREF-TAG                  #b001)
-  (TYPE-GREF-SIZE                 1)
-  (TYPE-GREF-TYPE-INDEX           0)
-  (TYPE-GVECT-TAG                 #b010)
-  (TYPE-GVECT-SIZE                1)
-  (TYPE-GVECT-TYPE-INDEX          0)
-  ;; monotonic types representation
-  (TYPE-MREF-TAG                  #b011)
-  (TYPE-MREF-SIZE                 1)
-  (TYPE-MREF-TYPE-INDEX           0)
-  (TYPE-MVECT-TAG                 #b100)
-  (TYPE-MVECT-SIZE                1)
-  (TYPE-MVECT-TYPE-INDEX          0)
-  ;; tuple type representation
-  (TYPE-TUPLE-TAG                 #b101)
-  (TYPE-TUPLE-COUNT-INDEX         0)
-  (TYPE-TUPLE-ELEMENTS-OFFSET     1)
-  ;;
+
   (HC-PRJ-TAG-MASK  #b10)
   (HC-INJ-TAG-MASK  #b01)
   (HC-TAG-MASK      #b11)
@@ -160,5 +137,3 @@
   (HYBRID-PROXY-TAG               #b001)
   (HYBRID-PROXY-CRCN-INDEX        2)
   (HYBRID-PROXY-CLOS-INDEX        1))
-
-
