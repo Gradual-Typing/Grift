@@ -13,7 +13,9 @@ but a static single assignment is implicitly maintained.
 | Target Grammar : Data0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../errors.rkt"
+(require (for-syntax racket/syntax syntax/parse racket/list
+                     "../language/forms.rkt")
+         "../errors.rkt"
          (submod "../logging.rkt" typed)
          "../configuration.rkt"
          "../language/data-representation.rkt"
@@ -609,30 +611,14 @@ but a static single assignment is implicitly maintained.
         [(Code-Label u) (Code-Label u)]
         ;; Type Representation
         [(Type t) (sr-prim-type t)]
-        [(Type-Fn-Huh (app recur e))
-         (sr-check-tag=? e TYPE-TAG-MASK TYPE-FN-TAG)]
-        [(Type-Fn-arity (app recur e))
-         (Op 'Array-ref (list e TYPE-FN-ARITY-INDEX))]
-        [(Type-Fn-return (app recur e))
-         (Op 'Array-ref (list e TYPE-FN-RETURN-INDEX))]
-        [(Type-Fn-arg (app recur e1) (app recur e2))
-         (define e2^
-           (match e2
-             [(Quote (? fixnum? k)) (Quote (+ data:TYPE-FN-FMLS-OFFSET k))]
-             [otherwiths (Op '+ (list e2 TYPE-FN-FMLS-OFFSET))]))
-         (Op 'Array-ref (list e1 e2^))]
-        [(Type-GRef-Huh (app recur e))
-         (sr-check-tag=? e TYPE-TAG-MASK TYPE-GREF-TAG)]
-        [(Type-GRef-Of (app recur e))
-         (define arg : D0-Expr
-           (Op 'binary-xor (list e TYPE-GREF-TAG)))
-         (Op 'Array-ref (list arg TYPE-GREF-TYPE-INDEX))]
-        [(Type-GVect-Huh (app recur e))
-         (sr-check-tag=? e TYPE-TAG-MASK TYPE-GVECT-TAG)]
-        [(Type-GVect-Of (app recur e))
-         (define arg : D0-Expr
-           (Op 'binary-xor (list e TYPE-GVECT-TAG)))
-         (Op 'Array-ref (list arg TYPE-GVECT-TYPE-INDEX))]
+        [(Type-Fn-Huh (app recur e)) (type-fn? e)]
+        [(Type-Fn-arity (app recur e)) (type-fn-arity-access e)]
+        [(Type-Fn-return (app recur e)) (type-fn-return-access e)]
+        [(Type-Fn-arg (app recur e1) (app recur e2)) (type-fn-fmls-access e1 e2)]
+        [(Type-GRef-Huh (app recur e)) (type-gref? e)]
+        [(Type-GRef-Of (app recur e)) (type-gref-type-access e)]
+        [(Type-GVect-Huh (app recur e)) (type-gvect? e)]
+        [(Type-GVect-Of (app recur e)) (type-gvect-type-access e)]
         [(Type-Dyn-Huh (app recur e))
          (Op '= (list TYPE-DYN-RT-VALUE e))]
         
@@ -1025,13 +1011,9 @@ but a static single assignment is implicitly maintained.
                (begin$
                  (op$ Printf (Quote "index out of bound %ld\n") ind)
                  (op$ Exit (Quote -1)))))]
-        [(Type-MVect e) (sr-type-mvect recur e)]
-        [(Type-MVect-Huh (app recur e))
-         (sr-check-tag=? e TYPE-TAG-MASK TYPE-MVECT-TAG)]
-        [(Type-MVect-Of (app recur e))
-         (define arg : D0-Expr
-           (Op 'binary-xor (list e TYPE-MVECT-TAG)))
-         (Op 'Array-ref (list arg TYPE-MVECT-TYPE-INDEX))]
+        [(Type-MVect (app recur e)) (sr-type-mvect e)]
+        [(Type-MVect-Huh (app recur e)) (type-mvect? e)]
+        [(Type-MVect-Of (app recur e)) (type-mvect-type-access e)]
         [(MVect-Coercion-Huh (app recur e))
          (begin$
            (assign$ tmp-crcn
@@ -1089,15 +1071,11 @@ but a static single assignment is implicitly maintained.
                (begin$
                  (assign$ tuple-type1 t1)
                  (invoke-mk-tuple-type-glb mk-tuple-type-glb tuple-type1 t2))))]
-        [(Type-GRef e) (sr-type-gref recur e)]
-        [(Type-GVect e) (sr-type-gvect recur e)]
-        [(Type-MRef e) (sr-type-mref recur e)]
-        [(Type-MRef-Huh (app recur e))
-         (sr-check-tag=? e TYPE-TAG-MASK TYPE-MREF-TAG)]
-        [(Type-MRef-Of (app recur e))
-         (define arg : D0-Expr
-           (Op 'binary-xor (list e TYPE-MREF-TAG)))
-         (Op 'Array-ref (list arg TYPE-MREF-TYPE-INDEX))]
+        [(Type-GRef (app recur e)) (sr-type-gref e)]
+        [(Type-GVect (app recur e)) (sr-type-gvect e)]
+        [(Type-MRef (app recur e)) (sr-type-mref e)]
+        [(Type-MRef-Huh (app recur e)) (type-mref? e)]
+        [(Type-MRef-Of (app recur e)) (type-mref-type-access e)]
         [(Error (app recur e))
          (begin$ (op$ Print e) (op$ Exit (Quote -1)) UNDEF-IMDT)]
         [(Create-tuple (app recur* e*))
@@ -1127,13 +1105,10 @@ but a static single assignment is implicitly maintained.
         [(Tuple-Coercion-Item (app recur e) (app recur i))
          (sr-tagged-array-ref
           e COERCION-MEDIATING-TAG (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i))]
-        [(Type-Tuple-Huh (app recur e))
-         (sr-check-tag=? e TYPE-TAG-MASK TYPE-TUPLE-TAG)]
-        [(Type-Tuple-num (app recur e))
-         (sr-tagged-array-ref e TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX)]
+        [(Type-Tuple-Huh (app recur e)) (type-tuple? e)]
+        [(Type-Tuple-num (app recur e)) (type-tuple-count-access e)]
         [(Type-Tuple-item (app recur e) (app recur i))
-         (sr-tagged-array-ref
-          e TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i))]
+         (type-tuple-elements-access e i)]
         [(Coerce-Tuple uid (app recur v) (app recur c))
          (: invoke-coerce-tuple ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
          (define (invoke-coerce-tuple coerce-tuple v c)
@@ -1286,53 +1261,150 @@ but a static single assignment is implicitly maintained.
     [(Static-Id u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
-;; The following functions specify the types runtime layout,
-;; parameterized on whether the type is known in compile-time or
-;; run-time
+;; define-memory-layout-helpers generates constants and functions for creating,
+;; accessing, and checking for equality for the specified heap-allocated object.
+;; For example:
+;; (define-memory-layout-helpers "type" "tuple" #b101
+;;                               ("count" single) ("elements" many))
+;; generates the following for a type called tuple:
+;; (define data:TYPE-TUPLE-COUNT-INDEX 0)
+;; (define TYPE-TUPLE-COUNT-INDEX data:TYPE-TUPLE-COUNT-INDEX)
+;; (define data:TYPE-TUPLE-ELEMENTS-OFFSET 1)
+;; (define TYPE-TUPLE-ELEMENTS-OFFSET data:TYPE-TUPLE-ELEMENTS-OFFSET)
+;; (define data:TYPE-TUPLE-TAG #b101)
+;; (define TYPE-TUPLE-TAG data:TYPE-TUPLE-TAG)
+;; (define (sr-type-tuple [tmp1 : D0-Expr] [tmp2 : (Listof D0-Expr)]) : D0-Expr
+;;   (sr-alloc "tuple" TYPE-TUPLE-TAG (("count" . tmp1) .
+;;                                    (map (lambda ([tmp3 : D0-Expr])
+;;                                           (cons "elements" tmp3)) tmp2))))
+;; (define (type-tuple? [tmp4 : D0-Expr]) : D0-Expr
+;;   (sr-check-tag=? tmp4 TYPE-TAG-MASK TYPE-TUPLE-TAG))
+;; (define (type-tuple-count-access [tmp5 : D0-Expr]) : D0-Expr
+;;   (sr-tagged-array-ref tmp5 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+;; (define (type-tuple-elements-access [tmp6 : D0-Expr] [tmp7 : D0-Expr]) : D0-Expr
+;;   (sr-tagged-array-ref tmp6 TYPE-TUPLE-TAG
+;;                        (match tmp7
+;;                         [(Quote (? fixnum? k))
+;;                           (Quote (+ data:TYPE-TUPLE-ELEMENTS-OFFSET k))]
+;;                         [otherwise
+;;                           (Op '+ (list TYPE-TUPLE-ELEMENTS-OFFSET tmp7))])))
+(define-syntax (define-memory-layout-helpers stx)
+  (syntax-parse stx
+    #:datum-literals (single many)
+    [(_ namespace:str name:str tag:exact-integer
+        (field*:str (~optional cval* #:defaults ([cval* #'#f])) (~literal single)) ...
+        (~optional (many-field:str many) #:defaults ([many-field #'#f])))
+     (define namespace-string (syntax->datum #'namespace))
+     (define namespace-string-caps (string-upcase namespace-string))
+     (define name-string (syntax->datum #'name))
+     (define qualified-upcase-name
+       (format "~a-~a" namespace-string-caps (string-upcase name-string)))
+     (define ((gen-index/offset-id postfix) field)
+       (format-id stx (string-append "~a-~a-" postfix)
+                  qualified-upcase-name (string-upcase field)))
+     (define (gen-data-id x) (format-id stx "data:~a" x))
+     (define many-field-dtm (syntax->datum #'many-field))
+     (define field-string* (map syntax->datum (syntax->list #'(field* ...))))
+     (define index-def* (map (gen-index/offset-id "INDEX") field-string*))
+     (define offset-def
+       (if many-field-dtm ((gen-index/offset-id "OFFSET") many-field-dtm) #f))
+     (define index-data-def* (map gen-data-id index-def*))
+     (define offset-data-def (if many-field-dtm (gen-data-id offset-def) #f))
+     (define-values (field-val* temp*)
+       (for/fold ([p* '()] [t* '()]) ([c (syntax->list #'(cval* ...))])
+         (let ([cdtm (syntax->datum c)])
+           (if cdtm
+               (values (cons (Quote cdtm) p*) t*)
+               (with-syntax ([a (generate-temporary)])
+                 (values (cons #'a p*) (cons #'a t*)))))))
+     (define/with-syntax func-alloc-name
+       (format-id stx "sr-~a-~a" namespace-string name-string))
+     (define/with-syntax func-huh-name
+       (format-id stx "~a-~a?" namespace-string name-string))
+     (define/with-syntax namespace-mask-def
+       (format-id stx "~a-TAG-MASK" namespace-string-caps))
+     (define/with-syntax tag-def (format-id stx "~a-TAG" qualified-upcase-name))
+     (define/with-syntax (sindex/offset-def* ...)
+       (if many-field-dtm (append index-def* (list offset-def)) index-def*))
+     (define/with-syntax (sindex/offset-data-def* ...)
+       (if many-field-dtm
+           (append index-data-def* (list offset-data-def))
+           index-data-def*))
+     (define/with-syntax tag-data-def (gen-data-id #'tag-def))
+     (define/with-syntax (sindex/offset-val* ...)
+       (let ([n (length field-string*)])
+         (datum->syntax stx (range (if many-field-dtm (add1 n) n)))))
+     (define/with-syntax (alloc-arg* ...) temp*)
+     (define/with-syntax (alloc-val* ...) field-val*)
+     (define/with-syntax func-alloc
+       (if many-field-dtm
+           (with-syntax ([arg (generate-temporary)]
+                         [last-alloc-arg (generate-temporary)])
+             #`(define (func-alloc-name
+                        [alloc-arg* : D0-Expr] ...
+                        [last-alloc-arg : (Listof D0-Expr)])
+                 : D0-Expr
+                 (sr-alloc
+                  #,name-string tag-def
+                  `((field*
+                     . ,alloc-val*) ... .
+                    ,(map (lambda ([arg : D0-Expr]) (cons many-field arg))
+                          last-alloc-arg)))))
+           #`(define (func-alloc-name [alloc-arg* : D0-Expr] ...) : D0-Expr
+               (sr-alloc #,name-string tag-def `((field* . ,alloc-val*) ...)))))
+     (define/with-syntax equal-arg (generate-temporary))
+     (define (gen-func-access*)
+       (define (gen-access-func-name field-string)
+         (format-id stx "~a-~a-~a-access"
+                    namespace-string name-string field-string))
+       (define (gen-index-func-access field-string index-def)
+         (define/with-syntax func-name (gen-access-func-name field-string))
+         (define/with-syntax access-arg (generate-temporary))
+         #`(define (func-name [access-arg : D0-Expr]) : D0-Expr
+             (sr-tagged-array-ref access-arg tag-def #,index-def)))
+       (define (gen-offset-func-access)
+         (define/with-syntax func-name (gen-access-func-name many-field-dtm))
+         (define/with-syntax access-arg (generate-temporary))
+         (define/with-syntax ind-arg (generate-temporary))
+         #`(define (func-name [access-arg : D0-Expr] [ind-arg : D0-Expr]) : D0-Expr
+             (sr-tagged-array-ref
+              access-arg tag-def
+              (match ind-arg
+                [(Quote (? fixnum? k)) (Quote (+ #,offset-data-def k))]
+                [otherwise (Op '+ (list #,offset-def ind-arg))]))))
+       (let ([l (map gen-index-func-access field-string* index-def*)])
+         (if many-field-dtm (append l (list (gen-offset-func-access))) l)))
+     #`(begin
+         (define tag-data-def tag)
+         (define tag-def (Quote tag-data-def))
+         (define sindex/offset-data-def* sindex/offset-val*) ...
+         (define sindex/offset-def* (Quote sindex/offset-data-def*)) ...
+         func-alloc
+         (define (func-huh-name [equal-arg : D0-Expr]) : D0-Expr
+           (sr-check-tag=? equal-arg namespace-mask-def tag-def))
+         #,@(gen-func-access*))]))
 
-(: sr-type-gref (All (A) (A -> D0-Expr) A -> D0-Expr))
-(define (sr-type-gref compile-type-static/dynamic ty)
-  (sr-alloc "GRefT" TYPE-GREF-TAG
-            `(("type" . ,(compile-type-static/dynamic ty)))))
-
-(: sr-type-gvect (All (A) (A -> D0-Expr) A -> D0-Expr))
-(define (sr-type-gvect compile-type-static/dynamic ty)
-  (sr-alloc "GVectT" TYPE-GVECT-TAG
-            `(("type" . ,(compile-type-static/dynamic ty)))))
-
-(: sr-type-mref (All (A) (A -> D0-Expr) A -> D0-Expr))
-(define (sr-type-mref compile-type-static/dynamic ty)
-  (sr-alloc "MRefT" TYPE-MREF-TAG
-            `(("type" . ,(compile-type-static/dynamic ty)))))
-
-(: sr-type-mvect (All (A) (A -> D0-Expr) A -> D0-Expr))
-(define (sr-type-mvect compile-type-static/dynamic ty)
-  (sr-alloc "MVectT" TYPE-MVECT-TAG
-            `(("type" . ,(compile-type-static/dynamic ty)))))
+(define-memory-layout-helpers "type" "gref" #b001 ("type" single))
+(define-memory-layout-helpers "type" "gvect" #b010 ("type" single))
+(define-memory-layout-helpers "type" "mref" #b011 ("type" single))
+(define-memory-layout-helpers "type" "mvect" #b100 ("type" single))
+(define-memory-layout-helpers "type" "fn" #b000
+  ("arity" single) ("return" single) ("fmls" many))
+(define-memory-layout-helpers "type" "tuple" #b101
+  ("count" single) ("elements" many))
 
 (: allocate-bound-type (CoC6-Bnd-Type -> D0-Expr))
 (define (allocate-bound-type bnd)
   (: sr-type (Compact-Type -> D0-Expr))
   (define (sr-type t)
     (match t
-      [(GRef t) (sr-type-gref sr-prim-type t)]
-      [(GVect t) (sr-type-gvect sr-prim-type t)]
-      [(MRef t) (sr-type-mref sr-prim-type t)]
-      [(MVect t) (sr-type-mvect sr-prim-type t)]
+      [(GRef t) (sr-type-gref (sr-prim-type t))]
+      [(GVect t) (sr-type-gvect (sr-prim-type t))]
+      [(MRef t) (sr-type-mref (sr-prim-type t))]
+      [(MVect t) (sr-type-mvect (sr-prim-type t))]
       [(Fn a f* r)
-       (sr-alloc "Fun_Type" TYPE-FN-TAG
-                 `(("arity" . ,(Quote a))
-                   ("return" . ,(sr-prim-type r)) .
-                   ,(map (lambda ([t : Immediate-Type])
-                           (cons "argument" (sr-prim-type t)))
-                         f*)))]
-      [(STuple n a*)
-       (sr-alloc "Tuple_Type" TYPE-TUPLE-TAG
-                 `(("num" . ,(Quote n))
-                   .
-                   ,(map (lambda ([t : Immediate-Type])
-                           (cons "argument" (sr-prim-type t)))
-                         a*)))]
+       (sr-type-fn (Quote a) (sr-prim-type r) (map sr-prim-type f*))]
+      [(STuple n a*) (sr-type-tuple (Quote n) (map sr-prim-type a*))]
       [other (error 'specify-representation/type "unmatched ~a" other)]))
   (match-let ([(cons u t) bnd])
     (Assign u (sr-type t))))
