@@ -312,12 +312,14 @@ run_benchmark()
     fi
 
     local lattice_file="${lattice_path}/out"
+
     if [ -f "$lattice_file" ]; then
     local dynamizer_out=$(cat "$lattice_file")
     else
     rm -rf "$lattice_path"
     rm -f "${lattice_path}.grift"
     cp "$static_source_file" "${lattice_path}.grift"
+
 	local dynamizer_out=$(dynamizer "${lattice_path}.grift" "$nsamples" "$nbins" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
