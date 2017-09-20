@@ -140,8 +140,8 @@
           ...
           [else ee* ... ee]))]))
 
-(define-syntax-rule (case$ e [(p** ...) e*] ... [else d])
-  (Switch e `([(,p** ...) . ,e*] ...) d))
+(define-syntax-rule (case$ v [(p** ...) e* ... e] ... [else d* ... d])
+  (Switch v `([(,p** ...) . ,(begin$ e* ... e)] ...) (begin$ d* ... d)))
 
 ;; 
 #;
