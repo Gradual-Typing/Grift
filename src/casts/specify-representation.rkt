@@ -126,7 +126,7 @@ but a static single assignment is implicitly maintained.
      (begin$
        (assign$ val e1)
        (assign$ type (sr-expr e2))
-       (assign$ tag (op$ binary-and type TYPE-TAG-MASK))
+       (assign$ tag (sr-get-tag type TYPE-TAG-MASK))
        (Switch
            type
          (let* ([shifted-imm (op$ %<< val DYN-IMDT-SHIFT)]
@@ -709,7 +709,7 @@ but a static single assignment is implicitly maintained.
          (begin$
            (assign$ tmp-crcn (sr-tagged-array-ref
                               e COERCION-MEDIATING-TAG COERCION-FN-ARITY-INDEX))
-           (assign$ crcn-tag (op$ binary-and tmp-crcn COERCION-TAG-MASK))
+           (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-FN-SECOND-TAG))]
         [(Fn-Coercion-Arity (app recur e))
          (begin$
@@ -802,7 +802,7 @@ but a static single assignment is implicitly maintained.
          (begin$
            (assign$ tmp-crcn
              (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-TAG-INDEX))
-           (assign$ crcn-tag (op$ binary-and tmp-crcn COERCION-TAG-MASK))
+           (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-REF-SECOND-TAG))]
         [(Ref-Coercion (app recur r) (app recur w))
          (begin$
@@ -854,7 +854,7 @@ but a static single assignment is implicitly maintained.
         [(Access (Dyn) 'value (app recur e) #f)
          (begin$
            (assign$ tmp e)
-           (assign$ tag (op$ binary-and tmp DYN-TAG-MASK))
+           (assign$ tag (sr-get-tag tmp DYN-TAG-MASK))
            (If (op$ = tag DYN-BOXED-TAG)
                (op$ Array-ref tmp DYN-VALUE-INDEX)
                (op$ %>> tmp DYN-IMDT-SHIFT)))]
@@ -862,7 +862,7 @@ but a static single assignment is implicitly maintained.
          (define err-msg (Quote "specify-representation/Dyn-type: switch failure"))
          (begin$
            (assign$ tmp e)
-           (assign$ tag (op$ binary-and tmp DYN-TAG-MASK))
+           (assign$ tag (sr-get-tag tmp DYN-TAG-MASK))
            (Switch tag
              `([(,data:DYN-BOXED-TAG) . ,(op$ Array-ref tmp DYN-TYPE-INDEX)]
                [(,data:DYN-INT-TAG) . ,TYPE-INT-RT-VALUE]
@@ -873,7 +873,7 @@ but a static single assignment is implicitly maintained.
         [(Access (Dyn) 'immediate-value (app recur e) #f)
          (op$ %>> e DYN-IMDT-SHIFT)]
         [(Access (Dyn) 'immediate-tag (app recur e) #f)
-         (op$ binary-and e DYN-TAG-MASK)]
+         (sr-get-tag e DYN-TAG-MASK)]
         [(Access (Dyn) 'box-value (app recur e) #f)
          (op$ Array-ref e DYN-VALUE-INDEX)]
         [(Access (Dyn) 'box-type (app recur e) #f)
@@ -888,7 +888,7 @@ but a static single assignment is implicitly maintained.
                 [(Unit) DYN-UNIT-TAG]
                 [(Character) DYN-CHAR-TAG]
                 [other  DYN-BOXED-TAG]))
-            (op$ = tag (op$ binary-and e DYN-TAG-MASK))]
+            (op$ = tag (sr-get-tag e DYN-TAG-MASK))]
            [other (error 'dyn-immediate-tag=? "expected type literal: ~a" t)])]
         ;; Observable Results Representation
         [(Blame (app recur e))
@@ -949,7 +949,7 @@ but a static single assignment is implicitly maintained.
                      (op$ Exit (Quote -1))))
                (op$ Array-set! vect (op$ + ind UGVECT-OFFSET) e3)))]
         [(Guarded-Proxy-Huh (app recur e))
-         (op$ = (op$ binary-and e GREP-TAG-MASK) GPROXY-TAG)]
+         (op$ = (sr-get-tag e GREP-TAG-MASK) GPROXY-TAG)]
         [(Unguarded-Vect-length (app recur e))
          (op$ Array-ref e UGVECT-SIZE-INDEX)]
         [(Guarded-Proxy (app recur e) r)
@@ -1033,7 +1033,7 @@ but a static single assignment is implicitly maintained.
            (assign$ tmp-crcn
              (sr-tagged-array-ref
               e COERCION-MEDIATING-TAG COERCION-MVECT-TAG-INDEX))
-           (assign$ crcn-tag (op$ binary-and tmp-crcn COERCION-TAG-MASK))
+           (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-MVECT-SECOND-TAG))]
         [(MVect-Coercion-Type (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MVECT-TYPE-INDEX)]
@@ -1048,7 +1048,7 @@ but a static single assignment is implicitly maintained.
          (begin$
            (assign$ tmp-crcn
              (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MREF-TAG-INDEX))
-           (assign$ crcn-tag (op$ binary-and tmp-crcn COERCION-TAG-MASK))
+           (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-MREF-SECOND-TAG))]
         [(MRef-Coercion-Type (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MREF-TYPE-INDEX)]
@@ -1108,7 +1108,7 @@ but a static single assignment is implicitly maintained.
            (assign$ tmp-crcn
              (sr-tagged-array-ref
               e COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
-           (assign$ crcn-tag (op$ binary-and tmp-crcn COERCION-TAG-MASK))
+           (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-TUPLE-SECOND-TAG))]
         [(Tuple-Coercion-Num (app recur e))
          (begin$
@@ -1709,7 +1709,7 @@ but a static single assignment is implicitly maintained.
   (sr-array-ref (unmask-rest e tm) i))
 
 (: check-tag? : D0-Expr D0-Expr -> D0-Expr)
-(define (check-tag? e m) (op$ not (op$ = ZERO-IMDT (op$ binary-and e m))))
+(define (check-tag? e m) (op$ not (op$ = ZERO-IMDT (sr-get-tag e m))))
 
 (: sr-tag-value (D0-Expr D0-Expr -> D0-Expr))
 (define (sr-tag-value e t)
@@ -1718,7 +1718,10 @@ but a static single assignment is implicitly maintained.
     [tag (Op 'binary-or `(,e ,tag))]))
 
 (: sr-check-tag=? (D0-Expr D0-Expr D0-Expr -> D0-Expr))
-(define (sr-check-tag=? e mask tag) (op$ = (op$ binary-and e mask) tag))
+(define (sr-check-tag=? e mask tag) (op$ = (sr-get-tag e mask) tag))
 
 (: sr-plus (D0-Expr D0-Expr -> D0-Expr))
 (define (sr-plus f s) (op$ + f s))
+
+(: sr-get-tag (D0-Expr D0-Expr -> D0-Expr))
+(define (sr-get-tag e mask) (op$ binary-and e mask))
