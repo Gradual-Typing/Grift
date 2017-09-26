@@ -129,6 +129,28 @@
              (error 'schml "invalid initial heap size: ~a" k)))]
       [else
        (error 'schml "invalid argument given for memory size: ~v" kilobytes)])]
+   [("--types-hash-table-slots")
+    num
+    "select the runtime's starting hash table number of slots"
+    (cond
+      [(string->number num) => 
+       (lambda (k)
+         (if (exact-positive-integer? k)
+             (init-types-hash-table-slots k)
+             (error 'schml "invalid initial types hashtable size: ~a" k)))]
+      [else
+       (error 'schml "invalid argument given for hashtable size: ~v" num)])]
+   [("--types-hash-table-load-factor")
+    num
+    "select the runtime's hashtable load factor"
+    (cond
+      [(string->number num) => 
+       (lambda (k)
+         (if (and (flonum? k) (positive? k))
+             (types-hash-table-load-factor k)
+             (error 'schml "invalid types hashtable load factor: ~a" k)))]
+      [else
+       (error 'schml "invalid argument given for hashtable load factor: ~v" num)])]
    [("-r" "--recursive")
     "recursively compile directory"
     (recursive-parameter #t)]
