@@ -52,20 +52,26 @@
   (let* ([in   (path->string c-path)]
          [out  (path->string o-path)]
          [rt?  (runtime-path)]
+         [hc?  (hashcons-path)]
          [flags (append-flags (c-flags))])
     (let* ([keep-s? (s-path)])
       (when keep-s?
         (system (format "cc ~a -S -o ~a ~a" in (path->string keep-s?) flags))))
-    (if rt?
-        (cc/runtime out in flags #:runtime rt?)
-        (cc/runtime out in flags))
+    (cond
+      [(and rt? hc?) (cc/runtime out in flags #:runtime rt? #:hashcons hc?)]
+      [rt? (cc/runtime out in flags #:runtime rt?)]
+      [hc? (cc/runtime out in flags #:hashcons hc?)]
+      [else (cc/runtime out in flags)])
     o-path))
 
 
 
 
-(: cc/runtime (->* (String String String) (#:runtime Path) Void))
-(define (cc/runtime out in flags #:runtime [rt runtime.o-path])
+(: cc/runtime (->* (String String String) (#:runtime Path #:hashcons Path)
+                   Void))
+(define (cc/runtime out in flags
+                    #:runtime [rt runtime.o-path]
+                    #:hashcons [hc hashcons.o-path])
   (define gc
     (match (garbage-collector)
       ['Boehm
@@ -80,7 +86,7 @@
      ['unix "-lm"]
      ['macosx ""]))
   (define cmd
-    (format "clang -o ~a ~a ~a ~a ~a ~a" out in rt rt-math gc flags))
+    (format "clang -o ~a ~a ~a ~a ~a ~a ~a" out in rt hc rt-math gc flags))
   (when (trace? 'Vomit)
     (logf "System call: ~a" cmd))
   (flush-output (current-log-port))
