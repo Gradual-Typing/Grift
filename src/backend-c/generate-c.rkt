@@ -161,6 +161,7 @@
 (: emit-var-declarations (-> (Listof Uid) Void))
 (define (emit-var-declarations d*)
   (display "\n//These are the variable declarations\n")
+  (display "\ntable types_ht;\nint64_t types_unique_index_counter;")
   (display-seq (map uid->string d*) "" (string-append IMDT-C-TYPE " ") "" ";\n" ""))
 
 (: emit-declarations (-> D5-Bnd-Code* Void))
@@ -171,6 +172,12 @@
          (emit-function-prototype IMDT-C-TYPE (uid->string lbl) (map uid->string var*))
          (display ";\n"))))
 
+(: initialize-types-table (-> Void))
+(define (initialize-types-table)
+  (printf "types_ht = alloc_hash_table(~a, ~a);\n"
+          (init-types-hash-table-slots) (types-hash-table-load-factor))
+  (display "types_unique_index_counter = 0;"))
+
 (: emit-main (-> D5-Body Void))
 (define (emit-main b)
   (display "\n//Obviously this is the main function\n")
@@ -180,6 +187,7 @@
       (display "{\n")
       (display-seq local-var* "" (string-append IMDT-C-TYPE " ") "" ";\n" "")
       (initialize-garbage-collector)
+      (initialize-types-table)
       (newline)
       (emit-main-tail tail)
       (when (display-mem-statistics?)
@@ -556,7 +564,16 @@
                (display ")")]
        ['None (display "nonegc_malloc(8 * ")
               (emit-value exp)
-              (display ")")])]    
+              (display ")")])]
+    [('Types-hashcons! (list e hcode))
+     (display "hashcons(")
+     (display "types_ht,")
+     (emit-value e)
+     (display ",")
+     (emit-value hcode)
+     (display ")")]
+    [('Types-gen-index! (list))
+     (display "types_unique_index_counter++")]
     [('timer-start (list)) (display timer-start)]
     [('timer-stop  (list)) (display timer-stop)]
     [('timer-report (list)) (display timer-report)]
