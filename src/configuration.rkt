@@ -79,6 +79,4 @@
   (make-parameter '("-Wno-int-conversion" "-Wno-format" "-Wno-unused-value")))
 ;; where is the runtime to be used located
 (define runtime-path : (Parameterof (Option Path)) (make-parameter #f))
-
-
-
+(define hashcons-path : (Parameterof (Option Path)) (make-parameter #f))

@@ -14,6 +14,14 @@
 (define-runtime-path runtime.c-path "runtime/runtime.c")
 (define-runtime-path runtime.h-path "runtime/runtime.h")
 
+;; hashcons implementation in c
+(: hashcons.o-path Path)
+(: hashcons.c-path Path)
+(: hashcons.h-path Path)
+(define-runtime-path hashcons.o-path "runtime/hashcons.o")
+(define-runtime-path hashcons.c-path "runtime/hashcons.c")
+(define-runtime-path hashcons.h-path "runtime/hashcons.h")
+
 (: boehm-gc.h-path Path)
 (: boehm-gc.a-path Path)
 (define-runtime-path boehm-gc-dir "runtime/boehm-gc")
