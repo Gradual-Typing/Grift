@@ -281,7 +281,7 @@
 We are going to UIL
 -----------------------------------------------------------------------------|#
 
-(define-type UIL-Prim  (U Schml-Prim Array-Prim))
+(define-type UIL-Prim  (U Schml-Prim Array-Prim Types-Prim))
 (define-type UIL-Prim! (U Schml-Prim! Array-Prim! Print-Prim! Bottom-Prim))
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
@@ -294,7 +294,8 @@ We are going to UIL
      Bool->Bool-Primitive
      Int->Int-Primitive
      Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim
-     ->Char-Primitive Char->Int-Primitive Int->Char-Primitive))
+     ->Char-Primitive Char->Int-Primitive Int->Char-Primitive
+     Types-Prim))
 
 (define-type UIL-Pred-Prim (U FloatxFloat->Bool-Primitive
                               IntxInt->Bool-Primitive))
@@ -303,14 +304,10 @@ We are going to UIL
 
 (define-type Array-Prim (U 'Alloc 'Array-ref))
 (define-type Array-Prim! 'Array-set!)
+(define-type Types-Prim (U 'Types-hashcons! 'Types-gen-index!))
 (define-type Print-Prim! (U 'Printf 'Print 'print-float
                             'print-int 'print-char 'display-char))
 (define-type Bottom-Prim (U 'Exit))
 
 (define-type (UIL-Op E) (Op UIL-Prim (Listof E)))
 (define-type (UIL-Op! E) (Op UIL-Prim! (Listof E)))
-
-
-
-
-
