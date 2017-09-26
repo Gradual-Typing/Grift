@@ -43,6 +43,8 @@
                  #:cast       Cast-Representation
                  #:cc-opts    (U String (Listof String))
                  #:mem        Natural
+                 #:t*-ht-size Natural
+                 #:t*-ht-load Flonum
                  #:rt         (Option (U String Path))
                  #:log-level  Log-Level
                  #:log-port   (Option (U String Path Output-Port))
@@ -59,6 +61,8 @@
                  #:cast       [cast       (cast-representation)]
                  #:cc-opts    [cc-opts    (c-flags)]
                  #:mem        [mem        (init-heap-kilobytes)]
+                 #:t*-ht-size [t*-ht-size (init-types-hash-table-slots)]
+                 #:t*-ht-load [t*-ht-load (types-hash-table-load-factor)]
                  #:rt         [rt         (runtime-path)]
                  #:log-level  [log-level  (schml-log-level)]
                  #:log-port   [log-port   (schml-log-port)]
@@ -83,6 +87,8 @@
                    [cast-representation cast]
                    [c-flags     cc-opts]
                    [init-heap-kilobytes mem]
+                   [init-types-hash-table-slots t*-ht-size]
+                   [types-hash-table-load-factor t*-ht-load]
                    [runtime-path rt]
                    [garbage-collector gc]
                    [bounds-checks? ckbs]
