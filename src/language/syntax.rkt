@@ -168,6 +168,7 @@
 
 
 (define-syntax-rule (op$ o a ...) (Op 'o (list a ...)))
+(define-syntax-rule (app-code$ cl a ...) (App-Code cl (list a ...)))
 (define-syntax-rule (not$ x) (op$ not x))
 (define-syntax-rule (op=? e1 e2) (op$ = e1 e2))
 (define-syntax-rule (op<=? e1 e2) (op$ <= e1 e2))
