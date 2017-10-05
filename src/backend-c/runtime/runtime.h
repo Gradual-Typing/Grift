@@ -6,6 +6,10 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <math.h>
+#include "hashcons.h"
+
+extern table types_ht;
+extern int64_t types_unique_index_counter;
 
 /* 
 read_int
