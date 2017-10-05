@@ -77,8 +77,6 @@
 
 (define test-suite-dir (make-parameter test-suite-path))
 
-
-
 (define (run-test-suite)
   (define dir  (build-path (test-suite-dir)))
   (debug off dir)
@@ -88,12 +86,18 @@
     (for*/list ([p (in-directory dir)]
                 [e (in-value (debug off (path-get-extension p)))] 
                 #:when (and e (equal? e #".schml")))
-      
       (test-path dir p)))))
 
 (define (run-single-path p)
-  (run-tests (test-path (current-directory) p)))
-
+  (define dir  (build-path (test-suite-dir)))
+  (for ([cast-rep (test-cast-representation)])
+    (parameterize ([cast-representation cast-rep]
+                   [output-path (build-path test-tmp-path "t.out")]
+                   [c-path (build-path test-tmp-path "t.c")]
+                   [c-flags (cons "-O3" (c-flags))]
+                   [specialize-cast-code-generation? #t]
+                   [check-asserts? #t])
+      (run-tests (test-path dir p)))))
 
 (define (test-path suite-dir p)
   (define-values (base src-name _) (split-path p))
@@ -126,12 +130,10 @@
           #:cast   cast)))
        input out-rx err-rx)))))
 
-
 (define (file?->string p d)
   (cond
     [(file-exists? p) (file->string p)]
     [else d]))
-
 
 (define (old-run-tests)
   (for ([cast-rep (test-cast-representation)])
@@ -145,7 +147,6 @@
       (match cast-rep
         ['Static (run-tests static-tests)]
         [_ (run-tests (suite))]))))
-
 
 ;; Parse the command line arguments
 (define main-function (make-parameter old-run-tests))
@@ -195,5 +196,3 @@
  #:args ()
  (debug off (test-suite-dir) (test-cast-representation))
  ((main-function)))
-
-
