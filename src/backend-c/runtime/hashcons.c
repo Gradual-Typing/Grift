@@ -37,6 +37,7 @@ int64_t hashcons(table ht, int64_t e, int64_t hcode)
     }
   }
   int h = hcode % ht->slots;
+  h = h < 0 ? h + ht->slots : h;
   chain C = ht->array[h];
   if (C == NULL) {
     C = GC_MALLOC(8 * 1);
@@ -106,6 +107,7 @@ void types_reinsert(table ht, int64_t ty)
   switch (tag) {
   case 0 ... 5:
     h = ((int64_t*)untagged_ty)[1] % ht->slots;
+    h = h < 0 ? h + ht->slots : h;
     chain C = ht->array[h];
     if (C == NULL) {
       C = GC_MALLOC(8 * 1);
