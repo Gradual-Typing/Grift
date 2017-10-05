@@ -29,4 +29,5 @@
    (test-file "monoboxes" "mbox10.schml" (int 42))
    (test-file "monoboxes" "mbox11.schml" (int 42))
    (test-file "monoboxes" "mbox12.schml" (int 42))
+   (test-file "monoboxes" "stress.schml" (int 4950))
    ))
