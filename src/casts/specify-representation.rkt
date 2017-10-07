@@ -330,7 +330,7 @@ but a static single assignment is implicitly maintained.
                COERCION-MEDIATING-TAG
                (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
             (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-            (assign$ new-val (App-Code cast-label `(,val ,crcn ,mono-addr)))
+            (assign$ new-val (app-code$ cast-label val crcn mono-addr))
             (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
             (If (op$ = rtti1 rtti2)
                 (op$ Array-set! tpl-val i new-val)
@@ -364,8 +364,7 @@ but a static single assignment is implicitly maintained.
                 (sr-tagged-array-ref
                  t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
               (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-              (assign$ new-val
-                (App-Code cast-label `(,val ,t1a ,t2a ,l ,mono-addr)))
+              (assign$ new-val (app-code$ cast-label val t1a t2a l mono-addr))
               (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
               (If (op$ = rtti1 rtti2)
                   (op$ Array-set! tpl-val i new-val)
