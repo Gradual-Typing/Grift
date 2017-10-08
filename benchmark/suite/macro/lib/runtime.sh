@@ -1,4 +1,4 @@
-# $1 - benchmark filename without extension
+
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
 # $RETURN - the runtime for the racket benchmark
@@ -19,6 +19,49 @@ get_racket_runtime()
 	echo "$RETURN" > "$cache_file"
     fi
 }
+
+# $2 - space-separated benchmark arguments
+# $3 - disk aux name
+# $RETURN - the runtime for the racket benchmark
+get_typed_racket_runtime()
+{
+    local benchmark="$1";      shift
+    local benchmark_args="$1"; shift
+    local disk_aux_name="$1";  shift
+    
+    local benchmark_path="${TMP_DIR}/typed_racket/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
+    local cache_file="${benchmark_path}${disk_aux_name}.runtime"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+	raco make "${benchmark_path}.rkt"
+	avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file"
+	echo "$RETURN" > "$cache_file"
+    fi
+}
+
+# $2 - space-separated benchmark arguments
+# $3 - disk aux name
+# $RETURN - the runtime for the racket benchmark
+get_ocaml_runtime()
+{
+    local benchmark="$1";      shift
+    local benchmark_args="$1"; shift
+    local disk_aux_name="$1";  shift
+    
+    local benchmark_path="${TMP_DIR}/ocaml/ocaml_${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
+    local cache_file="${benchmark_path}${disk_aux_name}.runtime"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+	ocamlopt -o "${benchmark_path}" "${benchmark_path}.ml"
+    avg "${benchmark_path}" "$benchmark_args" "$runtimes_file"
+	echo "$RETURN" > "$cache_file"
+    fi
+}
+
 
 # $1 - benchmark filename without extension
 # $2 - space-separated benchmark arguments
@@ -63,7 +106,7 @@ get_static_schml_runtime()
         RETURN=$(cat "$cache_file")
     else
         "${SCHML_DIR}/main.rkt" \
-               --static \
+               --static -O 3\
                -o "${benchmark_path}.o" \
                "${benchmark_path}.schml"
         

@@ -8,32 +8,33 @@ Description: Facilitates a user-friendly interface for Grift
 #lang racket
 (require racket/runtime-path)
 
+(provide configs)
 (define configs
   (make-hash
    ;; Index Cast-Mechinism
    ;; Ref-Mechinism
    ;; Cast-Specialization
    ;; Hybrid/Pure-Cast Runtime
-   '((1 |Type-Based Casts| Proxied Interpreted Pure)
-     (2 Coercions Proxied Interpreted Pure)
-     (3 Hyper-Coercions Proxied Interpreted Pure)
-     (4 |Type-Based Casts| Monotonic Interpreted Pure)
-     (5 Coercions Monotonic Interpreted Pure)
-     (6 Hyper-Coercions Monotonic Interpreted Pure)
-     (7 |Type-Based Casts| Proxied Specialized Pure)
-     (8 Coercions Proxied Specialized Pure)
-     (9 Hyper-Coercions Proxied Specialized Pure) 
-     (10 |Type-Based Casts| Monotonic Specialized Pure)
-     (11 Coercions Monotonic Specialized Pure)
-     (12 Hyper-Coercions Monotonic Specialized Pure)
-     (13 Coercions Proxied Interpreted Hybrid)
-     (14 Hyper-Coercions Proxied Interpreted Hybrid)
-     (15 Coercions Monotonic Interpreted Hybrid)
-     (16 Hyper-Coercions Monotonic Interpreted Hybrid)
-     (17 Coercions Proxied Specialized Hybrid)
-     (18 Hyper-Coercions Proxied Specialized Hybrid) 
-     (19 Coercions Monotonic Specialized Hybrid)
-     (20 Hyper-Coercions Monotonic Specialized Hybrid))))
+   '((1 |Type-Based Casts| Proxied Unspecialized Strict)
+     (2 Coercions Proxied Unspecialized Strict)
+     (3 Hyper-Coercions Proxied Unspecialized Strict)
+     (4 |Type-Based Casts| Monotonic Unspecialized Strict)
+     (5 Coercions Monotonic Unspecialized Strict)
+     (6 Hyper-Coercions Monotonic Unspecialized Strict)
+     (7 |Type-Based Casts| Proxied Specialized Strict)
+     (8 Coercions Proxied Specialized Strict)
+     (9 Hyper-Coercions Proxied Specialized Strict) 
+     (10 |Type-Based Casts| Monotonic Specialized Strict)
+     (11 Coercions Monotonic Specialized Strict)
+     (12 Hyper-Coercions Monotonic Specialized Strict)
+     (13 Coercions Proxied Unspecialized Lazy)
+     (14 Hyper-Coercions Proxied Unspecialized Lazy)
+     (15 Coercions Monotonic Unspecialized Lazy)
+     (16 Hyper-Coercions Monotonic Unspecialized Lazy)
+     (17 Coercions Proxied Specialized Lazy)
+     (18 Hyper-Coercions Proxied Specialized Lazy) 
+     (19 Coercions Monotonic Specialized Lazy)
+     (20 Hyper-Coercions Monotonic Specialized Lazy))))
 
 ;; Why are we writing this data structure to
 ;; a file. 
@@ -105,14 +106,7 @@ Description: Facilitates a user-friendly interface for Grift
            [(and (set-member? s 'Coercions) (set-member? s 'Lazy))
             "Lazy Coercions"]
            [else
-            (error (string-append
-                    "you should compare configurations that "
-                    "differ in exactly one parameter but the difference is: "
-                    (number->string (set-count s))
-                    " and they are: "
-                    (string-join (map symbol->string (set->list s1)))
-                    " and "
-                    (string-join (map symbol->string (set->list s2)))))]))
+            (string-join (map symbol->string (set->list s)) " ")]))
        (printf "~a,~a,~a"
                (f s1 s2)
                (f s2 s1)

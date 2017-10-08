@@ -58,9 +58,18 @@ run_benchmark()
 	echo "$benchmark_args" > "$benchmark_args_file"
     fi
 
+    # Record the runtime of Statically Typed Varients
     printf "$name$print_aux_name" >> "$logfile1"
     write_grift_speedups $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
+    # Typed Racket
+    get_speedup typed_racket $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name"
+    printf ",$RETURN" >> $logfile1    
+    # OCaml
+    get_speedup ocaml $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name"
+    printf ",$RETURN" >> $logfile1    
+     
     printf "\n" >> "$logfile1"
+    
     printf "$name$print_aux_name" >> $logfile2
     write_grift_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
     get_speedup racket $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
@@ -91,22 +100,21 @@ gen_fig()
     rm -rf "$outfile"
     
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-      	   `"enhanced color font 'Verdana,10' ;"`
-    	   `"set output '${outfile}';"`
+       `"enhanced color font 'Verdana,10' ;"`
+       `"set output '${outfile}';"`
 	   `"set border 15 back;"`
-           `"set style data histogram;"`
-           `"set style histogram cluster gap 1;"`
-           `"set style fill pattern border -1;"`
-           `"set boxwidth 0.9;"`
+       `"set style data histogram;"`
+       `"set style histogram cluster gap 1;"`
+       `"set style fill pattern border -1;"`
+       `"set boxwidth 0.9;"`
 	   `"set key left;"`
-	   `"set logscale y;"`
-	   `"set ylabel \"Speedup with respect to ${sys} in logarithmic scale\";"`
-           `"set title \"\";"`
+	   `"set ylabel \"Speedup with respect to ${sys}\";"`
+       `"set title \"\";"`
 	   `"set xtic rotate by -45 scale 0;"`
 	   `"set grid ytics;"`
-           `"set ytics add (\"1\" 1);"`
-           `"plot '${logfile}' using 2:xtic(1) title col,"`
-      	   `"for [i=3:$N] \"\" using i title columnheader(i)"
+       `"set ytics add (\"1\" 1);"`
+       `"plot '${logfile}' using 2:xtic(1) title col,"`
+       `"for [i=3:$N] \"\" using i title columnheader(i)"
 }
 
 
@@ -121,9 +129,8 @@ run_experiment()
     local logfile2="${DATA_DIR}/dyn.log"
     local logfile3="${DATA_DIR}/partial.log"
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt"\
-                              --indices-to-names $configs)
-    echo "name,${config_str}" > "$logfile1"
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" --indices-to-names $configs)
+    echo "name,${config_str},typed-racket,ocaml" > "$logfile1"
     echo "name,${config_str},racket,chezscheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
@@ -145,9 +152,9 @@ run_experiment()
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic "n-body" "100000" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic "n_body" "100000" ""
 
-    gen_fig static STLC
+    gen_fig static "Static Grift"
     gen_fig dyn Gambit
     # gen_fig partial
 }
