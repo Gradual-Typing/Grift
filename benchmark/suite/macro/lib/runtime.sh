@@ -62,7 +62,6 @@ get_ocaml_runtime()
     fi
 }
 
-
 # $1 - benchmark filename without extension
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
