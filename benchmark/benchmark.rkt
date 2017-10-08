@@ -6,7 +6,7 @@
 
 (require "../src/errors.rkt"
          "../src/compile.rkt"
-         
+         "./config_str.rkt"
          "../src/configuration.rkt"
          "../tests/paths.rkt")
 
@@ -23,7 +23,7 @@
                 specialize)]))
   (define specialize-casts?
     (match specialize
-      ['Interpreted #f]
+      ['Unspecialized #f]
       ['Specialized #t]
       [_ (error 'benchmark/guarded-compile
                 "invalid specialization: ~a"
@@ -40,6 +40,7 @@
           (compile src #:output exe #:cast cast #:ref ref))
         (void))))
 
+#;
 (define configs
   (call-with-input-file "benchmark/configs.dat"
     (lambda (in) (read in))))
