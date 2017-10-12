@@ -65,24 +65,21 @@ main()
     local v="$RETURN"
     echo "(define r : (MRef (Tuple $t)) (mbox (tuple $v)))" > mono.schml
 
+    echo "(define sum : (MRef Int) (mbox 0))" >> mono.schml
+    
     create_gradual $n 1 "Dyn" "Int"
     t="$RETURN"
     echo "(define r0 (: r (MRef (Tuple $t))))" >> mono.schml
     
     local j i
     for ((i=1;i<=n;i++)); do
+	j=$(($i - 1))
+	echo "(mbox-set! sum (+ (tuple-proj (munbox r$j) $i) (munbox sum)))" >> mono.schml
 	create_gradual $n $(($i + 1)) "Dyn" "Int"
 	t="$RETURN"
-	j=$(($i - 1))
 	echo "(define r$i (: r$j (MRef (Tuple $t))))" >> mono.schml
     done
-
-    echo "(define sum : (MRef Int) (mbox 0))" >> mono.schml
-    echo "(begin " >> mono.schml
-    for ((i=0;i<=n;i++)); do
-	echo "(mbox-set! sum (+ (tuple-proj (munbox r$i) $i) (munbox sum)))" >> mono.schml
-    done
-    echo "(munbox sum))" >> mono.schml
+    echo "(munbox sum)" >> mono.schml
 }
 
 main "$@"
