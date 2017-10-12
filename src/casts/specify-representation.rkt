@@ -243,64 +243,52 @@ but a static single assignment is implicitly maintained.
 (: get-comp-fn-crcn! (Uid -> (Code-Label Uid)))
 (define (get-comp-fn-crcn! comp-crcn)
   (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! mk-crcn)
-    (define-track-next-uid!$ comp-fn)
-    (define comp-fn-label (Code-Label comp-fn))
-    (define comp-c (Code-Label comp-crcn))
-    (define comp-fn-c : D0-Code
-      (code$ (c1 c2 i arity id?1)
-        (If (op$ = i arity)
-            (begin$
-              (assign$ c1r
-                (sr-tagged-array-ref
-                 c1 COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX))
-              (assign$ c2r
-                (sr-tagged-array-ref
-                 c2 COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX))
-              (assign$ cr (App-Code comp-c `(,c1r ,c2r)))
-              (If (If id?1
-                      (sr-check-tag=?
-                       cr COERCION-TAG-MASK COERCION-IDENTITY-TAG)
-                      FALSE-IMDT)
-                  COERCION-IDENTITY-IMDT
-                  (begin$
-                    (assign$ crcn
-                      (op$ Alloc (sr-plus arity COERCION-FN-FMLS-OFFSET)))
-                    (assign$ tagged-arity
-                      (op$ + (op$ %<< arity COERCION-SECOND-TAG-SHIFT)
-                           COERCION-FN-SECOND-TAG))
-                    (sr-array-set! crcn COERCION-FN-ARITY-INDEX tagged-arity)
-                    (sr-array-set! crcn COERCION-FN-RETURN-INDEX cr)
-                    (sr-tag-value crcn COERCION-MEDIATING-TAG))))
-            (begin$
-              (assign$ c1a
-                (sr-tagged-array-ref
-                 c1 COERCION-MEDIATING-TAG (sr-plus COERCION-FN-FMLS-OFFSET i)))
-              (assign$ c2a
-                (sr-tagged-array-ref
-                 c2 COERCION-MEDIATING-TAG (sr-plus COERCION-FN-FMLS-OFFSET i)))
-              (assign$ ca (App-Code comp-c `(,c2a ,c1a)))
-              (assign$ id?2
-                (If id?1
-                    (sr-check-tag=?
-                     ca COERCION-TAG-MASK COERCION-IDENTITY-TAG)
-                    FALSE-IMDT))
-              (assign$ tmp-crcn
-                (App-Code
-                 comp-fn-label `(,c1 ,c2 ,(sr-plus (Quote 1) i) ,arity ,id?2)))
-              (If (sr-check-tag=?
-                   tmp-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG)
-                  COERCION-IDENTITY-IMDT
-                  (begin$
-                    (sr-tagged-array-set!
-                     tmp-crcn
-                     COERCION-MEDIATING-TAG
-                     (sr-plus COERCION-FN-FMLS-OFFSET i)
-                     ca)
-                    tmp-crcn))))))
-    (add-new-code! (cons comp-fn comp-fn-c))
-    (set-box! comp-fn-coercion-code-label? comp-fn-label)
-    comp-fn-label)
+  (define (make-code! comp-crcn)
+    (define-track-next-uid!$ comp-fn-crcn)
+    (define comp-fn-crcn-label (Code-Label comp-fn-crcn))
+    (define comp-crcn-label (Code-Label comp-crcn))
+    (define comp-fn-crcn-c : D0-Code
+      (code$ (crcn1 crcn2)
+        (assign$ tagged-arity
+          (sr-tagged-array-ref
+           crcn1 COERCION-MEDIATING-TAG COERCION-FN-ARITY-INDEX))
+        (assign$ arity (op$ %>> tagged-arity COERCION-SECOND-TAG-SHIFT))
+        (assign$ c1r
+          (sr-tagged-array-ref
+           crcn1 COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX))
+        (assign$ c2r
+          (sr-tagged-array-ref
+           crcn2 COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX))
+        (assign$ cr (app-code$ comp-crcn-label c1r c2r))
+        (assign$ new-crcn UNIT-IMDT)
+        (assign$ iters (op$ + COERCION-FN-FMLS-OFFSET arity))
+        (assign$ id? (sr-check-tag=? cr COERCION-TAG-MASK COERCION-IDENTITY-TAG))
+        (repeat$ (i COERCION-FN-FMLS-OFFSET iters) (_ UNIT-IMDT)
+          (assign$ c1a (sr-tagged-array-ref crcn1 COERCION-MEDIATING-TAG i))
+          (assign$ c2a (sr-tagged-array-ref crcn2 COERCION-MEDIATING-TAG i))
+          (assign$ composed-crcn (app-code$ comp-crcn-label c1a c2a))
+          (cond$
+           [id?
+            (assign$ tmp-id?
+              (sr-check-tag=?
+               composed-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG))
+            (cond$
+             [(op$ not tmp-id?)
+              (Assign (Var-id new-crcn) (op$ Alloc (op$ + arity COERCION-FN-FMLS-OFFSET)))
+              (sr-array-set! new-crcn COERCION-FN-ARITY-INDEX tagged-arity)
+              (sr-array-set! new-crcn COERCION-FN-RETURN-INDEX cr)
+              (repeat$ (j COERCION-FN-FMLS-OFFSET i) (_ UNIT-IMDT)
+                (sr-array-set! new-crcn j COERCION-IDENTITY-IMDT))
+              (sr-array-set! new-crcn i composed-crcn)
+              (Assign (Var-id id?) FALSE-IMDT)]
+             [else UNIT-IMDT])]
+           [else (sr-array-set! new-crcn i composed-crcn)]))
+        (cond$
+         [id? COERCION-IDENTITY-IMDT]
+         [else (sr-tag-value new-crcn COERCION-MEDIATING-TAG)])))
+    (add-new-code! (cons comp-fn-crcn comp-fn-crcn-c))
+    (set-box! comp-fn-coercion-code-label? comp-fn-crcn-label)
+    comp-fn-crcn-label)
   (let ([cl? (unbox comp-fn-coercion-code-label?)])
     (or cl? (make-code! comp-crcn))))
 
@@ -878,20 +866,8 @@ but a static single assignment is implicitly maintained.
                (begin$
                  (assign$ fn-type1 t1)
                  (invoke-mk-fn-crcn mk-fn-crcn fn-type1 t2 l))))]
-        [(Compose-Fn-Coercion compose (app recur c1) (app recur c2))
-         (: invoke-comp ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
-         (define (invoke-comp comp-fn c1 c2)
-           (begin$
-             (assign$ tagged-arity
-               (sr-tagged-array-ref
-                c1 COERCION-MEDIATING-TAG COERCION-FN-ARITY-INDEX))
-             (assign$ arity (op$ %>> tagged-arity COERCION-SECOND-TAG-SHIFT))
-             (App-Code comp-fn (list c1 c2 ZERO-IMDT arity TRUE-IMDT))))
-         (let ([mk-fn-crcn (get-comp-fn-crcn! compose)])
-           (if (Var? c1)
-               (invoke-comp mk-fn-crcn c1 c2)
-               (begin$
-                 (assign$ fn-crcn1 c1) (invoke-comp mk-fn-crcn fn-crcn1 c2))))]
+        [(Compose-Fn-Coercion comp-crcn (app recur c1) (app recur c2))
+         (app-code$ (get-comp-fn-crcn! comp-crcn) c1 c2)]
         [(Id-Fn-Coercion (app recur a))
          (begin$
            (assign$ size a)
