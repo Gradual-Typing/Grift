@@ -305,34 +305,32 @@ but a static single assignment is implicitly maintained.
     (or cl? (make-code! comp-crcn))))
 
 (: get-coerce-tuple! (Uid -> (Code-Label Uid)))
-(define (get-coerce-tuple! cast)
+(define (get-coerce-tuple! coerce)
   (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! cast)
+  (define (make-code! coerce)
     (define-track-next-uid!$ coerce-tuple)
     (define coerce-tuple-label (Code-Label coerce-tuple))
-    (define cast-label (Code-Label cast))
+    (define coerce-label (Code-Label coerce))
     (define coerce-tuple-c : D0-Code
-      (code$ (v c i count)
-        (If (op$ = i count)
-            (op$ Alloc count)
-            (begin$
-              (assign$ va (op$ Array-ref v i))
-              (assign$ ca
-                (sr-tagged-array-ref
-                 c
-                 COERCION-MEDIATING-TAG
-                 (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
-              (assign$ casted-val (App-Code cast-label `(,va ,ca ,ZERO-IMDT)))
-              (assign$ tmp-tpl
-                (App-Code
-                 coerce-tuple-label `(,v ,c ,(sr-plus (Quote 1) i) ,count)))
-              (op$ Array-set! tmp-tpl i casted-val)
-              tmp-tpl))))
+      (code$ (val crcn)
+        (assign$ tagged-count
+          (sr-tagged-array-ref
+           crcn COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
+        (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
+        (assign$ iters (op$ + COERCION-TUPLE-ELEMENTS-OFFSET count))
+        (assign$ new-val (op$ Alloc count))
+        (repeat$ (i COERCION-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
+          (assign$ val-i (op$ - i COERCION-TUPLE-ELEMENTS-OFFSET))
+          (assign$ vala (op$ Array-ref val val-i))
+          (assign$ crcna (sr-tagged-array-ref crcn COERCION-MEDIATING-TAG i))
+          (assign$ casted-vala (app-code$ coerce-label vala crcna ZERO-IMDT))
+          (op$ Array-set! new-val val-i casted-vala))
+        new-val))
     (add-new-code! (cons coerce-tuple coerce-tuple-c))
     (set-box! coerce-tuple-code-label? coerce-tuple-label)
     coerce-tuple-label)
   (let ([cl? (unbox coerce-tuple-code-label?)])
-    (or cl? (make-code! cast))))
+    (or cl? (make-code! coerce))))
 
 (: get-coerce-tuple-in-place! (Uid -> (Code-Label Uid)))
 (define (get-coerce-tuple-in-place! cast)
@@ -1261,23 +1259,8 @@ but a static single assignment is implicitly maintained.
         [(Type-Tuple-num (app recur e)) (type-tuple-count-access e)]
         [(Type-Tuple-item (app recur e) (app recur i))
          (type-tuple-elements-access e i)]
-        [(Coerce-Tuple uid (app recur v) (app recur c))
-         (: invoke-coerce-tuple ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
-         (define (invoke-coerce-tuple coerce-tuple v c)
-           (begin$
-             (assign$ tagged-count
-               (sr-tagged-array-ref
-                c COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
-             (App-Code
-              coerce-tuple
-              (list v c ZERO-IMDT
-                    (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT)))))
-         (let ([coerce-tuple (get-coerce-tuple! uid)])
-           (if (Var? v)
-               (invoke-coerce-tuple coerce-tuple v c)
-               (begin$
-                 (assign$ tuple-val1 v)
-                 (invoke-coerce-tuple coerce-tuple tuple-val1 c))))]
+        [(Coerce-Tuple coerce (app recur v) (app recur c))
+         (app-code$ (get-coerce-tuple! coerce) v c)]
         [(Coerce-Tuple-In-Place uid (app recur v) (app recur c) (app recur mono-type))
          (: invoke-coerce-tuple ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr -> D0-Expr))
          (define (invoke-coerce-tuple coerce-tuple v c a)
