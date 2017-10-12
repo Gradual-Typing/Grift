@@ -1205,19 +1205,9 @@ but a static single assignment is implicitly maintained.
         [(Coerce-Tuple-In-Place coerce (app recur v) (app recur c) (app recur mono-type))
          (app-code$ (get-coerce-tuple-in-place! coerce) v c mono-type)]
         [(Cast-Tuple-In-Place
-          uid (app recur v) (app recur t1) (app recur t2) (app recur lbl)
+          cast (app recur v) (app recur t1) (app recur t2) (app recur l)
           (app recur mono-address))
-         (: invoke-cast-tuple
-            ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr D0-Expr D0-Expr
-                              -> D0-Expr))
-         (define (invoke-cast-tuple cast-tuple v t1 t2 lbl a)
-           (App-Code cast-tuple (list v t1 t2 lbl a)))
-         (let ([cast-tuple (get-cast-tuple-in-place! uid)])
-           (if (Var? v)
-               (invoke-cast-tuple cast-tuple v t1 t2 lbl mono-address)
-               (begin$
-                 (assign$ tuple-val1 v)
-                 (invoke-cast-tuple cast-tuple tuple-val1 t1 t2 lbl mono-address))))]
+         (app-code$ (get-cast-tuple-in-place! cast) v t1 t2 l mono-address)]
         [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
