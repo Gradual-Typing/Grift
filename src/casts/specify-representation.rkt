@@ -202,38 +202,26 @@ but a static single assignment is implicitly maintained.
     (define mk-fn-crcn-label (Code-Label mk-fn-crcn))
     (define mk-crcn-label (Code-Label mk-crcn))
     (define mk-fn-crcn-c : D0-Code
-      (code$ (t1 t2 l i arity)
-        (If (op$ = i arity)
-            (begin$
-              (assign$ t1r
-                (sr-tagged-array-ref t1 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
-              (assign$ t2r
-                (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
-              (assign$ cr (App-Code mk-crcn-label `(,t1r ,t2r ,l)))
-              (assign$ crcn (op$ Alloc (sr-plus arity COERCION-FN-FMLS-OFFSET)))
-              (assign$ tagged-arity
-                (op$ + (op$ %<< arity COERCION-SECOND-TAG-SHIFT)
-                     COERCION-FN-SECOND-TAG))
-              (sr-array-set! crcn COERCION-FN-ARITY-INDEX tagged-arity)
-              (sr-array-set! crcn COERCION-FN-RETURN-INDEX cr)
-              (sr-tag-value crcn COERCION-MEDIATING-TAG))
-            (begin$
-              (assign$ t1a
-                (sr-tagged-array-ref
-                 t1 TYPE-FN-TAG (sr-plus TYPE-FN-FMLS-OFFSET i)))
-              (assign$ t2a
-                (sr-tagged-array-ref
-                 t2 TYPE-FN-TAG (sr-plus TYPE-FN-FMLS-OFFSET i)))
-              (assign$ ca (App-Code mk-crcn-label `(,t2a ,t1a ,l)))
-              (assign$ tmp-crcn
-                (App-Code
-                 mk-fn-crcn-label `(,t1 ,t2 ,l ,(sr-plus (Quote 1) i) ,arity)))
-              (sr-tagged-array-set!
-               tmp-crcn
-               COERCION-MEDIATING-TAG
-               (sr-plus COERCION-FN-FMLS-OFFSET i)
-               ca)
-              tmp-crcn))))
+      (code$ (t1 t2 l)
+        (assign$ arity (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-ARITY-INDEX))
+        (assign$ tagged-arity
+          (op$ + (op$ %<< arity COERCION-SECOND-TAG-SHIFT)
+               COERCION-FN-SECOND-TAG))
+        (assign$ t1r (sr-tagged-array-ref t1 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
+        (assign$ t2r (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
+        (assign$ cr (app-code$ mk-crcn-label t1r t2r l))
+        (assign$ crcn (op$ Alloc (op$ + arity COERCION-FN-FMLS-OFFSET)))
+        (assign$ iters (op$ + TYPE-FN-FMLS-OFFSET arity))
+        (sr-array-set! crcn COERCION-FN-ARITY-INDEX tagged-arity)
+        (sr-array-set! crcn COERCION-FN-RETURN-INDEX cr)
+        (repeat$ (i TYPE-FN-FMLS-OFFSET iters) (_ UNIT-IMDT)
+          (assign$ t1a (sr-tagged-array-ref t1 TYPE-FN-TAG i))
+          (assign$ t2a (sr-tagged-array-ref t2 TYPE-FN-TAG i))
+          (assign$ val-crcn (app-code$ mk-crcn-label t2a t1a l))
+          (assign$ c-i (op$ + (op$ - i TYPE-FN-FMLS-OFFSET)
+                            COERCION-FN-FMLS-OFFSET))
+          (sr-array-set! crcn c-i val-crcn))
+        (sr-tag-value crcn COERCION-MEDIATING-TAG)))
     (add-new-code! (cons mk-fn-crcn mk-fn-crcn-c))
     (set-box! mk-fn-coercion-code-label? mk-fn-crcn-label)
     mk-fn-crcn-label)
@@ -854,18 +842,7 @@ but a static single assignment is implicitly maintained.
                                (cons "argument" e))
                              e*))))]
         [(Make-Fn-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
-         (: invoke-mk-fn-crcn ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr -> D0-Expr))
-         (define (invoke-mk-fn-crcn mk-fn t1 t2 l)
-           (App-Code
-            mk-fn
-            (list t1 t2 l ZERO-IMDT
-                  (sr-tagged-array-ref t1 TYPE-FN-TAG TYPE-FN-ARITY-INDEX))))
-         (let ([mk-fn-crcn (get-mk-fn-crcn! mk-crcn)])
-           (if (Var? t1)
-               (invoke-mk-fn-crcn mk-fn-crcn t1 t2 l)
-               (begin$
-                 (assign$ fn-type1 t1)
-                 (invoke-mk-fn-crcn mk-fn-crcn fn-type1 t2 l))))]
+         (app-code$ (get-mk-fn-crcn! mk-crcn) t1 t2 l)]
         [(Compose-Fn-Coercion comp-crcn (app recur c1) (app recur c2))
          (app-code$ (get-comp-fn-crcn! comp-crcn) c1 c2)]
         [(Id-Fn-Coercion (app recur a))
