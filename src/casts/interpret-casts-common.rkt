@@ -674,7 +674,7 @@ TODO write unit tests
   (: code-gen-mbox-ref MBox-Ref-Type)
   (define (code-gen-mbox-ref mref t2)
     (let*$ ([mref mref])
-      (cast (Mbox-val-ref mref) (Mbox-rtti-ref mref) t2 (Quote "Monotonic"))))
+      (cast (Mbox-val-ref mref) (Mbox-rtti-ref mref) t2 (Quote "Monotonic ref read error"))))
   
   (: bnd-t1-if-not-type : CoC3-Expr (CoC3-Expr -> CoC3-Expr) -> CoC3-Expr)
   (define (bnd-t1-if-not-type t1 type->expr)
@@ -699,7 +699,7 @@ TODO write unit tests
                          (Mbox-val-set! mref ctv)
                          ctv))]
                     [else val])]
-               [ccv (cast cv t1 t2 (Quote "Monotonic") mref)])
+               [ccv (cast cv t1 t2 (Quote "Monotonic ref write error") mref)])
          ;; Unclear: I don't understand why there is a conditional
          ;; write here. Perhaps it is due to the side channel mref in
          ;; cast above.  I think the only use of this is in the
@@ -717,7 +717,7 @@ TODO write unit tests
   (: code-gen-mvec-ref MVec-Ref-Type)
   (define (code-gen-mvec-ref mvec i t2)
     (let*$ ([v mvec])
-      (cast (Mvector-val-ref v i) (Mvector-rtti-ref mvec) t2 (Quote "Monotonic"))))
+      (cast (Mvector-val-ref v i) (Mvector-rtti-ref mvec) t2 (Quote "Monotonic vect read error"))))
   
   (: code-gen-mvec-set! MVec-Set-Type)
   (define (code-gen-mvec-set! mvec i val t1)
@@ -734,7 +734,7 @@ TODO write unit tests
                         (Mvector-val-set! mvec i cvi)
                         cvi)]
                      [else val])]
-               [ccvi (cast cvi t1 t2 (Quote "Monotonic") mvec)])
+               [ccvi (cast cvi t1 t2 (Quote "Monotonic vect write error") mvec)])
          (If (op=? t2 (Mvector-rtti-ref mvec))
              (Mvector-val-set! mvec i ccvi)
              (Quote '()))))))
@@ -1422,7 +1422,7 @@ TODO write unit tests
       (match t2
         [(Type (Dyn))
          (error 'grift/make-code-gen-project "Called with t2 = Dyn")]
-        [(Type (or (Int) (Character) (Unit) (Bool)))
+        [(Type (or (Float) (Int) (Character) (Unit) (Bool)))
          (If (dyn-immediate-tag=?$ v t2)
              (dyn-immediate-value$ v)
              (interp-project v t2 l mt))]
