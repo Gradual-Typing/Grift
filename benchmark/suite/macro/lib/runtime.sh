@@ -8,14 +8,14 @@ get_racket_runtime()
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
     
-    local benchmark_path="${TMP_DIR}/racket/${benchmark}"
+    local benchmark_path="${TMP_DIR}/racket/internal/${benchmark}"
     local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	raco make "${benchmark_path}.rkt"
-	avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file"
+	racket_avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file" "${benchmark_path}.tmp.txt"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -29,14 +29,14 @@ get_typed_racket_runtime()
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
     
-    local benchmark_path="${TMP_DIR}/typed_racket/${benchmark}"
+    local benchmark_path="${TMP_DIR}/typed_racket/internal/${benchmark}"
     local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	raco make "${benchmark_path}.rkt"
-	avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file"
+	racket_avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file" "${benchmark_path}.tmp.txt"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -56,7 +56,7 @@ get_ocaml_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	ocamlopt -o "${benchmark_path}" "${benchmark_path}.ml"
+	ocamlopt -O3 -o "${benchmark_path}" "${benchmark_path}.ml"
     avg "${benchmark_path}" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
@@ -368,6 +368,29 @@ avg()
     local avg_i avg_t
     for avg_i in `seq $LOOPS`; do
 	avg_t=$(eval "$c")
+	echo $avg_t >> "$runtimes_file"
+	avg_sum=$(echo "${avg_sum} ${avg_t}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 + $2}')
+    done
+    RETURN=$(echo "${avg_sum} ${LOOPS}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 / $2}')
+}
+
+# $1 - binary to run
+# $2 - stdin arguments
+# $3 - path to the file that will record individual runtimes
+# $RETURN - average runtime
+racket_avg()
+{
+    local bin="$1";             shift
+    local arg="$1";             shift
+    local runtimes_file="$1";   shift
+    local output_tmp_file="$1"; shift
+    local c="echo ${arg} | ${bin}"
+    local avg_sum=0.0
+    local avg_i avg_t output
+    for avg_i in `seq $LOOPS`; do
+    
+    $(eval "$c > ${output_tmp_file}")
+    avg_t=$(eval "cat ${output_tmp_file} | racket ${TEST_DIR}/lib/parse-racket-time.rkt")
 	echo $avg_t >> "$runtimes_file"
 	avg_sum=$(echo "${avg_sum} ${avg_t}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 + $2}')
     done

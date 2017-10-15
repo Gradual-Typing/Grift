@@ -92,15 +92,16 @@ gen_fig()
 {
     local mode="$1"; shift
     local sys="$1";  shift
+    local outfile_name="$1"; shift
     
     local logfile="${DATA_DIR}/${mode}.log"
-    local outfile="${OUT_DIR}/${mode}.png"
+    local outfile="${OUT_DIR}/${outfile_name}.png"
     local N=$(head -1 "${logfile}" | sed 's/[^,]//g' | wc -c)
 
     rm -rf "$outfile"
     
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-       `"enhanced color font 'Verdana,10' ;"`
+       `"noenhanced color font 'Verdana,10' ;"`
        `"set output '${outfile}';"`
 	   `"set border 15 back;"`
        `"set style data histogram;"`
@@ -129,9 +130,13 @@ run_experiment()
     local logfile2="${DATA_DIR}/dyn.log"
     local logfile3="${DATA_DIR}/partial.log"
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" --indices-to-names $configs)
-    echo "name,${config_str},typed-racket,ocaml" > "$logfile1"
-    echo "name,${config_str},racket,chezscheme" > "$logfile2"
+    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" \
+                              --name-end " Grift" --names $configs)
+    local shared_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" \
+                              --name-sep "." --common $configs)
+    
+    echo "name,${config_str},Typed-Racket,OCaml" > "$logfile1"
+    echo "name,${config_str},Racket,Chez Scheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
     local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/slow.txt")\""
@@ -153,10 +158,9 @@ run_experiment()
     run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "n_body" "100000" ""
-
-    gen_fig static "Static Grift"
-    gen_fig dyn Gambit
-    # gen_fig partial
+    
+    gen_fig static "Static Grift" "${shared_str}_static"
+    gen_fig dyn Gambit "${shared_str}_dynamic"
 }
 
 main()

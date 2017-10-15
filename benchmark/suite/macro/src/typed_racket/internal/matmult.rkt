@@ -1,5 +1,5 @@
 #lang typed/racket/base
-
+;;; 10/9/2017 changed to use internal timing (Andre)
 (require racket/fixnum)
 
 (: create : Fixnum Fixnum -> (Vectorof Fixnum))
@@ -37,13 +37,18 @@
                 (loop1 (fx+ i 1))))
           r))))
 
-(let ([size (read)])
+(define (main)
+  (let ([size (read)])
   (unless (fixnum? size)
     (error 'matmult.rkt "invalid input: expected an integer size"))
   (let ([ar size]
         [ac size]
         [br size]
         [bc size])
-    (let ([a (create ar ac)]
+    (if (fx= ac br)
+        (let ([a (create ar ac)]
               [b (create br bc)])
-      (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1)))))
+          (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1)))
+        0))))
+
+(time (main))
