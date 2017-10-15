@@ -261,6 +261,7 @@
                     e-ty)])]
     [(Mbox-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
                 (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
+     (define e2-lbl (mk-label "val" e2-src))
      (match e1-ty
        [(Dyn)
         (let ([lbl (mk-label "mbox-set" e1-src)])
@@ -272,11 +273,11 @@
             [else
              (MBoxCastedSet!
               (mk-cast e1-src lbl e1 DYN-TYPE (MRef DYN-TYPE))
-              (mk-cast e2-src (mk-label "val" e2-src) e2 e2-ty DYN-TYPE)
+              (mk-cast e2-src e2-lbl e2 e2-ty DYN-TYPE)
               DYN-TYPE)]))]
        [(MRef t)
         (if (completely-static-type? t)
-            (Mbox-set! e1 e2)
+            (Mbox-set! e1 (mk-cast e2-src e2-lbl e2 e2-ty t))
             ;; OPTIMIZATION: instead of casting e2 from
             ;; e2-ty to t, then cast it again from t to
             ;; the runtime type, I cast it from e2-ty to
@@ -325,10 +326,10 @@
           (define lbl (mk-label "mvector-set index" i-src))
           (mk-cast i-src lbl i i-ty INT-TYPE)]
          [else i]))
-     
+     (define e2-lbl (mk-label "val" e2-src))
      (match e1-ty
        [(Dyn)
-        (define lbl (mk-label "mvect-set" e1-src)) 
+        (define lbl (mk-label "mvect-set" e1-src))
         (cond
           [(dynamic-operations?)
            (define dop (Dyn-MVector-Set! e1 i^ e2 e2-ty (lbl)))
@@ -336,12 +337,11 @@
            dop]
           [else
            (define e1^ (mk-cast e1-src lbl e1 DYN-TYPE (MVect DYN-TYPE)))
-           (define e2-lbl (mk-label "val" e2-src))
            (define e2^ (mk-cast e2-src e2-lbl e2 e2-ty DYN-TYPE)) 
            (MVectCastedSet! e1^ i e2^ DYN-TYPE)])]
        [(MVect t)
         (if (completely-static-type? t)
-            (Mvector-set! e1 i^ e2)
+            (Mvector-set! e1 i^ (mk-cast e2-src e2-lbl e2 e2-ty t))
             (MVectCastedSet! e1 i^ e2 e2-ty))])]
     [(Mvector-length (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)))
      (define l-th (mk-label "mvector-length" e-src))
