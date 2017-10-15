@@ -15,18 +15,18 @@ Description: Facilitates a user-friendly interface for Grift
    ;; Ref-Mechinism
    ;; Cast-Specialization
    ;; Hybrid/Pure-Cast Runtime
-   '((1 |Type-Based Casts| Proxied Unspecialized Strict)
-     (2 Coercions Proxied Unspecialized Strict)
-     (3 Hyper-Coercions Proxied Unspecialized Strict)
-     (4 |Type-Based Casts| Monotonic Unspecialized Strict)
-     (5 Coercions Monotonic Unspecialized Strict)
-     (6 Hyper-Coercions Monotonic Unspecialized Strict)
-     (7 |Type-Based Casts| Proxied Specialized Strict)
-     (8 Coercions Proxied Specialized Strict)
-     (9 Hyper-Coercions Proxied Specialized Strict) 
-     (10 |Type-Based Casts| Monotonic Specialized Strict)
-     (11 Coercions Monotonic Specialized Strict)
-     (12 Hyper-Coercions Monotonic Specialized Strict)
+   '((1 |Type-Based Casts| Proxied Unspecialized Eager)
+     (2 Coercions Proxied Unspecialized Eager)
+     (3 Hyper-Coercions Proxied Unspecialized Eager)
+     (4 |Type-Based Casts| Monotonic Unspecialized Eager)
+     (5 Coercions Monotonic Unspecialized Eager)
+     (6 Hyper-Coercions Monotonic Unspecialized Eager)
+     (7 |Type-Based Casts| Proxied Specialized Eager)
+     (8 Coercions Proxied Specialized Eager)
+     (9 Hyper-Coercions Proxied Specialized Eager) 
+     (10 |Type-Based Casts| Monotonic Specialized Eager)
+     (11 Coercions Monotonic Specialized Eager)
+     (12 Hyper-Coercions Monotonic Specialized Eager)
      (13 Coercions Proxied Unspecialized Lazy)
      (14 Hyper-Coercions Proxied Unspecialized Lazy)
      (15 Coercions Monotonic Unspecialized Lazy)
@@ -55,10 +55,45 @@ Description: Facilitates a user-friendly interface for Grift
 (module+ main
   (define (default-main)
     (void))
+
   
   (define main-fn (make-parameter default-main))
+
+  (define name-sep (make-parameter " "))
+  (define name-end (make-parameter ""))
+
+  ;; Defines ordering for elements of the configurations
+  ;; names to be displayed
+  (define (name-element<? e1 e2)
+    (define classes
+      '((Specialized Unspecialized)
+        (Eager Lazy)
+        (Proxied Monotonic)
+        (Hyper-Coercions Coercions |Type-Based Casts|)))
+    (define (find-class-rank e)
+      (let loop ([cs classes])
+        (if (set-member? (car cs) e)
+            0
+            (+ (loop (cdr cs)) 1))))
+    (< (find-class-rank e1) (find-class-rank e2)))
+
+  ;; Given a set of configuration options returns the stylized string
+  ;; representation of that name.
+  (define (set->name s [sep (name-sep)] [end (name-end)])
+    (define ls (set->list s))
+    (define sls (sort ls name-element<?))
+    (define ss (map symbol->string sls)) 
+    (string-join ss sep #:after-last end))
+
   
   (command-line
+   #:once-each
+   [("--name-sep") sep
+    "Set the seperator for name generation"
+    (name-sep sep)]
+   [("--name-end") end
+    "Set the ending for name generation"
+    (name-end end)]
    #:once-any
    [("--generate-configs-file" "-g")
     "Generate the configurations file"
@@ -68,28 +103,42 @@ Description: Facilitates a user-friendly interface for Grift
     (read-configs!)]
    [("--all" "-a")
     "Generate configuration strings for all configurations supported by Grift"
-    (display
-     (string-join
-      (for/list ([i (in-range 1 (+ 1 (hash-count configs)))])
-        (string-join (map symbol->string (hash-ref configs i))
-                     ".")) ","))]
-   [("--indices-to-names")
+    (main-fn
+     (lambda ()
+      (display
+       (string-join
+        (for/list ([i (in-range 1 (+ 1 (hash-count configs)))])
+          (set->name (list->set (hash-ref configs i))))
+        ","))))]
+   [("--names")
     "Generate configuration names from indicies"
     (main-fn 
      (lambda rest
-       (display
-        (string-join
-         (for/list ([i (map string->number rest)])
-           (string-join (map symbol->string (hash-ref configs i))
-                        ".")) ","))))]
+       (define ns (map string->number rest))
+       (define cs (map (lambda (n) (hash-ref configs n)) ns))
+       (define ss (map list->set cs))
+       (define common (apply set-intersect ss))
+       (define ds (map (lambda (s) (set-subtract s common)) ss))
+       (define names (map set->name ds))
+       (display (string-join names ","))))]
+   [("--common")
+    "Generate shared features of a set of configurations"
+    (main-fn 
+     (lambda rest
+       (define ns (map string->number rest))
+       (define cs (map (lambda (n) (hash-ref configs n)) ns))
+       (define ss (map list->set cs))
+       (define common (apply set-intersect ss))
+       (define name (set->name common))
+       (display name)))]
    [("--indices" "-i")
     "Generate configuration indices"
     (display
      (string-join
       (map number->string
            (range 1 (+ 1 (hash-count configs)))) " "))]
-   [("--contrast" "-c") c1 c2
-    "compare two configurations by indice"
+   [("--compare" "-c") c1 c2
+    "compare and contrast two configurations"
     (define n1 (string->number c1))
     (define n2 (string->number c2))
     (cond
