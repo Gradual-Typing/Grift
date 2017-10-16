@@ -26,7 +26,7 @@
   (let* ([keep-c? (c-path)]
          [c-path (or keep-c? (find-unused-path ".c"))]
          [c-path (normalize-path c-path)]
-         [o-path (or (output-path) (build-path "a.out"))]
+         [o-path (output-path)]
          [o-path (normalize-path o-path)])
     ;; Write the C code to a file
     (logging c-backend-generate-code (Vomit) "~v" c-path)
