@@ -323,6 +323,7 @@ run_benchmark()
 	local dynamizer_out=$(dynamizer "${lattice_path}.grift" "$nsamples" "$nbins" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
+
     racket "${GRIFT_DIR}/benchmark/benchmark.rkt" -s "$c1 $c2" "${lattice_path}/"
     dynamizer_out=$(cat "$lattice_file")
 
