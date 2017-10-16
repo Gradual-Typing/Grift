@@ -316,25 +316,30 @@ run_experiment()
 
     local g=()
 
-    # local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_4K.txt")\""
-    # run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" "$nbins" ""
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_4K.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" "$nbins" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend1000.txt")\""
     run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "$nbins" ""
     g+=($RETURN)
     
-    # run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
-    # g+=($RETURN)
+    run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
-    # run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" "$nbins" ""
-    # g+=($RETURN)
+    run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
-    # run_benchmark $baseline_system $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
-    # g+=($RETURN)
+    run_benchmark $baseline_system $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
+    g+=($RETURN)
 
-    # local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/fast.txt")\""
-    # run_benchmark $baseline_system $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""
-    # g+=($RETURN)
+    local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/fast.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""
+    g+=($RETURN)
+
+    local tak_bc_arg="\"$(cat "${INPUT_DIR}/tak/slow.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "tak" "$tak_bc_arg" "$nsamples" "$nbins" ""
+
+    run_benchmark $baseline_system_static $baseline_system_dynamic "ray" "" "$nsamples" "$nbins" ""
 
     IFS=$'\n'
     max=$(echo "${g[*]}" | sort -nr | head -n1)
