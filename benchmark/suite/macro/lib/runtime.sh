@@ -89,6 +89,9 @@ get_chezscheme_runtime()
 # run the static variant of the schml compiler on a static
 # benchmark and return the average runtime creating
 # a couple utility files along the way.
+# It relies on the TMP_DIR variable being set and the static
+# varient of the benchmark being located in TMP_DIR/static/
+# directory.
 # $1 - benchmark filename without extension
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
@@ -100,18 +103,18 @@ get_static_schml_runtime()
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/static/${benchmark}"
-    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
-    local cache_file="${benchmark_path}${disk_aux_name}.runtime"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.static.runtimes"
+    local cache_file="${benchmark_path}${disk_aux_name}.static.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
         "${SCHML_DIR}/main.rkt" \
-               --static -O 3\
-               -o "${benchmark_path}.o" \
+               "--static" \
+               "-O" "3" \
+               "-o" "${benchmark_path}.static" \
                "${benchmark_path}.schml"
-        
-	local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
-        avg "${benchmark_path}.o" "$benchmark_args" "$runtimes_file"
+     
+        avg "${benchmark_path}.static" "$benchmark_args" "$runtimes_file"
         echo "$RETURN" > "$cache_file"
     fi
 }
