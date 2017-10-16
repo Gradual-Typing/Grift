@@ -45,14 +45,11 @@
   (call-with-input-file "benchmark/configs.dat"
     (lambda (in) (read in))))
 
-(define (compile-file f i)
-  (apply guarded-compile (cons f (cons i (hash-ref configs i)))))
+(define (compile-file f cs)
+  (for ([i (in-list cs)]) 
+    (apply guarded-compile (cons f (cons i (hash-ref configs i))))))
 
-(define (compile-file-all-configs f)
-  (for ([i (in-range 1 (+ (hash-count configs) 1))])
-    (compile-file f i)))
-
-(define (compile-directory-all-configs compile-dir)
+(define (compile-directory compile-dir cs)
   ;; The directory should exist if we are going to compile it
   (unless (directory-exists? compile-dir)
     (error 'compile-directory-all-configs "no such directory ~a" compile-dir))
@@ -70,29 +67,39 @@
   
   ;; Iterate over all grift files in directory and
   ;; compile them to 
+  
   (for ((fl (find-files grift-file? compile-dir)))
-    (compile-file-all-configs fl)))
+    (compile-file fl cs)))
 
 (module+ main
-  (define config-index? (make-parameter 0))
+  ;; All valid configurations
+  (define config-indices
+    (make-parameter (map car (hash-values configs))))
   (c-flags (cons "-O3" (c-flags)))
   (command-line
    #:once-each
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
+   [("--configs" "-s") cs
+    "Compile a path with multiple configurations"
+    (match (regexp-match* #px"(\\d+)" cs)
+      [(list ds ...)
+       (config-indices (map string->number ds))]
+      [other
+       (error 'benchmark.rkt "invalid configs string: ~v ~v" cs other)])]
    [("--config" "-i") i
     "Compile a path with a single configuration, must be a number > 0"
-    (config-index? (string->number i))]
+    (define n? (string->number i))
+    ;; compile-file checks for valid indices
+    (config-indices (list n?))]
    #:args (path)
-   (if (string->path path)
-       (cond
-         [(and (directory-exists? path) (> (config-index?) 0))
-          (compile-directory path (config-index?))]
-         [(directory-exists? path)
-          (compile-directory-all-configs path)]
-         [(and (file-exists? path) (> (config-index?) 0))
-          (compile-file path (config-index?))]
-         [(file-exists? path)
-          (compile-file-all-configs path)])
-       (error 'benchmark-main "could parse ~v as a path" path))))
+   (cond
+     [(string->path path)
+      (cond
+        [(directory-exists? path)
+         (compile-directory path (config-indices))]
+        [(file-exists? path)
+         (compile-file path (config-indices))])]
+     [else
+      (error 'benchmark-main "could parse ~v as a path" path)])))

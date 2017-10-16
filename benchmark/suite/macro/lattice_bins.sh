@@ -116,6 +116,7 @@ gen_output()
     perf_lattice_slowdown_fig="${OUT_DIR}/perflattice/slowdown/${disk_name}.png"
     perf_lattice_speedup_fig="${OUT_DIR}/perflattice/speedup/${disk_name}.png"
     perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}.png"
+    perf_lattice_lin_fig="${OUT_DIR}/perflattice/log/lin_${disk_name}.png"
     
     # if [[ ! -f "$cum_perf_lattice_slowdown_fig" || ! -f "$cum_perf_lattice_tbl" || ! -f "$perf_lattice_slowdown_fig" ]]; then
     rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_slowdown_fig"
@@ -183,49 +184,64 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
     	   `"set output '${perf_lattice_slowdown_fig}';"`
-	   `"set key left;"`
+	       `"set key left;"`
     	   `"set xrange [0:100];"`
-	   `"set ytics add (\"\" 0, \"1\" 1);"`
-	   `"set ytics font \", 13\";"`
-	   `"set xtics font \", 13\";"`
-	   `"set grid ytics;"`
+	       `"set ytics add (\"\" 0, \"1\" 1);"`
+	       `"set ytics font \", 13\";"`
+	       `"set xtics font \", 13\";"`
+	       `"set grid ytics;"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"Slowdown with respect to Gambit\";"`
-	   `"set xlabel \"How much of the code is typed\";"`
+	       `"set ylabel \"Slowdown with respect to Gambit\";"`
+	       `"set xlabel \"How much of the code is typed\";"`
     	   `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
 
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
     	   `"set output '${perf_lattice_speedup_fig}';"`
-	   `"set key left;"`
+	       `"set key left;"`
     	   `"set xrange [0:100];"`
-	   `"set ytics add (\"\" 0, \"1\" 1);"`
-	   `"set ytics font \", 13\";"`
-	   `"set xtics font \", 13\";"`
-	   `"set grid ytics;"`
+	       `"set ytics add (\"\" 0, \"1\" 1);"`
+	       `"set ytics font \", 13\";"`
+	       `"set xtics font \", 13\";"`
+	       `"set grid ytics;"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"Speedup with respect to Gambit\";"`
-	   `"set xlabel \"How much of the code is typed\";"`
+	       `"set ylabel \"Speedup with respect to Gambit\";"`
+	       `"set xlabel \"How much of the code is typed\";"`
     	   `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
 
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,13' ;"`
     	   `"set output '${perf_lattice_log_fig}';"`
-	   `"set key left;"`
-	   `"set logscale y;"`
+	       `"set key left;"`
+	       `"set logscale y;"`
     	   `"set xrange [0:100];"`
     	   `"set yrange [0.01:100];"`
-	   `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+	       `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"(Gambit runtime/Grift runtime) in logarithmic scale\";"`
-	   `"set xlabel \"How much of the code is typed\";"`
+	       `"set ylabel \"Speedup over Gambit (logarithmic scale)\";"`
+	       `"set xlabel \"How much of the code is typed\";"`
     	   `"plot 1 lw 2 dt 2 lc rgb \"black\" title 'Gambit',"`
-	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
+	       `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
-	   `"${g1} lw 2 dt 2 lc rgb \"#0072B2\" title '${c1t} mean',"`
-	   `"${g2} lw 2 dt 2 lc rgb \"#E69F00\" title '${c2t} mean'"
+	       `"${g1} lw 2 dt 2 lc rgb \"#0072B2\" title '${c1t} mean',"`
+	       `"${g2} lw 2 dt 2 lc rgb \"#E69F00\" title '${c2t} mean'"
+
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+      	   `"enhanced color font 'Verdana,13' ;"`
+    	   `"set output '${perf_lattice_lin_fig}';"`
+           `"set key left;"` 
+	       `"set xrange [0:100];"`
+           `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+    	   `"set title \"${printname}\";"`
+	       `"set ylabel \"Speedup over Gambit\";"`
+	       `"set xlabel \"How much of the code is typed\";"`
+    	   `"plot 1 lw 2 dt 2 lc rgb \"black\" title 'Gambit',"`
+	       `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
+    	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
+	       `"${g1} lw 2 dt 2 lc rgb \"#0072B2\" title '${c1t} mean',"`
+	       `"${g2} lw 2 dt 2 lc rgb \"#E69F00\" title '${c2t} mean'"
     # fi
     RETURN=$(awk -v g1="$g1" -v g2="$g2" "BEGIN {printf \"%.2f\n\", g2/g1}")
 }
@@ -279,7 +295,7 @@ run_benchmark()
                               | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
-    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
+    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" -s "$c1 $c2" "${lattice_path}/"
     dynamizer_out=$(cat "$lattice_file")
 
     gen_output $baseline_system $c1 $c2 "$lattice_path" "$benchmark_args" "$dynamizer_out" "$print_name" "$disk_aux_name"
@@ -307,18 +323,18 @@ run_experiment()
     run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "$nbins" ""
     g+=($RETURN)
     
-    run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
-    g+=($RETURN)
+    # run_benchmark $baseline_system $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
+    # g+=($RETURN)
 
-    run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" "$nbins" ""
-    g+=($RETURN)
+    # run_benchmark $baseline_system $c1 $c2 "n-body" "10000" "$nsamples" "$nbins" ""
+    # g+=($RETURN)
 
-    run_benchmark $baseline_system $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
-    g+=($RETURN)
+    # run_benchmark $baseline_system $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
+    # g+=($RETURN)
 
-    local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/fast.txt")\""
-    run_benchmark $baseline_system $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""
-    g+=($RETURN)
+    # local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/fast.txt")\""
+    # run_benchmark $baseline_system $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""
+    # g+=($RETURN)
 
     IFS=$'\n'
     max=$(echo "${g[*]}" | sort -nr | head -n1)
