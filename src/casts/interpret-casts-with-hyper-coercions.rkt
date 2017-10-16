@@ -40,7 +40,7 @@ that can be located throughout this file:
   (define-values (compile-make-coercion compile-make-med-coercion)
     (make-compile-make-coercion/compile-make-med-coercion))
 
-  (define greatest-lower-bound : Greatest-Lower-Bound-Type
+  (define greatest-lower-bound : (Code-Label Uid)
     (make-compile-types-greatest-lower-bound))
   
   (define compose-coercions
@@ -501,7 +501,7 @@ that can be located throughout this file:
 
 (: make-compose-coercions
    (->* (#:make-med-coercion Make-Med-Coercion-Type
-         #:greatest-lower-bound Greatest-Lower-Bound-Type)
+         #:greatest-lower-bound (Code-Label Uid))
         Compose-Coercions-Type))
 (define (make-compose-coercions #:make-med-coercion make-med-coercion
                                 #:greatest-lower-bound greatest-lower-bound)
@@ -602,12 +602,12 @@ that can be located throughout this file:
         [(and$ (MRef-Coercion-Huh fst) (MRef-Coercion-Huh snd))
          (let*$ ([fst_type  (MRef-Coercion-Type fst)]
                  [snd_type  (MRef-Coercion-Type snd)]
-                 [glb       (greatest-lower-bound fst_type snd_type)])
+                 [glb       (app-code$ greatest-lower-bound fst_type snd_type)])
            (MRef-Coercion glb))]
         [(and$ (MVect-Coercion-Huh fst) (MVect-Coercion-Huh snd))
          (let*$ ([fst_type  (MVect-Coercion-Type fst)]
                  [snd_type  (MVect-Coercion-Type snd)]
-                 [glb       (greatest-lower-bound fst_type snd_type)])
+                 [glb       (app-code$ greatest-lower-bound fst_type snd_type)])
            (MVect-Coercion glb))]
         [else
          (Blame (Quote "Internal Error: compose-mediating-coercions 1"))])]

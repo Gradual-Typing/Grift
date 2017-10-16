@@ -453,7 +453,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (: make-compose-coercions
    (->* (#:make-coercion Make-Coercion-Type
-         #:greatest-lower-bound Greatest-Lower-Bound-Type)
+         #:greatest-lower-bound (Code-Label Uid))
         (Values Uid Compose-Coercions-Type)))
 (define (make-compose-coercions #:make-coercion make-coercion
                                 #:greatest-lower-bound greatest-lower-bound)
@@ -534,12 +534,12 @@ form, to the shortest branch of the cast tree that is relevant.
         [(mbox-coercion?$ c1)
          (let*$ ([ref1_type  (mbox-coercion-type$ c1)]
                  [ref2_type  (mbox-coercion-type$ c2)]
-                 [type3  (greatest-lower-bound ref1_type ref2_type)])
+                 [type3  (app-code$ greatest-lower-bound ref1_type ref2_type)])
            (mbox-coercion$ type3))]
         [(mvec-coercion?$ c1)
          (let*$ ([ref1_type  (mvec-coercion-type$ c1)]
                  [ref2_type  (mvec-coercion-type$ c2)]
-                 [type3  (greatest-lower-bound ref1_type  ref2_type)])
+                 [type3  (app-code$ greatest-lower-bound ref1_type ref2_type)])
            (mvec-coercion$ type3))]
         [else (Blame (Quote "bad implemention of mediating coercions"))])]
       ;; C1 must be a failed coercion

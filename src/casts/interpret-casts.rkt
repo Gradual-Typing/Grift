@@ -25,7 +25,8 @@
   (define next-unique (make-unique-counter next))
   
   (parameterize ([cast-runtime-code-bindings '()]
-                 [current-unique-counter next-unique])
+                 [current-unique-counter next-unique]
+                 [types-greatest-lower-bound-code-label? #f])
 
     (define ic-expr! : (C0-Expr -> CoC3-Expr)
       (case (cast-representation) 
