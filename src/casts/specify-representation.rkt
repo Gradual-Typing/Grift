@@ -409,24 +409,19 @@ but a static single assignment is implicitly maintained.
     (define cast-tuple-label (Code-Label cast-tuple))
     (define cast-label (Code-Label cast))
     (define cast-tuple-c : D0-Code
-      (code$ (tpl-val t1 t2 l i count)
-        (If (op$ = i count)
-            (op$ Alloc count)
-            (begin$ (assign$ val (op$ Array-ref tpl-val i))
-                    (assign$ t1a
-                      (sr-tagged-array-ref
-                       t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-                    (assign$ t2a
-                      (sr-tagged-array-ref
-                       t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-                    (assign$ casted-val
-                      (App-Code cast-label `(,val ,t1a ,t2a ,l ,ZERO-IMDT)))
-                    (assign$ tmp-crcn
-                      (App-Code
-                       cast-tuple-label
-                       `(,tpl-val ,t1 ,t2 ,l ,(sr-plus (Quote 1) i) ,count)))
-                    (op$ Array-set! tmp-crcn i casted-val)
-                    tmp-crcn))))
+      (code$ (val t1 t2 l)
+        (assign$ count
+          (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+        (assign$ new-val (op$ Alloc count))
+        (assign$ iters (op$ + TYPE-TUPLE-ELEMENTS-OFFSET count))
+        (repeat$ (i TYPE-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
+          (assign$ val-i (op$ - i TYPE-TUPLE-ELEMENTS-OFFSET))
+          (assign$ vala (op$ Array-ref val val-i))
+          (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
+          (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
+          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l ZERO-IMDT))
+          (op$ Array-set! new-val val-i casted-vala))
+        new-val))
     (add-new-code! (cons cast-tuple cast-tuple-c))
     (set-box! cast-tuple-code-label? cast-tuple-label)
     cast-tuple-label)
@@ -1280,19 +1275,8 @@ but a static single assignment is implicitly maintained.
                (begin$
                  (assign$ tuple-val1 v)
                  (invoke-cast-tuple cast-tuple tuple-val1 t1 t2 lbl mono-address))))]
-        [(Cast-Tuple uid (app recur v) (app recur t1) (app recur t2) (app recur lbl))
-         (: invoke-cast-tuple ((Code-Label Uid) (Var Uid) D0-Expr D0-Expr D0-Expr -> D0-Expr))
-         (define (invoke-cast-tuple cast-tuple v t1 t2 lbl)
-           (begin$
-             (assign$ tagged-count
-               (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
-             (App-Code cast-tuple (list v t1 t2 lbl ZERO-IMDT tagged-count))))
-         (let ([cast-tuple (get-cast-tuple! uid)])
-           (if (Var? v)
-               (invoke-cast-tuple cast-tuple v t1 t2 lbl)
-               (begin$
-                 (assign$ tuple-val1 v)
-                 (invoke-cast-tuple cast-tuple tuple-val1 t1 t2 lbl))))]
+        [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l))
+         (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]
         [(Compose-Tuple-Coercion comp-crcn (app recur c1) (app recur c2))
