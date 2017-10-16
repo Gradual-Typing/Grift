@@ -502,53 +502,46 @@ but a static single assignment is implicitly maintained.
 (: get-comp-tuple-crcn! (Uid -> (Code-Label Uid)))
 (define (get-comp-tuple-crcn! comp-crcn)
   (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! mk-crcn)
+  (define (make-code! comp-crcn)
     (define-track-next-uid!$ comp-tuple-crcn)
     (define comp-tuple-crcn-label (Code-Label comp-tuple-crcn))
     (define comp-crcn-label (Code-Label comp-crcn))
     (define comp-tuple-crcn-c : D0-Code
-      (code$ (crcn1 crcn2 i count id?1)
-        (If (op$ = i count)
-            (begin$
-              (assign$ crcn
-                (op$ Alloc (sr-plus count COERCION-TUPLE-ELEMENTS-OFFSET)))
-              (assign$ tagged-count
-                (op$ + (op$ %<< count COERCION-SECOND-TAG-SHIFT)
-                     COERCION-TUPLE-SECOND-TAG))
-              (sr-array-set!
-               crcn COERCION-TUPLE-COUNT-INDEX tagged-count)
-              (sr-tag-value crcn COERCION-MEDIATING-TAG))
-            (begin$
-              (assign$ c1a
-                (sr-tagged-array-ref
-                 crcn1
-                 COERCION-MEDIATING-TAG
-                 (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
-              (assign$ c2a
-                (sr-tagged-array-ref
-                 crcn2
-                 COERCION-MEDIATING-TAG
-                 (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
-              (assign$ composed-crcn (App-Code comp-crcn-label `(,c1a ,c2a)))
-              (assign$ id?2
-                (If id?1
-                    (sr-check-tag=?
-                     composed-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG)
-                    FALSE-IMDT))
-              (assign$ tmp-crcn
-                (App-Code
-                 comp-tuple-crcn-label
-                 `(,crcn1 ,crcn2 ,(sr-plus (Quote 1) i) ,count ,id?2)))
-              (If (sr-check-tag=?
-                   tmp-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG)
-                  COERCION-IDENTITY-IMDT
-                  (begin$
-                    (sr-tagged-array-set!
-                     tmp-crcn
-                     COERCION-MEDIATING-TAG
-                     (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)
-                     composed-crcn)
-                    tmp-crcn))))))
+      ;; comp-tuple-crcn expects to compose two tuple coercions of the same
+      ;; length. This might change later when I formalize our tuple semantics.
+      ;; It also make sure to return an identity coercion if the two coercions
+      ;; are identical.
+      (code$ (crcn1 crcn2)
+        (assign$ tagged-count
+          (sr-tagged-array-ref
+           crcn1 COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
+        (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
+        (assign$ new-crcn UNIT-IMDT)
+        (assign$ iters (op$ + COERCION-TUPLE-ELEMENTS-OFFSET count))
+        (assign$ id? TRUE-IMDT)
+        (repeat$ (i COERCION-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
+          (assign$ c1a (sr-tagged-array-ref crcn1 COERCION-MEDIATING-TAG i))
+          (assign$ c2a (sr-tagged-array-ref crcn2 COERCION-MEDIATING-TAG i))
+          (assign$ composed-crcn (app-code$ comp-crcn-label c1a c2a))
+          (cond$
+           [id?
+            (assign$ tmp-id?
+              (sr-check-tag=?
+               composed-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG))
+            (cond$
+             [(op$ not tmp-id?)
+              (Assign (Var-id new-crcn)
+                (op$ Alloc (op$ + count COERCION-TUPLE-ELEMENTS-OFFSET)))
+              (sr-array-set! new-crcn COERCION-TUPLE-COUNT-INDEX tagged-count)
+              (repeat$ (j COERCION-TUPLE-ELEMENTS-OFFSET i) (_ UNIT-IMDT)
+                (sr-array-set! new-crcn j COERCION-IDENTITY-IMDT))
+              (sr-array-set! new-crcn i composed-crcn)
+              (Assign (Var-id id?) FALSE-IMDT)]
+             [else UNIT-IMDT])]
+           [else (sr-array-set! new-crcn i composed-crcn)]))
+        (cond$
+         [id? COERCION-IDENTITY-IMDT]
+         [else (sr-tag-value new-crcn COERCION-MEDIATING-TAG)])))
     (add-new-code! (cons comp-tuple-crcn comp-tuple-crcn-c))
     (set-box! comp-tuple-coercion-code-label? comp-tuple-crcn-label)
     comp-tuple-crcn-label)
@@ -1302,21 +1295,8 @@ but a static single assignment is implicitly maintained.
                  (invoke-cast-tuple cast-tuple tuple-val1 t1 t2 lbl))))]
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]
-        [(Compose-Tuple-Coercion compose (app recur c1) (app recur c2))
-         (: invoke-comp ((Code-Label Uid) (Var Uid) D0-Expr -> D0-Expr))
-         (define (invoke-comp comp-tuple c1 c2)
-           (begin$
-             (assign$ tagged-count
-               (sr-tagged-array-ref
-                c2 COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
-             (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
-             (App-Code comp-tuple (list c1 c2 ZERO-IMDT count TRUE-IMDT))))
-         (let ([mk-tuple-crcn (get-comp-tuple-crcn! compose)])
-           (if (Var? c1)
-               (invoke-comp mk-tuple-crcn c1 c2)
-               (begin$
-                 (assign$ tuple-crcn1 c1)
-                 (invoke-comp mk-tuple-crcn tuple-crcn1 c2))))]
+        [(Compose-Tuple-Coercion comp-crcn (app recur c1) (app recur c2))
+         (app-code$ (get-comp-tuple-crcn! comp-crcn) c1 c2)]
         [(Mediating-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK COERCION-MEDIATING-TAG)]
         [other (error 'specify-representation "unmatched ~a" other)]))
