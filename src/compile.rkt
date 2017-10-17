@@ -145,4 +145,5 @@
         (renaming-output-files p?)))
 
     ;; Use current parameterization plus new file names to compile the file
+    (displayln out-path)
     (compile fl #:output out-path #:keep-c c-path? #:keep-s s-path?)))

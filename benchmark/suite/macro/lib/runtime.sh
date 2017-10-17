@@ -57,9 +57,9 @@ get_schml_runtimes()
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
     else
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.schml"
-	local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+	local configs=($(racket "${SCHML_DIR}/src/config_str.rkt" -i))
 	for i in ${configs[@]}; do
+	    racket "${SCHML_DIR}/main.rkt" -O 3 -i $i -o "${benchmark_path}.o${i}" "${benchmark_path}.schml"
 	    avg "${benchmark_path}.o${i}" "$benchmark_args" "$runtimes_file"
 	    echo "$RETURN" >> "$cache_file"
 	done
@@ -84,7 +84,7 @@ get_schml_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.schml"
+	racket "${SCHML_DIR}/main.rkt" -O 3 -i $config_index -o "${benchmark_path}.o${config_index}" "${benchmark_path}.schml"
 	avg "${benchmark_path}.o${config_index}" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
