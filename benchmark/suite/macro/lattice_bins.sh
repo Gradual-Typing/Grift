@@ -165,12 +165,12 @@ gen_output()
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
     	   `"set output '${cum_perf_lattice_fig}';"`
-	   `"set border 15 back;"`
+	       `"set border 15 back;"`
       	   `"set title \"${printname}\";"`
     	   `"set xrange [0:10]; set yrange [0:${n}];"`
     	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
     	   `"set ytics nomirror 0,200;"`
-	   `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
+	       `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
     	   `"plot '${logfile2}' using 1:2 with lines lw 2 title '${c1t}' smooth cumulative,"`
     	   `"'${logfile4}' using 1:2 with lines lw 2 title '${c2t}' smooth cumulative"
 
@@ -189,37 +189,37 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 \end{tabular}
 \end{table}" > "${cum_perf_lattice_tbl}"
 
-    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-      	   `"enhanced color font 'Verdana,10' ;"`
-    	   `"set output '${perf_lattice_slowdown_fig}';"`
-	       `"set key left;"`
-    	   `"set xrange [0:100];"`
-	       `"set ytics add (\"\" 0, \"1\" 1);"`
-	       `"set ytics font \", 13\";"`
-	       `"set xtics font \", 13\";"`
-	       `"set grid ytics;"`
-    	   `"set title \"${printname}\";"`
-           `"set ylabel \"Slowdown with respect to Gambit\";"`
-	       `"set xlabel \"How much of the code is typed\";"`
-           `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
-           `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
+    # gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+    #   	   `"enhanced color font 'Verdana,10' ;"`
+    # 	   `"set output '${perf_lattice_slowdown_fig}';"`
+	#        `"set key left;"`
+    # 	   `"set xrange [0:100];"`
+	#        `"set ytics add (\"\" 0, \"1\" 1);"`
+	#        `"set ytics font \", 13\";"`
+	#        `"set xtics font \", 13\";"`
+	#        `"set grid ytics;"`
+    # 	   `"set title \"${printname}\";"`
+    #        `"set ylabel \"Slowdown with respect to Gambit\";"`
+	#        `"set xlabel \"How much of the code is typed\";"`
+    #        `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
+    #        `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
 
-    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-        	   `"enhanced color font 'Verdana,13' ;"`
-               `"set output '${perf_lattice_speedup_fig}';"`
-               `"set key outside center bottom font \",10\";"`
-    	       `"set xrange [-5:105];"`
-    	       `"set yrange [0.1:4];"`
-	           `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
-    	       `"set title \"${printname}\";"`
-	           `"set ylabel \"Speedup over Gambit\";"`
-	           `"set xlabel \"How much of the code is typed\";"`
-	           `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
-    	       `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
-	           `"${g1} lw 2 dt 3 lc rgb \"#0072B2\" notitle '${c1t} mean',"`
-	           `"${g2} lw 2 dt 3 lc rgb \"#E69F00\" notitle '${c2t} mean',"`
-               `"1 lw 2 dt 2 lc rgb \"black\" title 'No Gradual Overhead (Gambit Scheme)',"` 
-               `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'No Gradual Overhead (Grift STLC)';"
+    # gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+    #     	   `"enhanced color font 'Verdana,13' ;"`
+    #            `"set output '${perf_lattice_speedup_fig}';"`
+    #            `"set key outside center bottom font \",10\";"`
+    # 	       `"set xrange [-5:105];"`
+    # 	       `"set yrange [0.1:4];"`
+	#            `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+    # 	       `"set title \"${printname}\";"`
+	#            `"set ylabel \"Speedup over Gambit\";"`
+	#            `"set xlabel \"How much of the code is typed\";"`
+	#            `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
+    # 	       `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
+	#            `"${g1} lw 2 dt 3 lc rgb \"#0072B2\" notitle '${c1t} mean',"`
+	#            `"${g2} lw 2 dt 3 lc rgb \"#E69F00\" notitle '${c2t} mean',"`
+    #            `"1 lw 2 dt 2 lc rgb \"black\" title 'No Gradual Overhead (Gambit Scheme)',"` 
+    #            `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'No Gradual Overhead (Grift STLC)';"
     
     
      gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
@@ -237,8 +237,8 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     	   `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
 	       `"${g1} lw 2 dt 3 lc rgb \"#0072B2\" notitle '${c1t} mean',"`
 	       `"${g2} lw 2 dt 3 lc rgb \"#E69F00\" notitle '${c2t} mean',"`
-           `"1 lw 2 dt 2 lc rgb \"black\" title 'No Gradual Overhead (Dynamic)',"` 
-           `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'No Gradual Overhead (Static)';"
+           `"1 lw 2 dt 2 lc rgb \"black\" title 'Gambit Scheme',"` 
+           `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'Static Grift';"
 
      gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"noenhanced color font 'Verdana,13' ;"`
