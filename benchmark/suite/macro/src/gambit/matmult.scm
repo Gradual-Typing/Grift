@@ -39,6 +39,6 @@
 	  [bc size])
       (if (fx= ac br)
 	  (let ([a (create ar ac)]
-		[b (create br bc)])
-	    (time (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1))))
+            [b (create br bc)])
+	    (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1)))
 	  0))))

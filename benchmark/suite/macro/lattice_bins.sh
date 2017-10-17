@@ -367,9 +367,9 @@ run_experiment()
                  $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
     g+=($RETURN)
 
-    run_benchmark $baseline_system \
-                 $c1 $c2 "n_body" "10000" "$nsamples" "$nbins" ""
-    g+=($RETURN)
+    # run_benchmark $baseline_system \
+    #              $c1 $c2 "n_body" "10000" "$nsamples" "$nbins" ""
+    # g+=($RETURN)
 
     run_benchmark $baseline_system \
                  $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
@@ -427,7 +427,7 @@ main()
 
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
-    mkdir -p "$TMP_DIR"
+    mkdir -p "$TMP_DIR/partial"
     mkdir -p "$OUT_DIR/cumperflattice"
     mkdir -p "$OUT_DIR/perflattice/slowdown"
     mkdir -p "$OUT_DIR/perflattice/speedup"
