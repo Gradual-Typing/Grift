@@ -12,28 +12,31 @@
          "../configuration.rkt"
          syntax/location)
 (require/typed racket/base
-    [srcloc->string (srcloc -> (Option String))])
+  [srcloc->string (srcloc -> (Option String))])
 (provide (all-defined-out))
 
 (define-syntax (track-next-uid!$ stx)
   (syntax-case stx ()
     [(_ name)
-     (with-syntax ([fmt-name (format "~a" #'name)])
-       #'(if (emit-vars-with-original-source-location?)
-             (next-uid! fmt-name)
-             (next-uid! name)))]))
+     (let-values ([(_1 path _2) (split-path (syntax-source #'name))])
+       (with-syntax ([fmt-name (format "~a_~a_~a_~a"
+                                       (syntax->datum #'name)
+                                       path
+                                       (syntax-line #'name)
+                                       (syntax-column #'name))])
+         #'(if (emit-vars-with-original-source-location?)
+               (next-uid! fmt-name)
+               (next-uid! 'name))))]))
 
 (define-syntax (define-track-next-uid!$ stx)
   (syntax-case stx ()
-    [(_ name)
-     (with-syntax ([name-string (symbol->string (syntax->datum #'name))])
-       #'(define name (track-next-uid!$ name-string)))]))
+    [(_ name) #'(define name (track-next-uid!$ name))]))
 
 (define-syntax (begin$ stx)
   (syntax-case stx (assign$)
     [(_ b) #'b]
     [(_ (assign$ u e) b* ... b)
-     #'(let ([t (track-next-uid!$ 'u)])
+     #'(let ([t (track-next-uid!$ u)])
          (Begin
            (list (Assign t e))
            (let ([u (Var t)])
@@ -44,7 +47,7 @@
   (syntax-case stx ()
     [(_ ([i* e*] ...) b* ... b)
      (with-syntax ([(u* ...) (generate-temporaries #'(i* ...))])
-       #'(let ([u* (track-next-uid!$ 'i*)] ...)
+       #'(let ([u* (track-next-uid!$ i*)] ...)
            (Let `([,u* . ,e*] ...)
              (let ([i* (Var u*)] ...)
                (begin$ b* ... b)))))]))
@@ -68,10 +71,10 @@
                              [(or (Var _) (Type _) (Quote _) (Quote-Coercion _))
                               (values '() `(,t*))]
                              [_
-                              (define u (track-next-uid!$ 'i*))
+                              (define u (track-next-uid!$ i*))
                               (values `([,u . ,t*]) `(,(Var u)))])]
                           ...)
-             (values (append bnd?* ...) (append val?* ...))))
+               (values (append bnd?* ...) (append val?* ...))))
            (let*-values ([(i* val*) (values (car val*) (cdr val*))] ...)
              (define f (lambda () (begin$ b* ... b)))
              (cond
@@ -87,35 +90,35 @@
      (with-syntax ([bind-expr$ (datum->syntax stx 'bind-expr$)])
        #'(... ;; All elipsis inside are ellipsis literals
           (
-            (: bind-expr* : (Listof Symbol) (Listof type) ->
-               (Values (Listof (cons Uid type)) (Listof (U (Var Uid) type))))
-            (define (bind-expr* s* e*)
-              (match* (s* e*)
-                [('() '()) (values '() '())]
-                [((cons s s*) (cons e e*))
-                 (define-values (b* v*) (bind-expr* s* e*))
-                 (match e
-                   [(or (Var _) (Quote _) (Type _) (Quote-Coercion _))
-                    (values b* (cons e v*))]
-                   [_
-                    (define u (track-next-uid!$ s))
-                    (values `([,u . ,e] . ,b*) (cons (Var u) v*))])]))
-            (define-syntax (bind-expr$ stx)
-              (syntax-case stx ()
-                [(_ ([i* e*] ...) b* ... b)
-                 #'(let-values ([(bnd* val*) (bind-expr* '(i* ...) `(,e* ...))])
-                     (let*-values ([(i* val*) (values (car val*) (cdr val*))] ...)
-                       (let ([f (lambda () (begin$ b* ... b))])
-                         (cond
-                           [(null? bnd*) (f)]
-                           [else (Let bnd* (f))]))))])))))]))
+           (: bind-expr* : (Listof Symbol) (Listof type) ->
+              (Values (Listof (cons Uid type)) (Listof (U (Var Uid) type))))
+           (define (bind-expr* s* e*)
+             (match* (s* e*)
+               [('() '()) (values '() '())]
+               [((cons s s*) (cons e e*))
+                (define-values (b* v*) (bind-expr* s* e*))
+                (match e
+                  [(or (Var _) (Quote _) (Type _) (Quote-Coercion _))
+                   (values b* (cons e v*))]
+                  [_
+                   (define u (track-next-uid!$ s))
+                   (values `([,u . ,e] . ,b*) (cons (Var u) v*))])]))
+           (define-syntax (bind-expr$ stx)
+             (syntax-case stx ()
+               [(_ ([i* e*] ...) b* ... b)
+                #'(let-values ([(bnd* val*) (bind-expr* '(i* ...) `(,e* ...))])
+                    (let*-values ([(i* val*) (values (car val*) (cdr val*))] ...)
+                      (let ([f (lambda () (begin$ b* ... b))])
+                        (cond
+                          [(null? bnd*) (f)]
+                          [else (Let bnd* (f))]))))])))))]))
 
 
 (define-syntax (code$ stx)
   (syntax-case stx ()
     [(_ (p* ...) b* ... b)
      (with-syntax ([(u* ...) (generate-temporaries #'(p* ...))])
-       #'(let ([u* (track-next-uid!$ 'p*)] ...)
+       #'(let ([u* (track-next-uid!$ p*)] ...)
            (Code `(,u* ...)
              (let ([p* (Var u*)] ...)
                (begin$ b* ... b)))))]))
@@ -124,7 +127,7 @@
   (syntax-case stx (:)
     [(_ (i e1 e2) () b* ... b) #'(repeat$ (i e1 e2) (_ (Quote '())) b* ... b)]
     [(_ (i e1 e2) (a e3) b* ... b)
-     #'(let ([iu (track-next-uid!$ 'i)] [au (track-next-uid!$ 'a)])
+     #'(let ([iu (track-next-uid!$ i)] [au (track-next-uid!$ a)])
          (Repeat iu e1 e2 au e3
            (let ([i (Var iu)] [a (Var au)])
              (begin$ b* ... b))))]))
