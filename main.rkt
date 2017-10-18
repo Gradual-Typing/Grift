@@ -51,18 +51,11 @@
    ["--type-based-casts"
     "Select the type-based cast representation of casts"
     (cast-representation '|Type-Based Casts|)]
-   [("-R" "--cast-representation")
-    cast-rep
+   [("-R" "--cast-representation") cast-rep
     ((format "select cast representation: (~a)" (cast-representation)))
     (case cast-rep
-      [("Static")
-       (cast-representation 'Static)]
-      [("Type-Based Casts")
-       (cast-representation '|Type-Based Casts|)]
-      [("Coercions")
-       (cast-representation 'Coercions)]
-      [("Hyper-Coercions")
-       (cast-representation 'Hyper-Coercions)]
+      [("Static""Type-Based Casts" "Coercions" "Hyper-Coercions")
+       (cast-representation (string->symbol cast-rep))]
       [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
    [("--check-asserts")
@@ -72,9 +65,9 @@
     "Raise an error unless the program is statically typed"
     (program-must-be-statically-typed?)]
    [("--version")
-    "Output grift compiler version info"
-    (grift-did-something? #t)
-    (print-version-info)]
+    "Output grift compiler version info" 
+    (grift-main-function
+     (lambda args (print-version-info)))]
    #:once-any
    [("--reference-semantics") semantics
     "Monotonic, Proxied (defualt Proxied)"
