@@ -16,10 +16,28 @@
  (system "git status" #:set-pwd? this-dir))
 
 (module+ main
+  ;; Todo now that we have a main-function to overide do
+  ;; we still need this flag.
+  (define grift-did-something? (make-parameter #f))
   (define recursive-parameter (make-parameter #f))
-  (define schml-did-something? (make-parameter #f))
+  ;; The function that gets run after command line parsing
+  ;; we use a parameter because command line parsing can
+  ;; override the main function.
+  (define grift-main-function
+    (make-parameter
+     (lambda (args)
+       (match args
+         [(list)
+          (cond
+            [(not (grift-did-something?))
+             (error 'grift "no input given")])]
+         [(list (app string->path (and (not #f) path)))
+          (cond
+            [(recursive-parameter) (compile-directory path)]
+            [else (compile path)])]
+         [else (error 'grift "invalid arguments ~a" args)]))))
   (command-line
-   #:program "schml"
+   #:program "grift"
    #:once-any
    ["--static"
     "Static varient of lambda calculus" 
@@ -45,7 +63,7 @@
        (cast-representation 'Coercions)]
       [("Hyper-Coercions")
        (cast-representation 'Hyper-Coercions)]
-      [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
+      [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
    [("--check-asserts")
     ((format "Compile coded with assertions (~a)" (check-asserts?)))
@@ -54,8 +72,8 @@
     "Raise an error unless the program is statically typed"
     (program-must-be-statically-typed?)]
    [("--version")
-    "Output schml compiler version info"
-    (schml-did-something? #t)
+    "Output grift compiler version info"
+    (grift-did-something? #t)
     (print-version-info)]
    #:once-any
    [("--reference-semantics") semantics
@@ -126,9 +144,9 @@
        (lambda (k)
          (if (exact-nonnegative-integer? k)
              (init-heap-kilobytes k)
-             (error 'schml "invalid initial heap size: ~a" k)))]
+             (error 'grift "invalid initial heap size: ~a" k)))]
       [else
-       (error 'schml "invalid argument given for memory size: ~v" kilobytes)])]
+       (error 'grift "invalid argument given for memory size: ~v" kilobytes)])]
    [("--types-hash-table-slots")
     num
     "select the runtime's starting hash table number of slots"
@@ -137,9 +155,9 @@
        (lambda (k)
          (if (exact-positive-integer? k)
              (init-types-hash-table-slots k)
-             (error 'schml "invalid initial types hashtable size: ~a" k)))]
+             (error 'grift "invalid initial types hashtable size: ~a" k)))]
       [else
-       (error 'schml "invalid argument given for hashtable size: ~v" num)])]
+       (error 'grift "invalid argument given for hashtable size: ~v" num)])]
    [("--types-hash-table-load-factor")
     num
     "select the runtime's hashtable load factor"
@@ -148,9 +166,9 @@
        (lambda (k)
          (if (and (flonum? k) (positive? k))
              (types-hash-table-load-factor k)
-             (error 'schml "invalid types hashtable load factor: ~a" k)))]
+             (error 'grift "invalid types hashtable load factor: ~a" k)))]
       [else
-       (error 'schml "invalid argument given for hashtable load factor: ~v" num)])]
+       (error 'grift "invalid argument given for hashtable load factor: ~v" num)])]
    [("-r" "--recursive")
     "recursively compile directory"
     (recursive-parameter #t)]
@@ -175,15 +193,31 @@
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
+      #:once-any
+   ["--config" file
+    ("specify a file from which to read the configuration"
+     "this configuration shouldn't conflict with command line flags")
+    (define p (string->path file))
+    (unless(file-exists? p)
+      (error 'grift "file not found: ~v" p))
+    (define c (call-with-input-file read p))
+    (define (symbolic-association? x)
+      (and (pair? x) (symbol? (car x))))
+    (unless (and (list? c)
+                 (andmap symbolic-association? c))
+      (error 'grift "invalid configuration: ~v" c))
+    (reconfigure c)]
+   ["--display-config"
+    "print out the configuration of the compiler"
+    (grift-main-function
+     (lambda (args)
+        (match args
+          [(list) (display-configuration (current-output-port))]
+          [(list (app string->path (and (not #f) p)))
+           (when (file-exists? p)
+             (error 'grift
+                    "--display-config will not override file: ~a"
+                    p))
+           (call-with-output-file p display-configuration)])))]
    #:args args
-   (match args
-     [(list)
-      (cond
-       [(not (schml-did-something?))
-        (error 'schml "no input given")])]
-     [(list (app string->path (and (not #f) path)))
-      (cond
-       [(recursive-parameter) (compile-directory path)]
-       [else (compile path)])]
-     [else (error 'schml "invalid arguments ~a" args)])
-     (void)))
+   ((grift-main-function) args)))
