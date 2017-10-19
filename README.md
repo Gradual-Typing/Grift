@@ -1,4 +1,4 @@
-# Schml A GTLC Compiler
+# Grift: A GTLC Compiler
 
 Welcome to the home of a compiler for the Gradually Typed Lambda 
 Calculus (GTLC). The compiler is intended to explore how different
