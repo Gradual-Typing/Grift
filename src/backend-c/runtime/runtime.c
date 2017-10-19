@@ -54,12 +54,12 @@ void print_ascii_char(int64_t ch){
     default:
       // a small range of homoiconic characters
       if (ch >= 32  && ch <= 126) { 
-	buf[0] = '#';
-	buf[1] = '\\';
-	buf[2] = ch;  
-	buf[3] = 0;
+        buf[0] = '#';
+        buf[1] = '\\';
+        buf[2] = ch;  
+        buf[3] = 0;
       } else {
-	sprintf(buf, "#\\u%.4X", (uint32_t) ch);
+        sprintf(buf, "#\\u%.4X", (uint32_t) ch);
       }
       str = buf;
       break;
@@ -67,8 +67,8 @@ void print_ascii_char(int64_t ch){
     fputs(str, stdout);
   } else {
     fputs("print_ascii_string:"
-	  " code point is outside of ascii range",
-	  stderr);
+          " code point is outside of ascii range",
+          stderr);
   }
 }
 

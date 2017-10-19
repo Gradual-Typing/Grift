@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include "boehm-gc-install/include/gc/gc.h"
 #include "hashcons.h"
 
@@ -92,7 +93,7 @@ int types_equal(int64_t t1, int64_t t2)
       return true;
       break;
     default:
-      (printf("hashcons/types-equal: invalid tag: %ld", tag1));
+      (printf("hashcons/types-equal: invalid tag: %" PRId64, tag1));
       exit(1);
     }
   }
@@ -120,7 +121,7 @@ void types_reinsert(table ht, int64_t ty)
     C->list = new_item;
     break;
   default:
-    (printf("hashcons/types-reinsert: invalid tag: %ld", tag));
+    (printf("hashcons/types-reinsert: invalid tag: %" PRId64, tag));
     exit(1);
   }
 }
