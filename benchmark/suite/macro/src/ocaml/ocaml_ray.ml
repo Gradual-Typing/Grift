@@ -83,7 +83,7 @@ let round x = floor (x+.0.5)
         
 let color_at x y =
   let ray = unit_vector (x-.eye.x) (y-.eye.y) (-1.0*.eye.z) in
-  int_of_float ((round (sendray eye ray)) *. 255.0)
+  int_of_float (round ((sendray eye ray) *. 255.0))
         
 let tracer res =
   let extent = res * 100 in
@@ -103,7 +103,7 @@ let () =
   let counter = ref 29 in
   defsphere 32    0.0  (-300.0) (-1200.0) 200.0 0.8;
   defsphere 31 (-80.0) (-150.0) (-1200.0) 200.0 0.7;
-  defsphere 30    0.0  (-100.0) (-1200.0) 200.0 0.9;
+  defsphere 30   70.0  (-100.0) (-1200.0) 200.0 0.9;
   for x = -2 to 2 do
     for z = 2 to 7 do
       defsphere !counter
