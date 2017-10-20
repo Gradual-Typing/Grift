@@ -223,48 +223,46 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     
     
      gnuplot -e "set datafile separator \",\";"`
-      	   `"set terminal pngcairo size 1280,960"`
-              `" noenhanced color font 'Verdana,26' ;"`
-    	   `"set output '${perf_lattice_log_fig}';"`
-	       `"set key left font 'Verdana,20';"`
-	       `"set logscale y;"`
-    	   `"set xrange [-5:105];"`
-    	   `"set yrange [0.01:100];"`
-	       `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
-    	   `"set title \"${printname}\";"`
-	       `"set ylabel \"Speedup over Gambit (Log scale)\";"`
-	       `"set xlabel \"How much of the code is typed\";"`
-	       `"plot '${logfile1}' using 2:5 with points"`
-              `" pt 9 ps 3 lc rgb '#fdb863' title '${c1t}',"`
-	       `"${g1} lw 4 dt 2 lc rgb '#fdb863' notitle '${c1t} mean',"`
-    	   `"'${logfile3}' using 2:5 with points"`
-              `" pt 6 ps 3 lc rgb '#5e3c99' title '${c2t}',"`
-	       `"${g2} lw 4 dt 4 lc rgb '#5e3c99' notitle '${c2t} mean',"`
-           `"1 lw 2 dt 2 lc rgb \"black\" title 'Gambit Scheme',"` 
-           `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'Static Grift';"
+      	        `"set terminal pngcairo size 1280,960"`
+                `"   noenhanced color font 'Verdana,26' ;"`
+                `"set output '${perf_lattice_log_fig}';"`
+	            `"set key left font 'Verdana,20';"`
+	            `"set logscale y;"`
+    	        `"set xrange [-5:105];"` 
+    	        `"set yrange [.009:100];"` 
+	            `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+    	        `"set title \"${printname}\";"`
+	            `"set ylabel \"Speedup over Gambit (Log scale)\";"`
+	            `"set xlabel \"How much of the code is typed\";"`
+	            `"plot '${logfile1}' using 2:5 with points"`
+                `"   pt 9 ps 3 lc rgb '#fdb863' title '${c1t}',"`
+	            `"${g1} lw 4 dt 2 lc rgb '#fdb863' title '${c1t} mean',"`
+    	        `"'${logfile3}' using 2:5 with points"`
+                `"   pt 6 ps 3 lc rgb '#5e3c99' title '${c2t}',"`
+	            `"${g2} lw 4 dt 4 lc rgb '#5e3c99' title '${c2t} mean',"`
+                `"1 lw 2 dt 2 lc rgb \"black\" title 'Gambit Scheme',"` 
+                `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'Static Grift';"
 
 
      gnuplot -e "set datafile separator \",\";"`
-           `"set terminal pngcairo size 1280,960"`
-                `" noenhanced color font 'Verdana,26' ;"`
-    	   `"set output '${perf_lattice_lin_fig}';"`
-	       `"set key left font 'Verdana,20';"`
-    	   `"set xrange [-5:105];"`
-           `"set xrange [0:];"`
-	       `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
-    	   `"set title \"${printname}\";"`
-	       `"set ylabel \"Speedup over Gambit\";"`
-	       `"set xlabel \"How much of the code is typed\";"`
-	       `"plot '${logfile1}' using 2:5 with points"` 
-              `" pt 9 ps 3 lc rgb '#fdb863' title '${c1t}',"`
-	       `"${g1} lw 4 dt 2 lc rgb '#fdb863' title '${c1t} mean',"`
-    	   `"'${logfile3}' using 2:5 with points"`
-              `" pt 6 ps 3 lc rgb '#5e3c99' title '${c2t}',"`
-	       `"${g2} lw 4 dt 4 lc rgb '#5e3c99'  title '${c2t} mean',"`
-           `"1 lw 2 dt 4 lc rgb \"black\" title 'Gambit Scheme',"` 
-           `"${static_speed_up} lw 2 dt 2 lc \"black\" title 'Static Grift';"
-     
-    # RETURN=$(awk -v g1="$g1" -v g2="$g2" "BEGIN {printf \"%.2f\n\", g2/g1}")
+                `"set terminal pngcairo size 1280,960"`
+                `"   noenhanced color font 'Verdana,26' ;"`
+    	        `"set output '${perf_lattice_lin_fig}';"`
+	            `"set key left font 'Verdana,20';"`
+    	        `"set xrange [-5:105];"`
+                `"set yrange [0:];"`
+	            `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+    	        `"set title \"${printname}\";"`
+	            `"set ylabel \"Speedup over Gambit\";"`
+	            `"set xlabel \"How much of the code is typed\";"`
+	            `"plot '${logfile1}' using 2:5 with points"` 
+                `"   pt 9 ps 3 lc rgb '#fdb863' title '${c1t}',"`
+	            `"${g1} lw 4 dt 2 lc rgb '#fdb863' title '${c1t} mean',"`
+    	        `"'${logfile3}' using 2:5 with points"`
+                `"   pt 6 ps 3 lc rgb '#5e3c99' title '${c2t}',"`
+	            `"${g2} lw 4 dt 4 lc rgb '#5e3c99'  title '${c2t} mean',"`
+                `"1 lw 2 dt 4 lc rgb \"black\" title 'Gambit Scheme',"` 
+                `"${static_speed_up} lw 2 dt 2 lc \"black\" title 'Static Grift';"
 }
 
 ##3182bd
