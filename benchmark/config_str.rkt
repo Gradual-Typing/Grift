@@ -156,12 +156,21 @@ Description: Facilitates a user-friendly interface for Grift
             "Lazy Coercions"]
            [else
             (string-join (map symbol->string (set->list s)) " ")]))
-       (printf "~a,~a,~a"
-               (f s1 s2)
-               (f s2 s1)
-               (string-join
-                (map symbol->string
-                     (set->list (set-intersect s1 s2))) "_"))]
+       (define-values (c1 c2)
+         (let ([c1 (f s1 s2)] [c2 (f s2 s1)])
+           (cond
+             [(and (equal? "Eager Type-Based Casts" c1)
+                   (equal? "Lazy Coercions" c2))
+              (values "Type-Based Casts" "Coercions")]
+             [(and (equal? "Eager Type-Based Casts" c2)
+                   (equal? "Lazy Coercions" c1))
+              (values "Coercions" "Type-Based Casts")]
+             [else (values c1 c2)])))
+       (define intersection
+         (string-join
+          (map symbol->string
+               (set->list (set-intersect s1 s2))) "_")) 
+       (printf "~a,~a,~a" c1 c2 intersection)]
       [else
        (error 'config_str: "could not parse ~a and ~a as numbers" c1 c2)])]
    #:args all

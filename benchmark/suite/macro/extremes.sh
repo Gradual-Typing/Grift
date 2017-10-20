@@ -93,29 +93,30 @@ gen_fig()
     local mode="$1"; shift
     local sys="$1";  shift
     local outfile_name="$1"; shift
-    
+    local key_position="$1"; shift
     local logfile="${DATA_DIR}/${mode}.log"
     local outfile="${OUT_DIR}/${outfile_name}.png"
     local N=$(head -1 "${logfile}" | sed 's/[^,]//g' | wc -c)
 
     rm -rf "$outfile"
     
-    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-       `"noenhanced color font 'Verdana,10' ;"`
-       `"set output '${outfile}';"`
-	   `"set border 15 back;"`
-       `"set style data histogram;"`
-       `"set style histogram cluster gap 1;"`
-       `"set style fill pattern border -1;"`
-       `"set boxwidth 0.9;"`
-	   `"set key left;"`
-	   `"set ylabel \"Speedup with respect to ${sys}\";"`
-       `"set title \"\";"`
-	   `"set xtic rotate by -45 scale 0;"`
-	   `"set grid ytics;"`
-       `"set ytics add (\"1\" 1);"`
-       `"plot '${logfile}' using 2:xtic(1) title col,"`
-       `"for [i=3:$N] \"\" using i title columnheader(i)"
+    gnuplot -e "set datafile separator \",\";"`
+            `"set terminal pngcairo size 1280,960"`
+            `" noenhanced color font 'Verdana,26' ;"`
+            `"set output '${outfile}';"`
+	        `"set border 15 back;"`
+            `"set key ${key_position} font 'Verdana,20';"`
+            `"set style data histogram;"`
+            `"set style histogram cluster gap 1;"`
+            `"set style fill pattern border -1;"`
+            `"set boxwidth 0.9;"` 
+	        `"set ylabel \"  Speedup with respect to ${sys}\";"`
+            `"set title \"\";"`
+	        `"set xtic rotate by -45 scale 0;"`
+	        `"set grid ytics;"`
+            `"set ytics add (\"1\" 1);"`
+            `"plot '${logfile}' using 2:xtic(1) title col,"`
+            `"for [i=3:$N] \"\" using i title columnheader(i)"
 }
 
 
@@ -159,8 +160,8 @@ run_experiment()
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "n_body" "100000" ""
     
-    gen_fig static "Static Grift" "${shared_str}_static"
-    gen_fig dyn Gambit "${shared_str}_dynamic"
+    gen_fig static "Static Grift" "${shared_str}_static" "right"
+    gen_fig dyn Gambit "${shared_str}_dynamic" "left"
 }
 
 main()
