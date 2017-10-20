@@ -17,7 +17,6 @@
          racket/cmdline
          racket/path)
 
-
 (provide (all-defined-out))
 
 (require "./suite/tests.rkt")
@@ -90,13 +89,21 @@
 
 (define (run-single-path p)
   (define dir  (build-path (test-suite-dir)))
-  (for ([cast-rep (test-cast-representation)])
+  (for* ([spec? (test-specialize-cast-code-generation)]
+         [cast-rep (test-cast-representation)] 
+         #:unless (and (eq? cast-rep 'Static) spec?))
     (parameterize ([cast-representation cast-rep]
                    [output-path (build-path test-tmp-path "t.out")]
                    [c-path (build-path test-tmp-path "t.c")]
                    [c-flags (cons "-O3" (c-flags))]
-                   [specialize-cast-code-generation? #t]
+                   [specialize-cast-code-generation? spec?]
                    [check-asserts? #t])
+      (define spec-str
+        (cond
+          [(eq? cast-rep 'Static) ""]
+          [spec? "Specialized"]
+          [else  "Unspecialized"]))
+      (printf "~a ~a tests running:\n" spec-str cast-rep) 
       (run-tests (test-path dir p)))))
 
 (define (test-path suite-dir p)
@@ -136,14 +143,21 @@
     [else d]))
 
 (define (old-run-tests)
-  (for ([cast-rep (test-cast-representation)])
+  (for* ([spec? (test-specialize-cast-code-generation)]
+         [cast-rep (test-cast-representation)] 
+         #:unless (and (eq? cast-rep 'Static) spec?))
     (parameterize ([cast-representation cast-rep]
                    [output-path (build-path test-tmp-path "t.out")]
                    [c-path (build-path test-tmp-path "t.c")]
                    [c-flags (cons "-O3" (c-flags))]
-                   [specialize-cast-code-generation? #t]
+                   [specialize-cast-code-generation? spec?]
                    [check-asserts? #t])
-      (printf "~a tests running:\n" cast-rep)
+      (define spec-str
+        (cond
+          [(eq? cast-rep 'Static) ""]
+          [spec? "Specialized"]
+          [else  "Unspecialized"]))
+      (printf "~a ~a tests running:\n" spec-str cast-rep)
       (match cast-rep
         ['Static (run-tests static-tests)]
         [_ (run-tests (suite))]))))

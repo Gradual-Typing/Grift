@@ -19,6 +19,7 @@
    (test-file "core" "const-negative.schml" (int -5))
    (test-file "core" "const-ninetynine.schml" (int 99))
    (test-file "core" "const-larg-int.schml" (int 123456))
+   ;; Character
    (test-file "core" "const-char-a.schml" (char #\a))
    (test-file "core" "const-char-null.schml" (char #\nul))
    (test-file "core" "let-const-char-z.schml" (char #\z))
@@ -76,6 +77,8 @@
    "core tests"
    #:before (lambda () (display "core test running ... "))
    #:after (lambda () (display "done\n"))
+   ;; Simple dynamic tests
+   (test-file "core" "float1.schml" (bool #t))
    ;; Let
    (test-file "core" "let10.schml" (dyn))
    (test-file "core" "let12.1.schml" (dyn))
