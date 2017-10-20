@@ -1382,7 +1382,7 @@ TODO write unit tests
       (match t2
         [(Type (Dyn))
          (error 'grift/make-code-gen-project "Called with t2 = Dyn")]
-        [(Type (or (Float) (Int) (Character) (Unit) (Bool)))
+        [(Type (or (Int) (Character) (Unit) (Bool)))
          (If (dyn-immediate-tag=?$ v t2)
              (dyn-immediate-value$ v)
              (interp-project v t2 l mt))]
