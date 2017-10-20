@@ -10,6 +10,7 @@
 +------------------------------------------------------------------------------|#
 (require "../language/grift0.rkt"
          "../logging.rkt"
+         racket/exn
          racket/path)
 
 (provide read)
@@ -40,8 +41,23 @@ it as a list.
 |#
 ;(: read-syntax-from-file (Path String . -> . (Listof (Syntaxof Any))))
 (define (read-syntax-from-file path name)
-  (call-with-input-file path #:mode 'text
-    (lambda (p) (read-syntax-from-port p name))))
+  (unless (file-exists? path)
+    (error 'grift
+           "couldn't read grift source code\n\tno such file: ~a"
+           path))
+  (when (directory-exists? path)
+    (error 'grift
+           (string-append
+            "couldn't read grift source code:\n"
+            "\t found director instead of text file: ~a")
+           path))
+  (define (handle-unkown-read-exception e)
+    (error 'grift
+           "couldn't read grift source code:\n\tunkown exception follows\n~a"
+           (exn->string e)))
+  (with-handlers ([exn? handle-unkown-read-exception])
+    (call-with-input-file path #:mode 'text
+      (lambda (p) (read-syntax-from-port p name)))))
 
 (define (read-syntax-from-port port name)
   (let ((read (get-reader name)))
