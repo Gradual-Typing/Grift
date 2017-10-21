@@ -742,9 +742,6 @@ but a static single assignment is implicitly maintained.
         [(Type-GVect-Of (app recur e)) (type-gvect-type-access e)]
         [(Type-Dyn-Huh (app recur e))
          (Op '= (list TYPE-DYN-RT-VALUE e))]
-        
-        [(Type-Tag (app recur e))
-         (Op 'binary-and (list e TYPE-TAG-MASK))]
         ;; Coercions
         ;; Projection Coercions
         [(Quote-Coercion c) (sr-immediate-coercion c)]
@@ -931,8 +928,6 @@ but a static single assignment is implicitly maintained.
          (sr-tagged-array-ref e HYBRID-PROXY-TAG HYBRID-PROXY-CLOS-INDEX)]
         [(Hybrid-Proxy-Coercion (app recur e))
          (sr-tagged-array-ref e HYBRID-PROXY-TAG HYBRID-PROXY-CRCN-INDEX)]
-        ;; TODO Fix me TAG should never have been exposed
-        [(Tag t) (sr-tag t)]
         ;; Dynamic Values Representation
         [(Construct (Dyn) 'make (list e t)) (sr-dyn-make recur (recur e) t)]
         [(Access (Dyn) 'value (app recur e) #f)
@@ -1627,24 +1622,6 @@ but a static single assignment is implicitly maintained.
       [(Dyn? t) (op$ Print (Quote "Dynamic : ?\n"))]
       [else (error 'sr-observe "printing other things")]))
   (begin$ (assign$ res e) (generate-print res t)))
-
-#;(TODO GET RID OF TAGS IN THE COMPILER)
-(: sr-tag (Tag-Symbol -> (Quote Integer)))
-(define (sr-tag t)
-  (case t
-    [(Int)    DYN-INT-TAG]
-    [(Char)   DYN-CHAR-TAG]
-    [(Bool)   DYN-BOOL-TAG]
-    [(Unit)   DYN-UNIT-TAG]
-    [(Atomic) TYPE-ATOMIC-TAG]
-    [(Fn)     TYPE-FN-TAG]
-    [(GRef)   TYPE-GREF-TAG]
-    [(GVect)  TYPE-GVECT-TAG]
-    [(Boxed)  DYN-BOXED-TAG]
-    [(MRef)   TYPE-MREF-TAG]
-    [(MVect)  TYPE-MVECT-TAG]
-    [(STuple) TYPE-TUPLE-TAG]
-    [else (error 'sr-tag "invalid: ~a" t)]))
 
 (: sr-bndp* ((CoC6-Expr Env IndexMap -> D0-Expr)
              -> (CoC6-Bnd-Procedure* -> D0-Bnd-Code*)))

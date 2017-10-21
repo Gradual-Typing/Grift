@@ -46,7 +46,6 @@
           ;;Primitives
           (Op Grift-Primitive (Listof E))
           (Quote Cast-Literal)
-          (Tag Tag-Symbol)
           ;; Casts with different ways of getting the same semantics
 	  (Cast E (Twosome Grift-Type Grift-Type Blame-Label))
           (Cast E (Coercion Grift-Coercion))
@@ -57,7 +56,6 @@
           (Type-Fn-arg E E)
           (Type-Fn-return E)
           (Type-Fn-arity E)
-          (Type-Tag E)
           ;; Dynamic Representation
           (Dyn-tag E)
           (Dyn-immediate E)

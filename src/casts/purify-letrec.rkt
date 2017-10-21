@@ -71,7 +71,7 @@
     [(App-Code e e*)
      (and outer-lambda? (recur e) (recur* e*))]
     ;; Constant data is simple
-    [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _) (No-Op)) #t]
+    [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (No-Op)) #t]
     ;; All other forms are simple if their constituents are simple
     [(Letrec bnd* expr)
      (and (recur expr) (recur* (map (inst cdr Uid L0-Expr) bnd*)))]
@@ -144,7 +144,6 @@
     [(Type-GVect-Of e) (recur e)]
     [(Type-GRef-Huh e) (recur e)]
     [(Type-GVect-Huh e) (recur e)]
-    [(Type-Tag e) (recur e)]
     [(Blame e) (recur e)]
     [(Observe e t) (recur e)]
     [(Unguarded-Box e) (recur e)]
@@ -265,7 +264,7 @@
        [else v])]
     ;; Every other case is just a boring flow agnostic tree traversal
     [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
-    [(or (Code-Label _) (Tag _) (No-Op)) expr]
+    [(or (Code-Label _) (No-Op)) expr]
     [(Lambda f* (Castable ctr e)) (Lambda f* (Castable ctr (recur e)))]
     ;; TODO examine this code and ensure it isn't just doing
     ;; wasted computation we are using unique identifiers
@@ -395,8 +394,6 @@
      (Type-GRef-Huh e)]
     [(Type-GVect-Huh (app recur e))
      (Type-GVect-Huh e)]
-    [(Type-Tag (app recur e))
-     (Type-Tag e)]
     [(Construct t v (app recur* e*))
      (Construct t v e*)]
     [(Access t f (app recur e) i?)
@@ -620,7 +617,7 @@
             [else (Let simple* let-complex)]))))
      (debug who-return return)]
     [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
-    [(or  (Code-Label _) (Tag _) (No-Op)) expr]
+    [(or  (Code-Label _) (No-Op)) expr]
     [(Code-Label u)
      (Code-Label u)]
     [(Labels (app pl-expr-bnd-code* b*) (app pl-expr e))
@@ -735,10 +732,6 @@
      (Type-GRef-Huh e)]
     [(Type-GVect-Huh (app pl-expr e))
      (Type-GVect-Huh e)]
-    [(Type-Tag (app pl-expr e))
-     (Type-Tag e)]
-    [(Tag s)
-     (Tag s)]
     [(Construct t v (app pl-expr* e*))
      (Construct t v e*)]
     [(Access t f (app pl-expr e) i?)

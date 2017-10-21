@@ -84,10 +84,6 @@
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
-          ;; Tags are exposed before specify This is bad
-          ;; TODO fix this after the deadline
-          (Type-Tag E)
-          (Tag Tag-Symbol)
           ;; Binding Forms - Lambda
 	  (Letrec CoC3-Bnd* E)
 	  (Let CoC3-Bnd* E)

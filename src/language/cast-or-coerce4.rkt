@@ -83,10 +83,6 @@
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
-          ;; Tags are exposed before specify This is bad
-          ;; TODO fix this after the deadline
-          (Type-Tag E)
-          (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC4-Bnd-Lambda* E)

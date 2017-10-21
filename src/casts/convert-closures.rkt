@@ -269,7 +269,6 @@
         [(Op p (app recur* e*)) (Op p e*)]
         [(and nop (No-Op)) nop]
         [(Quote k) (Quote k)]
-        [(Tag t)   (Tag t)]
         ;; Observables Representation
         [(Blame (app recur e)) (Blame e)]
         [(Observe (app recur e) t) (Observe e t)]
@@ -280,7 +279,6 @@
         [(Break-Repeat) (Break-Repeat)]
         ;; Type Representation
         [(Type t) (Type t)]
-        [(Type-Tag (app recur e)) (Type-Tag e)]
         [(Type-GRef-Of (app recur e)) (Type-GRef-Of e)]
         [(Type-GVect-Of (app recur e)) (Type-GVect-Of e)]
         [(Type-Fn-arg (app recur e) (app recur i)) (Type-Fn-arg e i)]

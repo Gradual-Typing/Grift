@@ -122,7 +122,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (Quote literal)    ;; immediate data in general
   ;; Node that references a piece of code identified by the UID value
   (Code-Label value)
-  (Tag bits)         ;; an tag for an imediate value
   (Type type)        ;; an atomic type
   ;; Effectfull expressions
   ;; typed bindings annotations
@@ -135,7 +134,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (Fn-Caster expression)
   ;;Type Operations
   (Type-Dyn-Huh exp)
-  (Type-Tag expression)
   (Type-Fn index return-type argument-types)
   (Type-GRef type)
   (Type-GVect type)
@@ -796,10 +794,6 @@ Dyn
 
 (define-type Src srcloc)
 
-(define-type Tag-Symbol (U 'Int 'Bool 'Char 'Unit
-                           'Fn 'Atomic 'Boxed 'GRef
-                           'GVect 'MRef 'MVect 'STuple))
-
 
 (define-type (Mediating-Coercion C)
   (U Identity
@@ -951,7 +945,6 @@ Dyn
    [(Interpreted-Cast E1 (Coercion E1)) -> (Interpreted-Cast E2 (Coercion E2))]
    [(Fn-Caster E1) -> (Fn-Caster E2)]
    [(Type-Dyn-Huh E1) -> (Type-Dyn-Huh E2)]
-   [(Type-Tag E1) -> (Type-Tag E2)] 
    [(Type-Fn-arity E1) -> (Type-Fn-arity E2)]
    [(Type-Fn-arg E1 E1) -> (Type-Fn-arg E2 E2)]
    [(Type-Fn-return E1) -> (Type-Fn-return E2)]
@@ -1010,8 +1003,7 @@ Dyn
    [(Make-Fn-Coercion Uid E1 E1 E1) -> (Make-Fn-Coercion Uid E2 E2 E2)]
    [(Compose-Fn-Coercion Uid E1 E1) -> (Compose-Fn-Coercion Uid E2 E2)]
    [(Id-Coercion-Huh E1) -> (Id-Coercion-Huh E2)]
-   [Id-Coercion -> Id-Coercion]   
-   [(Tag Tag-Symbol) -> (Tag Tag-Symbol)]))
+   [Id-Coercion -> Id-Coercion]))
 
 ;; TODO submit a patch to racket so that this isn't necisarry
 ;; adhoc polymorphism encoded by case lambda across all
@@ -1021,8 +1013,7 @@ Dyn
 #;(define ((map-expr f) e)
   (match e
     [(and c (or (Type _) (Quote _) (Quote-Coercion _)
-                (Code-Label _) (Var _) (Static-Id _)
-                (Tag _)))
+                (Code-Label _) (Var _) (Static-Id _)))
      c]
     [(and c (or (No-Op) (Halt) (Success))) c]
     ;; Don't use compound forms anymore

@@ -114,7 +114,6 @@
   (Quote datum)    ;; immediate data in general
   ;; Node that references a piece of code identified by the UID value
   ;;(Code-Label value)
-  ;;(Tag bits)         ;; an tag for an imediate value
   ;;(Type type)        ;; an atomic type
   ;; Effectfull expressions
   ;; typed bindings annotations

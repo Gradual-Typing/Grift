@@ -68,7 +68,6 @@
     [(Op p (app uf-expr* e* e*-fvars)) (values (Op p e*) e*-fvars)]
     [(and nop (No-Op)) (values nop mt-set)]
     [(Quote k) (values (Quote k) mt-set)]
-    [(Tag t) (values (Tag t) mt-set)]
     ;; Observables Representation
     [(Blame (app uf-expr e f)) (values (Blame e) f)]
     [(Observe (app uf-expr e f) t) (values (Observe e t) f)]
@@ -79,8 +78,6 @@
      (values (Begin e* e) (set-union fv1 fv2))]
     ;; Type Representation
     [(Type t) (values (Type t) mt-set)]
-    [(Type-Tag (app uf-expr e fv))
-     (values (Type-Tag e) fv)]
     [(Type-GRef-Of (app uf-expr e f*))
      (values (Type-GRef-Of e) f*)]
     [(Type-GVect-Of (app uf-expr e f*))
