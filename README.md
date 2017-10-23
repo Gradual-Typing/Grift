@@ -11,7 +11,7 @@ I will post some of the relavant paper here or in the wiki soon.
 ## Installation
 
 ```bash
-git clone git@github.com:akuhlens/grift
+git clone git@github.com:Gradual-Typing/Grift.git
 cd grift
 raco pkg install
 ```
