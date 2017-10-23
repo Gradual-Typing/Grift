@@ -94,6 +94,7 @@
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
+          (Atomic-Type-Huh E)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
           ;; binding 
 	  (Let CoC6-Bnd-Data* E)

@@ -76,6 +76,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
+          (Atomic-Type-Huh E)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC3.1-Bnd* E)

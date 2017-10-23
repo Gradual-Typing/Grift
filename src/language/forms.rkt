@@ -133,6 +133,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Interpreted-Cast expression instruction)
   (Fn-Caster expression)
   ;;Type Operations
+  (Atomic-Type-Huh exp)
   (Type-Dyn-Huh exp)
   (Type-Fn index return-type argument-types)
   (Type-GRef type)

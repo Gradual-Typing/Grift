@@ -84,6 +84,7 @@
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
+          (Atomic-Type-Huh E)
           ;; Binding Forms - Lambda
 	  (Letrec CoC3-Bnd* E)
 	  (Let CoC3-Bnd* E)
