@@ -1,5 +1,5 @@
 ROOT_DIR=../../..
-COMPILE=$(SCHML)
+COMPILE=$(GRIFT)
 COMPILE_OPTIONS=--coercions -O 3 
 SRC_DIR=../src
 SRC_EXT=grift

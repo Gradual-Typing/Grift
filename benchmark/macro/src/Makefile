@@ -7,7 +7,7 @@ AUTO_DIRS:=
 CLEANED:=lattice stats *.log
 include shared.mk
 
-CONFIGS:=$(OTHER_LANGS) $(addprefix grift/, $(SCHML_CONFIGS))
+CONFIGS:=$(OTHER_LANGS) $(addprefix grift/, $(GRIFT_CONFIGS))
 ALL_BINS:=$(foreach CONFIG, $(CONFIGS), $(addprefix $(CONFIG)/, $(BINS)))
 ALL_ERRS:=$(foreach CONFIG, $(CONFIGS), $(addprefix $(CONFIG)/, $(ERRS)))
 
