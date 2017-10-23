@@ -105,7 +105,7 @@ gen_output()
 
     local name=$(basename "$path")
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
+    local config_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
     local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
     local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
     local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
@@ -278,7 +278,7 @@ run_benchmark()
 	local dynamizer_out=$(dynamizer "${lattice_path}.grift" "$nbins" "$nsamples" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
-    racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
+    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
     dynamizer_out=$(cat "$lattice_file")
 
     gen_output $baseline_system $c1 $c2 "$lattice_path" "$benchmark_args" "$dynamizer_out" "$print_name" "$disk_aux_name"
@@ -343,13 +343,13 @@ main()
 	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
     else
 	declare -r DATE="$date"
-	if [ ! -d "$SCHML_DIR/benchmark/suite/macro/lattice_bins/$DATE" ]; then
+	if [ ! -d "$GRIFT_DIR/benchmark/suite/macro/lattice_bins/$DATE" ]; then
 	    echo "Directory not found"
 	    exit 1
 	fi
     fi
     
-    declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
+    declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/lattice_bins/$DATE"
     declare -r DATA_DIR="$EXP_DIR/data"
     declare -r OUT_DIR="$EXP_DIR/output"
@@ -368,7 +368,7 @@ main()
 
     . "lib/runtime.sh"
 
-    cd "$SCHML_DIR"
+    cd "$GRIFT_DIR"
 
     local baseline_system=get_gambit_runtime
 

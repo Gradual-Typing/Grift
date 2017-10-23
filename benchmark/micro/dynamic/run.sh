@@ -1,7 +1,7 @@
 #!/bin/sh
 set -euo pipefail
 
-griftdir=$SCHML_DIR
+griftdir=$GRIFT_DIR
 memlimit=9999999999
 griftflags=""
 

@@ -5,7 +5,7 @@ loops=5
 precision=5
 grift_mem_limit=9999999999
 
-griftdir=$SCHML_DIR
+griftdir=$GRIFT_DIR
 ranges=(10 100 1000 2000 3000 4000 5000 6000 7000 8000 9000 10000)
 file=quicksort_worstcase
 # --------------------------------------------------------------------

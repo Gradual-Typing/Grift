@@ -57,8 +57,8 @@ get_grift_runtimes()
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
     else
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
-	local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+	racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
+	local configs=($(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -i))
 	for i in ${configs[@]}; do
 	    avg "${benchmark_path}.o${i}" "$benchmark_args" "$runtimes_file"
 	    echo "$RETURN" >> "$cache_file"
@@ -84,7 +84,7 @@ get_grift_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.grift"
+	racket "${GRIFT_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.grift"
 	avg "${benchmark_path}.o${config_index}" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
@@ -106,7 +106,7 @@ get_c_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	clang "${benchmark_path}.c" "${SCHML_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${SCHML_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
+	clang "${benchmark_path}.c" "${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
 	avg "${benchmark_path}.o" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
