@@ -383,9 +383,9 @@ that can be located throughout this file:
   ;; information contained in a type-based cast.
   ;; This coercion literal is eligable to be hoisted in a later
   ;; pass so that it only ever is creates a value once. 
-  (: make-coercion : Schml-Type Schml-Type Blame-Label -> CoC3-Expr)
+  (: make-coercion : Grift-Type Grift-Type Blame-Label -> CoC3-Expr)
   (define (make-coercion t1 t2 l)
-    (: recur : Schml-Type Schml-Type -> Hyper-Coercion)
+    (: recur : Grift-Type Grift-Type -> Hyper-Coercion)
     (define (recur t1 t2)
       (match* (t1 t2)
         [(t        t) (HC #f t #f #f t IDENTITY)]

@@ -3,11 +3,11 @@
 (require "./forms.rkt")
 (provide (all-defined-out))
 #|-----------------------------------------------------------------------------+
-| Language/Schml-Syntax 
+| Language/Grift-Syntax 
 +-----------------------------------------------------------------------------|#
 #| Maybe type |#
 
-;; The language created by schml/read
+;; The language created by grift/read
 (define-type Syntax-Lang (Prog String (Listof Stx)))
 
 (define-type Stx (Syntaxof Any));; This might not be what I want considier Just Syntax
@@ -15,20 +15,20 @@
 
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml0
+| Language/Grift0
 +-----------------------------------------------------------------------------|#
-(define-type Schml0-Lang (Prog (List String Natural) S0-Expr))
+(define-type Grift0-Lang (Prog (List String Natural) S0-Expr))
 
 (define-type (S0-Form E)
-  (U (Lambda Schml-Fml* (Ann E (Option Schml-Type)))
+  (U (Lambda Grift-Fml* (Ann E (Option Grift-Type)))
      (Letrec S0-Bnd* E)
      (Let S0-Bnd* E)
      (App E (Listof E))
-     (Op Schml-Primitive (Listof E))
+     (Op Grift-Primitive (Listof E))
      (If E E E)
-     (Ascribe E Schml-Type (Option Blame-Label))
+     (Ascribe E Grift-Type (Option Blame-Label))
      (Var Uid)
-     (Quote Schml-Literal)
+     (Quote Grift-Literal)
      (Begin (Listof E) E)
      (Repeat Uid E E E)
      ;; Monotonic effects
@@ -50,6 +50,6 @@
   (Rec E (Ann (S0-Form E) Src)))
 
 (define-type S0-Expr* (Listof S0-Expr))
-(define-type S0-Bnd (Bnd Uid Schml-Type? S0-Expr))
+(define-type S0-Bnd (Bnd Uid Grift-Type? S0-Expr))
 (define-type S0-Bnd* (Listof S0-Bnd))
 

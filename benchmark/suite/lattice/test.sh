@@ -7,19 +7,19 @@ nsamples=10
 deliverable=3
 usable=10
 nAnnotizerbin=/u/dalmahal/nAnnotizer/.stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/./nAnnotizer
-schmldir=/u/dalmahal/Schml
+griftdir=/u/dalmahal/Schml
 # --------------------------------------------------------------------
 
-testdir=$schmldir/benchmark/suite
-datadir=$schmldir/benchmark/suite/lattice/data
-outdir=$schmldir/benchmark/suite/lattice/output
-tmpdir=$schmldir/benchmark/suite/lattice/tmp
-miscdir=$schmldir/benchmark/suite/lattice/misc
+testdir=$griftdir/benchmark/suite
+datadir=$griftdir/benchmark/suite/lattice/data
+outdir=$griftdir/benchmark/suite/lattice/output
+tmpdir=$griftdir/benchmark/suite/lattice/tmp
+miscdir=$griftdir/benchmark/suite/lattice/misc
 TIMEFORMAT=%R
 let "n=nbins*nsamples"
 let "nx=n*6/10"
 
-for f in $tmpdir/*.schml; do
+for f in $tmpdir/*.grift; do
     path="${f%.*}";name=$(basename "$path")
     logfile1=$datadir/${name}1.log
     logfile2=$datadir/${name}1.csv

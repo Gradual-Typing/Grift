@@ -53,8 +53,8 @@ casts/%:
 # 	echo 'options:' >> coercions/log/compile.log
 # 	echo $(COERCEOPTS) >> coercions/log/compile.log
 
-# coercions/bin/% : coercions/bin src/%.schml
-# 	${SCHML} ${OPTS} -o $@ src/$*.schml 
+# coercions/bin/% : coercions/bin src/%.grift
+# 	${SCHML} ${OPTS} -o $@ src/$*.grift 
 
 # coercions/out/%.out : coercions/log coercions/out \
 # 		      coercions/bin/% ../../inputs/%
@@ -71,8 +71,8 @@ casts/%:
 # 	echo 'options:' >> casts/log/compile.log
 # 	echo $(CASTOPTS) >> casts/log/compile.log
 
-# casts/bin/% : casts/bin src/%.schml
-# 	${SCHML} $(CASTOPTS) -o $@ src/$*.schml
+# casts/bin/% : casts/bin src/%.grift
+# 	${SCHML} $(CASTOPTS) -o $@ src/$*.grift
 
 # casts/out/%.out : casts/log casts/out casts/bin/% ../../inputs/%
 # 	echo >> casts/log/run.log # print a new line

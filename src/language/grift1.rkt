@@ -3,37 +3,37 @@
 (provide (all-from-out "forms.rkt" "primitives.rkt")
          (all-defined-out))
 #|-----------------------------------------------------------------------------+
-| Language/Schml1 created by type-check
+| Language/Grift1 created by type-check
 +-----------------------------------------------------------------------------|#
 
-(define-type Schml1-Lang
-  (Prog (List String Natural Schml-Type) (Listof S1-Top)))
+(define-type Grift1-Lang
+  (Prog (List String Natural Grift-Type) (Listof S1-Top)))
 
 (define-type S1-Top
-  (U (Define Boolean Uid Schml-Type S1-Expr)
-     (Observe S1-Expr Schml-Type)))
+  (U (Define Boolean Uid Grift-Type S1-Expr)
+     (Observe S1-Expr Grift-Type)))
 
 (define-type S1-Expr
   ;; This slightly complicated formulation of lambda's Structure allows me
   ;; To rely on lambdas to have function types during cast insertion
-  (Rec E (U (Ann (Lambda Schml-Fml* E) (Pair Src Schml-Fn-Type))
+  (Rec E (U (Ann (Lambda Grift-Fml* E) (Pair Src Grift-Fn-Type))
             (Ann (U
                   (Letrec S1-Bnd* E)
                   (Let S1-Bnd* E)
                   (App E (Listof E))
-                  (Op (Ann Schml-Primitive Schml-Type*) (Listof E))
+                  (Op (Ann Grift-Primitive Grift-Type*) (Listof E))
                   (If E E E)
                   (Switch E (Switch-Case* E) E)
-                  (Ascribe E Schml-Type (Option Blame-Label))
+                  (Ascribe E Grift-Type (Option Blame-Label))
                   (Var Uid)
-                  (Quote Schml-Literal)
+                  (Quote Grift-Literal)
                   (Begin (Listof E) E)
                   (Repeat Uid E E Uid E E)
                   ;; Monotonic effects
-                  (Mbox E Schml-Type)
+                  (Mbox E Grift-Type)
                   (Munbox E)
                   (Mbox-set! E E)
-                  (Mvector E E Schml-Type)
+                  (Mvector E E Grift-Type)
                   (Mvector-ref E E)
                   (Mvector-set! E E E)
                   ;; Guarded effects
@@ -46,8 +46,8 @@
                   ;;
                   (Create-tuple (Listof E))
                   (Tuple-proj E Index))
-                 (Pair Src Schml-Type)))))
+                 (Pair Src Grift-Type)))))
 
-(define-type S1-Bnd (Bnd Uid Schml-Type S1-Expr))
+(define-type S1-Bnd (Bnd Uid Grift-Type S1-Expr))
 (define-type S1-Bnd* (Listof S1-Bnd))
 

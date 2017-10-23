@@ -1,4 +1,4 @@
-for f in schml/partial/*/out/*/*.err; do
+for f in grift/partial/*/out/*/*.err; do
     echo $f
 #     path="${f%.*}";name=$(basename "$path")
 #     # parameters are benchmark dependent
@@ -6,19 +6,19 @@ for f in schml/partial/*/out/*/*.err; do
 # 	command1=$quicksort_worstcase_rkt_command
 # 	command2=$quicksort_worstcase_clang_command
 # 	command3=$quicksort_worstcase_gambit_command
-# 	schml_arg=$quicksort_worstcase_schml_arg
+# 	grift_arg=$quicksort_worstcase_grift_arg
 # 	working_nsamples=$quicksort_worstcase_nsamples
 #     elif [ "$name" = "quicksort_bestcase" ]; then
 # 	command1=$quicksort_bestcase_rkt_command
 # 	command2=$quicksort_bestcase_clang_command
 # 	command3=$quicksort_bestcase_gambit_command
-# 	schml_arg=$quicksort_bestcase_schml_arg
+# 	grift_arg=$quicksort_bestcase_grift_arg
 # 	working_nsamples=$quicksort_bestcase_nsamples
 #     elif [ "$name" = "matmult" ]; then
 # 	command1=$matmult_rkt_command
 # 	command2=$matmult_clang_command
 # 	command3=$matmult_gambit_command
-# 	schml_arg=$matmult_schml_arg
+# 	grift_arg=$matmult_grift_arg
 # 	working_nsamples=$matmult_nsamples
 #     fi
 
@@ -34,7 +34,7 @@ for f in schml/partial/*/out/*/*.err; do
 #     avg "$c"
 #     baseline=$RETURN
 
-#     c="$command2 | $schml_regex"
+#     c="$command2 | $grift_regex"
 #     avg "$c"
 #     ct=$RETURN
 #     cr=$(echo "$ct/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n",p, $0}')
@@ -47,8 +47,8 @@ for f in schml/partial/*/out/*/*.err; do
 #     dynamizer_out=$(dynamizer $path ${working_nsamples} | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 #     type_constructor_count=$(echo $dynamizer_out | sed -n 's/[0-9]\+.\([0-9]\+\)/\1/p')
 #     less_precise_count=$(echo $dynamizer_out | sed -n 's/\([0-9]\+\).*/\1/p')
-#     cd $schmldir
-#     racket $schmldir/benchmark/benchmark.rkt $path/ $schml_mem_limit2
+#     cd $griftdir
+#     racket $griftdir/benchmark/benchmark.rkt $path/ $grift_mem_limit2
     
 #     echo "name,precision,time,slowdown" > $logfile1
 #     n=0
@@ -56,8 +56,8 @@ for f in schml/partial/*/out/*/*.err; do
 # 	let n=n+1
 # 	echo $b $n
 # 	binpath="${b%.*}";bname=$(basename "$binpath")
-# 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
-# 	c="echo $schml_arg | $b | $schml_regex"
+# 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.grift)
+# 	c="echo $grift_arg | $b | $grift_regex"
 # 	avg "$c"
 # 	t=$RETURN	
 # 	# echo $t
@@ -72,8 +72,8 @@ for f in schml/partial/*/out/*/*.err; do
 # 	let n=n+1
 # 	binpath="${b%.*}";bname=$(basename "$binpath")
 # 	echo $b $n
-# 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
-# 	c="echo $schml_arg | $b | $schml_regex"
+# 	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.grift)
+# 	c="echo $grift_arg | $b | $grift_regex"
 # 	avg "$c"
 # 	t=$RETURN
 # 	# echo $t
@@ -94,18 +94,18 @@ for f in schml/partial/*/out/*/*.err; do
 #     read std_c mean_c <<< $( cat $logfile2 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 #     read std_tb mean_tb <<< $( cat $logfile4 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 
-#     c11="echo $schml_arg | $tmpdir/static/$name.o1 | $schml_regex"
+#     c11="echo $grift_arg | $tmpdir/static/$name.o1 | $grift_regex"
 #     avg "$c11"
 #     t11=$RETURN
-#     c12="echo $schml_arg | $tmpdir/dyn/$name.o1 | $schml_regex"
+#     c12="echo $grift_arg | $tmpdir/dyn/$name.o1 | $grift_regex"
 #     avg "$c12"
 #     t12=$RETURN
 #     typed_untyped_ratio_c=$(echo "$t11/$t12" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
 
-#     c21="echo $schml_arg | $tmpdir/static/$name.o2 | $schml_regex"
+#     c21="echo $grift_arg | $tmpdir/static/$name.o2 | $grift_regex"
 #     avg "$c21"
 #     t21=$RETURN
-#     c22="echo $schml_arg | $tmpdir/dyn/$name.o2 | $schml_regex"
+#     c22="echo $grift_arg | $tmpdir/dyn/$name.o2 | $grift_regex"
 #     avg "$c22"
 #     t22=$RETURN
 #     typed_untyped_ratio_tb=$(echo "$t21/$t22" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')

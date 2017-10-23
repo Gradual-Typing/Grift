@@ -46,7 +46,7 @@
 
 (: open-test-input (Path -> Input-Port))
 (define (open-test-input path)
-  (let* ([root (string-trim (path->string path) ".schml")]
+  (let* ([root (string-trim (path->string path) ".grift")]
          [in   (string-append root ".in")])
     (if (file-exists? in)
         (open-input-file in)

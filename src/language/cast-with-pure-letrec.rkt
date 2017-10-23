@@ -5,7 +5,7 @@
          (all-from-out "forms.rkt"))
 
 (define-type Cast/Pure-Letrec
-  (Prog (List String Natural Schml-Type) C/PL-Expr))
+  (Prog (List String Natural Grift-Type) C/PL-Expr))
 
 (define-type C/PL-Expr
   (Rec E (U ;; Non-Terminals
@@ -13,9 +13,9 @@
 	  (Letrec C/PL-Bnd-Lam* E)
 	  (Let C/PL-Bnd* E)
 	  (App E (Listof E))
-	  (Op Schml-Primitive (Listof E))
+	  (Op Grift-Primitive (Listof E))
 	  (If E E E)
-	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
+	  (Cast E (Twosome Grift-Type Grift-Type Blame-Label))
           (Begin C/PL-Expr* E)
           (Repeat Uid E E E)
           ;; Guarded effects
@@ -26,16 +26,16 @@
           (Gvector-set! E E E)
           (Gvector-ref E E)
           ;; Monotonic references
-          (Mbox E Schml-Type)
+          (Mbox E Grift-Type)
           (Munbox E) ;; fast read
           (Mbox-set! E E) ;; fast write
-          (MBoxCastedRef Uid Schml-Type)
-          (MBoxCastedSet! Uid E Schml-Type)
-          (Mvector E E Schml-Type)
+          (MBoxCastedRef Uid Grift-Type)
+          (MBoxCastedSet! Uid E Grift-Type)
+          (Mvector E E Grift-Type)
           (Mvector-ref E E) ;; fast read
           (Mvector-set! E E E) ;; fast write
-          (MVectCastedRef Uid E Schml-Type)
-          (MVectCastedSet! Uid E E Schml-Type)
+          (MVectCastedRef Uid E Grift-Type)
+          (MVectCastedSet! Uid E E Grift-Type)
           ;;
           (Create-tuple (Listof E))
           (Tuple-proj E Index)

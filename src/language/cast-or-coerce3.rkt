@@ -8,7 +8,7 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast-or-Coerce3-Lang
-  (Prog (List String Natural Schml-Type) CoC3-Expr))
+  (Prog (List String Natural Grift-Type) CoC3-Expr))
 
 
 (define-type CoC3-Expr
@@ -16,7 +16,7 @@
           (Construct CoC3-Gen-Data CoC3-Gen-Ctor (Listof E))
           (Access CoC3-Gen-Data CoC3-Gen-Access E (Option E))
           (Check CoC3-Gen-Data CoC3-Gen-Pred E (Listof E))
-          (Observe E Schml-Type) 
+          (Observe E Grift-Type) 
           No-Op
           ;; Code Labels
           (Code-Label Uid)
@@ -33,7 +33,7 @@
           (Fn-Proxy-Closure E)
           (Fn-Proxy-Coercion E)
           ;; Coercions
-          (Quote-Coercion Schml-Coercion)
+          (Quote-Coercion Grift-Coercion)
           (Quote-HCoercion Mixed-Coercion)
           (Compose-Coercions E E)
           (Id-Coercion-Huh E)
@@ -74,7 +74,7 @@
           (HC-T2 E)
           (HC-Med E)
           ;;Type operations
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Type-Dyn-Huh E)
           (Type-Fn-Huh E)
           (Type-Fn-arity E)
@@ -99,16 +99,16 @@
           (Repeat Uid E E Uid E E)
           Break-Repeat
           ;;Primitives
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
           (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
-	  ;;(Cast E (Twosome Schml-Type Schml-Type Blame-Label))
-          ;;(Cast E (Coercion Schml-Coercion))
+	  ;;(Cast E (Twosome Grift-Type Grift-Type Blame-Label))
+          ;;(Cast E (Coercion Grift-Coercion))
           ;;(Interpreted-Cast E (Twosome E E E))
           ;;(Interpreted-Cast E (Coercion E))
           ;; Observations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Unguarded-Representation
           (Unguarded-Box E)
           (Unguarded-Box-Ref E)
@@ -126,7 +126,7 @@
           (Guarded-Proxy-Coercion E)
           (Unguarded-Vect-length E)
           ;; Monotonic references
-          (Mbox E Schml-Type)
+          (Mbox E Grift-Type)
           (Mbox-val-set! E E)
           (Mbox-val-ref E)
           (Mbox-rtti-set! E E)
@@ -141,7 +141,7 @@
           (Type-MRef E)
           (Type-MRef-Huh E)
           (Type-MRef-Of E)
-          (Mvector E E Schml-Type)
+          (Mvector E E Grift-Type)
           (Mvector-length E)
           (Mvector-val-ref E E)
           (Mvector-val-set! E E E)

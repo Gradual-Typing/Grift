@@ -154,7 +154,7 @@
    #:acc-init acc-init
    #:use-acc-action use))
 
-;; Save the source code ./src/name.schml
+;; Save the source code ./src/name.grift
 (define (write-source path prog)
   (call-with-output-file path #:exists 'replace #:mode 'text
     (lambda (file-port)

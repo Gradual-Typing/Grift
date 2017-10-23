@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require "schml.rkt")
+(require "grift.rkt")
 
 (provide (all-defined-out)
          (all-from-out "forms.rkt"))
@@ -8,14 +8,14 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast5-Lang
-  (Prog (List String Natural Schml-Type) C5-Expr))
+  (Prog (List String Natural Grift-Type) C5-Expr))
 
 (define-type C5-Expr
   (Rec E (U ;; Non-Terminals
           (Letrec C5-Bnd-Lambda* E)
 	  (Let C5-Bnd-Data* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C5-Expr* E)
           (Repeat Uid E E E)
@@ -36,9 +36,9 @@
           (Dyn-make E E) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)

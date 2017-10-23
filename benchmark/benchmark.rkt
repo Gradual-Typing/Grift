@@ -63,13 +63,13 @@
   ;;    (error 'compiler-directory "not a directory ~a" compile-dir)]
   ;;   [(not (directory-exists? c-dir)) (make-directory c-dir)])
 
-  ;; We are currently only supporting .schml files
-  (define (schml-file? path-searched)
-    (equal? #"schml" (filename-extension path-searched)))
+  ;; We are currently only supporting .grift files
+  (define (grift-file? path-searched)
+    (equal? #"grift" (filename-extension path-searched)))
   
-  ;; Iterate over all schml files in directory and
+  ;; Iterate over all grift files in directory and
   ;; compile them to 
-  (for ((fl (find-files schml-file? compile-dir)))
+  (for ((fl (find-files grift-file? compile-dir)))
     (compile-file-all-configs fl)))
 
 (module+ main

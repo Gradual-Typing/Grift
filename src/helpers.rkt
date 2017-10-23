@@ -134,7 +134,7 @@
 
 ;; allows for conditional compilation
 (define-for-syntax under-construction?
-  (and (getenv "schmlUnderConstruction") #t))
+  (and (getenv "griftUnderConstruction") #t))
 
 (define-for-syntax syntax-id
   (syntax-rules ()
@@ -144,7 +144,7 @@
   (syntax-rules ()
     [(_ x ...) (void)]))
 
-;; only run this code if we are working on schml
+;; only run this code if we are working on grift
 (define-syntax if-in-construction
   (if under-construction?
       syntax-id

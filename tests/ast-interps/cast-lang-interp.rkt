@@ -298,11 +298,11 @@
 
 (define (timer-report)
   (when (not timer-started?)
-    (raise (exn:schml:type:dynamic
+    (raise (exn:grift:type:dynamic
             "timer not started"
             (current-continuation-marks))))
   (when (not timer-stopped?)
-    (raise (exn:schml:type:dynamic
+    (raise (exn:grift:type:dynamic
             "timer not stopped"
             (current-continuation-marks))))
   #;(printf "time (sec): ~a\n" (- stop-time start-time))
@@ -329,7 +329,7 @@
           [(and (GVect? t1) (GVect? t2))
            (CL-GVectProxy (cast v1 CL-GVect) (GVect-arg t1) (GVect-arg t2) l1)]
           [else (mk-cast v1 t1 t2 l1)])
-        (raise (exn:schml:type:dynamic l1 (current-continuation-marks)))))
+        (raise (exn:grift:type:dynamic l1 (current-continuation-marks)))))
   (logging apply-cast-res (All) "~a > ~v" (get c-depth) res)
   (dec c-depth)
   res)
@@ -348,7 +348,7 @@
       [(CL-Dyn lbl val (Fn ar1 t1* t2) (Fn ar2 t3* t4))
        (let* ((rands^ (if (= ar1 ar2)
                           (map (cast/lbl lbl) rands t3* t1*)
-                          (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))))
+                          (raise (exn:grift:type:dynamic lbl (current-continuation-marks)))))
               (result (recur val rands^)))
          (cast result t2 t4 lbl))]
       [otherwise (if (CL-Proc? rator)
@@ -358,8 +358,8 @@
 
 (: observe-lazy (-> (-> CL-Value) Test-Value))
 (define (observe-lazy thunk)
-  (with-handlers ([exn:schml:type:dynamic?
-		   (lambda ([e : exn:schml:type:dynamic])
+  (with-handlers ([exn:grift:type:dynamic?
+		   (lambda ([e : exn:grift:type:dynamic])
                      (blame #f (exn-message e)))])
     (let ([v (thunk)])
      (cond

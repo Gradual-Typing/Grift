@@ -1,12 +1,12 @@
 #lang racket/base
 #|------------------------------------------------------------------------------+
-Pass: src/schml/syntax->schml0.rkt
+Pass: src/grift/syntax->grift0.rkt
 +-------------------------------------------------------------------------------+
 Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)
 +-------------------------------------------------------------------------------+
 Discription: The parse pass takes racket's native syntax objects to a set of 
 the only reason that syntax objects are used in to correlate source location
-information. Namely the syntax->schml0 tranformation does not handle expansion
+information. Namely the syntax->grift0 tranformation does not handle expansion
 whatsoever identifiers maintain lexical scope according to symbolic equality.
 +------------------------------------------------------------------------------|#
 
@@ -24,23 +24,23 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
          "../errors.rkt"
          "../configuration.rkt"
          "../language/forms.rkt"
-         "../language/schml0.rkt"
+         "../language/grift0.rkt"
          "../language/make-begin.rkt")
 
 (require syntax/stx)
 
-(provide syntax->schml0
+(provide syntax->grift0
          parse-type)
 
-(define/match (syntax->schml0 prgm)
+(define/match (syntax->grift0 prgm)
   [((Prog name s*))
-   (define who 'syntax->schml0)
+   (define who 'syntax->grift0)
    (define uc (make-unique-counter 0))
    (define tl*
      (parameterize ([current-unique-counter uc])
        ((parse-top-level name (make-top-level-env))  s*)))
    (debug who (Prog (list name (unique-counter-next! uc)) tl*))]
-  [(other) (error 'syntax->schml0 "unmatched: ~a" other)])
+  [(other) (error 'syntax->grift0 "unmatched: ~a" other)])
 
 (define (syntax->srcloc stx)
   (srcloc (syntax-source stx)
@@ -80,7 +80,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
     ;; x? : (Option (List Symbol srcloc Uid))
     (define x? (hash-ref xs v #f))
     (when x?
-      (error 'schml "duplicate definitions: ~a\n  at:~a  and ~a"
+      (error 'grift "duplicate definitions: ~a\n  at:~a  and ~a"
              v s (cadr x?)))
     (hash-set xs v x))
   (define (env-cons x env)
@@ -117,7 +117,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
        (App p as)]
       [other
        (define dat (syntax->datum #'other))
-       (unless (schml-literal? dat)
+       (unless (grift-literal? dat)
          (syntax-error 'parse-form "expected datum" #'other))
        (if (and (not (exact-integer? dat)) (real? dat))
            (Quote (exact->inexact dat))
@@ -140,7 +140,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (let ([msg (format "~a\n\tin:~a\n\tin particular: ~a" message expr sub)])
        (error name msg))])) 
 
-#;(define (schml-core-form? x)
+#;(define (grift-core-form? x)
   (or (Lambda? x) (Letrec? x) (Let? x) (Var? x) (App? x)
       (Op? x) (Quote? x) (Ascribe? x)
       (Begin? x) (If? x) (Repeat? x)
@@ -408,7 +408,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 #|
 Parse Type converts syntax objects to the core forms that
-represents types in the schml abstract syntax tree.
+represents types in the grift abstract syntax tree.
 |#
 ;|#
 
@@ -551,7 +551,7 @@ represents types in the schml abstract syntax tree.
                   (box            . ,parse-mbox)
                   (box-set!       . ,parse-mbox-set!)
                   (unbox          . ,parse-munbox))]
-               [other (error 'syntax-to-schml0/top-level-env "unmatched: ~a" other)])
+               [other (error 'syntax-to-grift0/top-level-env "unmatched: ~a" other)])
            (gvector        . ,parse-gvector)
            (gvector-ref    . ,parse-gvector-ref)
            (gvector-set!   . ,parse-gvector-set!)

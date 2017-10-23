@@ -16,8 +16,8 @@ set -euo pipefail
 
 loops=${2:-5}
 precision=5
-schml_mem_limit1=999999
-schml_mem_limit2=9999999999
+grift_mem_limit1=999999
+grift_mem_limit2=9999999999
 
 #---------------------------------------------------------------------
 # Obselete params
@@ -39,8 +39,8 @@ matmult_nsamples=${1:-1000}
 # --------------------------------------------------------------------
 date=`date +%Y_%m_%d_%H_%M_%S`
 
-schmldir=$SCHML_DIR
-testdir=$schmldir/benchmark/suite/macro
+griftdir=$SCHML_DIR
+testdir=$griftdir/benchmark/suite/macro
 latticedir=$testdir/lattice-dev/$date
 datadir=$latticedir/data
 outdir=$latticedir/output
@@ -54,7 +54,7 @@ TIMEFORMAT=%R
 # scaling racket and gambit timing from milliseconds to seconds
 c1=$(echo "1/1000" | bc -l)
 
-schml_regex="sed -n 's/.*): \\([0-9]\\+\\)/\\1/p'"
+grift_regex="sed -n 's/.*): \\([0-9]\\+\\)/\\1/p'"
 
 # common lines in the plots
 # LIN="set arrow from 1,$nx to 20,$nx nohead lt 3 dashtype 2 lc rgb \"brown\" lw 2;\
@@ -76,8 +76,8 @@ cp -r $srcdir/* $tmpdir
 printf "Date\t\t:%s\n" "$date" >> $paramfile
 MYEMAIL="`id -un`@`hostname -f`"
 printf "Machine\t\t:%s\n" "$MYEMAIL" >> $paramfile
-schml_ver=$(git rev-parse HEAD)
-printf "Schml ver.\t:%s\n" "$schml_ver" >> $paramfile
+grift_ver=$(git rev-parse HEAD)
+printf "Schml ver.\t:%s\n" "$grift_ver" >> $paramfile
 clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
 printf "Clang ver.\t:%s\n" "$clang_ver" >> $paramfile
 gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
@@ -105,7 +105,7 @@ benchmark_gambit="$tmpdir/gambit/$benchmark"
 gsc -exe -cc-options -O3 $benchmark_gambit.scm
 quicksort_worstcase_gambit_command="$benchmark_gambit $quicksort_worstcase_array_len"
 
-quicksort_worstcase_schml_arg=$quicksort_worstcase_array_len
+quicksort_worstcase_grift_arg=$quicksort_worstcase_array_len
 
 # ---------------------------------
 # preparing the quicksort bestcase benchmark
@@ -140,7 +140,7 @@ benchmark_gambit="$tmpdir/gambit/$benchmark"
 gsc -exe -cc-options -O3 $benchmark_gambit.scm
 quicksort_bestcase_gambit_command="$benchmark_gambit $quicksort_bestcase_array_len"
 
-quicksort_bestcase_schml_arg=$f
+quicksort_bestcase_grift_arg=$f
 
 # ---------------------------------
 # preparing the matmult benchmark
@@ -162,12 +162,12 @@ benchmark_gambit="$tmpdir/gambit/$benchmark"
 gsc -exe -cc-options -O3 $benchmark_gambit.scm
 matmult_gambit_command="$benchmark_gambit $matmult_mat_side_len"
 
-matmult_schml_arg=$matmult_mat_side_len
+matmult_grift_arg=$matmult_mat_side_len
 #---------------------------------------------------------------------
 
-cd $schmldir
-racket $schmldir/benchmark/benchmark.rkt $tmpdir/static/ $schml_mem_limit1
-racket $schmldir/benchmark/benchmark.rkt $tmpdir/dyn/ $schml_mem_limit2
+cd $griftdir
+racket $griftdir/benchmark/benchmark.rkt $tmpdir/static/ $grift_mem_limit1
+racket $griftdir/benchmark/benchmark.rkt $tmpdir/dyn/ $grift_mem_limit2
 
 avg()
 {
@@ -181,26 +181,26 @@ avg()
 }
 
 in=0
-for f in $tmpdir/static/*.schml; do
+for f in $tmpdir/static/*.grift; do
     path="${f%.*}";name=$(basename "$path")
     # parameters are benchmark dependent
     if [ "$name" = "quicksort_worstcase" ]; then
 	command1=$quicksort_worstcase_rkt_command
 	command2=$quicksort_worstcase_clang_command
 	command3=$quicksort_worstcase_gambit_command
-	schml_arg=$quicksort_worstcase_schml_arg
+	grift_arg=$quicksort_worstcase_grift_arg
 	working_nsamples=$quicksort_worstcase_nsamples
     elif [ "$name" = "quicksort_bestcase" ]; then
 	command1=$quicksort_bestcase_rkt_command
 	command2=$quicksort_bestcase_clang_command
 	command3=$quicksort_bestcase_gambit_command
-	schml_arg=$quicksort_bestcase_schml_arg
+	grift_arg=$quicksort_bestcase_grift_arg
 	working_nsamples=$quicksort_bestcase_nsamples
     elif [ "$name" = "matmult" ]; then
 	command1=$matmult_rkt_command
 	command2=$matmult_clang_command
 	command3=$matmult_gambit_command
-	schml_arg=$matmult_schml_arg
+	grift_arg=$matmult_grift_arg
 	working_nsamples=$matmult_nsamples
     fi
 
@@ -216,7 +216,7 @@ for f in $tmpdir/static/*.schml; do
     avg "$c"
     baseline=$RETURN
 
-    c="$command2 | $schml_regex"
+    c="$command2 | $grift_regex"
     avg "$c"
     ct=$RETURN
     cr=$(echo "$ct/$baseline" | bc -l | awk -v p="$precision" '{printf "%.*f\n",p, $0}')
@@ -229,8 +229,8 @@ for f in $tmpdir/static/*.schml; do
     dynamizer_out=$(dynamizer $path ${working_nsamples} | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
     type_constructor_count=$(echo $dynamizer_out | sed -n 's/[0-9]\+.\([0-9]\+\)/\1/p')
     less_precise_count=$(echo $dynamizer_out | sed -n 's/\([0-9]\+\).*/\1/p')
-    cd $schmldir
-    racket $schmldir/benchmark/benchmark.rkt $path/ $schml_mem_limit2
+    cd $griftdir
+    racket $griftdir/benchmark/benchmark.rkt $path/ $grift_mem_limit2
     
     echo "name,precision,time,slowdown" > $logfile1
     n=0
@@ -238,8 +238,8 @@ for f in $tmpdir/static/*.schml; do
 	let n=n+1
 	echo $b $n
 	binpath="${b%.*}";bname=$(basename "$binpath")
-	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
-	c="echo $schml_arg | $b | $schml_regex"
+	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.grift)
+	c="echo $grift_arg | $b | $grift_regex"
 	avg "$c"
 	t=$RETURN	
 	# echo $t
@@ -254,8 +254,8 @@ for f in $tmpdir/static/*.schml; do
 	let n=n+1
 	binpath="${b%.*}";bname=$(basename "$binpath")
 	echo $b $n
-	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.schml)
-	c="echo $schml_arg | $b | $schml_regex"
+	p=$(sed -n 's/;; \([0-9]*.[0-9]*\) %/\1/p;q' < $binpath.grift)
+	c="echo $grift_arg | $b | $grift_regex"
 	avg "$c"
 	t=$RETURN
 	# echo $t
@@ -276,18 +276,18 @@ for f in $tmpdir/static/*.schml; do
     read std_c mean_c <<< $( cat $logfile2 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
     read std_tb mean_tb <<< $( cat $logfile4 | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 
-    c11="echo $schml_arg | $tmpdir/static/$name.o1 | $schml_regex"
+    c11="echo $grift_arg | $tmpdir/static/$name.o1 | $grift_regex"
     avg "$c11"
     t11=$RETURN
-    c12="echo $schml_arg | $tmpdir/dyn/$name.o1 | $schml_regex"
+    c12="echo $grift_arg | $tmpdir/dyn/$name.o1 | $grift_regex"
     avg "$c12"
     t12=$RETURN
     typed_untyped_ratio_c=$(echo "$t11/$t12" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')
 
-    c21="echo $schml_arg | $tmpdir/static/$name.o2 | $schml_regex"
+    c21="echo $grift_arg | $tmpdir/static/$name.o2 | $grift_regex"
     avg "$c21"
     t21=$RETURN
-    c22="echo $schml_arg | $tmpdir/dyn/$name.o2 | $schml_regex"
+    c22="echo $grift_arg | $tmpdir/dyn/$name.o2 | $grift_regex"
     avg "$c22"
     t22=$RETURN
     typed_untyped_ratio_tb=$(echo "$t21/$t22" | bc -l | awk -v p="$precision" '{printf "%.2f\n",$0}')

@@ -85,7 +85,7 @@
 
 (define (timer-report)
   (when (not timer-started?)
-    (raise (exn:schml:type:dynamic "timer not started" (current-continuation-marks))))
+    (raise (exn:grift:type:dynamic "timer not started" (current-continuation-marks))))
   (when (not timer-stopped?)
-    (raise (exn:schml:type:dynamic "timer not stopped" (current-continuation-marks))))
+    (raise (exn:grift:type:dynamic "timer not stopped" (current-continuation-marks))))
   '())

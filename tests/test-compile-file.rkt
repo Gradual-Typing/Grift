@@ -26,7 +26,7 @@
                    [current-error-port errp])
       (with-handlers ([exn:break? abort]
                       [exn:fail? print-exn]
-                      [exn:schml? print-exn]) 
+                      [exn:grift? print-exn]) 
         (parameterize-break #t (run-thunk)))))
   (define out (get-output-string outp))
   (define err (get-output-string errp))

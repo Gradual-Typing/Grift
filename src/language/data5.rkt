@@ -9,7 +9,7 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Data5-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
 	(GlobDecs Uid*
                     (Labels D5-Bnd-Code*
                             D5-Body))))

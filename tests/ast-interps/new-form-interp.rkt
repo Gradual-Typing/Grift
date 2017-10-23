@@ -203,7 +203,7 @@ currently implemented in severral files.
                 [else (cons n s)]))
             (racket-apply printf (cons (list->string (foldr reformat '() (string->list fmt))) v*))]
            [('Print (list s)) (display s)]
-           [((? schml-primitive? p) v*) (delta p v*)]
+           [((? grift-primitive? p) v*) (delta p v*)]
            [(other v*) (unmatched Op (cons p v*))])]
         [(Quote k) k]
         ;; The interface for functions
@@ -343,7 +343,7 @@ currently implemented in severral files.
            (mismatch Sequence-Coercion-Snd s 'Sequence-Coercion))
          (Sequence-snd s)]
         [(Project-Coercion (app recur/env t) (app recur/env l))
-         (unless (schml-type? t)
+         (unless (grift-type? t)
            (mismatch Project-Coercion t 'Type))
          (unless (string? l)
            (mismatch Project-Coercion l 'String))
@@ -358,7 +358,7 @@ currently implemented in severral files.
            (mismatch Project-Coercion-Label p 'Project-Coercion))
          (Project-label p)]
         [(Inject-Coercion (app recur/env t))
-         (unless (schml-type? t)
+         (unless (grift-type? t)
            (mismatch Inject-Coercion t 'Type))
          (Inject t)]
         [(Inject-Coercion-Huh (app recur/env c)) (Inject? c)]
@@ -559,7 +559,7 @@ currently implemented in severral files.
            [(Interp-Dyn v _) v]
            [other (error 'interp/Dyn-type "~a" other)])]
         [(Dyn-make (app recur/env v) (app recur/env t))
-         (unless (schml-type? t)
+         (unless (grift-type? t)
            (mismatch Dyn-make t 'Type))
          (Interp-Dyn v t)]
         ;; The Type Tag interface (one that shouldn't be expose so early)
@@ -649,7 +649,7 @@ currently implemented in severral files.
        (define rands^
          (if (= ar1 ar2)
              (map (cast/lbl lbl) rands t3* t1*)
-             (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))))
+             (raise (exn:grift:type:dynamic lbl (current-continuation-marks)))))
        (define result (recur val rands^))
        (cast result t2 t4 lbl)]
       [(Interp-Dyn val (Fn ar args res))
@@ -699,7 +699,7 @@ currently implemented in severral files.
                     (return-value result))))))))))
   (with-handlers ([string?
                    (lambda (s) (parse-observable s))]
-                  [exn:schml:type:dynamic?
+                  [exn:grift:type:dynamic?
 		   (lambda (e)
                      (blame #f (exn-message e)))])
     (define v (io-thunk))

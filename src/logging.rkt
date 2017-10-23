@@ -8,7 +8,7 @@
          "helpers.rkt")
 (provide (all-defined-out))
 
-(define-logger schml)
+(define-logger grift)
 
 
 
@@ -18,8 +18,8 @@
     [(logging n (o0 o* ...) f a ...)
      (let ([t? (trace? 'n 'o0 'o* ...)])
        (when t?
-         (log-schml-debug "~a: ~a\n\n" 'n f)
-         (log-schml-debug (with-output-to-string (lambda () (display a) ...)))))]))
+         (log-grift-debug "~a: ~a\n\n" 'n f)
+         (log-grift-debug (with-output-to-string (lambda () (display a) ...)))))]))
 
 (define-syntax (debug stx)
   (syntax-case stx (off std)
@@ -38,7 +38,7 @@
      (with-syntax ([(t* ... t) (generate-temporaries #'(e* ... e))])
        #`(let ([t* e*] ... [t e])
            (begin
-             (log-schml-debug
+             (log-grift-debug
               (with-output-to-string
                 (lambda ()
                   (printf "~a:\n" (srcloc->string (quote-srcloc #,stx)))
@@ -60,15 +60,15 @@
   (require/typed racket/base
     [srcloc->string (srcloc -> (Option String))])
   (provide (all-defined-out))
-  (define-logger schml)
+  (define-logger grift)
   (define-syntax logging
     (syntax-rules ()
       [(logging n () f a ...) (logging n (All) f a ...)]
       [(logging n (o0 o* ...) f a ...)
        (let ([t? (trace? 'n 'o0 'o* ...)])
          (when t?
-           (log-schml-debug "~a: ~a\n\n" 'n f)
-           (log-schml-debug
+           (log-grift-debug "~a: ~a\n\n" 'n f)
+           (log-grift-debug
             (with-output-to-string (lambda () (display a) ...)))))]))
 
   (define-syntax (debug stx)
@@ -88,7 +88,7 @@
        (with-syntax ([(t* ... t) (generate-temporaries #'(e* ... e))])
          #`(let ([t* e*] ... [t e])
              (begin
-               (log-schml-debug
+               (log-grift-debug
                 (with-output-to-string
                   (lambda ()
                     (printf "~a:\n" (srcloc->string (quote-srcloc #,stx)))

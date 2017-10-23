@@ -11,7 +11,7 @@ TIMEFORMAT=%R
 # $4 - aux name
 # $5 - static/dyn/partial
 # $6 - logfile full path
-write_schml_speedups()
+write_grift_speedups()
 {
     local baseline_system="$1"; shift
     local name="$1";            shift
@@ -22,7 +22,7 @@ write_schml_speedups()
     
     local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
     for config_index in ${configs[@]}; do
-	get_schml_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
+	get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
 	printf ",$RETURN" >> $logfile
     done
 }
@@ -60,10 +60,10 @@ run_benchmark()
     fi
 
     printf "$name$print_aux_name" >> "$logfile1"
-    write_schml_speedups $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
+    write_grift_speedups $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
     printf "\n" >> "$logfile1"
     printf "$name$print_aux_name" >> $logfile2
-    write_schml_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
+    write_grift_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
     get_speedup racket $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
     get_speedup chezscheme $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
@@ -71,9 +71,9 @@ run_benchmark()
     printf "\n" >> "$logfile2"
 
     # local partial_path="${TMP_DIR}/partial/${name}"
-    # if [ -f "${partial_path}.schml" ]; then
+    # if [ -f "${partial_path}.grift" ]; then
     # 	echo -n "$name$print_aux_name" >> "$logfile3"
-    # 	write_schml_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
+    # 	write_grift_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
     # fi
     
     echo "finished ${name}${print_aux_name}"
@@ -200,8 +200,8 @@ main()
 	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
 	MYEMAIL="`id -un`@`hostname -f`"
 	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
-	schml_ver=$(git rev-parse HEAD)
-	printf "Schml ver.\t:%s\n" "$schml_ver" >> "$PARAMS_LOG"
+	grift_ver=$(git rev-parse HEAD)
+	printf "Schml ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
 	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
 	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
 	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')

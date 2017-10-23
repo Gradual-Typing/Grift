@@ -8,7 +8,7 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast-or-Coerce5-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (Let-Static* CoC5-Bnd-Type*
                      CoC5-Bnd-Crcn*
                      CoC5-Expr)))
@@ -99,17 +99,17 @@
           (Repeat Uid E E Uid E E)
           Break-Repeat
           ;;Primitives
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
           No-Op
           (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
-	  ;;(Cast E (Twosome Schml-Type Schml-Type Blame-Label))
-          ;;(Cast E (Coercion Schml-Coercion))
+	  ;;(Cast E (Twosome Grift-Type Grift-Type Blame-Label))
+          ;;(Cast E (Coercion Grift-Coercion))
           ;;(Interpreted-Cast E (Twosome E E E))
           ;;(Interpreted-Cast E (Coercion E))
           ;; Observations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Unguarded-Representation
           (Unguarded-Box E)
           (Unguarded-Box-Ref E)

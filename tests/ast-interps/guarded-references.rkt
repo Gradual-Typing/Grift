@@ -72,7 +72,7 @@
 ;; Helpers Follow
 
 (define-syntax-rule (raise-not-grep who x)
-  (error 'schml-interp-internal
+  (error 'grift-interp-internal
          "~a applied to non guarded representation value: ~a"
          'who x))
 

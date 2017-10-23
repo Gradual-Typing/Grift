@@ -105,7 +105,7 @@ Configuaration variables
   (let ([spec #px"^time \\(sec\\): (\\d+.\\d+)\nInt : 42\n$"])
     (for/list ([test (in-list function-app-tests)])
       (match-let ([(list name casts t1 t2 prog) test])
-        (define src-file (build-path src-dir (string-append "fn-app-for-stop-" name ".schml")))
+        (define src-file (build-path src-dir (string-append "fn-app-for-stop-" name ".grift")))
         (write-source src-file prog)
         (define name-twosomes-functional (string-append name "-twosomes-functional"))
         (define name-coercions-hybrid    (string-append name "-coercions-hybrid"))

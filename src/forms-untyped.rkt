@@ -230,9 +230,9 @@
   #:guard
   (lambda (prefix suffix struct-type)
     (unless (or (string? prefix) (symbol? prefix))
-      (error 'schml-uid-guard "uid prefix must be string or symbol"))
+      (error 'grift-uid-guard "uid prefix must be string or symbol"))
     (unless (number? suffix)
-      (error 'schml-uid-guard "uid suffix must be a number"))
+      (error 'grift-uid-guard "uid suffix must be a number"))
     (if (string? prefix)
         (values (string->symbol prefix) suffix)
         (values prefix suffix)))

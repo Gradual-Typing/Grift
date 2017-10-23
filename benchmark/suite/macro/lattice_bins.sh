@@ -40,7 +40,7 @@ run_config()
 	    let n=n+1
 	    local binpath="${b%.*}"
 	    local bname=$(basename "$binpath")
-	    local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' < "${binpath}.schml")
+	    local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' < "${binpath}.grift")
 	    echo $b
 	    avg "$b" "$args" "${b}.runtimes"
 	    local t="$RETURN"
@@ -71,9 +71,9 @@ compute_typed_untyped_ratio()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	get_schml_runtime "${TMP_DIR}/static/${name}" "$benchmark_args" "$disk_aux_name" $i
+	get_grift_runtime "${TMP_DIR}/static/${name}" "$benchmark_args" "$disk_aux_name" $i
 	t11="$RETURN"
-	get_schml_runtime "${TMP_DIR}/dyn/${name}" "$benchmark_args" "$disk_aux_name" $i
+	get_grift_runtime "${TMP_DIR}/dyn/${name}" "$benchmark_args" "$disk_aux_name" $i
 	t12="$RETURN"
 	RETURN=$(echo "${t11}/${t12}" | bc -l | awk -v p="$PRECISION" '{printf "%.2f\n",$0}')
         echo "$RETURN" > $cache_file
@@ -253,7 +253,7 @@ run_benchmark()
     local aux_name="$1";        shift
 
     local lattice_path="${TMP_DIR}/static/${name}"
-    local benchmark_file="${lattice_path}.schml"
+    local benchmark_file="${lattice_path}.grift"
 
     local disk_aux_name="" print_aux_name=""
     if [[ ! -z "${aux_name}" ]]; then
@@ -275,7 +275,7 @@ run_benchmark()
     local lattice_file="${lattice_path}/out"
     if [ ! -f "$lattice_file" ]; then
 	rm -rf "$lattice_path"
-	local dynamizer_out=$(dynamizer "${lattice_path}.schml" "$nbins" "$nsamples" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+	local dynamizer_out=$(dynamizer "${lattice_path}.grift" "$nbins" "$nsamples" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
     racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
@@ -380,8 +380,8 @@ main()
 	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
 	MYEMAIL="`id -un`@`hostname -f`"
 	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
-	schml_ver=$(git rev-parse HEAD)
-	printf "Schml ver.\t:%s\n" "$schml_ver" >> "$PARAMS_LOG"
+	grift_ver=$(git rev-parse HEAD)
+	printf "Schml ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
 	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
 	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
 	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')

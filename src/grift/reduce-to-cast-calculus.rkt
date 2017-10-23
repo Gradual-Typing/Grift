@@ -8,7 +8,7 @@ of the cast calculus.
 |#
 
 (require "./read.rkt"
-         "./syntax-to-schml0.rkt"
+         "./syntax-to-grift0.rkt"
          "./type-check.rkt"
          "./insert-casts.rkt")
 (provide reduce-to-cast-calculus)
@@ -22,7 +22,7 @@ of the cast calculus.
 
 (define (reduce-to-cast-calculus path)
   (let* ((stx-lang (read path))
-	 (s0 (syntax->schml0 stx-lang))
+	 (s0 (syntax->grift0 stx-lang))
          (s1 (type-check s0)))
     (insert-casts s1)))
 

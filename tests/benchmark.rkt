@@ -2,38 +2,38 @@
 
 #|
 This is a small utility that uses the unix time utility and system calls in order
-to time programs compiled by the schml compiler. It should probably use something
+to time programs compiled by the grift compiler. It should probably use something
 slightly more acurate than time.
 
 It takes a structured list of information named benchmarks,
 and prints the timing log to the variable named benchmark-log-file.
 |#
 (require racket/port)
-(require schml/src/compile
-         schml/src/helpers
-         schml/testing/paths
-         schml/testing/values
-         schml/src/errors)
+(require grift/src/compile
+         grift/src/helpers
+         grift/testing/paths
+         grift/testing/values
+         grift/src/errors)
 
 ;; This structure is a list representing the arguments to a call to bench
 (: benchmarks (Listof (List String Test-Value)))
 (define benchmarks
-  (list (list "odd-20-static.schml" (boole #f))
-        (list "odd-20-hybrid1.schml" (boole #f))
-        (list "odd-20-hybrid2.schml" (boole #f))
-        (list "odd-20-hybrid3.schml" (boole #f))
-        (list "odd-20-hybrid4.schml" (boole #f))
-        (list "odd-20-hybrid5.schml" (boole #f))
-        (list "odd-20-dynamic.schml" (dynamic))
-        (list "ack-1-2-static.schml" (integ 4))
-        (list "ack-2-3-static.schml"  (integ 9))
-        (list "ack-3-10-static.schml" (integ 8189))
-        (list "ack-3-10-hybrid1.schml" (integ 8189))
-        (list "ack-3-10-hybrid2.schml" (integ 8189))
-        (list "ack-3-10-hybrid3.schml" (integ 8189))
-        (list "ack-3-10-dynamic.schml" (integ 8189))
-        #;(list "ack-4-1-static.schml"  (integ 65533))
-        #;(list  "ack-static.schml"      (boole #t))
+  (list (list "odd-20-static.grift" (boole #f))
+        (list "odd-20-hybrid1.grift" (boole #f))
+        (list "odd-20-hybrid2.grift" (boole #f))
+        (list "odd-20-hybrid3.grift" (boole #f))
+        (list "odd-20-hybrid4.grift" (boole #f))
+        (list "odd-20-hybrid5.grift" (boole #f))
+        (list "odd-20-dynamic.grift" (dynamic))
+        (list "ack-1-2-static.grift" (integ 4))
+        (list "ack-2-3-static.grift"  (integ 9))
+        (list "ack-3-10-static.grift" (integ 8189))
+        (list "ack-3-10-hybrid1.grift" (integ 8189))
+        (list "ack-3-10-hybrid2.grift" (integ 8189))
+        (list "ack-3-10-hybrid3.grift" (integ 8189))
+        (list "ack-3-10-dynamic.grift" (integ 8189))
+        #;(list "ack-4-1-static.grift"  (integ 65533))
+        #;(list  "ack-static.grift"      (boole #t))
         ))
 
 ;; The file that is used to return information from this test
@@ -106,20 +106,20 @@ and prints the timing log to the variable named benchmark-log-file.
   (value=? (observe (envoke-compiled-program #:config configuration)) expected-out))
 
 ;; The structure raised when a benchmark fails
-(struct exn:schml:benchmark exn:schml ())
+(struct exn:grift:benchmark exn:grift ())
 
 ;; raise an exception signaling that the benchmark has failed to run
 (: fail-benchmark (-> String Nothing))
 (define (fail-benchmark msg)
-  (raise (exn:schml:benchmark msg (current-continuation-marks))))
+  (raise (exn:grift:benchmark msg (current-continuation-marks))))
 
 
 ;; benchmark is the main logic of a single program benchmark
 ;; compile the file to tmp-exec-path
 (: benchmark (-> String Test-Value Config Void))
 (define (benchmark name expected config)
-  (with-handlers ([exn:schml:benchmark?
-                   (lambda ([e : exn:schml:benchmark])
+  (with-handlers ([exn:grift:benchmark?
+                   (lambda ([e : exn:grift:benchmark])
                      (logf "[Error] ~a ~a\n" name (exn-message e)))])
     (compile/conf (build-path test-suite-path name) config)
     (if (correct? config expected)

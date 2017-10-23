@@ -132,19 +132,19 @@
 
 ;; Make all types of equal structure the same structure
 ;; this is essentially a compile time hash-consing of the types
-(: identify-type! (Unique-Counter Type-Table -> (Schml-Type -> Immediate-Type)))
+(: identify-type! (Unique-Counter Type-Table -> (Grift-Type -> Immediate-Type)))
 (define (identify-type! us tt)
   (match-define (cons ti sb) tt)
 
   (: ti! : Nat Compact-Type -> (Values (Static-Id Uid) Nat))
   (define ti! (table-identify! us ti sb))
   
-  (lambda ([type : Schml-Type]) : Immediate-Type
+  (lambda ([type : Grift-Type]) : Immediate-Type
     ;; Here the Nonnegative Integer creates a partial order which
     ;; Identifies the order in which types can be constructed.
     ;; It can be seen as counting the number of types that must be
     ;; constructed before this type can be constructed.
-    (: recur (Schml-Type -> (Values Immediate-Type Nat)))
+    (: recur (Grift-Type -> (Values Immediate-Type Nat)))
     (define (recur t)
       (match t
         [(Dyn)  (values DYN-TYPE  0)]
@@ -166,7 +166,7 @@
         [(STuple arity (app recur* t* n))
          (ti! n (STuple arity t*))]
         [other (error 'hoist-types/identify-type! "unmatched ~a" other)]))
-    (: recur* ((Listof Schml-Type) -> (Values (Listof Immediate-Type) Nat)))
+    (: recur* ((Listof Grift-Type) -> (Values (Listof Immediate-Type) Nat)))
     (define (recur* t*)
       (match t*
         ['() (values '() 0)]
@@ -223,7 +223,7 @@
       c)))
     
 (: map-hoisting-thru-Expr :
-   (Schml-Type     -> Immediate-Type)
+   (Grift-Type     -> Immediate-Type)
    (Mixed-Coercion -> Immediate-Coercion)
    CoC3-Expr
    -> L0-Expr)

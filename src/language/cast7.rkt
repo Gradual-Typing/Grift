@@ -8,14 +8,14 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast7-Lang
-  (Prog (List String Natural Schml-Type) C7-Value))
+  (Prog (List String Natural Grift-Type) C7-Value))
 
 (define-type C7-Value
   (Rec V (U ;; Non-Terminals
           (LetP C7-Bnd-Procedure* (LetC C7-Bnd-Closure* V))
 	  (Let C7-Bnd-Data* V)
 	  (App (Pair V V) (Listof V))
-          (Op Schml-Primitive (Listof V))
+          (Op Grift-Primitive (Listof V))
 	  (If V V V)
           (Begin C7-Effect* V)
           (Repeat Uid V V V)
@@ -36,9 +36,9 @@
           (Dyn-make V V) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame V)
-          (Observe V Schml-Type)
+          (Observe V Grift-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep V)

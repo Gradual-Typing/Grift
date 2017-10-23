@@ -8,7 +8,7 @@
 ------------------------------------------------------------------------------|#
 
 (define-type Cast-or-Coerce1-Lang
-  (Prog (List String Natural Schml-Type) CoC1-Expr))
+  (Prog (List String Natural Grift-Type) CoC1-Expr))
 
 (define-type CoC1-Expr
   (Rec E (U ;; Non-Terminals
@@ -18,17 +18,17 @@
 	  (Let CoC1-Bnd* E)
           (App-Code E (Listof E))
           (App-Fn E (Listof E))
-	  (Op Schml-Primitive (Listof E))
+	  (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Switch E (Switch-Case* E) E)
           ;; Terminals
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           No-Op
           (Begin CoC1-Expr* E)
           (Repeat Uid E E Uid E E)
 	  (Var Uid)
-          (Quote-Coercion Schml-Coercion)
-          (Type Schml-Type)
+          (Quote-Coercion Grift-Coercion)
+          (Type Grift-Type)
 	  (Quote Cast-Literal)
           (Code-Label Uid)
           ;; Coecions Currently Exposed as Expressions
@@ -39,8 +39,8 @@
           ;; Casts with different ways of getting the same semantics
           (Interpreted-Cast E (Coercion E))
           (Interpreted-Cast E (Twosome E E E))
-	  (Cast E (Twosome Schml-Type Schml-Type Blame-Label))
-          (Cast E (Coercion Schml-Coercion))
+	  (Cast E (Twosome Grift-Type Grift-Type Blame-Label))
+          (Cast E (Coercion Grift-Coercion))
 	  (Fn-Caster E)
           (Compose-Coercions E E)
           ;;
@@ -64,29 +64,29 @@
           (Gvector-ref E E)
           (Gvector-length E)
           ;; Monotonic
-          (Mbox E Schml-Type)
+          (Mbox E Grift-Type)
           (Munbox E) ;; fast read
           (Mbox-set! E E) ;; fast write
-          (MBoxCastedRef E Schml-Type)
-          (MBoxCastedSet! E E Schml-Type)
-          (Mvector E E Schml-Type)
+          (MBoxCastedRef E Grift-Type)
+          (MBoxCastedSet! E E Grift-Type)
+          (Mvector E E Grift-Type)
           (Mvector-ref E E) ;; fast read
           (Mvector-set! E E E) ;; fast write
-          (MVectCastedRef E E Schml-Type)
-          (MVectCastedSet! E E E Schml-Type)
+          (MVectCastedRef E E Grift-Type)
+          (MVectCastedSet! E E E Grift-Type)
           (Mvector-length E)
           ;; Dynamic Operations
           (Dyn-Tuple-Proj E E E)
-          (Dyn-GVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-GVector-Set! E E E Grift-Type Blame-Label)
           (Dyn-GVector-Ref E E Blame-Label)
           (Dyn-GVector-Len E E)
-          (Dyn-GRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-GRef-Set! E E Grift-Type Blame-Label)
           (Dyn-GRef-Ref E Blame-Label)
-          (Dyn-MVector-Set! E E E Schml-Type Blame-Label)
+          (Dyn-MVector-Set! E E E Grift-Type Blame-Label)
           (Dyn-MVector-Ref E E Blame-Label)
-          (Dyn-MRef-Set! E E Schml-Type Blame-Label)
+          (Dyn-MRef-Set! E E Grift-Type Blame-Label)
           (Dyn-MRef-Ref E Blame-Label)
-          (Dyn-Fn-App E CoC1-Expr* Schml-Type* Blame-Label)
+          (Dyn-Fn-App E CoC1-Expr* Grift-Type* Blame-Label)
           ;;
           (Create-tuple (Listof E))
           (Tuple-proj E Index))))

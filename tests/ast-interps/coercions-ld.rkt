@@ -20,15 +20,15 @@
 ;; (base-type? x) :: Any -> Boolean : (U Int Bool Unit)
 
 ;; A, B, C ::= i | Dyn | A ... -> B | (GRef A)
-;; (schml-type? x) :: Any -> Boolean : Schml-Type
+;; (grift-type? x) :: Any -> Boolean : Schml-Type
 
 ;; Coercions
 ;; c, d ::= id_A | G! | G?ᵖ | c -> d | c ; d | ⊥ᴳᵖᴴ
 
 (define (coercion? x)
   (or (Identity? x)
-      ((inj-coercion? schml-type?) x)
-      ((proj-coercion? schml-type? blame-label?) x)
+      ((inj-coercion? grift-type?) x)
+      ((proj-coercion? grift-type? blame-label?) x)
       ((fn-coercion? coercion?) x)
       ((gref-coercion? coercion?) x)
       ((seq-coercion? coercion? coercion?) x)

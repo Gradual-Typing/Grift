@@ -10,9 +10,9 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require grift/src/helpers
+         grift/src/errors
+	 grift/src/language)
 
 ;; Only the pass is provided by this module
 (provide name-intermediates)
