@@ -8,7 +8,7 @@
 |the function read-syntax so that the source locations may be lifted from the
 |syntax-objects as we convert them to core forms.
 +------------------------------------------------------------------------------|#
-(require "../language/schml0.rkt"
+(require "../language/grift0.rkt"
          "../logging.rkt"
          racket/path)
 
@@ -22,7 +22,7 @@ This helper function called by read extracts a file name from a path.
   (let ([maybe-name (file-name-from-path p)])
     (if maybe-name
 	(path->string maybe-name)
-	(error 'schml "expected path to file: ~a" p))))
+	(error 'grift "expected path to file: ~a" p))))
 
 #|
 Function: get-reader

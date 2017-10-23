@@ -84,7 +84,7 @@
     "/"
     (for*/list ([p (in-directory dir)]
                 [e (in-value (debug off (path-get-extension p)))] 
-                #:when (and e (equal? e #".schml")))
+                #:when (and e (equal? e #".grift")))
       (test-path dir p)))))
 
 (define (run-single-path p)
@@ -166,18 +166,18 @@
 (define main-function (make-parameter old-run-tests))
 
 (command-line
- #:program "schml-test-runner"
+ #:program "grift-test-runner"
  #:once-any
  [("-t" "--test") path-to-test
   "run a single test"
   (define p (build-path path-to-test))
   (unless (file-exists? p)
-    (error 'schml-test-runner "invalid path to test: ~v" path-to-test))
+    (error 'grift-test-runner "invalid path to test: ~v" path-to-test))
   (main-function (thunk (run-single-path p)))]
  [("-d" "--dir") dir
   "run all files in a directiory"
   (unless (directory-exists? dir)
-    (error 'schml-test-runner "invalid directory ~v" dir))
+    (error 'grift-test-runner "invalid directory ~v" dir))
   (main-function run-test-suite)
   (test-suite-dir (build-path dir))]
  [("-s" "--suite") choice

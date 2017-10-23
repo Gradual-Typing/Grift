@@ -2,12 +2,12 @@
 
 gloop=999999
 loop=99999999
-schmldir=/u/dalmahal/lattice/Schml
+griftdir=/u/dalmahal/lattice/Schml
 memlimit=9999999999
 #---------------------------------------------------------------------
 
 name=loop
-dir=$schmldir/benchmark/suite/micro/$name
+dir=$griftdir/benchmark/suite/micro/$name
 datadir=$dir/data
 outdir=$dir/output
 tmpdir=$dir/tmp
@@ -22,7 +22,7 @@ mkdir -p $datadir $tmpdir
 cp $dir/src/* $tmpdir
 
 # compile Schml source files, then enter the src directory
-cd $schmldir
+cd $griftdir
 racket benchmark.rkt $tmpdir $memlimit
 cd $tmpdir
 
@@ -47,6 +47,6 @@ done
 
 # read gcc_std gcc_mean <<< $( cat c$name.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{print sqrt(sumsq/NR - (sum/NR)**2)" "(sum/var)}' )
 read gambitc_std gambitc_mean <<< $( cat s$name.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{print sqrt(sumsq/NR - (sum/NR)**2)" "(sum/var)}' )
-read schml_std schml_mean <<< $( cat $name.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{print sqrt(sumsq/NR - (sum/NR)**2)" "(sum/var)}' )
+read grift_std grift_mean <<< $( cat $name.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{print sqrt(sumsq/NR - (sum/NR)**2)" "(sum/var)}' )
 
-echo "$gambitc_mean $schml_mean" > $logfile
+echo "$gambitc_mean $grift_mean" > $logfile

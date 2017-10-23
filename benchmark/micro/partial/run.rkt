@@ -65,7 +65,7 @@
   (build-path base-path (string-append name extension)))
 
 (define (configuration->src test casts t-size c-size overhead?)
-  (configuration->file src-dir ".schml" test casts t-size c-size overhead?))
+  (configuration->file src-dir ".grift" test casts t-size c-size overhead?))
 
 (define (file->configuration path)
   (define name (path->string (path-replace-suffix (file-name-from-path path) "")))
@@ -1020,7 +1020,7 @@ Configuaration variables
      (or (string->exact-integer number-of-runs)
          (error 'dynamic-write-read-benchmark "bad runs argument")))]
    [("-m" "--memory") memory-start-size
-    "size in kilobytes of schml starting memory"
+    "size in kilobytes of grift starting memory"
     (init-heap-kilobytes
      (or (string->exact-integer memory-start-size)
          (error 'dynamic-write-read-benchmark "bad memory argument")))]
@@ -1032,9 +1032,9 @@ Configuaration variables
    #:once-any
    ["--test" "run a quick check to see if all generated programs compile"
     (runs-of-program 1)]
-   ["--generate" "Generate schml programs for benchmark."
+   ["--generate" "Generate grift programs for benchmark."
     (program-main generate-benchmarks)]
-   ["--compile" "Run schml on all programs in the src dir."
+   ["--compile" "Run grift on all programs in the src dir."
     (program-main compile-benchmarks)]
    ["--run" "Run programs in exe directory"
     (program-main run-benchmarks)]

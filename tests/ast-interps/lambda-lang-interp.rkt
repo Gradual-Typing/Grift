@@ -9,10 +9,10 @@
 +-------------------------------------------------------------------------------+
 +------------------------------------------------------------------------------|#
 
-(require schml/src/helpers
-         schml/src/errors
-	 schml/testing/values
-	 schml/src/language
+(require grift/src/helpers
+         grift/src/errors
+	 grift/testing/values
+	 grift/src/language
          racket/fixnum)
 
 (provide lambda-lang-interp)

@@ -65,7 +65,7 @@
      (or (string->exact-integer number-of-runs)
          (error 'dynamic-write-read-benchmark "bad runs argument")))]
    [("-m" "--memory") memory-start-size
-    "size in bytes of schml and gambit starting memory"
+    "size in bytes of grift and gambit starting memory"
     (mem-dflt
      (or (string->exact-integer memory-start-size)
          (error 'dynamic-write-read-benchmark "bad memory argument")))]
@@ -189,7 +189,7 @@
    src-dir
    (case compiler
      [(Gambit)  (format "~a.scm" test-name)]
-     [(Twosomes Coercions) (format "~a~a.schml" test-name dl-str)])))
+     [(Twosomes Coercions) (format "~a~a.grift" test-name dl-str)])))
 
 (define (build-benchmark test compiler dyn-ops? dyn-loop?)
   (define out-path (make-exe-path test compiler dyn-ops? dyn-loop?))
@@ -199,7 +199,7 @@
      (define out-file (path->string out-path))
      (define src-file (path->string src-path))
      (unless (system* gambit
-                      ;; set minimum heap size to same as schml
+                      ;; set minimum heap size to same as grift
                       (format "-:m~a" (/ (mem-dflt) 1024))
                       ;; Compile to a standalone executable optimized
                       "-exe" "-cc-options" "-O3"            
@@ -234,7 +234,7 @@
          (unless (system* (path->string exe-path))
            (error 'run-benchmark "failed to run ~a" exe-path))))]))
 
-(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nDynamic : \\?")
+(define grift-spec #px"time \\(sec\\): (\\d+.\\d+)\nDynamic : \\?")
 
 (define gambit-spec #px"(\\d+) ms real time")
 
@@ -245,17 +245,17 @@
          (and (bytes->string/utf-8 tmp))
          (error '->number "failed to parse number ~v" tmp))))
   
-  (define schml-result? (regexp-match schml-spec str))
+  (define grift-result? (regexp-match grift-spec str))
   (define gambit-result? (regexp-match gambit-spec str))
 
   (define run-result-in-milliseconds
     (cond
-      [schml-result? (* (expt 10 3) (->number (cadr schml-result?)))] 
+      [grift-result? (* (expt 10 3) (->number (cadr grift-result?)))] 
       [gambit-result? (->number (cadr gambit-result?))]
       [else
        (error 'parse-output
               "failed to parse: ~v ~v ~v"
-              str gambit-result? schml-result?)]))
+              str gambit-result? grift-result?)]))
 
   (unless (> run-result-in-milliseconds epsilon)
     (error 'timer-epsilon

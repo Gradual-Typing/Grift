@@ -44,7 +44,7 @@
      (or (string->exact-integer number-of-runs)
          (error 'dynamic-function-call-benchmark "bad runs argument")))]
    [("-m" "--memory") memory-start-size
-    "size in bytes of schml and gambit starting memory"
+    "size in bytes of grift and gambit starting memory"
     (mem-dflt
      (or (string->exact-integer memory-start-size)
          (error 'dynamic-function-call-benchmark "bad memory argument")))]
@@ -136,7 +136,7 @@
    src-dir
    (case compiler
      [(gambit) (format "s~a.scm" test)]
-     [(twosomes coercions) (format "~a.schml" test)])))
+     [(twosomes coercions) (format "~a.grift" test)])))
 
 (define (build-benchmark test compiler dyn-ops)
   (define out-path (make-exe-path test compiler dyn-ops))
@@ -146,7 +146,7 @@
      (define out-file (path->string out-path))
      (define src-file (path->string src-path))
      (unless (system* gambit
-                      ;; set minimum heap size to same as schml
+                      ;; set minimum heap size to same as grift
                       (format "-:m~a" (/ (mem-dflt) 1024))
                       ;; Compile to a standalone executable optimized
                       "-exe" "-cc-options" "-O3"            
@@ -155,7 +155,7 @@
        (error 'build-benchmarks/gambit
               "failed to compile gambit program: ~a" src-file))]
     [(twosomes coercions)
-     (define (schml-compile rep dyn-ops)
+     (define (grift-compile rep dyn-ops)
        (define (help p m s) (format "~a.~a.~a" p m s))
        (define tmp-c-path
          (build-path tmp-dir (help test compiler "c")))
@@ -172,7 +172,7 @@
      (define cast-rep (case compiler
                         [(twosomes) 'Twosomes]
                         [(coercions) 'Coercions]))
-     (schml-compile cast-rep dyn-ops)]))
+     (grift-compile cast-rep dyn-ops)]))
 
 (define ((run-benchmark iterations) test compiler dyn-ops)
   (define exe-path (make-exe-path test compiler dyn-ops))
@@ -187,7 +187,7 @@
            (error 'run-benchmark "failed to run ~a" exe-path))))]))
 
 
-(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : 42")
+(define grift-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : 42")
 
 (define gambit-spec #px"(\\d+) ms real time")
 
@@ -198,17 +198,17 @@
          (and (bytes->string/utf-8 tmp))
          (error '->number "failed to parse number ~v" tmp))))
   
-  (define schml-result? (regexp-match schml-spec str))
+  (define grift-result? (regexp-match grift-spec str))
   (define gambit-result? (regexp-match gambit-spec str))
 
   (define run-result-in-milliseconds
     (cond
-      [schml-result? (* (expt 10 3) (->number (cadr schml-result?)))] 
+      [grift-result? (* (expt 10 3) (->number (cadr grift-result?)))] 
       [gambit-result? (->number (cadr gambit-result?))]
       [else
        (error 'parse-output
               "failed to parse: ~v ~v ~v"
-              str gambit-result? schml-result?)]))
+              str gambit-result? grift-result?)]))
 
   (unless (> run-result-in-milliseconds epsilon)
     (error 'timer-epsilon

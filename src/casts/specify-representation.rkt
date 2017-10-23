@@ -1585,9 +1585,9 @@ but a static single assignment is implicitly maintained.
         (cons u (Code u* (sr-expr/env e env empty-index-map))))))
   (map sr-bnd b*))
 
-(: sr-observe ((String -> Uid) D0-Expr Schml-Type -> D0-Expr))
+(: sr-observe ((String -> Uid) D0-Expr Grift-Type -> D0-Expr))
 (define (sr-observe next-uid! e t)
-  (: generate-print ((Var Uid) Schml-Type -> D0-Expr))
+  (: generate-print ((Var Uid) Grift-Type -> D0-Expr))
   (define (generate-print id ty)
     (cond
       [(Int? t) (op$ Printf (Quote "Int : %ld\n") id)]

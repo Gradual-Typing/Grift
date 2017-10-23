@@ -4,7 +4,7 @@
          math/statistics
          
          "../../../src/compile.rkt"
-         "../../../src/schml/syntax-to-schml0.rkt"
+         "../../../src/grift/syntax-to-grift0.rkt"
          "../../../src/casts/casts-to-coercions.rkt"
          "../../../src/language/forms.rkt"
          "../../../src/backend-c/code-generator.rkt")

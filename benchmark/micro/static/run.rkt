@@ -26,7 +26,7 @@
 (define-runtime-path exe-dir "tmp/exe")
 (build-dir/check exe-dir)
 
-(define-runtime-path src-paths-file "src/schml.path-objects")
+(define-runtime-path src-paths-file "src/grift.path-objects")
 
 ;; where is clang
 (define clang
@@ -51,30 +51,30 @@
   (define copy-over-it #t)
   (define src-paths (make-hash))
   (for ([n (in-list (overhead-test-repetitions))])
-    (define schml-path  (configuration->schml-src-path test n))
+    (define grift-path  (configuration->grift-src-path test n))
     (define src-code (generate n))
-    (write-source schml-path src-code)
+    (write-source grift-path src-code)
     
     (define type-based-path (configuration->src-path test n 'Type-Based 'Guarded #f))
-    (compile schml-path #:cast 'Type-Based #:ref 'Guarded #:keep-c type-based-path)
+    (compile grift-path #:cast 'Type-Based #:ref 'Guarded #:keep-c type-based-path)
     
     (define type-based-c-path (configuration->src-path test n 'Type-Based 'Guarded #t))
     (copy-file type-based-path type-based-c-path copy-over-it)
     
     (define coercions-path (configuration->src-path test n 'Coercions 'Guarded #f))
-    (compile schml-path #:cast 'Coercions #:ref 'Guarded #:keep-c coercions-path)
+    (compile grift-path #:cast 'Coercions #:ref 'Guarded #:keep-c coercions-path)
     
     (define coercions-c-path (configuration->src-path test n 'Coercions 'Guarded #t))
     (copy-file coercions-path coercions-c-path copy-over-it)
 
     (define type-based-mono-path (configuration->src-path test n 'Type-Based 'Monotonic #f))
-    (compile schml-path #:cast 'Type-Based #:ref 'Monotonic #:keep-c type-based-mono-path)
+    (compile grift-path #:cast 'Type-Based #:ref 'Monotonic #:keep-c type-based-mono-path)
     
     (define type-based-mono-c-path (configuration->src-path test n 'Type-Based 'Monotonic #t))
     (copy-file type-based-mono-path type-based-mono-c-path copy-over-it)
     
     (define coercions-mono-path (configuration->src-path test n 'Coercions 'Monotonic #f))
-    (compile schml-path #:cast 'Coercions #:ref 'Monotonic #:keep-c coercions-mono-path)
+    (compile grift-path #:cast 'Coercions #:ref 'Monotonic #:keep-c coercions-mono-path)
     
     (define coercions-mono-c-path (configuration->src-path test n 'Coercions 'Monotonic #t))
     (copy-file coercions-mono-path coercions-mono-c-path copy-over-it)))
@@ -87,8 +87,8 @@
   (define name (configuration->string test reps compiler ref hand-coded?))
   (build-path src-dir (string-append name ".c")))
 
-(define (configuration->schml-src-path test reps)
-  (build-path tmp-dir (format "~a-x~a.schml" test reps)))
+(define (configuration->grift-src-path test reps)
+  (build-path tmp-dir (format "~a-x~a.grift" test reps)))
 
 (define (configuration->exe-path test reps compiler ref hand-coded?)
   (define name (configuration->string test reps compiler ref hand-coded?))
@@ -233,7 +233,7 @@
       (unless (system* (path->string exe-path))
         (error 'run-benchmark "failed to run ~a" exe-path)))))
 
-(define schml-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : \\d")
+(define grift-spec #px"time \\(sec\\): (\\d+.\\d+)\nInt : \\d")
 
 (define ((parse-output iterations epsilon) str)
   (define (->number tmp)
@@ -242,12 +242,12 @@
          (and (bytes->string/utf-8 tmp))
          (error '->number "failed to parse number ~v" tmp))))
   
-  (define schml-result
-    (or (regexp-match schml-spec str)
+  (define grift-result
+    (or (regexp-match grift-spec str)
         (error 'parse-output "failed to parse: ~v" str)))
 
   (define run-result-in-milliseconds
-    (* (expt 10 3) (->number (cadr schml-result))))
+    (* (expt 10 3) (->number (cadr grift-result))))
   
   (unless (> run-result-in-milliseconds epsilon)
     (error 'timer-epsilon
@@ -434,7 +434,7 @@
      (or (string->exact-integer number-of-runs)
          (error 'dynamic-write-read-benchmark "bad runs argument")))]
    [("-m" "--memory") memory-start-size
-    "size in kilobytes of schml starting memory"
+    "size in kilobytes of grift starting memory"
     (init-heap-kilobytes
      (or (string->exact-integer memory-start-size)
          (error 'dynamic-write-read-benchmark "bad memory argument")))]

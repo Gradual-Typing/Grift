@@ -23,7 +23,7 @@
     (make-directory test-tmp-path))
 
 (command-line
- #:program "schml-test-runner"
+ #:program "grift-test-runner"
  #:once-each
  [("-r" "--cast-representation") crep
   "specify which cast representation to use (Twosomes or Coercions)"

@@ -46,7 +46,7 @@ get_chezscheme_runtime()
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
 # $RETURN - the runtime for the Schml benchmark
-get_schml_runtimes()
+get_grift_runtimes()
 {
     local benchmark_path="$1"; shift
     local benchmark_args="$1"; shift
@@ -57,7 +57,7 @@ get_schml_runtimes()
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
     else
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.schml"
+	racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
 	local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
 	for i in ${configs[@]}; do
 	    avg "${benchmark_path}.o${i}" "$benchmark_args" "$runtimes_file"
@@ -72,7 +72,7 @@ get_schml_runtimes()
 # $3 - disk aux name
 # $4 - configuration index
 # $RETURN - the runtime for the Schml benchmark
-get_schml_runtime()
+get_grift_runtime()
 {
     local benchmark_path="$1"; shift
     local benchmark_args="$1"; shift
@@ -84,7 +84,7 @@ get_schml_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	racket "${SCHML_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.schml"
+	racket "${SCHML_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.grift"
 	avg "${benchmark_path}.o${config_index}" "$benchmark_args" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
@@ -139,7 +139,7 @@ get_gambit_runtime()
 # $3 - space-separated benchmark arguments
 # $4 - disk aux name
 # $RETURN - the runtime for the racket benchmark
-get_schml_slowdowns()
+get_grift_slowdowns()
 {
     local baseline_system="$1"; shift
     local benchmark_path="$1";  shift
@@ -153,7 +153,7 @@ get_schml_slowdowns()
 	local benchmark=$(basename "$benchmark_path")
 	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
 	local baseline="$RETURN" st sr;
-	get_schml_runtimes "$benchmark_path" "$benchmark_args" "$disk_aux_name"
+	get_grift_runtimes "$benchmark_path" "$benchmark_args" "$disk_aux_name"
 	st=${RETURN[@]}
 	for st in ${st[@]}; do
 	    sr=$(echo "${st}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
@@ -170,7 +170,7 @@ get_schml_slowdowns()
 # $4 - disk aux name
 # $5 - configuration index
 # $RETURN - the runtime for the racket benchmark
-get_schml_slowdown()
+get_grift_slowdown()
 {
     local baseline_system="$1"; shift
     local benchmark_path="$1";  shift
@@ -185,7 +185,7 @@ get_schml_slowdown()
 	local benchmark=$(basename "$benchmark_path")
 	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
 	local baseline="$RETURN" st sr;
-	get_schml_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
+	get_grift_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
 	local st="$RETURN";
 	RETURN=$(echo "${st} ${baseline}" | awk '{printf "%.2f", $1 \ $2}')
 	echo "$RETURN" >> "$cache_file"
@@ -198,7 +198,7 @@ get_schml_slowdown()
 # $4 - disk aux name
 # $5 - configuration index
 # $RETURN - the runtime for the racket benchmark
-get_schml_speedup()
+get_grift_speedup()
 {
     local baseline_system="$1"; shift
     local benchmark_path="$1";  shift
@@ -213,7 +213,7 @@ get_schml_speedup()
 	local benchmark=$(basename "$benchmark_path")
 	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
 	local baseline="$RETURN" st sr;
-	get_schml_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
+	get_grift_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
 	local st="$RETURN";
 	RETURN=$(echo "${baseline} ${st}" | awk '{printf "%.2f\n", $1 / $2}')
 	echo "$RETURN" >> "$cache_file"

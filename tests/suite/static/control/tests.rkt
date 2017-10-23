@@ -2,7 +2,7 @@
 
 (require typed/rackunit
          typed/rackunit/text-ui
-         schml/testing/test-compile)
+         grift/testing/test-compile)
 
 (provide (all-defined-out))
 
@@ -10,6 +10,6 @@
   (test-suite
    #:before (lambda () (display "control tests running ... "))
    #:after (lambda () (display "done\n"))
-   (test-file "begin.schml" (int 7))
-   (test-file "letBegin.schml" (int 5))
+   (test-file "begin.grift" (int 7))
+   (test-file "letBegin.grift" (int 5))
    ))

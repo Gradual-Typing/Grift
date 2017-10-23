@@ -12,14 +12,14 @@
 (define-runtime-path this-dir ".")
 (define (print-version-info)
  (unless (system "git rev-parse --verify HEAD" #:set-pwd? this-dir)
-   (error 'schml "This should not be used for non-development versions"))
+   (error 'grift "This should not be used for non-development versions"))
  (system "git status" #:set-pwd? this-dir))
 
 (module+ main
   (define recursive-parameter (make-parameter #f))
-  (define schml-did-something? (make-parameter #f))
+  (define grift-did-something? (make-parameter #f))
   (command-line
-   #:program "schml"
+   #:program "grift"
    #:once-any
    ["--static"
     "Static varient of lambda calculus" 
@@ -45,7 +45,7 @@
        (cast-representation 'Coercions)]
       [("Hyper-Coercions")
        (cast-representation 'Hyper-Coercions)]
-      [else (error 'schml "unrecognized cast representation: ~a" cast-rep)])]
+      [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
    [("--check-asserts")
     ((format "Compile coded with assertions (~a)" (check-asserts?)))
@@ -54,8 +54,8 @@
     "Raise an error unless the program is statically typed"
     (program-must-be-statically-typed?)]
    [("--version")
-    "Output schml compiler version info"
-    (schml-did-something? #t)
+    "Output grift compiler version info"
+    (grift-did-something? #t)
     (print-version-info)]
    #:once-any
    [("--reference-semantics") semantics
@@ -126,9 +126,9 @@
        (lambda (k)
          (if (exact-nonnegative-integer? k)
              (init-heap-kilobytes k)
-             (error 'schml "invalid initial heap size: ~a" k)))]
+             (error 'grift "invalid initial heap size: ~a" k)))]
       [else
-       (error 'schml "invalid argument given for memory size: ~v" kilobytes)])]
+       (error 'grift "invalid argument given for memory size: ~v" kilobytes)])]
    [("--types-hash-table-slots")
     num
     "select the runtime's starting hash table number of slots"
@@ -137,9 +137,9 @@
        (lambda (k)
          (if (exact-positive-integer? k)
              (init-types-hash-table-slots k)
-             (error 'schml "invalid initial types hashtable size: ~a" k)))]
+             (error 'grift "invalid initial types hashtable size: ~a" k)))]
       [else
-       (error 'schml "invalid argument given for hashtable size: ~v" num)])]
+       (error 'grift "invalid argument given for hashtable size: ~v" num)])]
    [("--types-hash-table-load-factor")
     num
     "select the runtime's hashtable load factor"
@@ -148,24 +148,24 @@
        (lambda (k)
          (if (and (flonum? k) (positive? k))
              (types-hash-table-load-factor k)
-             (error 'schml "invalid types hashtable load factor: ~a" k)))]
+             (error 'grift "invalid types hashtable load factor: ~a" k)))]
       [else
-       (error 'schml "invalid argument given for hashtable load factor: ~v" num)])]
+       (error 'grift "invalid argument given for hashtable load factor: ~v" num)])]
    [("-r" "--recursive")
     "recursively compile directory"
     (recursive-parameter #t)]
    [("-d" "--debug-logging") debug-file
     "enable debuging logging to file (1=stdout, 2=stderr)"
     (begin
-      (schml-log-level 'debug)
+      (grift-log-level 'debug)
       (match debug-file
-        ["1" (schml-log-port (current-output-port))]
-        ["2" (schml-log-port (current-error-port))]
+        ["1" (grift-log-port (current-output-port))]
+        ["2" (grift-log-port (current-error-port))]
         [other
          (define of-port (open-output-file other
                                            #:mode 'text
                                            #:exists 'replace))
-         (schml-log-port of-port)]))]
+         (grift-log-port of-port)]))]
    [("-g" "--with-debug-symbols")
     "Invoke c compiler so that debugging symbols are retained."
     (c-flags (cons "-g" (c-flags)))]
@@ -179,11 +179,11 @@
    (match args
      [(list)
       (cond
-       [(not (schml-did-something?))
-        (error 'schml "no input given")])]
+       [(not (grift-did-something?))
+        (error 'grift "no input given")])]
      [(list (app string->path (and (not #f) path)))
       (cond
        [(recursive-parameter) (compile-directory path)]
        [else (compile path)])]
-     [else (error 'schml "invalid arguments ~a" args)])
+     [else (error 'grift "invalid arguments ~a" args)])
      (void)))

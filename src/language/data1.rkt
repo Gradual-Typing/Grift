@@ -9,7 +9,7 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Data1-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (GlobDecs Uid*
                     (Labels D1-Bnd-Code*
                             D1-Tail))))

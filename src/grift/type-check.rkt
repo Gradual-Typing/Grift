@@ -1,6 +1,6 @@
 #lang racket/base
 #|------------------------------------------------------------------------------+
-|Pass: compiler/schml/typecheck                                                  |
+|Pass: compiler/grift/typecheck                                                  |
 +-------------------------------------------------------------------------------+
 |Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
@@ -32,8 +32,8 @@ Provide comments about where to find definitions of types and data
          "../configuration.rkt"
          "../language/primitives.rkt"
          "../language/forms.rkt"
-         "../language/schml0.rkt"
-         "../language/schml1.rkt")
+         "../language/grift0.rkt"
+         "../language/grift1.rkt")
 
 (define-syntax-rule (: _ ...) (void))
 ;; Only the pass is provided by this module
@@ -41,15 +41,15 @@ Provide comments about where to find definitions of types and data
 
 #;
 (module* typed typed/racket/base
-  (require "../language/schml0.rkt"
-           "../language/schml1.rkt")
+  (require "../language/grift0.rkt"
+           "../language/grift1.rkt")
   (provide (all-from-out
-            "../language/schml0.rkt"
-            "../language/schml1.rkt"))
+            "../language/grift0.rkt"
+            "../language/grift1.rkt"))
   (require/typed/provide (submod "..")
-    [type-check (Schml0-Lang -> Schml1-Lang)]))
+    [type-check (Grift0-Lang -> Grift1-Lang)]))
 
-(: type-check (Schml0-Lang -> Schml1-Lang))
+(: type-check (Grift0-Lang -> Grift1-Lang))
 (define (type-check prgm)
   (match-define (Prog (list n c) top-level*) prgm)
   (debug (Prog (list n c INT-TYPE) (tc-top* top-level*))))
@@ -151,31 +151,31 @@ The type rules for core forms that have interesting type rules
 ;; as long as the annotation is consistent with the type of the
 ;; body
 #;
-(: lambda-type-rule (-> Src Schml-Type* Schml-Type Schml-Type?
-			(Fn Index Schml-Type* Schml-Type)))
+(: lambda-type-rule (-> Src Grift-Type* Grift-Type Grift-Type?
+			(Fn Index Grift-Type* Grift-Type)))
 (define (lambda-type-rule src ty-param* t-body return-ann)
   (cond
     [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
     [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
     [else (error 'lambda-inconsistent "~a ~a ~a" src t-body return-ann)]))
 
-#;(: tuple-type-rule (Schml-Type* -> Schml-Type))
+#;(: tuple-type-rule (Grift-Type* -> Grift-Type))
 (define (tuple-type-rule t*)
   (STuple (length t*) t*))
 
-(: tuple-proj-type-rule (Schml-Type Integer -> Schml-Type))
+(: tuple-proj-type-rule (Grift-Type Integer -> Grift-Type))
 (define (tuple-proj-type-rule ty i)
   (match ty
     [(Dyn) DYN-TYPE]
     [(STuple l t*)
      (cond
        [(< -1 i l) (list-ref t* i)]
-       [else (error 'schml "type error: tuple index out of bounds")])]
-    [otherwise (error 'schml/type-check/tuple-proj-type-rule "internal error")]))
+       [else (error 'grift "type error: tuple index out of bounds")])]
+    [otherwise (error 'grift/type-check/tuple-proj-type-rule "internal error")]))
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
-(: let-binding-type-rule (-> Schml-Type? Schml-Type Uid Src Schml-Type))
+(: let-binding-type-rule (-> Grift-Type? Grift-Type Uid Src Grift-Type))
 (define (let-binding-type-rule t-bnd t-exp id src)
   (cond
     [(not t-bnd) t-exp]
@@ -184,20 +184,20 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of a cast is the cast-type if the expression type and
 ;; the cast type are consistent.
-(: ascription-type-rule (-> Schml-Type Schml-Type Src (Option String)
-			    Schml-Type))
+(: ascription-type-rule (-> Grift-Type Grift-Type Src (Option String)
+			    Grift-Type))
 (define (ascription-type-rule ty-exp ty-cast src label)
   (if (not (consistent? ty-exp ty-cast))
       (if label
-	  (raise (exn:schml:type:static label (current-continuation-marks)))
+	  (raise (exn:grift:type:static label (current-continuation-marks)))
 	  (error 'ascription-inconsistent "~a ~a ~a" src ty-exp ty-cast))
       ty-cast))
 
 ;; The type of an if is the join of the consequence and alternative
 ;; types if the type of the branches are consistent and the test is
 ;; consistent with Bool.
-(: if-type-rule (-> Schml-Type Schml-Type Schml-Type Src
-		    Schml-Type))
+(: if-type-rule (-> Grift-Type Grift-Type Grift-Type Src
+		    Grift-Type))
 (define (if-type-rule t-tst t-csq t-alt src)
   (define if-t (join t-csq t-alt))
   (cond
@@ -207,7 +207,7 @@ The type rules for core forms that have interesting type rules
      (error 'if-inconsistent-branches "~a ~a ~a" src t-csq t-alt)]
     [else if-t]))
 
-(: switch-type-rule : Schml-Type Schml-Type* Schml-Type -> Schml-Type)
+(: switch-type-rule : Grift-Type Grift-Type* Grift-Type -> Grift-Type)
 (define (switch-type-rule exp clause* default)
   (define switch-t (join+ (cons default clause*)))
   (cond
@@ -220,15 +220,15 @@ The type rules for core forms that have interesting type rules
     [else switch-t]))
 
 ;; The type of literal constants are staticly known
-(: const-type-rule (Schml-Literal . -> . Schml-Base-Type))
+(: const-type-rule (Grift-Literal . -> . Grift-Base-Type))
 (define (const-type-rule c)
   (define who 'type-check/const-type-rule)
-  (schml-literal->base-type c))
+  (grift-literal->base-type c))
 
 ;; The type of an application is the return type of the applied
 ;; procedure given that the arguments are consistent with the
 ;; arguments types of the proceedure.
-(: application-type-rule (-> Schml-Type Schml-Type* Src Schml-Type))
+(: application-type-rule (-> Grift-Type Grift-Type* Src Grift-Type))
 (define (application-type-rule t-rator t-rand* src)
   (match t-rator
     [(Fn arr t-fml* t-ret)
@@ -242,10 +242,10 @@ The type rules for core forms that have interesting type rules
 ;; I am really just defining this in order to maintain
 ;; the abstraction but the type of a begin is the type
 ;; of it's final argument
-(: begin-type-rule (-> Schml-Type* Schml-Type Schml-Type))
+(: begin-type-rule (-> Grift-Type* Grift-Type Grift-Type))
 (define (begin-type-rule t* ty) ty)
 
-(: repeat-type-rule (Schml-Type Schml-Type Schml-Type Schml-Type -> Schml-Type))
+(: repeat-type-rule (Grift-Type Grift-Type Grift-Type Grift-Type -> Grift-Type))
 (define (repeat-type-rule tstart tstop tacc tbody)
   (cond
     [(not (consistent? tstart INT-TYPE))
@@ -264,13 +264,13 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of wrapping a value in a gaurded box is a
 ;; Gref of the value's type
-(: gbox-type-rule (-> Schml-Type Schml-Type))
+(: gbox-type-rule (-> Grift-Type Grift-Type))
 (define (gbox-type-rule ty) (GRef ty))
 
 ;; The type of unwrapping a Dyn value is also Dyn
 ;; The type of unwrapping a Ref is the type that the reference is
 ;; parameterized by.
-(: gunbox-type-rule (-> Schml-Type Schml-Type))
+(: gunbox-type-rule (-> Grift-Type Grift-Type))
 (define (gunbox-type-rule ty)
   (match ty
     [(Dyn) DYN-TYPE]
@@ -278,7 +278,7 @@ The type rules for core forms that have interesting type rules
     [otherwise (error 'type-check/todo)]))
 
 ;; The type of setting a reference is always unit
-(: gbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(: gbox-set!-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (gbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) UNIT-TYPE]
@@ -295,13 +295,13 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of wrapping a value in a monotonic box is a
 ;; MRef of the value's type
-(: mbox-type-rule (-> Schml-Type Schml-Type))
+(: mbox-type-rule (-> Grift-Type Grift-Type))
 (define (mbox-type-rule ty) (MRef ty))
 
 ;; The type of unboxing a Dyn value is also Dyn
 ;; The type of unboxing a MRef is the type that the reference is
 ;; parameterized by.
-(: munbox-type-rule (-> Schml-Type Schml-Type))
+(: munbox-type-rule (-> Grift-Type Grift-Type))
 (define (munbox-type-rule ty)
   (match ty
     [(Dyn) DYN-TYPE]
@@ -310,7 +310,7 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of setting a dyn value is dyn
 ;; The type of setting a MRef value is the type of the argument
-(: mbox-set!-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(: mbox-set!-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (mbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) UNIT-TYPE]
@@ -319,7 +319,7 @@ The type rules for core forms that have interesting type rules
                   (error 'type-check/todo))]
     [otherwise (error 'type-check/todo)]))
 
-(: mbox-val-type (-> Schml-Type Schml-Type))
+(: mbox-val-type (-> Grift-Type Grift-Type))
 (define (mbox-val-type box-ty)
   (match box-ty
     [(Dyn) DYN-TYPE]
@@ -328,7 +328,7 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of creating an array is Vect of the type of the initializing argument
 ;; The size argument must be consistent with Int
-(: gvector-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(: gvector-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (gvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (GVect init-ty)
@@ -337,7 +337,7 @@ The type rules for core forms that have interesting type rules
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
 ;; The type of the index must be consistent with Int
-(: gvector-ref-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(: gvector-ref-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (gvector-ref-type-rule vect-ty index-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -352,7 +352,7 @@ The type rules for core forms that have interesting type rules
 ;; The indice must be consistent with int
 
 ;; FIXME: return unit after setting a vector cell
-(: gvector-set!-type-rule (-> Schml-Type Schml-Type Schml-Type Schml-Type))
+(: gvector-set!-type-rule (-> Grift-Type Grift-Type Grift-Type Grift-Type))
 (define (gvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -366,19 +366,19 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of creating an array is Vect of the type of the initializing argument
 ;; The size argument must be consistent with Int
-(: mvector-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(: mvector-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (mvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (MVect init-ty)
       (error 'type-check/todo)))
 
-(: mvector-length-type-rule (-> Schml-Type Schml-Type))
+(: mvector-length-type-rule (-> Grift-Type Grift-Type))
 (define (mvector-length-type-rule vect-ty)
   (if (or (MVect? vect-ty) (Dyn? vect-ty))
       INT-TYPE
       (error 'type-check/todo)))
 
-(: gvector-length-type-rule (-> Schml-Type Schml-Type))
+(: gvector-length-type-rule (-> Grift-Type Grift-Type))
 (define (gvector-length-type-rule vect-ty)
   (if (or (GVect? vect-ty) (Dyn? vect-ty))
       INT-TYPE
@@ -387,7 +387,7 @@ The type rules for core forms that have interesting type rules
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
 ;; The type of the index must be consistent with Int
-(: mvector-ref-type-rule (-> Schml-Type Schml-Type Schml-Type))
+(: mvector-ref-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (mvector-ref-type-rule vect-ty index-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -400,7 +400,7 @@ The type rules for core forms that have interesting type rules
 ;; The new value as long as the new value is consistent with the old value
 ;; The type of setting a Dyn is Dyn
 ;; The indice must be consistent with int
-(: mvector-set!-type-rule (-> Schml-Type Schml-Type Schml-Type Schml-Type))
+(: mvector-set!-type-rule (-> Grift-Type Grift-Type Grift-Type Grift-Type))
 (define (mvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -411,7 +411,7 @@ The type rules for core forms that have interesting type rules
         [otherwise (error 'type-check/todo)])
       (error 'type-check/todo)))
 
-(: mvector-val-type (-> Schml-Type Schml-Type))
+(: mvector-val-type (-> Grift-Type Grift-Type))
 (define (mvector-val-type vect-ty)
   (match vect-ty
     [(Dyn) DYN-TYPE]
@@ -419,7 +419,7 @@ The type rules for core forms that have interesting type rules
     [otherwise (error 'type-check/mvector-val-type)]))
                       
 ;;; Procedures that destructure and restructure the ast
-(: tc-expr (-> S0-Expr Env (values S1-Expr Schml-Type)))
+(: tc-expr (-> S0-Expr Env (values S1-Expr Grift-Type)))
 (define (tc-expr exp env)
   (debug 'tc-expr exp env)
   (: env-extend/bnd (S1-Bnd Env . -> . Env))
@@ -430,11 +430,11 @@ The type rules for core forms that have interesting type rules
     (define-values (id-type new-rhs)
       (infer-recursive-binding-type id-type? rhs))
     (Bnd id id-type new-rhs))
-  (: recur (-> S0-Expr* (values S1-Expr* Schml-Type*)))
+  (: recur (-> S0-Expr* (values S1-Expr* Grift-Type*)))
   (define (map-recur e*)
     (for/lists (e* t*) ([e e*])
       (tc-expr e env)))
-  (: recur (-> S0-Expr (values S1-Expr Schml-Type)))
+  (: recur (-> S0-Expr (values S1-Expr Grift-Type)))
   (let recur ([e exp])
     (define src (Ann-data e))
     (define-values (new-exp type)
@@ -456,7 +456,7 @@ The type rules for core forms that have interesting type rules
 	[(App (app recur rator ty-rator) (app map-recur rand* ty-rand*))
          (values (App rator rand*)
                  (application-type-rule ty-rator ty-rand* src))]
-	[(Op (and p (app schml-primitive->type ty-p))
+	[(Op (and p (app grift-primitive->type ty-p))
              (app map-recur rand* ty-rand*))
          (unless (Fn? ty-p)
            (error 'type-check/Op "assuming operators have function type"))
@@ -535,7 +535,7 @@ The type rules for core forms that have interesting type rules
 ;; Type checks the rhs to be consistent with type annotation if
 ;; provided the resulting type is the type of the annotation.
 (: mk-tc-binding :
-   Src (-> S0-Expr (values S1-Expr Schml-Type)) -> (-> S0-Bnd S1-Bnd))
+   Src (-> S0-Expr (values S1-Expr Grift-Type)) -> (-> S0-Bnd S1-Bnd))
 (define ((tc-binding src tc-expr) bnd)
   (match-define (Bnd id id-type rhs) bnd)
   (define-values (new-rhs rhs-type) (tc-expr rhs))

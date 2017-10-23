@@ -10,7 +10,7 @@
 (define-type Bnd-Crcn* (Listof Bnd-Crcn))
 
 (define-type Lambda0-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (Let-Static* Bnd-Type* Bnd-Crcn*
                      L0-Expr)))
 
@@ -19,7 +19,7 @@
           (Construct L0-Gen-Data L0-Gen-Ctor (Listof E))
           (Access L0-Gen-Data L0-Gen-Access E (Option E))
           (Check L0-Gen-Data L0-Gen-Pred E (Listof E))
-          (Observe E Schml-Type) 
+          (Observe E Grift-Type) 
           ;; Code Labels
           No-Op
           (Code-Label Uid)
@@ -102,16 +102,16 @@
           (Repeat Uid E E Uid E E)
           Break-Repeat
           ;;Primitives
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
           (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
-	  ;;(Cast E (Twosome Schml-Type Schml-Type Blame-Label))
-          ;;(Cast E (Coercion Schml-Coercion))
+	  ;;(Cast E (Twosome Grift-Type Grift-Type Blame-Label))
+          ;;(Cast E (Coercion Grift-Coercion))
           ;;(Interpreted-Cast E (Twosome E E E))
           ;;(Interpreted-Cast E (Coercion E))
           ;; Observations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Unguarded-Representation
           (Unguarded-Box E)
           (Unguarded-Box-Ref E)

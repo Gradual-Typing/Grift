@@ -8,7 +8,7 @@
 | Data0-Language created by impose-cast-semantics / specify-representation     | 
 +-----------------------------------------------------------------------------|#
 (define-type Data0-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (GlobDecs Uid* D0-Expr)))
 
 (define-type D0-Bnd-Code* (Listof D0-Bnd-Code))

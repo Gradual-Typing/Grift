@@ -2,7 +2,7 @@ ROOT_DIR=../../..
 COMPILE=$(SCHML)
 COMPILE_OPTIONS=--coercions -O 3 
 SRC_DIR=../src
-SRC_EXT=schml
+SRC_EXT=grift
 
 RUNS := 1
 

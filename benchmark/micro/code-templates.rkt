@@ -1,11 +1,11 @@
 #lang racket
 (require "../../src/language/forms.rkt"
          "../helpers.rkt"
-         "../../src/schml/syntax-to-schml0.rkt"
+         "../../src/grift/syntax-to-grift0.rkt"
          "../../src/casts/casts-to-coercions.rkt")
 (provide (all-defined-out))
 
-;; Save the source code ./src/name.schml
+;; Save the source code ./src/name.grift
 (define (write-source path prog)
   (call-with-output-file path #:exists 'replace #:mode 'text
     (lambda (file-port)

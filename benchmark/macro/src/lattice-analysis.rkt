@@ -41,23 +41,23 @@
 (define number-of-lattice-samples (make-parameter #f))
 
 
-;; - extract timing info from the output logs of schml/partial
+;; - extract timing info from the output logs of grift/partial
 ;; - build plots based on this data
 ;; - summarize findings
 ;; Generates some output but all real output is save in the outputs-dir
 (define (analyze-lattice) 
   (define partial-benchmark-stats
-    (for/list ([f (in-glob "schml/partial/*/out/*/*.err")])
+    (for/list ([f (in-glob "grift/partial/*/out/*/*.err")])
       ;; Bind the variable portions of the path
-      (define rx #px"schml/partial/(\\w+)/out/((\\w|-)+)/(\\d)+.err")
+      (define rx #px"grift/partial/(\\w+)/out/((\\w|-)+)/(\\d)+.err")
       (define-values (rel-path impl benchmark file)
         (match (regexp-match rx f)
           [(list r i b _ f) (values r i b f)]
           [other (error 'analyze-lattice "unmatched: ~a" other)]))
       (define src-file-path
-	(build-path "schml/partial/src"
+	(build-path "grift/partial/src"
 		    benchmark
-		    (string-append file ".schml")))
+		    (string-append file ".grift")))
       (define percent-typed
 	(match (regexp-match #px";; (\\d+\\.\\d+) %"
 	       		     (file->string src-file-path))
@@ -186,10 +186,10 @@
   (define (mean-ref x) (car (hash-ref stats-table x (err x))))
   (define c-avg (mean-ref "c"))
   (define gambit-avg (mean-ref "gambit"))
-  (define static/type-base-avg (mean-ref "schml/static/casts"))
-  (define static/coercions-avg (mean-ref "schml/static/coercions"))
-  (define dynamic/type-base-avg (mean-ref "schml/dynamic/casts"))
-  (define dynamic/coercions-avg (mean-ref "schml/dynamic/coercions"))
+  (define static/type-base-avg (mean-ref "grift/static/casts"))
+  (define static/coercions-avg (mean-ref "grift/static/coercions"))
+  (define dynamic/type-base-avg (mean-ref "grift/dynamic/casts"))
+  (define dynamic/coercions-avg (mean-ref "grift/dynamic/coercions"))
   (define type-base-static/dynamic
     (/ dynamic/type-base-avg static/type-base-avg))
   (define coercions-static/dynamic

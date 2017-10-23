@@ -27,8 +27,8 @@ done
 #     echo "${res[@]}"
 # }
 
-# schmls=$(pow 'static/ dynamic/' 'coercions casts')
-# langs="c gambit racket ${schmls}"
+# grifts=$(pow 'static/ dynamic/' 'coercions casts')
+# langs="c gambit racket ${grifts}"
 # tmpdir=tmp 
 
 

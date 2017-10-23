@@ -6,19 +6,19 @@ reads=999999
 writes=999999
 ncasts=9999999
 casts=11
-schmldir=/u/dalmahal/Schml
+griftdir=/u/dalmahal/Schml
 # --------------------------------------------------------------------
 
 name1=refread
 name2=refwrite
 name3=refcast
-testdir=$schmldir/benchmark/suite
-datadir=$schmldir/benchmark/suite/ref-cast/data
-outdir=$schmldir/benchmark/suite/ref-cast/output
+testdir=$griftdir/benchmark/suite
+datadir=$griftdir/benchmark/suite/ref-cast/data
+outdir=$griftdir/benchmark/suite/ref-cast/output
 # contains files required by tikz to output correct figures
 # created by lua gnuplot-tikz.lua style
-miscdir=$schmldir/benchmark/suite/ref-cast/misc
-tmpdir=$schmldir/benchmark/suite/ref-cast/tmp
+miscdir=$griftdir/benchmark/suite/ref-cast/misc
+tmpdir=$griftdir/benchmark/suite/ref-cast/tmp
 logfile1=$datadir/$name1.csv
 logfile2=$datadir/$name2.csv
 logfile3=$datadir/$name3.csv
@@ -35,12 +35,12 @@ mkdir -p $outdir
 # specialize all source files templates to a concrete number of
 # iterations.
 cd $testdir/ref-cast/src
-sed "s/CAST-COUNT/$casts/;s/OP-COUNT/$reads/" < $name1-template> $tmpdir/$name1.schml
-sed "s/CAST-COUNT/$casts/;s/OP-COUNT/$writes/" < $name2-template> $tmpdir/$name2.schml
-sed "s/CAST-COUNT/$ncasts/" < $name3-template> $tmpdir/$name3.schml
+sed "s/CAST-COUNT/$casts/;s/OP-COUNT/$reads/" < $name1-template> $tmpdir/$name1.grift
+sed "s/CAST-COUNT/$casts/;s/OP-COUNT/$writes/" < $name2-template> $tmpdir/$name2.grift
+sed "s/CAST-COUNT/$ncasts/" < $name3-template> $tmpdir/$name3.grift
 
 # compile Schml source files, then enter the src directory.
-cd $schmldir
+cd $griftdir
 racket benchmark.rkt $tmpdir
 cd $tmpdir
 

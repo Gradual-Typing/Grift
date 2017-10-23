@@ -141,7 +141,7 @@ TODO write unit tests
   (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type Dyn-PVec-Len-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type Dyn-Fn-App-Type
-  (CoC3-Expr CoC3-Expr* Schml-Type* CoC3-Expr -> CoC3-Expr))
+  (CoC3-Expr CoC3-Expr* Grift-Type* CoC3-Expr -> CoC3-Expr))
 (define-type Dyn-Tup-Prj-Type
   (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type MBox-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
@@ -234,10 +234,10 @@ TODO write unit tests
          #:dyn-fn-app   [dyn-fn-app    : Dyn-Fn-App-Type]
          #:dyn-tup-prj  [dyn-tup-prj   : Dyn-Tup-Prj-Type]
          ;; These are node that may get compiled differently for static
-         #:mbox         [mbox : (CoC3-Expr Schml-Type -> CoC3-Expr) Mbox]
+         #:mbox         [mbox : (CoC3-Expr Grift-Type -> CoC3-Expr) Mbox]
          #:stc-mbox-ref [stc-mbox-ref : (CoC3-Expr -> CoC3-Expr) Mbox-val-ref]
          #:stc-mbox-set [stc-mbox-set! : (CoC3-Expr CoC3-Expr -> CoC3-Expr) Mbox-val-set!]
-         #:mvec         [mvec : (CoC3-Expr CoC3-Expr Schml-Type -> CoC3-Expr) Mvector]
+         #:mvec         [mvec : (CoC3-Expr CoC3-Expr Grift-Type -> CoC3-Expr) Mvector]
          #:stc-mvec-ref [stc-mvec-ref : (CoC3-Expr CoC3-Expr -> CoC3-Expr) Mvector-val-ref]
          #:stc-mvec-set [stc-mvec-set! : (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) Mvector-val-set!]
          #:mvec-len     [mvec-len : (CoC3-Expr -> CoC3-Expr) Mvector-length])
@@ -911,7 +911,7 @@ TODO write unit tests
     (define arg-casts : CoC3-Expr*
       (for/list : (Listof CoC3-Expr)
                 ([v : CoC3-Expr v*]
-                 [t : Schml-Type t*]
+                 [t : Grift-Type t*]
                  [i (in-naturals)])
         (let$ ([dyn-fn-arg-type (Type-Fn-arg ty (Quote i))])
           (compile-cast v (Type t) dyn-fn-arg-type l))))

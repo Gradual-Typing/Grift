@@ -7,35 +7,35 @@
                        "primitives.rkt"))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml-Syntax this is a program returned from schml/read
+| Language/Grift-Syntax this is a program returned from grift/read
 +-----------------------------------------------------------------------------|#
 (define-type Syntax-Lang (Prog String (Listof Any)))
 
 
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml0 this is the language returned by schml/syntax->schml0
+| Language/Grift0 this is the language returned by grift/syntax->grift0
 +-----------------------------------------------------------------------------|#
-(define-type Schml0-Lang
+(define-type Grift0-Lang
   (Prog (List String Natural) (Listof S0-Top)))
 
 (define-type S0-Top
-  (U (Observe S0-Form (Option Schml-Type))
-     (Define Boolean Uid (Option Schml-Type) S0-Form)))
+  (U (Observe S0-Form (Option Grift-Type))
+     (Define Boolean Uid (Option Grift-Type) S0-Form)))
 
 (define-type (S0-Form E)
-  (U (Lambda Schml-Fml* (Ann E (Option Schml-Type)))
+  (U (Lambda Grift-Fml* (Ann E (Option Grift-Type)))
      (Letrec S0-Bnd* E)
      (Let S0-Bnd* E)
      (App E (Listof E))
-     (Op Schml-Primitive (Listof E))
+     (Op Grift-Primitive (Listof E))
      (If E E E)
      (Switch E (Listof (Pair (Listof Integer) E)) E)
-     (Ascribe E Schml-Type (Option Blame-Label))
+     (Ascribe E Grift-Type (Option Blame-Label))
      (Var Uid)
-     (Quote Schml-Literal)
+     (Quote Grift-Literal)
      (Begin (Listof E) E)
-     (Repeat Uid E E (Ann Uid (Option Schml-Type)) E E)
+     (Repeat Uid E E (Ann Uid (Option Grift-Type)) E E)
      ;; Monotonic effects
      (MboxS E)
      (Munbox E)
@@ -60,7 +60,7 @@
   (Rec E (Ann (S0-Form E) Src)))
 
 (define-type S0-Expr* (Listof S0-Expr))
-(define-type S0-Bnd (Bnd Uid Schml-Type? S0-Expr))
+(define-type S0-Bnd (Bnd Uid Grift-Type? S0-Expr))
 (define-type S0-Bnd* (Listof S0-Bnd))
 
 

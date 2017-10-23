@@ -7,9 +7,9 @@
 |Discription: This program uses the first few passes of the compiler to generate
 |a the entire latice for dynamically typed programs that are structurally equal.
 +------------------------------------------------------------------------------|#
-(require schml/src/helpers
-         schml/src/errors
-	 schml/src/language)
+(require grift/src/helpers
+         grift/src/errors
+	 grift/src/language)
 
 ;; Only the pass is provided by this module
 (provide generate-programs)

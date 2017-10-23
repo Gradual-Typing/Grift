@@ -2,7 +2,7 @@
 
 (require typed/rackunit
          typed/rackunit/text-ui
-         schml/testing/test-compile)
+         grift/testing/test-compile)
 
 (provide (all-defined-out))
 
@@ -16,11 +16,11 @@
    #:after (lambda () (display "done\n"))
 
    ;; Bools
-   (test-file "true.schml"  (bool #t))
-   (test-file "false.schml" (bool #f))
+   (test-file "true.grift"  (bool #t))
+   (test-file "false.grift" (bool #f))
    ;; Ints
-   (test-file "1.schml"   (int 1))
-   (test-file "neg7.schml"   (int -7))
-   (test-file "99.schml" (int 99))
-   (test-file "123456.schml" (int 123456))
+   (test-file "1.grift"   (int 1))
+   (test-file "neg7.grift"   (int -7))
+   (test-file "99.grift" (int 99))
+   (test-file "123456.grift" (int 123456))
    ))

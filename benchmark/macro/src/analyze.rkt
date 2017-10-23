@@ -6,10 +6,10 @@
 	 file/glob)
 
 (define langs '("c" "gambit" "racket"
-		"schml/static/coercions"
-		"schml/static/casts"
-	 	"schml/dynamic/coercions"
-		"schml/dynamic/casts"))
+		"grift/static/coercions"
+		"grift/static/casts"
+	 	"grift/dynamic/coercions"
+		"grift/dynamic/casts"))
 
 (define (print-stat-layout-to-port p)
  (define data-layout "#language, mean(sec), stddev(sec)\n")
@@ -26,7 +26,7 @@
       (unless runs? (error '--assert-runs "invalid: ~v" runs))
       (number-of-runs runs?))]
  #:args ()
- (display (glob "{c,gambit,racket,schml}/{,static/,dynamic/}*.err"))
+ (display (glob "{c,gambit,racket,grift}/{,static/,dynamic/}*.err"))
  (unless (directory-exists? "stats")
   (make-directory "stats"))
  (for* ([input (in-glob "inputs/*")])

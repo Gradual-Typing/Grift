@@ -3,11 +3,11 @@
 (require "./helpers.rkt")
 (provide (all-defined-out))
 
-;; Exceptions Thrown should all be subtypes of exn:schml
-(struct exn:schml exn ())
+;; Exceptions Thrown should all be subtypes of exn:grift
+(struct exn:grift exn ())
 
 ;; Expception thrown in a specific pass 
-(struct exn:schml:pass exn:schml ())
+(struct exn:grift:pass exn:grift ())
 
 ;; This is a generic error handler that is usefull for
 ;; quick testing it should not be used for actuall errors
@@ -15,20 +15,20 @@
 
 (define-syntax-rule (raise-pass-exn who fmt args ...)
   (raise 
-   (exn:schml:pass 
+   (exn:grift:pass 
     (format "Error in ~a: ~a"
 	    who
 	    (format fmt args ...))
     (current-continuation-marks))))
 
 #| Errors thrown in the read pass |#
-(struct exn:schml:read exn:schml ())
+(struct exn:grift:read exn:grift ())
 
 (define file-name-fmt
   "Error in read: unable to extract file name from the path ~a")
 
 (define-syntax-rule (raise-file-name-exn p)
-  (raise (exn:schml:read
+  (raise (exn:grift:read
 	  (format file-name-fmt (path->string p))
 	  (current-continuation-marks))))
 
@@ -38,10 +38,10 @@
    Note: exceptions are defined as macros so that the 
    stacktraces are more accurate.
 |#
-(struct exn:schml:parse exn:schml ())
+(struct exn:grift:parse exn:grift ())
 
 (define-syntax-rule (raise-parse-exn l fmt args ...)
-  (raise (exn:schml:parse
+  (raise (exn:grift:parse
 	  (format "Exception in parse:~a: ~a" 
 		  (srcloc->string l) 
 		  (format fmt args ...))
@@ -117,19 +117,19 @@
   (raise-parse-exn src "bad syntax in ~a" (rebuild-stx* ': stx*)))
 
 
-(struct exn:schml:type exn:schml ())
-(struct exn:schml:type:static exn:schml:type ())
-(struct exn:schml:type:dynamic exn:schml:type () #:transparent)
+(struct exn:grift:type exn:grift ())
+(struct exn:grift:type:static exn:grift:type ())
+(struct exn:grift:type:dynamic exn:grift:type () #:transparent)
 
 (define-syntax-rule (raise-static-type-exn src fmt args ...)
-  (raise (exn:schml:type:static
+  (raise (exn:grift:type:static
 	  (format "Error in Type-Check:~a: ~a"
 		  (srcloc->string src)
 		  (format fmt args ...))
 	  (current-continuation-marks))))
 
 (define-syntax-rule (raise-blame-label l)
-  (raise (exn:schml:type:static l (current-continuation-marks))))
+  (raise (exn:grift:type:static l (current-continuation-marks))))
 
 (define-syntax-rule (raise-variable-not-found src id)
   (raise-static-type-exn 
@@ -197,16 +197,16 @@
 
 (define-syntax raise-dynamic-type-error
   (syntax-rules ()
-    [(_ lbl) (raise (exn:schml:type:dynamic lbl (current-continuation-marks)))]))
+    [(_ lbl) (raise (exn:grift:type:dynamic lbl (current-continuation-marks)))]))
 
-(struct exn:schml:cast exn:schml ())
+(struct exn:grift:cast exn:grift ())
 (define-syntax-rule (raise-lambda-without-fn-type type)
-  (raise (exn:schml:cast
+  (raise (exn:grift:cast
 	  (format "Error in cast compilation: lambda without a function type: ~a" type)
 	  (current-continuation-marks))))
 
 (define-syntax-rule (raise-limited-types-exn t)
-  (raise (exn:schml:cast
+  (raise (exn:grift:cast
 	  (format "Error in cast compilation: Couldn't create a runtime representation of ~a"
 		  t)
 	  (current-continuation-marks))))

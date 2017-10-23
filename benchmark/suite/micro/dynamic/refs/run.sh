@@ -1,17 +1,17 @@
 #!/bin/sh
 
-schmldir=/u/dalmahal/lattice/Schml
+griftdir=/u/dalmahal/lattice/Schml
 memlimit=9999999999
 # --------------------------------------------------------------------
 
 name=ref
-testdir=$schmldir/benchmark/suite/micro
+testdir=$griftdir/benchmark/suite/micro
 dir=$testdir/dynamic/refs
 datadir=$dir/data
 outdir=$dir/output
 tmpdir=$dir/tmp
 logfile1=$outdir/${name}-gambit.csv
-logfile2=$outdir/${name}-schml.csv
+logfile2=$outdir/${name}-grift.csv
 logfile3=$datadir/
 TIMEFORMAT=%R
 
@@ -25,7 +25,7 @@ cp $dir/src/* $tmpdir
 echo "Benchmarking mutable references read and write"
 
 # compile Schml source files, then enter the tmp directory
-cd $schmldir
+cd $griftdir
 racket benchmark.rkt $tmpdir $memlimit
 cd $tmpdir
 
@@ -39,36 +39,36 @@ printf "n, coercions mean, coercions stddev, typebased mean, typebased stddev\n"
 # if Schml decided to return more verpose data about timing, remove q
 size=10000000
 # Schml segfault at bigger sizes
-schml_size=10000000 #$(($size/10))
+grift_size=10000000 #$(($size/10))
 # normalize to the cost of iteration in nano seconds.
-c1=$(echo "1000000000/$schml_size" | bc -l)
+c1=$(echo "1000000000/$grift_size" | bc -l)
 c2=$(echo "1000000/$size" | bc -l)
 
 # calculating overhead
 for i in `seq 1 $1`; do
-    echo $schml_size | ./overhead.o1 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" '{printf("%.2f\n", ($1*c))}' >> ${name}1.log
-    echo $schml_size | ./overhead.o2 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" '{printf("%.2f\n", ($1*c))}' >> ${name}2.log
+    echo $grift_size | ./overhead.o1 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" '{printf("%.2f\n", ($1*c))}' >> ${name}1.log
+    echo $grift_size | ./overhead.o2 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" '{printf("%.2f\n", ($1*c))}' >> ${name}2.log
     ./soverhead $size | sed -n '3,3s/ *\([0-9]*\).*/\1/p' | awk -v c="$c2" '{printf("%.2f\n", ($1*c))}' >> s$name.log
     echo "finished run #$i"
 done
 
-read schml1overhead_std schml1overhead_mean <<< $( cat ${name}1.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
-read schml2overhead_std schml2overhead_mean <<< $( cat ${name}2.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+read grift1overhead_std grift1overhead_mean <<< $( cat ${name}1.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+read grift2overhead_std grift2overhead_mean <<< $( cat ${name}2.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 read s1overhead_std s1overhead_mean <<< $( cat s$name.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 
 rm ${name}1.log ${name}2.log s$name.log
 
 for i in `seq 1 $1`; do
-    echo $schml_size | ./${name}.o1 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" -v o="$schml1overhead_mean" '{printf("%.2f\n", ($1*c)-o)}' >> ${name}1.log
-    echo $schml_size | ./${name}.o2 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" -v o="$schml2overhead_mean" '{printf("%.2f\n", ($1*c)-o)}' >> ${name}2.log
+    echo $grift_size | ./${name}.o1 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" -v o="$grift1overhead_mean" '{printf("%.2f\n", ($1*c)-o)}' >> ${name}1.log
+    echo $grift_size | ./${name}.o2 | sed -n 's/.*: \([0-9]*\)/\1/p;q' | awk -v c="$c1" -v o="$grift2overhead_mean" '{printf("%.2f\n", ($1*c)-o)}' >> ${name}2.log
     ./s$name $size | sed -n '3,3s/ *\([0-9]*\).*/\1/p' | awk -v c="$c2" -v o="$s1overhead_mean" '{printf("%.2f\n", ($1*c)-o)}' >> s$name.log
     echo "finished run #$i"
 done
-read schml1_std schml1_mean <<< $( cat ${name}1.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
-read schml2_std schml2_mean <<< $( cat ${name}2.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+read grift1_std grift1_mean <<< $( cat ${name}1.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+read grift2_std grift2_mean <<< $( cat ${name}2.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 read s1_std s1_mean <<< $( cat s$name.log | awk -v var=$1 '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 printf "%s,%s,%s\n" $size $s1_mean $s1_std >> $logfile1
-printf "%s,%s,%s,%s,%s\n" $schml_size $schml1_mean $schml1_std $schml2_mean $schml2_std >> $logfile2
+printf "%s,%s,%s,%s,%s\n" $grift_size $grift1_mean $grift1_std $grift2_mean $grift2_std >> $logfile2
 # save the data
 echo "GambitC,Schml coercions,Schml typebased" > ${logfile3}$size
 paste -d"," s${name}.log ${name}1.log ${name}2.log >> ${logfile3}$size

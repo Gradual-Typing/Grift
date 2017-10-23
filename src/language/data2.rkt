@@ -10,7 +10,7 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Data2-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (GlobDecs Uid*
                     (Labels D2-Bnd-Code*
                             D2-Body))))

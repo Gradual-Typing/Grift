@@ -24,13 +24,13 @@
 (provide insert-casts)
 
 (module* typed typed/racket/base
-  (require "../language/schml1.rkt"
+  (require "../language/grift1.rkt"
            "../language/cast0.rkt")
   (provide (all-from-out
-            "../language/schml1.rkt"
+            "../language/grift1.rkt"
             "../language/cast0.rkt"))
   (require/typed/provide (submod "..")
-    [insert-casts (Schml1-Lang -> Cast0-Lang)]))
+    [insert-casts (Grift1-Lang -> Cast0-Lang)]))
 
 (define-syntax-rule (: stx ...) (void))
 (define-syntax-rule (ann e t ...) e)
@@ -47,7 +47,7 @@
   (set-box! casts-inserted '()))
 
 
-(: insert-casts (Schml1-Lang -> Cast0-Lang))
+(: insert-casts (Grift1-Lang -> Cast0-Lang))
 (define (insert-casts prgm)
   (match-define (Prog (list name unique type) tl*) prgm)
   (define uc (make-unique-counter unique))
@@ -74,7 +74,7 @@
   
   (debug (Prog (list name (unique-counter-next! uc) type) new-tl*)))
 
-(: mk-cast ((-> Blame-Label) C0-Expr Schml-Type Schml-Type -> C0-Expr))
+(: mk-cast ((-> Blame-Label) C0-Expr Grift-Type Grift-Type -> C0-Expr))
 (define (mk-cast src l-th e t1 t2)
   (cond
     [(equal? t1 t2) e]
@@ -94,8 +94,8 @@
        (error 'insert-casts "function type recieve non-function type"))
      (let* ([lbl-th (mk-label "lambda" body-src)]
             [body (mk-cast body-src lbl-th body
-                           body-type (ann (Fn-ret type) Schml-Type))]
-            [fml* (map (inst Fml-identifier Uid Schml-Type) fml*)])
+                           body-type (ann (Fn-ret type) Grift-Type))]
+            [fml* (map (inst Fml-identifier Uid Grift-Type) fml*)])
        (Lambda fml* body))]
     [(Let bnd* (and (Ann _ (cons src type^)) body))
      (Let (map ic-bnd bnd*)
@@ -374,7 +374,7 @@
      (Tuple-proj e i)]
     [other (error 'insert-casts/expression "unmatched ~a" other)]))
 
-(: make-list (Integer Schml-Type -> (Listof Schml-Type)))
+(: make-list (Integer Grift-Type -> (Listof Grift-Type)))
 (define (make-list n t)
   (if (= n 0)
       '()
@@ -390,7 +390,7 @@
 
 ;; An Application of dynamic casts the arguments to dyn and the operand to
 ;; a function that takes dynamic values and returns a dynamic value
-(: ic-application (S1-Expr (Listof S1-Expr) Src Schml-Type . -> . C0-Expr))
+(: ic-application (S1-Expr (Listof S1-Expr) Src Grift-Type . -> . C0-Expr))
 (define (ic-application rator rand* src type)
   (match-define (Ann _ (cons rator-src rator-type)) rator)
   (match rator-type
@@ -414,19 +414,19 @@
      (define exp* (map (ic-operand/cast src) rand* dom))
      (App (ic-expr rator) exp*)]))
 
-(: make-dyn-fn-type (-> Index (Fn Index (Listof Schml-Type) Schml-Type)))
+(: make-dyn-fn-type (-> Index (Fn Index (Listof Grift-Type) Grift-Type)))
 (define (make-dyn-fn-type n)
-  (Fn n (build-list n (lambda (_) #;#;: Schml-Type DYN-TYPE)) DYN-TYPE))
+  (Fn n (build-list n (lambda (_) #;#;: Grift-Type DYN-TYPE)) DYN-TYPE))
 
 (: ic-operands
    (-> (Listof S1-Expr)
-       (values (Listof C0-Expr) (Listof Schml-Type))))
+       (values (Listof C0-Expr) (Listof Grift-Type))))
 (define (ic-operands rand*)
   (for/lists (cf* ty*) ([rand rand*])
     (match-let ([(Ann _ (cons _ type)) rand])
       (values (ic-expr rand) type))))
 
-(: ic-operand/cast (-> Src (-> S1-Expr Schml-Type C0-Expr)))
+(: ic-operand/cast (-> Src (-> S1-Expr Grift-Type C0-Expr)))
 (define (ic-operand/cast app-src)
   (lambda (rand arg-type)
     (match-let ([(Ann _ (cons rand-src rand-type)) rand])

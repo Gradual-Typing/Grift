@@ -15,7 +15,7 @@ Thoughts about improvements
 
 ;; Controls how many time each function call is repeated in
 ;; order to scale the time to a measurable quantity.
-(define schml-iterations 10000)
+(define grift-iterations 10000)
 
 (define PAGE-SIZE 4096)
 ;; Number of decimals in formatted latex output
@@ -108,7 +108,7 @@ Thoughts about improvements
     (let-values ([(results) (c-compile/run/parse test)])
       (list test (mean results) (stddev results)))))
 
-(define (schml-compile/run/parse test [rep #f])
+(define (grift-compile/run/parse test [rep #f])
   (define (sec->pico x) (* x (expt 10 12)))
   (define spec #px"^time \\(sec\\): (\\d+.\\d+)\n")
   (define base (car test))
@@ -118,7 +118,7 @@ Thoughts about improvements
      (if rep
          (string-append base "-" (~a rep))
          base)))
-  (define src  (path src-dir base ".schml"))
+  (define src  (path src-dir base ".grift"))
   (define tmpa (path tmp-dir base^ ".s"))
   (define tmpc (path tmp-dir base^ ".c"))
   (define exe  (path exe-dir base^ ".out"))
@@ -138,22 +138,22 @@ Thoughts about improvements
     (for/list ([run (in-range runs)])
       (let* ([result (with-output-to-string
                        (lambda ()
-                         (with-input-from-string (format "~a" schml-iterations)
+                         (with-input-from-string (format "~a" grift-iterations)
                            (lambda ()
                             (system (format "~a" (path->string exe)))))))]
              [parse?  (regexp-match spec result)])
         (unless parse?
-          (error 'schml-compile/run/parse
+          (error 'grift-compile/run/parse
                  "failed to parse ~a with ~a"
                  exe result))
         (let* ([time-s (string->number (cadr parse?))]
                [time-ps (sec->pico time-s)]
-               [time/iter (/ time-ps schml-iterations)])
+               [time/iter (/ time-ps grift-iterations)])
           (printf "~a ~a ~a\n" base time-ps time/iter)
           time/iter))))
   (values base^ results))
 
-(define schml-loop-test
+(define grift-loop-test
   `("gtlc-loop" .
     (let ([acc : (GRef Int) (gbox 0)]
           [iters : Int (read-int)])
@@ -168,7 +168,7 @@ Thoughts about improvements
           (timer-report)
           (gunbox acc))))))
 
-(define schml-tests
+(define grift-tests
   `(("gtlc-static-int-x1" .
      (letrec ([f : (Int -> Int) (lambda (n) n)])
        (let ([acc : (GRef Int) (gbox 0)]
@@ -308,13 +308,13 @@ Thoughts about improvements
              (timer-report)
              (gunbox acc))))))))
 
-(define schml-results
+(define grift-results
   (cons
-   (let-values ([(name results) (schml-compile/run/parse schml-loop-test)])
+   (let-values ([(name results) (grift-compile/run/parse grift-loop-test)])
      (list name (mean results) (stddev results)))
-   (for*/list ([test (in-list schml-tests)]
+   (for*/list ([test (in-list grift-tests)]
                [rep  '(Twosomes Coercions)])
-     (let-values ([(name results) (schml-compile/run/parse test rep)])
+     (let-values ([(name results) (grift-compile/run/parse test rep)])
        (list name (mean results) (stddev results))))))
 
 (define (check-for x)
@@ -384,7 +384,7 @@ Thoughts about improvements
                   (real->decimal-string sdev decimals))))
      (display "\\end{tabular}\n" p))))
 
-(define results (append c-results schml-results gambit-results))
+(define results (append c-results grift-results gambit-results))
 
 (define results-string (results->string results))
 

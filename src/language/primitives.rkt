@@ -6,10 +6,10 @@
 ;; We should believe in the type system more and do away with the
 ;; tracking of the type of primitives
 
-(define-type Schml-Primitive (U Schml-Prim Schml-Prim!))
-(define-predicate schml-primitive? Schml-Primitive)
+(define-type Grift-Primitive (U Grift-Prim Grift-Prim!))
+(define-predicate grift-primitive? Grift-Primitive)
 
-(define-type Schml-Prim
+(define-type Grift-Prim
   (U Int->Int-Primitive
      IntxInt->Int-Primitive
      IntxInt->Bool-Primitive
@@ -27,18 +27,18 @@
      Int->Char-Primitive 
      ->Char-Primitive))
 
-(define-predicate schml-prim? Schml-Prim)
+(define-predicate grift-prim? Grift-Prim)
 
-(define-type Schml-Prim!
+(define-type Grift-Prim!
   (U Timer-Primitive
      Char->Unit-Primitive
      Int->Unit-Primitive
      FloatxInt->Unit-Primitive))
 
-(define-predicate schml-prim!? Schml-Prim!)
-#;(: schml-prim!? (Any -> Boolean : Schml-Prim!))
+(define-predicate grift-prim!? Grift-Prim!)
+#;(: grift-prim!? (Any -> Boolean : Grift-Prim!))
 #;
-(define (schml-prim!? x)
+(define (grift-prim!? x)
   (or (timer-primitive? x)))
 
 (define-type Int->Int-Primitive (U 'binary-not))
@@ -142,8 +142,8 @@
 (define FLOAT->UNIT-TYPE (Fn 1 (list FLOAT-TYPE) UNIT-TYPE))
 (define FLOATxINT->UNIT-TYPE (Fn 2 (list FLOAT-TYPE INT-TYPE) UNIT-TYPE))
 
-(define schml-primitive-type-table
-  : (HashTable Schml-Primitive (Fn Index (Listof Base-Type) Base-Type))
+(define grift-primitive-type-table
+  : (HashTable Grift-Primitive (Fn Index (Listof Base-Type) Base-Type))
   (make-immutable-hash
    `((char->int  . ,CHAR->INT-TYPE)
      (int->char  . ,INT->CHAR-TYPE)
@@ -216,11 +216,11 @@
      (timer-report . ,->UNIT-TYPE))))
 
 
-(: schml-primitive->type
-   (-> Schml-Primitive (Fn Index (Listof Base-Type) Base-Type)))
-(define (schml-primitive->type p)
-  (define (err) (error 'schml-primitive->type "invalid: ~a" p))
-  (hash-ref schml-primitive-type-table p err))
+(: grift-primitive->type
+   (-> Grift-Primitive (Fn Index (Listof Base-Type) Base-Type)))
+(define (grift-primitive->type p)
+  (define (err) (error 'grift-primitive->type "invalid: ~a" p))
+  (hash-ref grift-primitive-type-table p err))
 
 
 (define-type Dyn-Repr-Ctor
@@ -281,8 +281,8 @@
 We are going to UIL
 -----------------------------------------------------------------------------|#
 
-(define-type UIL-Prim  (U Schml-Prim Array-Prim Types-Prim))
-(define-type UIL-Prim! (U Schml-Prim! Array-Prim! Print-Prim! Bottom-Prim))
+(define-type UIL-Prim  (U Grift-Prim Array-Prim Types-Prim))
+(define-type UIL-Prim! (U Grift-Prim! Array-Prim! Print-Prim! Bottom-Prim))
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
 

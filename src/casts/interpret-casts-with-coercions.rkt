@@ -41,12 +41,12 @@ form, to the shortest branch of the cast tree that is relevant.
 
 
 (: make-coercion
-   (->* (Schml-Type Schml-Type Blame-Label)
+   (->* (Grift-Type Grift-Type Blame-Label)
         (#:top-level? Boolean)
-        Schml-Coercion))
+        Grift-Coercion))
 (define (make-coercion t1 t2 lbl
                        #:top-level? [top-level? #f])
-  (: r : Schml-Type Schml-Type -> Schml-Coercion)
+  (: r : Grift-Type Grift-Type -> Grift-Coercion)
   (define (r t1 t2) (make-coercion t1 t2 lbl #:top-level? #f))
   (match* (t1 t2)
     [(t t) IDENTITY]
@@ -71,9 +71,9 @@ form, to the shortest branch of the cast tree that is relevant.
 (define make-coercion-inline/both-vars? : (Parameterof Boolean)
   (make-parameter #f))
 
-(define-type CoC3-Value (U (Quote Schml-Literal)
+(define-type CoC3-Value (U (Quote Grift-Literal)
                            (Quote-Coercion Coercion)
-                           (Type Schml-Type)
+                           (Type Grift-Type)
                            (Var Uid)))
 
 (define (make-compile-make-coercion/make-med-coercion)

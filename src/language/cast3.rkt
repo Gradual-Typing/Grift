@@ -8,7 +8,7 @@
 
 
 (define-type Cast3-Lang
-  (Prog (List String Natural Schml-Type) C3-Expr))
+  (Prog (List String Natural Grift-Type) C3-Expr))
 
 (define-type C3-Expr
   (Rec E (U ;; Non-Terminals
@@ -16,7 +16,7 @@
 	  (Letrec C3-Bnd* E)
 	  (Let C3-Bnd* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C3-Expr* E)
           (Repeat Uid E E E)
@@ -37,9 +37,9 @@
           (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)

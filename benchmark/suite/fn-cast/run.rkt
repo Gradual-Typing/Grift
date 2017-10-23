@@ -140,7 +140,7 @@ it hard to find this directory.
 (define benchmarks
   (for*/list ([n (in-list casts)])
     (let* ([base (format "~a-i~a-c~a" unique-name iterations n)]
-           [src  (build-path src-dir (string-append base ".schml"))]
+           [src  (build-path src-dir (string-append base ".grift"))]
            [port (open-output-file src #:exists 'replace)])
       (printf "\t~a\n" base)
       (generate-source port iterations n)
@@ -148,7 +148,7 @@ it hard to find this directory.
       (list base src n))))
 
 (call-with-output-file
-  (build-path this-dir "fn-cast-code-template.schml") #:exists 'replace
+  (build-path this-dir "fn-cast-code-template.grift") #:exists 'replace
   (lambda (p) (generate-source p 'N-ITERATIONS 'N-CASTS)))
 
 
@@ -164,7 +164,7 @@ it hard to find this directory.
              [tmpc (build-path tmp-dir (string-append base^ ".c"))]
              [tmpa (build-path tmp-dir (string-append base^ ".s"))]
              [exe  (build-path exe-dir  (string-append base^ ".out"))])
-        ;; Compile the src file using the schml library
+        ;; Compile the src file using the grift library
         (compile src #:output exe #:keep-c tmpc #:keep-a tmpa
                  #:cast-rep cast-rep #:cc-opt "-w" #:mem (* 4096 1000))
         ;; Give a little feedback so that running tests isn't so boring

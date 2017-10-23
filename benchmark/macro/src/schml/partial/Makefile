@@ -13,7 +13,7 @@ SRCS:=$(addprefix src/, $(PROGS))
 BINS=$(foreach IMPL, $(SCHML_IMPLS), \
        $(addprefix $(IMPL)/, \
 	 $(subst $(SRC_DIR)/, $(BIN_DIR)/, \
-          $(subst .schml,, \
+          $(subst .grift,, \
 	   $(wildcard $(SRC_DIR)/*/*)))))
 
 ERRS=$(subst $(BIN_DIR),$(OUT_DIR), $(addsuffix .err, $(BINS)))
@@ -38,6 +38,6 @@ casts/%:
 	$(MAKE) -C casts $*
 
 src/%: src counts .trash
-	cp ../static/src/$*.schml src/$*.schml
+	cp ../static/src/$*.grift src/$*.grift
 	dynamizer src/$* $(LATTICE_SIZE) >> counts/$*
-	mv src/$*.schml .trash/
+	mv src/$*.grift .trash/

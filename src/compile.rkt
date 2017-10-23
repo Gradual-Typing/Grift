@@ -3,7 +3,7 @@
 (require "./configuration.rkt"
          ;; "./helpers.rkt"
          (submod "./logging.rkt" typed)
-         (submod "./schml/reduce-to-cast-calculus.rkt" typed)
+         (submod "./grift/reduce-to-cast-calculus.rkt" typed)
          "./casts/impose-cast-semantics.rkt"
          "./data/convert-representation.rkt"
          "./backend-c/code-generator.rkt"
@@ -16,8 +16,8 @@
 ;; These ports only effect function how logging is configured during
 ;; calls to compile exported from this file. Otherwise the standard
 ;; environment flags are used.
-(define schml-log-level : (Parameterof Log-Level) (make-parameter 'none))
-(define schml-log-port : (Parameterof (Option Output-Port)) (make-parameter #f))
+(define grift-log-level : (Parameterof Log-Level) (make-parameter 'none))
+(define grift-log-port : (Parameterof (Option Output-Port)) (make-parameter #f))
 
 
 ;; This is the main compiler it is composed of several micro
@@ -64,8 +64,8 @@
                  #:t*-ht-size [t*-ht-size (init-types-hash-table-slots)]
                  #:t*-ht-load [t*-ht-load (types-hash-table-load-factor)]
                  #:rt         [rt         (runtime-path)]
-                 #:log-level  [log-level  (schml-log-level)]
-                 #:log-port   [log-port   (schml-log-port)]
+                 #:log-level  [log-level  (grift-log-level)]
+                 #:log-port   [log-port   (grift-log-port)]
                  #:gc         [gc         (garbage-collector)]
                  #:ck-bounds  [ckbs       (bounds-checks?)]
                  #:track-vars [track-vars (emit-vars-with-original-source-location?)]
@@ -95,21 +95,21 @@
                    [reference-semantics rs])
       (define (compile-target) : Path (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
-        (with-logging-to-port p compile-target log-level 'schml))
+        (with-logging-to-port p compile-target log-level 'grift))
       (cond
         [(not log-port) (compile-target)]
         [(output-port? log-port) (compile/log-port log-port)]
         [else
          (call-with-output-file log-port #:exists 'replace compile/log-port)]))))
 
-;; We are currently only supporting .schml files
-(: schml-path? :  Path -> Boolean)
-(define (schml-path? path-searched)
-  (equal? #"schml" (filename-extension path-searched)))
+;; We are currently only supporting .grift files
+(: grift-path? :  Path -> Boolean)
+(define (grift-path? path-searched)
+  (equal? #"grift" (filename-extension path-searched)))
 
 (define output-suffix : (Parameterof String) (make-parameter ""))
 
-;; Compile all .schml files in a directory and sub-directories
+;; Compile all .grift files in a directory and sub-directories
 (: compile-directory : Path -> (Listof Path))
 (define (compile-directory compile-dir)
   ;; The directory should exist if we are going to compile it
@@ -136,14 +136,14 @@
     (define s-path (and s-dir (build-path s-dir (path-add-suffix out-name #".s"))))
     (values (build-path compile-dir out-name) c-path s-path))
   
-  ;; Iterate over all schml files in directory and subdirectories
-  (for/list ((fl (find-files schml-path? compile-dir)))
+  ;; Iterate over all grift files in directory and subdirectories
+  (for/list ((fl (find-files grift-path? compile-dir)))
 
     ;; generate actual file paths instead of directory paths
     (define-values (out-path c-path? s-path?)
       (let ([p? (file-name-from-path fl)])
         (unless (path? p?)
-          (error 'schml-path? "this should never happen"))
+          (error 'grift-path? "this should never happen"))
         (renaming-output-files p?)))
 
     ;; Use current parameterization plus new file names to compile the file

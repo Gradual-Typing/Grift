@@ -194,7 +194,7 @@ name-field2 - accessor for field2
 
 #| Types throughout the languages |#
 
-;; Schml types
+;; Grift types
 (define-forms
   (Unit)
   (Int)
@@ -260,16 +260,16 @@ name-field2 - accessor for field2
       (ref-shallow-consistent? t g)))
 
 
-(: completely-static-type? (-> Schml-Type Boolean))
+(: completely-static-type? (-> Grift-Type Boolean))
 ;; Is the type t devoid of dyn?
 (define (completely-static-type? t)
   ;; Typed Racket made me do it
   ;; This uber modular structure speeds up type checking
-  (define (fn-completely-static? [t : Schml-Type]): Boolean
+  (define (fn-completely-static? [t : Grift-Type]): Boolean
     (and (Fn? t)
          (andmap completely-static-type? (Fn-fmls t))
          (completely-static-type? (Fn-ret t))))
-  (define (ref-completely-static? [t : Schml-Type])
+  (define (ref-completely-static? [t : Grift-Type])
     (or (and (GRef? t) (completely-static-type? (GRef-arg t)))
         (and (MRef? t) (completely-static-type? (MRef-arg t)))
         (and (GVect? t) (completely-static-type? (GVect-arg t)))
@@ -380,48 +380,48 @@ name-field2 - accessor for field2
     [else (cons eff rest)]))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml-Syntax 
+| Language/Grift-Syntax 
 +-----------------------------------------------------------------------------|#
 #| Maybe type |#
 (define-type Src srcloc)
 
-;; The language created by schml/read
+;; The language created by grift/read
 (define-type Syntax-Lang (Prog String (Listof Stx)))
 
 (define-type Stx (Syntaxof Any));; This might not be what I want considier Just Syntax
 (define-type Stx* (Listof Stx))
 
 #|-----------------------------------------------------------------------------+
-| Types shared by the Schml language family
+| Types shared by the Grift language family
 +-----------------------------------------------------------------------------|#
 
-(define-type Schml-Primitive (U Schml-Prim Schml-Prim!))
+(define-type Grift-Primitive (U Grift-Prim Grift-Prim!))
 
-#;(: schml-primitive? (-> Any Boolean : Schml-Primitive))
+#;(: grift-primitive? (-> Any Boolean : Grift-Primitive))
 #;
-(define (schml-primitive? x)
-  (or (schml-prim? x) (schml-prim!? x)))
+(define (grift-primitive? x)
+  (or (grift-prim? x) (grift-prim!? x)))
 
-(define-predicate schml-primitive? Schml-Primitive)
+(define-predicate grift-primitive? Grift-Primitive)
 
-(define-type Schml-Prim
+(define-type Grift-Prim
   (U IntxInt->Int-Primitive IntxInt->Bool-Primitive))
 
-(define-predicate schml-prim? Schml-Prim)
+(define-predicate grift-prim? Grift-Prim)
 
-#;(: schml-prim? (Any -> Boolean : Schml-Prim))
+#;(: grift-prim? (Any -> Boolean : Grift-Prim))
 #;
-(define (schml-prim? x)
+(define (grift-prim? x)
   (or (IntxInt->Int-primitive? x)
       (IntxInt->Bool-primitive? x)))
 
-(define-type Schml-Prim!
+(define-type Grift-Prim!
   (U Timer-Primitive))
 
-(define-predicate schml-prim!? Schml-Prim!)
-#;(: schml-prim!? (Any -> Boolean : Schml-Prim!))
+(define-predicate grift-prim!? Grift-Prim!)
+#;(: grift-prim!? (Any -> Boolean : Grift-Prim!))
 #;
-(define (schml-prim!? x)
+(define (grift-prim!? x)
   (or (timer-primitive? x)))
 
 (define-type IntxInt->Int-Primitive (U '* '+ '-
@@ -472,12 +472,12 @@ name-field2 - accessor for field2
       (eq? 'timer-stop   x)
       (eq? 'timer-report x)))
 
-#| Literals of the schml languages
-   Only Integers and Booleans in the schml language are first
+#| Literals of the grift languages
+   Only Integers and Booleans in the grift language are first
    class literal constants
 |#
 
-(define-type Schml-Literal
+(define-type Grift-Literal
   (U Integer Boolean Null))
 
 #;(: platform-integer? (Any -> Boolean : Integer))
@@ -485,21 +485,21 @@ name-field2 - accessor for field2
 (define (platform-integer? x)
   (fixnum? x))
 
-(: schml-literal? (Any -> Boolean : Schml-Literal))
-(define (schml-literal? x)
+(: grift-literal? (Any -> Boolean : Grift-Literal))
+(define (grift-literal? x)
   (or (exact-integer? x)
       (boolean? x)
       (null? x)))
 
-(: schml-literal->type (Schml-Literal -> (U Bool Int Unit)))
-(define (schml-literal->type x)
+(: grift-literal->type (Grift-Literal -> (U Bool Int Unit)))
+(define (grift-literal->type x)
   (cond
     [(boolean? x) BOOL-TYPE]
     [(integer? x) INT-TYPE]
     [(null? x)    UNIT-TYPE]
-    [else (error 'language/schml-literal->type "~a" x)]))
+    [else (error 'language/grift-literal->type "~a" x)]))
 
-;; Types in the schml languages
+;; Types in the grift languages
 (define-type  Base-Type (U Int Bool Unit))
 
 (: base-type? (Any -> Boolean : Base-Type))
@@ -508,81 +508,81 @@ name-field2 - accessor for field2
       (Bool? x)
       (Unit? x)))
 
-(define-type+ Schml-Type ([Schml-Type* Listof]
-			  [Schml-Type? Option])
+(define-type+ Grift-Type ([Grift-Type* Listof]
+			  [Grift-Type? Option])
   (U Dyn
      Base-Type
-     Schml-Fn-Type
-     Schml-Ref-Type))
+     Grift-Fn-Type
+     Grift-Ref-Type))
 
-(define-type Schml-Fn-Type
-  (Fn Index Schml-Type* Schml-Type))
+(define-type Grift-Fn-Type
+  (Fn Index Grift-Type* Grift-Type))
 
-(define-type Schml-Ref-Type
-  (U (GRef  Schml-Type)
-     (GVect Schml-Type)
-     (MRef  Schml-Type)
-     (MVect Schml-Type)))
+(define-type Grift-Ref-Type
+  (U (GRef  Grift-Type)
+     (GVect Grift-Type)
+     (MRef  Grift-Type)
+     (MVect Grift-Type)))
 
-(define-type Atomic-Schml-Type (U Unit Int Bool Dyn))
+(define-type Atomic-Grift-Type (U Unit Int Bool Dyn))
 
 
-(: schml-type? (Any -> Boolean : Schml-Type))
-(define (schml-type? x)
+(: grift-type? (Any -> Boolean : Grift-Type))
+(define (grift-type? x)
   (or (Dyn? x)
       (base-type? x)
-      (schml-fn? x)
-      (schml-ref? x)))
+      (grift-fn? x)
+      (grift-ref? x)))
       
 
-(define-predicate schml-type*? Schml-Type*)
-#;(: schml-type*? (Any -> Boolean : Schml-Type*))
+(define-predicate grift-type*? Grift-Type*)
+#;(: grift-type*? (Any -> Boolean : Grift-Type*))
 #;
-(define (schml-type*? x)
+(define (grift-type*? x)
   (or (null? x)
       (and (pair? x)
-           (schml-type? (car x))
-           (schml-type*? (cdr x)))))
+           (grift-type? (car x))
+           (grift-type*? (cdr x)))))
 
-(define-predicate schml-fn? Schml-Fn-Type)
-#;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
-#;(define (schml-fn? x)
+(define-predicate grift-fn? Grift-Fn-Type)
+#;(: grift-fn? (Any -> Boolean : Grift-Fn-Type))
+#;(define (grift-fn? x)
    (and (Fn? x)
     (index? (Fn-arity x))
-    (schml-type*? (Fn-fmls x))
-    (schml-type? (Fn-ret x))))
+    (grift-type*? (Fn-fmls x))
+    (grift-type? (Fn-ret x))))
 
 
-(define-predicate schml-ref? Schml-Ref-Type)
-#;(: schml-ref? (Any -> Boolean : Schml-Ref-Type))
+(define-predicate grift-ref? Grift-Ref-Type)
+#;(: grift-ref? (Any -> Boolean : Grift-Ref-Type))
 
 #;
-(define (schml-ref? x)
-  (or (and (GRef? x)  (schml-type? (GRef-arg x)))
-      (and (GVect? x) (schml-type? (GVect-arg x)))
-      (and (MRef? x)  (schml-type? (MRef-arg x)))
-      (and (MVect? x) (schml-type? (MVect-arg x)))))
+(define (grift-ref? x)
+  (or (and (GRef? x)  (grift-type? (GRef-arg x)))
+      (and (GVect? x) (grift-type? (GVect-arg x)))
+      (and (MRef? x)  (grift-type? (MRef-arg x)))
+      (and (MVect? x) (grift-type? (MVect-arg x)))))
 
 
 
-(define-type+ Schml-Fml ([Schml-Fml* Listof])
-  (Fml Uid Schml-Type))
+(define-type+ Grift-Fml ([Grift-Fml* Listof])
+  (Fml Uid Grift-Type))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml0
+| Language/Grift0
 +-----------------------------------------------------------------------------|#
-(define-type Schml0-Lang (Prog (List String Natural) S0-Expr))
+(define-type Grift0-Lang (Prog (List String Natural) S0-Expr))
 
 (define-type (S0-Form E)
-  (U (Lambda Schml-Fml* (Ann E (Option Schml-Type)))
+  (U (Lambda Grift-Fml* (Ann E (Option Grift-Type)))
      (Letrec S0-Bnd* E)
      (Let S0-Bnd* E)
      (App E (Listof E))
-     (Op Schml-Primitive (Listof E))
+     (Op Grift-Primitive (Listof E))
      (If E E E)
-     (Ascribe E Schml-Type (Option Blame-Label))
+     (Ascribe E Grift-Type (Option Blame-Label))
      (Var Uid)
-     (Quote Schml-Literal)
+     (Quote Grift-Literal)
      (Begin (Listof E) E)
      (Repeat Uid E E E)
      ;; Monotonic effects
@@ -604,28 +604,28 @@ name-field2 - accessor for field2
   (Rec E (Ann (S0-Form E) Src)))
 
 (define-type S0-Expr* (Listof S0-Expr))
-(define-type S0-Bnd (Bnd Uid Schml-Type? S0-Expr))
+(define-type S0-Bnd (Bnd Uid Grift-Type? S0-Expr))
 (define-type S0-Bnd* (Listof S0-Bnd))
 
 #|-----------------------------------------------------------------------------+
-| Language/Schml1 created by type-check
+| Language/Grift1 created by type-check
 +-----------------------------------------------------------------------------|#
-(define-type Schml1-Lang
-  (Prog (List String Natural Schml-Type) S1-Expr))
+(define-type Grift1-Lang
+  (Prog (List String Natural Grift-Type) S1-Expr))
 
 (define-type S1-Expr
   ;; This slightly complicated formulation of lambda's Structure allows me
   ;; To rely on lambdas to have function types during cast insertion
-  (Rec E (U (Ann (Lambda Schml-Fml* E) (Pair Src Schml-Fn-Type))
+  (Rec E (U (Ann (Lambda Grift-Fml* E) (Pair Src Grift-Fn-Type))
             (Ann (U
 		 (Letrec S1-Bnd* E)
 		 (Let S1-Bnd* E)
 		 (App E (Listof E))
-		 (Op (Ann Schml-Primitive Schml-Type*) (Listof E))
+		 (Op (Ann Grift-Primitive Grift-Type*) (Listof E))
 		 (If E E E)
-		 (Ascribe E Schml-Type (Option Blame-Label))
+		 (Ascribe E Grift-Type (Option Blame-Label))
 		 (Var Uid)
-		 (Quote Schml-Literal)
+		 (Quote Grift-Literal)
                  (Begin (Listof E) E)
                  (Repeat Uid E E E)
                  ;; Monotonic effects
@@ -642,20 +642,20 @@ name-field2 - accessor for field2
                  (Gvector E E)
                  (Gvector-set! E E E)
                  (Gvector-ref E E))
-	      (Pair Src Schml-Type)))))
+	      (Pair Src Grift-Type)))))
 
-(define-type S1-Bnd (Bnd Uid Schml-Type S1-Expr))
+(define-type S1-Bnd (Bnd Uid Grift-Type S1-Expr))
 (define-type S1-Bnd* (Listof S1-Bnd))
 
-(: schml-primitive->type
-   (-> Schml-Primitive (Fn Index (Listof (U Int Bool)) (U Int Bool Unit))))
-(define (schml-primitive->type p)
+(: grift-primitive->type
+   (-> Grift-Primitive (Fn Index (Listof (U Int Bool)) (U Int Bool Unit))))
+(define (grift-primitive->type p)
   (cond
    [(IntxInt->Bool-primitive? p) INTxINT->BOOL-TYPE]
    [(IntxInt->Int-primitive? p)  INTxINT->INT-TYPE]
    [(timer-primitive? p)         ->UNIT-TYPE]))
 
-(define-type ConsistentT (Schml-Type Schml-Type . -> . Boolean))
+(define-type ConsistentT (Grift-Type Grift-Type . -> . Boolean))
 (: consistent? ConsistentT)
 (define (consistent? t g)
   ;; Typed racket made me structure the code this way.
@@ -719,7 +719,7 @@ Dyn --> Int Int --> Dyn
           Dyn
 |#
 
-(: join (Schml-Type Schml-Type . -> . Schml-Type))
+(: join (Grift-Type Grift-Type . -> . Grift-Type))
 (define (join t g)
   (cond
     [(Dyn? t) g] [(Dyn? g) t]
@@ -747,8 +747,8 @@ Dyn --> Int Int --> Dyn
 We are going to UIL
 -----------------------------------------------------------------------------|#
 
-(define-type UIL-Prim  (U Schml-Prim Array-Prim))
-(define-type UIL-Prim! (U Schml-Prim! Array-Prim! Print-Prim! Runtime-Prim!))
+(define-type UIL-Prim  (U Grift-Prim Array-Prim))
+(define-type UIL-Prim! (U Grift-Prim! Array-Prim! Print-Prim! Runtime-Prim!))
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
 
@@ -763,9 +763,9 @@ We are going to UIL
 (define-type (UIL-Op! E) (Op UIL-Prim! (Listof E)))
 
 (define-type Cast-Fml* (Listof Cast-Fml))
-(define-type Cast-Fml (Fml Uid Schml-Type))
+(define-type Cast-Fml (Fml Uid Grift-Type))
 
-(define-type Cast-Literal (U Schml-Literal Blame-Label))
+(define-type Cast-Literal (U Grift-Literal Blame-Label))
 
 #|-----------------------------------------------------------------------------+
 | The Cast Language Family Types, Primitives, Literals, and Terminals          |
@@ -774,7 +774,7 @@ We are going to UIL
 | Language/Cast0 created by insert-casts                                       |
 +-----------------------------------------------------------------------------
 | Description: At the begining of this section of the compiler all cast in the |
-| ast are performed on known schml language types. But as the compiler imposes |
+| ast are performed on known grift language types. But as the compiler imposes |
 | the semantics of cast there become situations where a type is dependant on   |
 | econtents of a variable. At this point casts are no longer able to be        |
 | completely compiled into primitives. These casts require a sort of cast      |
@@ -784,7 +784,7 @@ We are going to UIL
 | applications of the cast interpreter function.
 +-----------------------------------------------------------------------------|#
 
-(define-type Cast0-Lang (Prog (List String Natural Schml-Type) C0-Expr))
+(define-type Cast0-Lang (Prog (List String Natural Grift-Type) C0-Expr))
 
 (define-type C0-Expr
   (Rec E (U ;; Non-Terminals
@@ -792,16 +792,16 @@ We are going to UIL
 	  (Letrec C0-Bnd* E)
 	  (Let C0-Bnd* E)
 	  (App E (Listof E))
-	  (Op Schml-Primitive (Listof E))
+	  (Op Grift-Primitive (Listof E))
 	  (If E E E)
-	  (Cast E Schml-Type Schml-Type Blame-Label)
+	  (Cast E Grift-Type Grift-Type Blame-Label)
           (Begin C0-Expr* E)
           (Repeat Uid E E E)
           ;; Monotonic
-          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
+          (Mbox (Ann E (Pair Blame-Label Grift-Type)))
           (Munbox E)
-          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
+          (Munbox (Ann E (Pair Blame-Label Grift-Type)))
+          (Mbox-set! (Ann E (Pair Blame-Label Grift-Type)) E)
           (Mbox-set! E E)
           (Mvector E E)
           (Mvector-set! E E E)
@@ -833,7 +833,7 @@ We are going to UIL
 ------------------------------------------------------------------------------|#
 
 (define-type Cast1-Lang
-  (Prog (List String Natural Schml-Type) C1-Expr))
+  (Prog (List String Natural Grift-Type) C1-Expr))
 
 (define-type C1-Expr
   (Rec E (U ;; Non-Terminals
@@ -841,7 +841,7 @@ We are going to UIL
 	  (Letrec C1-Bnd* E)
 	  (Let C1-Bnd* E)
 	  (App E (Listof E))
-	  (Op Schml-Primitive (Listof E))
+	  (Op Grift-Primitive (Listof E))
 	  (If E E E)
           ;; Terminals
           (Begin C1-Expr* E)
@@ -850,8 +850,8 @@ We are going to UIL
 	  (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
 	  (Runtime-Cast E E E E)
-	  (Cast E Schml-Type Schml-Type Blame-Label)
-	  (Fn-Cast E Schml-Type Schml-Type Blame-Label)
+	  (Cast E Grift-Type Grift-Type Blame-Label)
+	  (Fn-Cast E Grift-Type Grift-Type Blame-Label)
           ;; FN-Type operations
           (Type-Fn-arg E E)
           (Type-Fn-return E)
@@ -859,10 +859,10 @@ We are going to UIL
           ;; Observations
           (Blame E)
           ;; Monotonic
-          (Mbox (Ann E (Pair Blame-Label Schml-Type)))
+          (Mbox (Ann E (Pair Blame-Label Grift-Type)))
           (Munbox E)
-          (Munbox (Ann E (Pair Blame-Label Schml-Type)))
-          (Mbox-set! (Ann E (Pair Blame-Label Schml-Type)) E)
+          (Munbox (Ann E (Pair Blame-Label Grift-Type)))
+          (Mbox-set! (Ann E (Pair Blame-Label Grift-Type)) E)
           (Mbox-set! E E)
           (Mvector E E)
           (Mvector-set! E E E)
@@ -884,7 +884,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast2-Lang
- (Prog (List String Natural Schml-Type) C2-Expr))
+ (Prog (List String Natural Grift-Type) C2-Expr))
 
 (define-type C2-Expr
   (Rec E (U ;; Non-Terminals
@@ -892,18 +892,18 @@ We are going to UIL
 	  (Letrec C2-Bnd* E)
 	  (Let C2-Bnd* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           ;; Terminals
           (Begin C2-Expr* E)
           (Repeat Uid E E E)
 	  (Var Uid)
-          (Type Schml-Type)
+          (Type Grift-Type)
 	  (Quote Cast-Literal)
           ;; Casts with different ways of getting the same semantics
 	  (Runtime-Cast E E E E)
-	  (Cast E Schml-Type Schml-Type Blame-Label)
-	  (Fn-Cast E Schml-Type Schml-Type Blame-Label)
+	  (Cast E Grift-Type Grift-Type Blame-Label)
+	  (Fn-Cast E Grift-Type Grift-Type Blame-Label)
           ;; FN-Type operations
           (Type-Fn-arg E E)
           (Type-Fn-return E)
@@ -946,7 +946,7 @@ We are going to UIL
 
 
 (define-type Cast3-Lang
-  (Prog (List String Natural Schml-Type) C3-Expr))
+  (Prog (List String Natural Grift-Type) C3-Expr))
 
 (define-type C3-Expr
   (Rec E (U ;; Non-Terminals
@@ -954,7 +954,7 @@ We are going to UIL
 	  (Letrec C3-Bnd* E)
 	  (Let C3-Bnd* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C3-Expr* E)
           (Repeat Uid E E E)
@@ -975,9 +975,9 @@ We are going to UIL
           (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)
@@ -994,7 +994,7 @@ We are going to UIL
 ------------------------------------------------------------------------------|#
 
 (define-type Cast-with-hoisted-types
-  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C/LT-Expr)))
+  (Prog (List String Natural Grift-Type) (LetT* C/LT-BndT* C/LT-Expr)))
 
 (define-type C/LT-BndT*
   (Listof C/LT-BndT))
@@ -1007,7 +1007,7 @@ We are going to UIL
      (GRef Prim-Type) (MRef Prim-Type)
      (GVect Prim-Type) (MVect Prim-Type)))
 
-(define-type Prim-Type (U Atomic-Schml-Type (TypeId Uid)))
+(define-type Prim-Type (U Atomic-Grift-Type (TypeId Uid)))
 
 (define-type C/LT-Expr
   (Rec E (U ;; Non-Terminals
@@ -1015,7 +1015,7 @@ We are going to UIL
 	  (Letrec C/LT-Bnd* E)
 	  (Let C/LT-Bnd* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C/LT-Expr* E)
           (Repeat Uid E E E)
@@ -1036,7 +1036,7 @@ We are going to UIL
           (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
           (Type Prim-Type)
           (Tag Tag-Symbol)
@@ -1053,14 +1053,14 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast4-Lang
-  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C4-Expr)))
+  (Prog (List String Natural Grift-Type) (LetT* C/LT-BndT* C4-Expr)))
 
 (define-type C4-Expr
   (Rec E (U ;; Non-Terminals
           (Letrec C4-Bnd-Lambda* E)
 	  (Let C4-Bnd-Data* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C4-Expr* E)
           (Repeat Uid E E E)
@@ -1081,7 +1081,7 @@ We are going to UIL
           (Dyn-make E E)
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
           (Type Prim-Type)
           (Tag Tag-Symbol)
@@ -1102,14 +1102,14 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast5-Lang
-  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C5-Expr)))
+  (Prog (List String Natural Grift-Type) (LetT* C/LT-BndT* C5-Expr)))
 
 (define-type C5-Expr
   (Rec E (U ;; Non-Terminals
           (Letrec C5-Bnd-Lambda* E)
 	  (Let C5-Bnd-Data* E)
 	  (App E (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C5-Expr* E)
           (Repeat Uid E E E)
@@ -1130,7 +1130,7 @@ We are going to UIL
           (Dyn-make E E) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
           (Type Prim-Type)
           (Tag Tag-Symbol)
@@ -1151,14 +1151,14 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast6-Lang
-  (Prog (List String Natural Schml-Type) (LetT* C/LT-BndT* C6-Expr)))
+  (Prog (List String Natural Grift-Type) (LetT* C/LT-BndT* C6-Expr)))
 
 (define-type C6-Expr
   (Rec E (U ;; Non-Terminals
           (LetP C6-Bnd-Procedure* (LetC C6-Bnd-Closure* E))
 	  (Let C6-Bnd-Data* E)
 	  (App (Pair E E) (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C6-Expr* E)
           (Repeat Uid E E E)
@@ -1181,7 +1181,7 @@ We are going to UIL
           (Dyn-make E E) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
           (Type Prim-Type)
           (Tag Tag-Symbol)
@@ -1208,14 +1208,14 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast7-Lang
-  (Prog (List String Natural Schml-Type) C7-Value))
+  (Prog (List String Natural Grift-Type) C7-Value))
 
 (define-type C7-Value
   (Rec V (U ;; Non-Terminals
           (LetP C7-Bnd-Procedure* (LetC C7-Bnd-Closure* V))
 	  (Let C7-Bnd-Data* V)
 	  (App (Pair V V) (Listof V))
-          (Op Schml-Primitive (Listof V))
+          (Op Grift-Primitive (Listof V))
 	  (If V V V)
           (Begin C7-Effect* V)
           (Repeat Uid V V V)
@@ -1236,9 +1236,9 @@ We are going to UIL
           (Dyn-make V V) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame V)
-          (Observe V Schml-Type)
+          (Observe V Grift-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep V)
@@ -1354,7 +1354,7 @@ We are going to UIL
 | Data0-Language created by impose-cast-semantics                              |
 +-----------------------------------------------------------------------------|#
 (define-type Data0-Lang
-  (Prog (List String Natural Schml-Type) (GlobDecs (Listof Uid) D0-Expr)))
+  (Prog (List String Natural Grift-Type) (GlobDecs (Listof Uid) D0-Expr)))
 
 (define-type D0-Bnd-Code* (Listof D0-Bnd-Code))
 (define-type D0-Bnd-Code (Pairof Uid D0-Code))
@@ -1383,7 +1383,7 @@ We are going to UIL
 | Data1-Language created by normalize-context                                          |
 +-----------------------------------------------------------------------------|#
 (define-type Data1-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
 	(GlobDecs (Listof Uid)
                   (Labels D1-Bnd-Code*
                           D1-Tail))))
@@ -1452,7 +1452,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Data2-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
 	(GlobDecs (Listof Uid)
                   (Labels D2-Bnd-Code*
                           D2-Body))))
@@ -1509,7 +1509,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Data3-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (GlobDecs (Listof Uid)
                   (Labels D3-Bnd-Code*
                           D3-Body))))
@@ -1571,7 +1571,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Data4-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
 	(GlobDecs (Listof Uid)
                   (Labels D4-Bnd-Code*
                           D4-Body))))
@@ -1626,7 +1626,7 @@ We are going to UIL
 +-----------------------------------------------------------------------------|#
 
 (define-type Data5-Lang
-  (Prog (List String Natural Schml-Type)
+  (Prog (List String Natural Grift-Type)
         (GlobDecs (Listof Uid)
                   (Labels D5-Bnd-Code*
                           D5-Body))))
@@ -1669,8 +1669,8 @@ We are going to UIL
  "./language/forms.rkt"
  "./language/primitives.rkt"
  "./language/types.rkt"
- "./language/schml0.rkt"
- "./language/schml1.rkt"
+ "./language/grift0.rkt"
+ "./language/grift1.rkt"
  "./language/cast0.rkt"
  "./language/coercion.rkt"
  "./language/cast1.rkt"

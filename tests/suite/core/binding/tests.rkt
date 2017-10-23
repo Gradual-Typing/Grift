@@ -2,7 +2,7 @@
 
 (require typed/rackunit
          typed/rackunit/text-ui
-         schml/testing/test-compile)
+         grift/testing/test-compile)
 
 (provide (all-defined-out))
 
@@ -11,6 +11,6 @@
    "binding"
    #:before (lambda () (display "binding tests running ... "))
    #:after (lambda () (display "done\n"))
-   (test-file "letrec1.schml" (int 7))
-   (test-file "letrec2.schml" (int 7))
+   (test-file "letrec1.grift" (int 7))
+   (test-file "letrec2.grift" (int 7))
    ))

@@ -7,14 +7,14 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast6-Lang
-  (Prog (List String Natural Schml-Type) C6-Expr))
+  (Prog (List String Natural Grift-Type) C6-Expr))
 
 (define-type C6-Expr
   (Rec E (U ;; Non-Terminals
           (LetP C6-Bnd-Procedure* (LetC C6-Bnd-Closure* E))
 	  (Let C6-Bnd-Data* E)
 	  (App (Pair E E) (Listof E))
-          (Op Schml-Primitive (Listof E))
+          (Op Grift-Primitive (Listof E))
 	  (If E E E)
           (Begin C6-Expr* E)
           (Repeat Uid E E E)
@@ -37,9 +37,9 @@
           (Dyn-make E E) ;; This is bad and I do not like it
           ;; Observational Operations
           (Blame E)
-          (Observe E Schml-Type)
+          (Observe E Grift-Type)
           ;; Terminals
-          (Type Schml-Type)
+          (Type Grift-Type)
           (Tag Tag-Symbol)
 	  (Var Uid)
           (GRep E)

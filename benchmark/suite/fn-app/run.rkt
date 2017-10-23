@@ -141,7 +141,7 @@ the base file name, the path to the file, and the number of casts.
 (define benchmarks
   (for*/list ([n (in-list casts)])
     (let* ([base (format "~a-i~a-c~a" unique-name iterations n)]
-           [src  (build-path src-dir (string-append base ".schml"))]
+           [src  (build-path src-dir (string-append base ".grift"))]
            [port (open-output-file src #:exists 'replace)])
       (printf "\t~a\n" base)
       (generate-source port iterations n)
@@ -149,7 +149,7 @@ the base file name, the path to the file, and the number of casts.
       (list base src n))))
 
 (call-with-output-file
-  (build-path this-dir "fn-app.schml") #:exists 'replace
+  (build-path this-dir "fn-app.grift") #:exists 'replace
   (lambda (p) (generate-source p iterations 'N-CASTS)))
 
 ;; Run each benchmark for a particular compiler configuration
@@ -162,7 +162,7 @@ the base file name, the path to the file, and the number of casts.
              [tmpc (build-path tmp-dir (string-append base^ ".c"))]
              [tmpa (build-path tmp-dir (string-append base^ ".s"))]
              [exe  (build-path exe-dir  (string-append base^ ".out"))])
-        ;; Compile the src file using the schml library
+        ;; Compile the src file using the grift library
         (compile src #:output exe #:keep-c tmpc #:keep-a tmpa
                  #:cast-rep cast-rep #:cc-opt "-w" #:mem (* 4096 100))
         ;; Give a little feedback so that running tests isn't so boring

@@ -266,7 +266,7 @@ And a type constructor "name" expecting the types of field1 and field2
 
 #| Types throughout the languages |#
 
-;; Schml types
+;; Grift types
 (define-forms
   (Unit)
   (Int)
@@ -362,19 +362,19 @@ And a type constructor "name" expecting the types of field1 and field2
       (ref-shallow-consistent? t g)))
 
 
-(: completely-static-type? (-> Schml-Type Boolean))
+(: completely-static-type? (-> Grift-Type Boolean))
 ;; Is the type t devoid of dyn?
 (define (completely-static-type? t)
   ;; Typed Racket made me do it
   ;; This uber modular structure speeds up type checking
-  (define (fn-completely-static? [t : Schml-Type]): Boolean
+  (define (fn-completely-static? [t : Grift-Type]): Boolean
     (and (Fn? t)
          (andmap completely-static-type? (Fn-fmls t))
          (completely-static-type? (Fn-ret t))))
-  (define (tuple-completely-static? [t : Schml-Type]): Boolean
+  (define (tuple-completely-static? [t : Grift-Type]): Boolean
     (and (STuple? t)
          (andmap completely-static-type? (STuple-items t))))
-  (define (ref-completely-static? [t : Schml-Type])
+  (define (ref-completely-static? [t : Grift-Type])
     (or (and (GRef? t) (completely-static-type? (GRef-arg t)))
         (and (MRef? t) (completely-static-type? (MRef-arg t)))
         (and (GVect? t) (completely-static-type? (GVect-arg t)))
@@ -392,15 +392,15 @@ And a type constructor "name" expecting the types of field1 and field2
 
 
 #|-----------------------------------------------------------------------------+
-| Types shared by the Schml language family
+| Types shared by the Grift language family
 +-----------------------------------------------------------------------------|#
 
-#| Literals of the schml languages
-Only Integers and Booleans in the schml language are first
+#| Literals of the grift languages
+Only Integers and Booleans in the grift language are first
 class literal constants
 |#
 
-(define-type Schml-Literal
+(define-type Grift-Literal
   (U Integer Boolean Null Real Char))
 
 #;(: platform-integer? (Any -> Boolean : Integer))
@@ -408,25 +408,25 @@ class literal constants
 (define (platform-integer? x)
   (fixnum? x))
 
-(: schml-literal? (Any -> Boolean : Schml-Literal))
-(define (schml-literal? x)
+(: grift-literal? (Any -> Boolean : Grift-Literal))
+(define (grift-literal? x)
   (or (exact-integer? x)
       (char? x)
       (boolean? x)
       (null? x)
       (real? x)))
 
-(: schml-literal->base-type (Schml-Literal -> Base-Type))
-(define (schml-literal->base-type x)
+(: grift-literal->base-type (Grift-Literal -> Base-Type))
+(define (grift-literal->base-type x)
   (cond
     [(char? x) CHAR-TYPE]
     [(boolean? x) BOOL-TYPE]
     [(exact-integer? x) INT-TYPE]
     [(inexact-real? x) FLOAT-TYPE]
     [(null? x)    UNIT-TYPE]
-    [else (error 'language/schml-literal->type "~a" x)]))
+    [else (error 'language/grift-literal->type "~a" x)]))
 
-;; Types in the schml languages
+;; Types in the grift languages
 (define-type  Base-Type (U Int Bool Unit Character Float))
 
 (: base-type? (Any -> Boolean : Base-Type))
@@ -437,29 +437,29 @@ class literal constants
       (Unit? x)
       (Float? x)))
 
-(define-type+ Schml-Type ([Schml-Type* Listof]
-			  [Schml-Type? Option])
+(define-type+ Grift-Type ([Grift-Type* Listof]
+			  [Grift-Type? Option])
   (U Dyn
      Base-Type
-     Schml-Fn-Type
-     Schml-Ref-Type
-     Schml-Tuple-Type))
+     Grift-Fn-Type
+     Grift-Ref-Type
+     Grift-Tuple-Type))
 
 ;; type known at runtime only for monotonic references, the uid is for
 ;; the entire reference cell, you have to access the second component
 ;; of the cell to get the type.
 
-(define-type Schml-Fn-Type
-  (Fn Index Schml-Type* Schml-Type))
+(define-type Grift-Fn-Type
+  (Fn Index Grift-Type* Grift-Type))
 
-(define-type Schml-Tuple-Type
-  (STuple Index Schml-Type*))
+(define-type Grift-Tuple-Type
+  (STuple Index Grift-Type*))
 
-(define-type Schml-Ref-Type
-  (U (GRef  Schml-Type)
-     (GVect Schml-Type)
-     (MRef  Schml-Type)
-     (MVect Schml-Type)))
+(define-type Grift-Ref-Type
+  (U (GRef  Grift-Type)
+     (GVect Grift-Type)
+     (MRef  Grift-Type)
+     (MVect Grift-Type)))
 
 (define-type Atomic-Type (U Base-Type Dyn))
 
@@ -467,48 +467,48 @@ class literal constants
 (define (atomic-type? x)
   (or (Dyn? x) (base-type? x)))
 
-(: schml-type? (Any -> Boolean : Schml-Type))
-(define (schml-type? x)
+(: grift-type? (Any -> Boolean : Grift-Type))
+(define (grift-type? x)
   (or (atomic-type? x)
-      (schml-fn? x)
-      (schml-ref? x)
-      (schml-tuple? x)))
+      (grift-fn? x)
+      (grift-ref? x)
+      (grift-tuple? x)))
 
-(define-predicate schml-type*? Schml-Type*)
-#;(: schml-type*? (Any -> Boolean : Schml-Type*))
+(define-predicate grift-type*? Grift-Type*)
+#;(: grift-type*? (Any -> Boolean : Grift-Type*))
 #;
-(define (schml-type*? x)
+(define (grift-type*? x)
   (or (null? x)
       (and (pair? x)
-           (schml-type? (car x))
-           (schml-type*? (cdr x)))))
+           (grift-type? (car x))
+           (grift-type*? (cdr x)))))
 
-(define-predicate schml-fn? Schml-Fn-Type)
-(define-predicate schml-tuple? Schml-Tuple-Type)
-#;(: schml-fn? (Any -> Boolean : Schml-Fn-Type))
-#;(define (schml-fn? x)
+(define-predicate grift-fn? Grift-Fn-Type)
+(define-predicate grift-tuple? Grift-Tuple-Type)
+#;(: grift-fn? (Any -> Boolean : Grift-Fn-Type))
+#;(define (grift-fn? x)
     (and (Fn? x)
          (index? (Fn-arity x))
-         (schml-type*? (Fn-fmls x))
-         (schml-type? (Fn-ret x))))
+         (grift-type*? (Fn-fmls x))
+         (grift-type? (Fn-ret x))))
 
 
-(define-predicate schml-ref? Schml-Ref-Type)
-#;(: schml-ref? (Any -> Boolean : Schml-Ref-Type))
+(define-predicate grift-ref? Grift-Ref-Type)
+#;(: grift-ref? (Any -> Boolean : Grift-Ref-Type))
 
 #;
-(define (schml-ref? x)
-  (or (and (GRef? x)  (schml-type? (GRef-arg x)))
-      (and (GVect? x) (schml-type? (GVect-arg x)))
-      (and (MRef? x)  (schml-type? (MRef-arg x)))
-      (and (MVect? x) (schml-type? (MVect-arg x)))))
+(define (grift-ref? x)
+  (or (and (GRef? x)  (grift-type? (GRef-arg x)))
+      (and (GVect? x) (grift-type? (GVect-arg x)))
+      (and (MRef? x)  (grift-type? (MRef-arg x)))
+      (and (MVect? x) (grift-type? (MVect-arg x)))))
 
-(define-type+ Schml-Fml ([Schml-Fml* Listof])
-  (Fml Uid Schml-Type))
+(define-type+ Grift-Fml ([Grift-Fml* Listof])
+  (Fml Uid Grift-Type))
 
 
 
-(define-type ConsistentT (Schml-Type Schml-Type -> Boolean))
+(define-type ConsistentT (Grift-Type Grift-Type -> Boolean))
 (: consistent? ConsistentT)
 (define (consistent? t g)
   ;; Typed racket made me structure the code this way.
@@ -580,10 +580,10 @@ Dyn --> Dyn
 Dyn
 |#
 
-(struct Bottom ([t1 : Schml-Type] [t2 : Schml-Type]) #:transparent)
-(define-type Schml-Type?! (U Bottom Schml-Type))
+(struct Bottom ([t1 : Grift-Type] [t2 : Grift-Type]) #:transparent)
+(define-type Grift-Type?! (U Bottom Grift-Type))
 
-#;(: join+ (Schml-Type* -> Schml-Type?!))
+#;(: join+ (Grift-Type* -> Grift-Type?!))
 #;(define (join+ t+)
   (match t+
     [(list) (error 'join+ "needs non-empty list")]
@@ -594,7 +594,7 @@ Dyn
            t?!
            (join t t?!)))]))
 
-(: up ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type)))
+(: up ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type)))
 (define ((up exit) t g)
   (match* (t g)
     [((Dyn) g)     g]
@@ -602,7 +602,7 @@ Dyn
     [(t     t)     t]
     [(t     g)     (exit (Bottom t g))]))
 
-(: down ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type)))
+(: down ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type)))
 (define ((down exit) t g)
   (match* (t g)
     [((and t (Dyn)) _) t]
@@ -610,12 +610,12 @@ Dyn
     [(t t) t]
     [(t g) (exit (Bottom t g))]))
   
-#;(: join (Schml-Type Schml-Type -> Schml-Type?!))
+#;(: join (Grift-Type Grift-Type -> Grift-Type?!))
 #;(define (join t g)
   ;; Typed racket made me do it...
   (call/ec
-   (lambda ([exit : (Bottom -> Schml-Type)])
-     (: j (Schml-Type Schml-Type -> Schml-Type))
+   (lambda ([exit : (Bottom -> Grift-Type)])
+     (: j (Grift-Type Grift-Type -> Grift-Type))
      (define (j t g)
        (match* (t g)
          [((Dyn) g) g]
@@ -637,10 +637,10 @@ Dyn
      (j t g))))
 
 (: move :
-   (Schml-Type Schml-Type -> Schml-Type)
-   -> (Schml-Type Schml-Type -> Schml-Type))
+   (Grift-Type Grift-Type -> Grift-Type)
+   -> (Grift-Type Grift-Type -> Grift-Type))
 (define ((move u/d/fail) t g)
-  (let m : Schml-Type ([t : Schml-Type t] [g : Schml-Type g])
+  (let m : Grift-Type ([t : Grift-Type t] [g : Grift-Type g])
        (match* (t g)
          [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
           (Fn ta (map m ta* ga*) (m tr gr))]
@@ -654,34 +654,34 @@ Dyn
           (MRef (m t g))]
          [(t g) (u/d/fail t g)])))
 
-(: move?! : ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type))
-   -> (Schml-Type Schml-Type -> Schml-Type?!))
+(: move?! : ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type))
+   -> (Grift-Type Grift-Type -> Grift-Type?!))
 (define ((move?! u/d) t g)
   (call/ec
-   (lambda ([return : (Bottom -> Schml-Type)])
+   (lambda ([return : (Bottom -> Grift-Type)])
      ((move (u/d return)) t g))))
 
-(: move+ : ((Bottom -> Schml-Type) -> (Schml-Type Schml-Type -> Schml-Type))
-   -> (Schml-Type* -> Schml-Type?!))
+(: move+ : ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type))
+   -> (Grift-Type* -> Grift-Type?!))
 (define ((move+ u/d) t+)
   (call/ec
-   (lambda ([return : (Bottom -> Schml-Type)])
+   (lambda ([return : (Bottom -> Grift-Type)])
      (define m (move (u/d return)))
-     (let move+ : Schml-Type ([t+ : Schml-Type* t+])
+     (let move+ : Grift-Type ([t+ : Grift-Type* t+])
           (match t+
             [(list) (error 'move+ "must be non empty list")]
             [(list t) t]
             [(cons t t+) (m t (move+ t+))])))))
 
-(: join : Schml-Type Schml-Type -> Schml-Type?!)
+(: join : Grift-Type Grift-Type -> Grift-Type?!)
 (define join (move?! up))
 
-(: join+ : Schml-Type* -> Schml-Type?!)
+(: join+ : Grift-Type* -> Grift-Type?!)
 (define join+ (move+ up))
 
-(: meet : Schml-Type Schml-Type -> Schml-Type?!)
+(: meet : Grift-Type Grift-Type -> Grift-Type?!)
 (define meet (move?! down))
-(: meet+ : Schml-Type* -> Schml-Type?!)
+(: meet+ : Grift-Type* -> Grift-Type?!)
 (define meet+ (move+ down))
 
 
@@ -790,9 +790,9 @@ Dyn
   (HC-T2 hc))
 
 (define-type Cast-Fml* (Listof Cast-Fml))
-(define-type Cast-Fml (Fml Uid Schml-Type))
+(define-type Cast-Fml (Fml Uid Grift-Type))
 
-(define-type Cast-Literal (U Schml-Literal Blame-Label))
+(define-type Cast-Literal (U Grift-Literal Blame-Label))
 
 (define-type Src srcloc)
 
@@ -806,23 +806,23 @@ Dyn
      (Fn Index (Listof C) C)
      (CTuple Index (Listof C))
      (Ref C C)
-     (MonoRef Schml-Type)
-     (MonoVect Schml-Type)
+     (MonoRef Grift-Type)
+     (MonoVect Grift-Type)
      (Failed Blame-Label)))
 
-(define-type Schml-Coercion
-  (Rec C (U (Project Schml-Type Blame-Label)
-            (Inject Schml-Type)
+(define-type Grift-Coercion
+  (Rec C (U (Project Grift-Type Blame-Label)
+            (Inject Grift-Type)
             (Sequence C C)
             (Mediating-Coercion C))))
 
 (define-type Hyper-Coercion
-  (HC Boolean Schml-Type (Option Blame-Label)
-      Boolean Schml-Type
+  (HC Boolean Grift-Type (Option Blame-Label)
+      Boolean Grift-Type
       (Mediating-Coercion Hyper-Coercion)))
 
 (define-type Mixed-Coercion
-  (U Schml-Coercion
+  (U Grift-Coercion
      Hyper-Coercion
      (Mediating-Coercion Hyper-Coercion)))
 
@@ -832,7 +832,7 @@ Dyn
 (define ZERO-EXPR (Quote 0))
 
 
-(define-type Schml-Coercion* (Listof Schml-Coercion))
+(define-type Grift-Coercion* (Listof Grift-Coercion))
 
 (define-type Data-Literal (U Integer Inexact-Real Char String))
 
@@ -906,10 +906,10 @@ Dyn
 
 #;(define-type (Map-Expr E1 E2)
   (case->
-   [(Type Schml-Type) -> (Type Schml-Type)]
-   [(Quote Schml-Literal) -> (Quote Schml-Literal)]
+   [(Type Grift-Type) -> (Type Grift-Type)]
+   [(Quote Grift-Literal) -> (Quote Grift-Literal)]
    [(Quote Cast-Literal) -> (Quote Cast-Literal)]
-   [(Quote-Coercion Schml-Coercion) -> (Quote-Coercion Schml-Coercion)]
+   [(Quote-Coercion Grift-Coercion) -> (Quote-Coercion Grift-Coercion)]
    [(Quote-Coercion Immediate-Coercion) -> (Quote-Coercion Immediate-Coercion)]
    [(Code-Label Uid) -> (Code-Label Uid)]
    [(Var Uid) -> (Var Uid)]
@@ -918,22 +918,22 @@ Dyn
    [Halt -> Halt]
    [Success -> Success] 
    [(Lambda (Listof Uid) E1) -> (Lambda (Listof Uid) E2)]
-   [(Lambda (Listof (Fml Uid Schml-Type)) E1) ->
-    (Lambda (Listof (Fml Uid Schml-Type)) E2)]
+   [(Lambda (Listof (Fml Uid Grift-Type)) E1) ->
+    (Lambda (Listof (Fml Uid Grift-Type)) E2)]
    [(App E1 (Listof E1)) -> (App E2 (Listof E2))]
    [(App-Code E1 (Listof E1)) -> (App-Code E2 (Listof E2))]
    [(App-Fn E1 (Listof E1)) -> (App-Fn E2 (Listof E2))]
    [(App-Fn-or-Proxy Uid E1 (Listof E1)) -> (App-Fn-or-Proxy Uid E2 (Listof E2))]
    [(App-Closure E1 E1 (Listof E1)) -> (App-Closure E2 E2 (Listof E2))]
    [(If E1 E1 E1) -> (If E2 E2 E2)]
-   [(Observe E1 Schml-Type) -> (Observe E2 Schml-Type)]
+   [(Observe E1 Grift-Type) -> (Observe E2 Grift-Type)]
    [(Blame E1) -> (Blame E2)]
    [(Repeat Uid E1 E1 E1) -> (Repeat Uid E2 E2 E2)]
-   [(Op Schml-Prim (Listof E1)) -> (Op Schml-Prim (Listof E2))]
+   [(Op Grift-Prim (Listof E1)) -> (Op Grift-Prim (Listof E2))]
    [(Letrec (Listof (Pair Uid E1)) E1) -> (Letrec (Listof (Pair Uid E2)) E2)]
-   [(Letrec (Listof (Bnd Uid Schml-Type E1)) E1) -> (Letrec (Listof (Bnd Uid Schml-Type E2)) E2)]
+   [(Letrec (Listof (Bnd Uid Grift-Type E1)) E1) -> (Letrec (Listof (Bnd Uid Grift-Type E2)) E2)]
    [(Let (Listof (Pair Uid E1)) E1) -> (Let (Listof (Pair Uid E2)) E2)]
-   [(Let (Listof (Bnd Uid Schml-Type E1)) E1) -> (Let (Listof (Bnd Uid Schml-Type E2)) E2)]
+   [(Let (Listof (Bnd Uid Grift-Type E1)) E1) -> (Let (Listof (Bnd Uid Grift-Type E2)) E2)]
    [(Labels (Listof (Pair Uid (Code Uid* E1))) E1) ->
     (Labels (Listof (Pair Uid (Code Uid* E2))) E2)]
    [(Begin (Listof E1) E1) -> (Begin (Listof E2) E2)]
@@ -943,10 +943,10 @@ Dyn
    [(Gvector E1 E1) -> (Gvector E2 E2)]
    [(Gvector-set! E1 E1 E1) -> (Gvector-set! E2 E2 E2)]
    [(Gvector-ref E1 E1) -> (Gvector-ref E2 E2)]
-   [(Cast E1 (Twosome Schml-Type Schml-Type Blame-Label)) ->
-    (Cast E2 (Twosome Schml-Type Schml-Type Blame-Label))]
-   [(Cast E1 (Coercion Schml-Coercion)) ->
-    (Cast E2 (Coercion Schml-Coercion))]
+   [(Cast E1 (Twosome Grift-Type Grift-Type Blame-Label)) ->
+    (Cast E2 (Twosome Grift-Type Grift-Type Blame-Label))]
+   [(Cast E1 (Coercion Grift-Coercion)) ->
+    (Cast E2 (Coercion Grift-Coercion))]
    [(Interpreted-Cast E1 (Twosome E1 E1 E1)) -> (Interpreted-Cast E2 (Twosome E2 E2 E2))]
    [(Interpreted-Cast E1 (Coercion E1)) -> (Interpreted-Cast E2 (Coercion E2))]
    [(Fn-Caster E1) -> (Fn-Caster E2)]
@@ -1082,7 +1082,7 @@ Dyn
 
 (define-type (Map-Bnd E1 E2)
   (case->
-   [(Bnd Uid Schml-Type E1) -> (Bnd Uid Schml-Type E2)]
+   [(Bnd Uid Grift-Type E1) -> (Bnd Uid Grift-Type E2)]
    [(Pair Uid E1) -> (Pair Uid E2)]))
 
 (: map-bnd (All (A B) (A -> B) -> (Map-Bnd A B)))

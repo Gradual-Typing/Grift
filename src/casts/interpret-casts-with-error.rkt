@@ -25,7 +25,7 @@
    #:pvec-len Unguarded-Vect-length
    ;; Override all of monotonic with regular reference types
    #:mbox
-   (λ ([v : CoC3-Expr] [t : Schml-Type])
+   (λ ([v : CoC3-Expr] [t : Grift-Type])
      (Unguarded-Box v))
    #:mbox-ref
    (λ ([a : CoC3-Expr] [t2 : CoC3-Expr])
@@ -36,7 +36,7 @@
    #:stc-mbox-ref Unguarded-Box-Ref
    #:stc-mbox-set Unguarded-Box-Set!
    #:mvec
-   (λ ([v : CoC3-Expr] [s : CoC3-Expr] [t : Schml-Type])
+   (λ ([v : CoC3-Expr] [s : CoC3-Expr] [t : Grift-Type])
      (Unguarded-Vect v s))
    #:mvec-ref
    (λ ([a : CoC3-Expr][i : CoC3-Expr][t2 : CoC3-Expr])
