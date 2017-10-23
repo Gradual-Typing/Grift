@@ -638,7 +638,7 @@ currently implemented in severral files.
 
 #;(: apply-lazy (-> Cast-Type apply-type))
 (define (apply-lazy cast)
-  #;(: cast/lbl (-> String (-> CL-Value Schml-Type Schml-Type CL-Value)))
+  #;(: cast/lbl (-> String (-> CL-Value Grift-Type Grift-Type CL-Value)))
   (define (cast/lbl l)
     (lambda (v t1 t2) ;;: CL-Value
       (cast v t1 t2 l)))

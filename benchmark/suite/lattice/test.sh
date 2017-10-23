@@ -7,7 +7,7 @@ nsamples=10
 deliverable=3
 usable=10
 nAnnotizerbin=/u/dalmahal/nAnnotizer/.stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/./nAnnotizer
-griftdir=/u/dalmahal/Schml
+griftdir=/u/dalmahal/Grift
 # --------------------------------------------------------------------
 
 testdir=$griftdir/benchmark/suite

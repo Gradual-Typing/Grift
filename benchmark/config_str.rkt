@@ -1,6 +1,6 @@
 #|
 Author:      Deyaaeldeen Almahallawi (dalmahal@indiana.edu)
-Description: Facilitates a user-friendly interface for Schml
+Description: Facilitates a user-friendly interface for Grift
              configurations. It is used mainly by the benchmarking
              scripts.
 |#
@@ -52,7 +52,7 @@ Description: Facilitates a user-friendly interface for Schml
     "Generate the configurations file"
     (write-configs)]
    [("--all" "-a")
-    "Generate configuration strings for all configurations supported by Schml"
+    "Generate configuration strings for all configurations supported by Grift"
     (let ([cs (read-configs)])
       (display
        (string-join

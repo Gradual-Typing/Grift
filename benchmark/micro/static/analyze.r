@@ -292,7 +292,7 @@ pf3 <- ggplot(f3, aes(x = paste(cast.type,
                       fill = paste(cast.type, ref.type,
                                    ifelse(hand.coded,
                                           "by Hand",
-                                          "Schml")))) +
+                                          "Grift")))) +
   geom_bar(stat="identity", 
            position=position_dodge()) +
   geom_errorbar(aes(ymin=l.x1_x0 * s, ymax=h.x1_x0 * s),
@@ -317,7 +317,7 @@ pr3 <- ggplot(r3, aes(x = paste(cast.type,
                       fill = paste(cast.type, ref.type,
                                    ifelse(hand.coded,
                                           "by Hand",
-                                          "Schml")))) +
+                                          "Grift")))) +
   geom_bar(stat="identity", 
            position=position_dodge()) +
   geom_errorbar(aes(ymin=l.x1_x0 * s, ymax=h.x1_x0 * s),

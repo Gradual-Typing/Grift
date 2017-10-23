@@ -14,7 +14,7 @@
 ;; Only the pass is provided by this module
 (provide generate-programs)
 
-(: insert-implicit-casts (Schml1-Lang Config . -> . Cast0-Lang))
+(: insert-implicit-casts (Grift1-Lang Config . -> . Cast0-Lang))
 (define (insert-implicit-casts prgm comp-config)
   (match-let ([(Prog (list name next-uid type) exp) prgm])
     (let ([vars ()]))
@@ -56,7 +56,7 @@
     (match-let ([(Bnd i t (and rhs (Ann _ (cons rhs-src rhs-type)))) b])
       (Bnd i t (mk-cast (mk-label "binding" rhs-src) (iic-expr rhs) rhs-type t))))
 
-(: iic-application (S1-Expr (Listof S1-Expr) Src Schml-Type . -> . C0-Expr))
+(: iic-application (S1-Expr (Listof S1-Expr) Src Grift-Type . -> . C0-Expr))
 (define (iic-application rator rand* src type)
   (match-let ([(Ann _ (cons rator-src rator-type)) rator])
     (cond
@@ -75,15 +75,15 @@
 
 (: iic-operands 
    (-> (Listof S1-Expr) 
-       (values (Listof C0-Expr) (Listof Schml-Type))))
+       (values (Listof C0-Expr) (Listof Grift-Type))))
 (define (iic-operands rand*) 
   (for/lists ([cf* : (Listof C0-Expr)]
-	      [ty* : Schml-Type*])
+	      [ty* : Grift-Type*])
       ([rand : S1-Expr rand*])
     (match-let ([(Ann _ (cons _ type)) rand])
       (values (iic-expr rand) type))))
 
-(: iic-operand/cast (-> Src (-> S1-Expr Schml-Type C0-Expr)))
+(: iic-operand/cast (-> Src (-> S1-Expr Grift-Type C0-Expr)))
 (define (iic-operand/cast app-src)
   (lambda (rand arg-type)
     (match-let ([(Ann _ (cons rand-src rand-type)) rand])

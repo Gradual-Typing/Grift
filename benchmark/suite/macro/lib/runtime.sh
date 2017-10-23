@@ -45,7 +45,7 @@ get_chezscheme_runtime()
 # $1 - benchmark file path without extension
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
-# $RETURN - the runtime for the Schml benchmark
+# $RETURN - the runtime for the Grift benchmark
 get_grift_runtimes()
 {
     local benchmark_path="$1"; shift
@@ -71,7 +71,7 @@ get_grift_runtimes()
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
 # $4 - configuration index
-# $RETURN - the runtime for the Schml benchmark
+# $RETURN - the runtime for the Grift benchmark
 get_grift_runtime()
 {
     local benchmark_path="$1"; shift

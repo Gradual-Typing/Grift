@@ -1,6 +1,6 @@
 ;;; RAY -- Ray-trace a simple scene with spheres, generating a ".pgm" file.
 ;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
-;;; And then translated to Schml by Deyaaeldeen Almahallawi
+;;; And then translated to Grift by Deyaaeldeen Almahallawi
 
 (define (make-point [x : Float] [y : Float] [z : Float]) : (Tuple Float Float Float)
   (tuple x y z))

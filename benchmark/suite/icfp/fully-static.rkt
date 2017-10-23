@@ -172,7 +172,7 @@
      (string-append
       "\\begin{tabular}{| l | r | r | r | r | r |}\n"
       "\\hline\n"
-      " & \\multicolumn{2}{c|}{Schml}"
+      " & \\multicolumn{2}{c|}{Grift}"
       "        & \\multicolumn{2}{c|}{C Edit} & \\\\\n"
       "\\cline{2-6}\n"
       "\\multicolumn{1}{|c|}{all units in $ns$} & time & stdev &"

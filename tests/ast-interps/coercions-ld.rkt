@@ -20,7 +20,7 @@
 ;; (base-type? x) :: Any -> Boolean : (U Int Bool Unit)
 
 ;; A, B, C ::= i | Dyn | A ... -> B | (GRef A)
-;; (grift-type? x) :: Any -> Boolean : Schml-Type
+;; (grift-type? x) :: Any -> Boolean : Grift-Type
 
 ;; Coercions
 ;; c, d ::= id_A | G! | G?ᵖ | c -> d | c ; d | ⊥ᴳᵖᴴ

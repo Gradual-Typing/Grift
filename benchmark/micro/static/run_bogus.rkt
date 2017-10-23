@@ -383,7 +383,7 @@
         "\\hline\n"
         "\\multicolumn{2}{c|}{Time in nanoseconds} & Overhead \\\\\n"
         "\\cline{2-4}\n"
-        "& \\multicolumn{1}{c|}{Schml (S)} "
+        "& \\multicolumn{1}{c|}{Grift (S)} "
         "& \\multicolumn{1}{c|}{C} "
         "& \\multicolumn{1}{c|}{(S - C) / S} "
         "\\\\\n\\hline\n"

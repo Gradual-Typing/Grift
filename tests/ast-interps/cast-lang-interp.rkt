@@ -21,16 +21,16 @@
 
 (struct CL-Dyn ([label : String]
                 [value : CL-Value]
-                [type1 : Schml-Type]
-                [type2 : Schml-Type])
+                [type1 : Grift-Type]
+                [type2 : Grift-Type])
   #:transparent)
 
 ;; The Guarded ADT Until Specify Representation
 (define-type CL-GRef (U CL-GProxy CL-GBox))
 
 (struct CL-GProxy  ([value : CL-GRef]
-                    [t1 : Schml-Type]
-                    [t2 : Schml-Type]
+                    [t1 : Grift-Type]
+                    [t2 : Grift-Type]
                     [label : Blame-Label])
   #:transparent)
 
@@ -55,8 +55,8 @@
 (define-type CL-GVect (U CL-GVectProxy (Vectorof CL-Value)))
 
 (struct CL-GVectProxy  ([value : CL-GVect]
-                        [t1 : Schml-Type]
-                        [t2 : Schml-Type]
+                        [t1 : Grift-Type]
+                        [t2 : Grift-Type]
                         [label : Blame-Label])
   #:transparent)
 
@@ -73,7 +73,7 @@
                         (CL-GVectProxy-t1 vect)
                         (CL-GVectProxy-label vect)))]))
 
-(: cast-gvect (-> CL-GVect Schml-Type Schml-Type Blame-Label CL-GVect))
+(: cast-gvect (-> CL-GVect Grift-Type Grift-Type Blame-Label CL-GVect))
 (define cast-gvect CL-GVectProxy)
 
 (: read-gref (-> Cast-Type CL-GRef CL-Value))
@@ -141,7 +141,7 @@
 (define-syntax-rule (empty-env)
   (hash))
 
-(define-type Cast-Type (-> CL-Value Schml-Type Schml-Type Blame-Label CL-Value))
+(define-type Cast-Type (-> CL-Value Grift-Type Grift-Type Blame-Label CL-Value))
 
 (: mk-cast Cast-Type)
 (define (mk-cast e t g l)
@@ -338,9 +338,9 @@
 
 (: apply-lazy (-> Cast-Type apply-type))
 (define (apply-lazy cast)
-  (: cast/lbl (-> String (-> CL-Value Schml-Type Schml-Type CL-Value)))
+  (: cast/lbl (-> String (-> CL-Value Grift-Type Grift-Type CL-Value)))
   (define (cast/lbl l)
-    (lambda ([v : CL-Value] [t1 : Schml-Type] [t2 : Schml-Type]) : CL-Value
+    (lambda ([v : CL-Value] [t1 : Grift-Type] [t2 : Grift-Type]) : CL-Value
       (cast v t1 t2 l)))
   (: recur apply-type)
   (define (recur rator rands)
