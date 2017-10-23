@@ -39,7 +39,7 @@ matmult_nsamples=${1:-1000}
 # --------------------------------------------------------------------
 date=`date +%Y_%m_%d_%H_%M_%S`
 
-griftdir=$SCHML_DIR
+griftdir=$GRIFT_DIR
 testdir=$griftdir/benchmark/suite/macro
 latticedir=$testdir/lattice-dev/$date
 datadir=$latticedir/data

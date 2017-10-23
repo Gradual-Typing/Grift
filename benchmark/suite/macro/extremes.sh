@@ -20,7 +20,7 @@ write_grift_speedups()
     local dir="$1";             shift
     local logfile="$1";         shift
     
-    local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+    local configs=($(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -i))
     for config_index in ${configs[@]}; do
 	get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
 	printf ",$RETURN" >> $logfile
@@ -122,7 +122,7 @@ run_experiment()
     local logfile2="${DATA_DIR}/dyn.log"
     local logfile3="${DATA_DIR}/partial.log"
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -a)
+    local config_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -a)
     echo "name,${config_str}" > "$logfile1"
     echo "name,${config_str},racket,chezscheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
@@ -166,15 +166,15 @@ main()
 	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
     else
 	declare -r DATE="$date"
-	if [ ! -d "$SCHML_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
+	if [ ! -d "$GRIFT_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
 	    echo "Directory not found"
 	    exit 1
 	fi
     fi
 
-    SCHML_DIR=${SCHML_DIR:=`pwd`/../../..}
+    GRIFT_DIR=${GRIFT_DIR:=`pwd`/../../..}
     
-    declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
+    declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
     declare -r DATA_DIR="$EXP_DIR/data"
     declare -r OUT_DIR="$EXP_DIR/output"
@@ -190,7 +190,7 @@ main()
 
     . "lib/runtime.sh"
 
-    cd "$SCHML_DIR"
+    cd "$GRIFT_DIR"
 
     if [ "$date" == "fresh" ]; then
 	# copying the benchmarks to a temporary directory

@@ -32,7 +32,7 @@ main()
     local expirement2="$1"; shift
     
     
-    declare -r TEST_DIR="$SCHML_DIR/benchmark/suite/macro"
+    declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r EXP1_DIR="$TEST_DIR/extremes/$expirement1"
     declare -r DATA1_DIR="$EXP1_DIR/data"
     declare -r OUT1_DIR="$EXP1_DIR/output"
@@ -42,7 +42,7 @@ main()
 
     . "lib/runtime.sh"
 
-    cd "$SCHML_DIR"
+    cd "$GRIFT_DIR"
 
     local i
     if [ "$#" == "1" ]; then
