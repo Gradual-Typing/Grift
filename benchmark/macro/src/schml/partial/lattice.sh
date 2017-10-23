@@ -77,7 +77,7 @@ printf "Date\t\t:%s\n" "$date" >> $paramfile
 MYEMAIL="`id -un`@`hostname -f`"
 printf "Machine\t\t:%s\n" "$MYEMAIL" >> $paramfile
 grift_ver=$(git rev-parse HEAD)
-printf "Schml ver.\t:%s\n" "$grift_ver" >> $paramfile
+printf "Grift ver.\t:%s\n" "$grift_ver" >> $paramfile
 clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
 printf "Clang ver.\t:%s\n" "$clang_ver" >> $paramfile
 gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')

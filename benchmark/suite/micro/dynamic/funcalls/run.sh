@@ -1,6 +1,6 @@
 #!/bin/sh
 
-griftdir=/u/dalmahal/lattice/Schml
+griftdir=/u/dalmahal/lattice/Grift
 memlimit=9999999999
 # --------------------------------------------------------------------
 
@@ -24,7 +24,7 @@ cp $dir/src/* $tmpdir
 
 echo "Benchmarking function calls"
 
-# compile Schml source files, then enter the tmp directory
+# compile Grift source files, then enter the tmp directory
 cd $griftdir
 racket benchmark.rkt $tmpdir $memlimit
 cd $tmpdir
@@ -36,9 +36,9 @@ gsc -exe -cc-options -O3 soverhead.scm
 printf "n, Gambit Scheme mean, Gambit Scheme stddev\n" >> $logfile1
 printf "n, coercions mean, coercions stddev, typebased mean, typebased stddev\n" >> $logfile2
 
-# if Schml decided to return more verpose data about timing, remove q
+# if Grift decided to return more verpose data about timing, remove q
 size=10000000
-# Schml segfault at bigger sizes
+# Grift segfault at bigger sizes
 grift_size=10000000 #$(($size/1000))
 # normalize to the cost of iteration in nano seconds.
 c1=$(echo "1000000000/$grift_size" | bc -l)
@@ -70,7 +70,7 @@ read grift2_std grift2_mean <<< $( cat ${name}2.log | awk -v var=$1 '{sum+=$1; s
 printf "%s,%s,%s\n" $size $s1_mean $s1_std >> $logfile1
 printf "%s,%s,%s,%s,%s\n" $grift_size $grift1_mean $grift1_std $grift2_mean $grift2_std >> $logfile2
 # save the data
-echo "GambitC,Schml coercions,Schml typebased" > ${logfile3}$size
+echo "GambitC,Grift coercions,Grift typebased" > ${logfile3}$size
 paste -d"," s${name}.log ${name}1.log ${name}2.log >> ${logfile3}$size
 rm -f s${name}.log ${name}1.log ${name}2.log
 

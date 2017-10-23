@@ -6,7 +6,7 @@ reads=999999
 writes=999999
 ncasts=9999999
 casts=11
-griftdir=/u/dalmahal/Schml
+griftdir=/u/dalmahal/Grift
 # --------------------------------------------------------------------
 
 name1=refread
@@ -39,7 +39,7 @@ sed "s/CAST-COUNT/$casts/;s/OP-COUNT/$reads/" < $name1-template> $tmpdir/$name1.
 sed "s/CAST-COUNT/$casts/;s/OP-COUNT/$writes/" < $name2-template> $tmpdir/$name2.grift
 sed "s/CAST-COUNT/$ncasts/" < $name3-template> $tmpdir/$name3.grift
 
-# compile Schml source files, then enter the src directory.
+# compile Grift source files, then enter the src directory.
 cd $griftdir
 racket benchmark.rkt $tmpdir
 cd $tmpdir

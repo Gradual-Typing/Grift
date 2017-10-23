@@ -18,8 +18,8 @@
          #:let-bnds       [let-bnds '()]
          #:acc-type       acc-type
          #:acc-init       acc-init
-         #:use-acc-action use-acc-action ; (Symbol -> Schml-Expr)
-         #:timed-action   timed-action)   ; (Symbol Symbol -> Schml-Expr)
+         #:use-acc-action use-acc-action ; (Symbol -> Grift-Expr)
+         #:timed-action   timed-action)   ; (Symbol Symbol -> Grift-Expr)
   `(letrec ,letrec-bnds 
      (let ([iters : Int (read-int)])
        ,(let make-let* ([b* let-bnds])

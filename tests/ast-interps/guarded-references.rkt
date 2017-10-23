@@ -35,7 +35,7 @@
      (write-gvect cast underlying-vector pos val^)]
     [else (raise-not-grep write-gvect vect)]))
 
-;; (: cast-gvect (GVect Schml-Type Schml-Type Blame-Label -> GVect))
+;; (: cast-gvect (GVect Grift-Type Grift-Type Blame-Label -> GVect))
 ;; Obviously not space efficient at the start
 (define (cast-grep/twosome ref t1 t2 lbl)
   (define type

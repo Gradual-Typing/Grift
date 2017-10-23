@@ -7,7 +7,7 @@
 // Reference Source: Options, Futures, and Other Derivatives, 3rd Edition, Prentice 
 // Hall, John C. Hull,
 
-// Edited for use in The Schml Benchmark Project By Andre Kuhlenschmidt
+// Edited for use in The Grift Benchmark Project By Andre Kuhlenschmidt
 #define GC_INITIAL_HEAP_SIZE 1048576
 #include "../../../../../src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
 
@@ -360,7 +360,7 @@ int main (int argc, char **argv)
   prices = (fptype*)GC_MALLOC(numOptions*sizeof(fptype));
   
   // inlined bs_thread from the original benchmark to remove
-  // globally mutable state which isn't available in Schml
+  // globally mutable state which isn't available in Grift
   for (j=0; j<NUM_RUNS; j++) {
     for (i=0; i < numOptions; i++) {
 

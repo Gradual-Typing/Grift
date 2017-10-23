@@ -201,7 +201,7 @@ main()
 	MYEMAIL="`id -un`@`hostname -f`"
 	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
 	grift_ver=$(git rev-parse HEAD)
-	printf "Schml ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
+	printf "Grift ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
 	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
 	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
 	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')

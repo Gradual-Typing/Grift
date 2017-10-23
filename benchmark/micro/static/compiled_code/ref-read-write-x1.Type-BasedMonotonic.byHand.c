@@ -2,10 +2,10 @@
 // compiler.
 
 // This is the boiler plate
-#include "/home/deyaa/mono/Schml/src/backend-c/runtime/runtime.h"
+#include "/home/deyaa/mono/Grift/src/backend-c/runtime/runtime.h"
 #include <sys/time.h>
 #define GC_INITIAL_HEAP_SIZE 1048576
-#include "/home/deyaa/mono/Schml/src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
+#include "/home/deyaa/mono/Grift/src/backend-c/runtime/boehm-gc-install/include/gc/gc.h"
 
 // This is the global state for the timer
 struct timeval timer_start_time;

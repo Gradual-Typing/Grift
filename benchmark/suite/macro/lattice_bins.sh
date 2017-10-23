@@ -219,7 +219,7 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     	   `"set yrange [0.01:100];"`
 	   `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
     	   `"set title \"${printname}\";"`
-	   `"set ylabel \"(Gambit runtime/Schml runtime) in logarithmic scale\";"`
+	   `"set ylabel \"(Gambit runtime/Grift runtime) in logarithmic scale\";"`
 	   `"set xlabel \"How much of the code is typed\";"`
     	   `"plot 1 lw 2 dt 2 lc rgb \"black\" title 'Gambit',"`
 	   `"'${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
@@ -381,7 +381,7 @@ main()
 	MYEMAIL="`id -un`@`hostname -f`"
 	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
 	grift_ver=$(git rev-parse HEAD)
-	printf "Schml ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
+	printf "Grift ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
 	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
 	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
 	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')

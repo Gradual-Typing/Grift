@@ -2,7 +2,7 @@
 
 gloop=999999
 loop=99999999
-griftdir=/u/dalmahal/lattice/Schml
+griftdir=/u/dalmahal/lattice/Grift
 memlimit=9999999999
 #---------------------------------------------------------------------
 
@@ -21,7 +21,7 @@ mkdir -p $datadir $tmpdir
 
 cp $dir/src/* $tmpdir
 
-# compile Schml source files, then enter the src directory
+# compile Grift source files, then enter the src directory
 cd $griftdir
 racket benchmark.rkt $tmpdir $memlimit
 cd $tmpdir
