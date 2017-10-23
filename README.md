@@ -11,14 +11,14 @@ I will post some of the relavant paper here or in the wiki soon.
 ## Installation
 
 ```bash
-git clone git@github.com:akuhlens/schml
-cd schml
+git clone git@github.com:akuhlens/grift
+cd grift
 raco pkg install
 ```
 
 ## Use as a Library
 ```racket
-(require schml)
+(require grift)
 (compile string/or/path/to/file)
 ```
 

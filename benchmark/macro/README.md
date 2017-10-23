@@ -2,7 +2,7 @@
 
 This directory contains a framework for systematically
 building, running, analyising, and archiving benchmarks
-which measure the performance of schml programs as a whole.
+which measure the performance of grift programs as a whole.
 
 ## Getting Started
 
