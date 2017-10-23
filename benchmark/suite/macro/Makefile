@@ -1,5 +1,5 @@
 LIBGC=../../../src/backend-c/runtime/boehm-gc-install/lib/libgc.a
-SCHML=racket ../../../main.rkt -O 3
+GRIFT=racket ../../../main.rkt -O 3
 GAMBIT=gsc -exe -cc-options "-O3"
 GCC=gcc -O3
 

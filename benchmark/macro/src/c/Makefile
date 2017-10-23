@@ -1,6 +1,6 @@
 ROOT_DIR=..
-SCHMLDIR=../../../..
-LIBGC=$(SCHMLDIR)/src/backend-c/runtime/boehm-gc-install/lib/libgc.a
+GRIFTDIR=../../../..
+LIBGC=$(GRIFTDIR)/src/backend-c/runtime/boehm-gc-install/lib/libgc.a
 COMPILE_LIBRARIES=$(LIBGC) -pthread -lm 
 COMPILE_VERSION=clang --version
 COMPILE=clang

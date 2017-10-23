@@ -4,8 +4,8 @@ ifeq ($(origin ROOT_DIR), undefined)
   $(error ROOT_DIR must be set for this include to work)
 endif
 
-SCHML_DIR=$(ROOT_DIR)/../../../
-SCHML=racket $(SCHML_DIR)/main.rkt
+GRIFT_DIR=$(ROOT_DIR)/../../../
+GRIFT=racket $(GRIFT_DIR)/main.rkt
 
 # the basic structure of a benchmark configuration
 # each "bechmark configuration" has log, bin, and out directories
@@ -43,10 +43,10 @@ COMPILE_INVOKE=$(COMPILE) $(COMPILE_OPTIONS) -o $@ \
 		$(SRC_DIR)/$*.$(SRC_EXT) $(COMPILE_LIBRARIES) 
 
 
-SCHML_TYPES:=static dynamic
-SCHML_IMPLS:=coercions casts
-SCHML_CONFIGS:= $(foreach TYPE, $(SCHML_TYPES), \
-		  $(foreach IMPL, $(SCHML_IMPLS), \
+GRIFT_TYPES:=static dynamic
+GRIFT_IMPLS:=coercions casts
+GRIFT_CONFIGS:= $(foreach TYPE, $(GRIFT_TYPES), \
+		  $(foreach IMPL, $(GRIFT_IMPLS), \
 		    $(TYPE)/$(IMPL)))
 
 # Make keeps all intermediate files

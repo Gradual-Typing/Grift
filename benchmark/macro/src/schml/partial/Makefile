@@ -10,7 +10,7 @@ SRCS:=$(addprefix src/, $(PROGS))
 
 # BINS has to be the delayed assignment so that
 # it is calculated after generate has run.
-BINS=$(foreach IMPL, $(SCHML_IMPLS), \
+BINS=$(foreach IMPL, $(GRIFT_IMPLS), \
        $(addprefix $(IMPL)/, \
 	 $(subst $(SRC_DIR)/, $(BIN_DIR)/, \
           $(subst .grift,, \

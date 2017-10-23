@@ -4,9 +4,9 @@ CLEANED:=
 MADE_CLEAN:=casts coercions
 include $(ROOT_DIR)/shared.mk 
 
-BINS:= $(foreach CONFIG, $(SCHML_IMPLS), $(addprefix $(CONFIG)/, $(BINS)))
+BINS:= $(foreach CONFIG, $(GRIFT_IMPLS), $(addprefix $(CONFIG)/, $(BINS)))
 
-OUTS:= $(foreach CONFIG, $(SCHML_IMPLS), $(addprefix $(CONFIG)/, $(OUTS)))
+OUTS:= $(foreach CONFIG, $(GRIFT_IMPLS), $(addprefix $(CONFIG)/, $(OUTS)))
 
 .PHONEY: all
 all : $(BINS) $(OUTS)
@@ -25,14 +25,14 @@ casts/%:
 # COERCEOPTS=$(OPTS) --coercions
 # INPUTS=$(wildcard ../../inputs/*)
 # PROGS=$(foreach INPUT, $(INPUTS), $(shell basename $(INPUT)))
-# SCHMLS:=coercions casts
-# BIN_DIRS:=$(addsuffix /bin, $(SCHMLS))
-# OUT_DIRS:=$(addsuffix /out, $(SCHMLS))
-# LOG_DIRS:=$(addsuffix /log, $(SCHMLS))
+# GRIFTS:=coercions casts
+# BIN_DIRS:=$(addsuffix /bin, $(GRIFTS))
+# OUT_DIRS:=$(addsuffix /out, $(GRIFTS))
+# LOG_DIRS:=$(addsuffix /log, $(GRIFTS))
 # BINS:=$(foreach DIR, $(BIN_DIRS), $(addprefix $(DIR)/, $(PROG)))
 # OUTS:=$(foreach DIR, $(OUT_DIRS), $(addprefix $(DIR)/, \
 # 				    $(addsuffix .out, $(PROGS))))
-# DIRS:=$(SCHMLS) $(BIN_DIRS) $(OUT_DIRS) $(LOG_DIRS)
+# DIRS:=$(GRIFTS) $(BIN_DIRS) $(OUT_DIRS) $(LOG_DIRS)
 # RUNTIMER=sh ../../run.sh
 # RUNS=10
 
@@ -49,12 +49,12 @@ casts/%:
 
 # coercions/log/compile.log : coercions coercions/log
 # 	racket --version >> coercions/log/compile.log
-# 	$(SCHML) --version >> coercions/log/compile.log
+# 	$(GRIFT) --version >> coercions/log/compile.log
 # 	echo 'options:' >> coercions/log/compile.log
 # 	echo $(COERCEOPTS) >> coercions/log/compile.log
 
 # coercions/bin/% : coercions/bin src/%.grift
-# 	${SCHML} ${OPTS} -o $@ src/$*.grift 
+# 	${GRIFT} ${OPTS} -o $@ src/$*.grift 
 
 # coercions/out/%.out : coercions/log coercions/out \
 # 		      coercions/bin/% ../../inputs/%
@@ -67,12 +67,12 @@ casts/%:
 
 # casts/log/compile.log : casts casts/log
 # 	racket --version > casts/log/compile.log
-# 	$(SCHML) --version >> casts/log/compile.log
+# 	$(GRIFT) --version >> casts/log/compile.log
 # 	echo 'options:' >> casts/log/compile.log
 # 	echo $(CASTOPTS) >> casts/log/compile.log
 
 # casts/bin/% : casts/bin src/%.grift
-# 	${SCHML} $(CASTOPTS) -o $@ src/$*.grift
+# 	${GRIFT} $(CASTOPTS) -o $@ src/$*.grift
 
 # casts/out/%.out : casts/log casts/out casts/bin/% ../../inputs/%
 # 	echo >> casts/log/run.log # print a new line
