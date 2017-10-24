@@ -36,7 +36,7 @@
 ;; compile file at path
 ;; exec-path = path/name of final executable
 (: compile (->* ((U String Path))
-                (#:output     (Option (U String Path))
+                (#:output     (U String Path)
                  #:keep-c     (Option (U String Path)) 
                  #:keep-s     (Option (U String Path))
                  #:blame      Blame-Semantics
@@ -107,8 +107,6 @@
 (define (schml-path? path-searched)
   (equal? #"schml" (filename-extension path-searched)))
 
-(define output-suffix : (Parameterof String) (make-parameter ""))
-
 ;; Compile all .schml files in a directory and sub-directories
 (: compile-directory : Path -> (Listof Path))
 (define (compile-directory compile-dir)
@@ -131,7 +129,7 @@
   ;; filename to output file paths
   (: renaming-output-files : Path -> (Values Path (Option Path) (Option Path))) 
   (define (renaming-output-files file-name)
-    (define out-name (path-replace-suffix file-name out-suffix))
+    (define out-name (path-replace-extension file-name (string-append "." out-suffix)))
     (define c-path (and c-dir (build-path c-dir (path-add-suffix out-name #".c"))))
     (define s-path (and s-dir (build-path s-dir (path-add-suffix out-name #".s"))))
     (values (build-path compile-dir out-name) c-path s-path))
@@ -147,4 +145,5 @@
         (renaming-output-files p?)))
 
     ;; Use current parameterization plus new file names to compile the file
+    (displayln out-path)
     (compile fl #:output out-path #:keep-c c-path? #:keep-s s-path?)))

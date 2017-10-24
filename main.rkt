@@ -2,6 +2,7 @@
 #lang racket/base
 
 (require "src/compile.rkt"
+         "src/config_str.rkt"
 	 racket/cmdline
 	 racket/match
 	 racket/runtime-path
@@ -172,6 +173,18 @@
    [("--profile")
     "Invoke c compiler with profiling flags"
     (c-flags (cons "-pg" (c-flags)))]
+   [("-i" "--config-index") ci
+    "Compile with configurations specified by the input configuration index."
+    (define i (string->number ci))
+    (unless (>= i 0) (error 'main "configuration index must be >= 0."))
+    (define config (hash-ref configs i))
+    (cast-representation (config-cast-semantics config))
+    (reference-semantics (config-ref-semantics config))
+    (specialize-cast-code-generation?
+     (eq? (config-cast-specs config) 'Specialized))
+    (hybrid-cast/coercion-runtime?
+     (eq? (config-coercion-creation-semantics config) 'Lazy))
+    (output-suffix (string-append "o" ci))]
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]

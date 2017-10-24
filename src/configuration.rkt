@@ -60,8 +60,12 @@
   (make-parameter #f))
 (define s-path : (Parameterof (Option Path))
   (make-parameter #f))
-(define output-path : (Parameterof (Option Path))
-  (make-parameter #f))
+(define output-path : (Parameterof Path)
+  (make-parameter (build-path "a.out")))
+;; When compiling multiple files in a directory, output-suffix specifies what
+;; is the extension for the output files.
+(define output-suffix : (Parameterof String)
+  (make-parameter ""))
 (define init-heap-kilobytes : (Parameterof Natural)
   (make-parameter 1024))
 (define init-types-hash-table-slots : (Parameterof Natural)

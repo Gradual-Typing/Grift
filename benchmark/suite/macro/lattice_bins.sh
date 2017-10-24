@@ -105,7 +105,7 @@ gen_output()
 
     local name=$(basename "$path")
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
+    local config_str=$(racket "${SCHML_DIR}/src/config_str.rkt" -c $c1 $c2)
     local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
     local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
     local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
@@ -275,10 +275,11 @@ run_benchmark()
     local lattice_file="${lattice_path}/out"
     if [ ! -f "$lattice_file" ]; then
 	rm -rf "$lattice_path"
-	local dynamizer_out=$(dynamizer "${lattice_path}.schml" "$nbins" "$nsamples" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+	local dynamizer_out=$(dynamizer "${lattice_path}.schml" "$nsamples" "$nbins" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
-    racket "${SCHML_DIR}/benchmark/benchmark.rkt" "${lattice_path}/"
+    racket "${SCHML_DIR}/main.rkt" -O 3 -i $c1 -r "${lattice_path}/"
+    racket "${SCHML_DIR}/main.rkt" -O 3 -i $c2 -r "${lattice_path}/"
     dynamizer_out=$(cat "$lattice_file")
 
     gen_output $baseline_system $c1 $c2 "$lattice_path" "$benchmark_args" "$dynamizer_out" "$print_name" "$disk_aux_name"
@@ -298,9 +299,6 @@ run_experiment()
     local nbins="$1";           shift
 
     local g=()
-
-    # local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_4K.txt")\""
-    # run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" "$nbins" ""
     
     local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend1000.txt")\""
     run_benchmark $baseline_system $c1 $c2 "quicksort" "$qs_wc_arg" "$nsamples" "$nbins" ""
@@ -314,6 +312,9 @@ run_experiment()
 
     run_benchmark $baseline_system $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
     g+=($RETURN)
+
+    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_4K.txt")\""
+    run_benchmark $baseline_system $c1 $c2 "blackscholes" "$bs_bc_arg" "$nsamples" "$nbins" ""
 
     local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/fast.txt")\""
     run_benchmark $baseline_system $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""

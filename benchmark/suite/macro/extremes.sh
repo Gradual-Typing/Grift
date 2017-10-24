@@ -20,7 +20,7 @@ write_schml_speedups()
     local dir="$1";             shift
     local logfile="$1";         shift
     
-    local configs=($(racket "${SCHML_DIR}/benchmark/config_str.rkt" -i))
+    local configs=($(racket "${SCHML_DIR}/src/config_str.rkt" -i))
     for config_index in ${configs[@]}; do
 	get_schml_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
 	printf ",$RETURN" >> $logfile
@@ -122,7 +122,7 @@ run_experiment()
     local logfile2="${DATA_DIR}/dyn.log"
     local logfile3="${DATA_DIR}/partial.log"
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" -a)
+    local config_str=$(racket "${SCHML_DIR}/src/config_str.rkt" -a)
     echo "name,${config_str}" > "$logfile1"
     echo "name,${config_str},racket,chezscheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
