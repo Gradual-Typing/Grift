@@ -1,5 +1,0 @@
-(define f : Float 1.5)
-(define d : Dyn f)
-(if (fl= f d)
-    #t
-    #f)

@@ -78,7 +78,7 @@
    #:before (lambda () (display "core test running ... "))
    #:after (lambda () (display "done\n"))
    ;; Simple dynamic tests
-   (test-file "core" "float1.schml" (bool #t))
+   (test-file "core" "float1.grift" (bool #t))
    ;; Let
    (test-file "core" "let10.grift" (dyn))
    (test-file "core" "let12.1.grift" (dyn))
