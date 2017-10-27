@@ -14,7 +14,7 @@ but a static single assignment is implicitly maintained.
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
 (require (for-syntax racket/syntax syntax/parse racket/list
-                     "../language/forms.rkt")
+                     "../language/forms.rkt" "../language/c-helpers.rkt")
          "../errors.rkt"
          (submod "../logging.rkt" typed)
          "../configuration.rkt"
@@ -1437,12 +1437,23 @@ but a static single assignment is implicitly maintained.
                 [otherwise (Op '+ (list #,offset-def ind-arg))]))))
        (let ([l (map gen-index-func-access field-string* index-def*)])
          (if many-field-dtm (append l (list (gen-offset-func-access))) l)))
+     (define/with-syntax index-index 0)
+     (define/with-syntax hash-index 1)
+     (append-to-constants.h
+      'append
+      (lambda (in)
+        (define define-line/in (define-line in))
+        (define-line/in #'tag-def #'tag)
+        (define-line/in #'hash-def #'hash-index)
+        (map define-line/in
+             (syntax-e #'(sindex/offset-def* ...))
+             (syntax-e #'(sindex/offset-val* ...)))))
      #`(begin
          (define tag-data-def tag)
          (define tag-def (Quote tag-data-def))
-         (define index-data-def 0)
+         (define index-data-def index-index)
          (define index-def (Quote index-data-def))
-         (define hash-data-def 1)
+         (define hash-data-def hash-index)
          (define hash-def (Quote hash-data-def))
          (define sindex/offset-data-def* sindex/offset-val*) ...
          (define sindex/offset-def* (Quote sindex/offset-data-def*)) ...
