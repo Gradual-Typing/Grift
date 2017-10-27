@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include "boehm-gc-install/include/gc/gc.h"
 #include "hashcons.h"
+#include "constants.h"
 
 table alloc_hash_table(int64_t slots, float load_factor)
 {
@@ -66,27 +67,30 @@ int64_t hashcons(table ht, int64_t e, int64_t hcode)
 
 int types_equal(int64_t t1, int64_t t2)
 {
-  int64_t tag1 = (t1 & 7);
-  int64_t tag2 = (t2 & 7);
+  int64_t tag1 = (t1 & TYPE_TAG_MASK);
+  int64_t tag2 = (t2 & TYPE_TAG_MASK);
   int64_t count, untagged_t1, untagged_t2, i;
   if (tag1 == tag2) {
     untagged_t1 = (t1 ^ tag1);
     untagged_t2 = (t2 ^ tag1);
     switch (tag1) {
-    case 1 ... 4:
-      return ((int64_t*)untagged_t1)[2] == ((int64_t*)untagged_t2)[2];
+    case TYPE_GREF_TAG ... TYPE_MVECT_TAG:
+      // the type index is the same for gref,gvect,mref, and mvect.
+      return ((int64_t*)untagged_t1)[TYPE_GREF_TYPE_INDEX] == ((int64_t*)untagged_t2)[TYPE_GREF_TYPE_INDEX];
       break;
-    case 5:
-      count = ((int64_t*)untagged_t1)[2];
-      for (i = 2; i < (count + 3); ++i) {
+    case TYPE_TUPLE_TAG:
+      count = ((int64_t*)untagged_t1)[TYPE_TUPLE_COUNT_INDEX];
+      // the loop checks count along with the elements
+      for (i = TYPE_TUPLE_ELEMENTS_OFFSET-1; i < (count + TYPE_TUPLE_ELEMENTS_OFFSET); ++i) {
 	if (((int64_t*)untagged_t1)[i] != ((int64_t*)untagged_t2)[i])
 	  return false;
       }
       return true;
       break;
-    case 0:
-      count = ((int64_t*)untagged_t1)[2];
-      for (i = 2; i < (count + 4); ++i) {
+    case TYPE_FN_TAG:
+      count = ((int64_t*)untagged_t1)[TYPE_FN_ARITY_INDEX];
+      // the loop checks the arity and the return type along with the elements
+      for (i = TYPE_FN_FMLS_OFFSET-2; i < (count + TYPE_FN_FMLS_OFFSET); ++i) {
 	if (((int64_t*)untagged_t1)[i] != ((int64_t*)untagged_t2)[i])
 	  return false;
       }
@@ -102,12 +106,13 @@ int types_equal(int64_t t1, int64_t t2)
 
 void types_reinsert(table ht, int64_t ty)
 {
-  int64_t tag = (ty & 7);
+  int64_t tag = (ty & TYPE_TAG_MASK);
   int64_t untagged_ty = (ty ^ tag);
   int64_t h;
   switch (tag) {
-  case 0 ... 5:
-    h = ((int64_t*)untagged_ty)[1] % ht->slots;
+  case TYPE_FN_TAG ... TYPE_TUPLE_TAG:
+    // the hash index is the same for all types
+    h = ((int64_t*)untagged_ty)[TYPE_FN_HASH_INDEX] % ht->slots;
     h = h < 0 ? h + ht->slots : h;
     chain C = ht->array[h];
     if (C == NULL) {
