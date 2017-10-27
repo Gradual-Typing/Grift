@@ -94,6 +94,7 @@
       ;; And all the boring cases
       [(and nop (No-Op)) nop]
       [(Op p exp*) (Op p (map ll-expr exp*))]
+      [(Atomic-Type-Huh t) (Atomic-Type-Huh (ll-expr t))]
       [(Type-Fn-arg e i) (Type-Fn-arg (ll-expr e) (ll-expr i))]
       [(Type-Fn-return e) (Type-Fn-return (ll-expr e))]
       [(Type-Fn-arity e) (Type-Fn-arity (ll-expr e))]

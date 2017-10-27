@@ -144,6 +144,7 @@
     [(Type-GVect-Of e) (recur e)]
     [(Type-GRef-Huh e) (recur e)]
     [(Type-GVect-Huh e) (recur e)]
+    [(Atomic-Type-Huh e) (recur e)]
     [(Blame e) (recur e)]
     [(Observe e t) (recur e)]
     [(Unguarded-Box e) (recur e)]
@@ -394,6 +395,8 @@
      (Type-GRef-Huh e)]
     [(Type-GVect-Huh (app recur e))
      (Type-GVect-Huh e)]
+    [(Atomic-Type-Huh (app recur t))
+     (Atomic-Type-Huh t)]
     [(Construct t v (app recur* e*))
      (Construct t v e*)]
     [(Access t f (app recur e) i?)
@@ -732,6 +735,8 @@
      (Type-GRef-Huh e)]
     [(Type-GVect-Huh (app pl-expr e))
      (Type-GVect-Huh e)]
+    [(Atomic-Type-Huh (app pl-expr t))
+     (Atomic-Type-Huh t)]
     [(Construct t v (app pl-expr* e*))
      (Construct t v e*)]
     [(Access t f (app pl-expr e) i?)

@@ -279,6 +279,7 @@
         [(Break-Repeat) (Break-Repeat)]
         ;; Type Representation
         [(Type t) (Type t)]
+        [(Atomic-Type-Huh (app recur e)) (Atomic-Type-Huh e)]
         [(Type-GRef-Of (app recur e)) (Type-GRef-Of e)]
         [(Type-GVect-Of (app recur e)) (Type-GVect-Of e)]
         [(Type-Fn-arg (app recur e) (app recur i)) (Type-Fn-arg e i)]

@@ -20,18 +20,19 @@
 
 (define-constants
   ;; types
-  (TYPE-TAG-MASK                  #b111)  
   ;; unallocated types
-  (TYPE-ATOMIC-TAG #b111) ;; This should be TYPE-IMDT-TAG
-  ;; Immediate types are tagged with #b111
-  (TYPE-DYN-RT-VALUE   #b000111)
-  (TYPE-INT-RT-VALUE   #b001111)
-  (TYPE-BOOL-RT-VALUE  #b010111)
-  (TYPE-UNIT-RT-VALUE  #b011111)
-  (TYPE-FLOAT-RT-VALUE #b100111)
-  (TYPE-CHAR-RT-VALUE  #b101111)
-  (TYPE-MAX-ATOMIC-RT-VALUE #b111111)
-
+  (TYPE-INT-RT-VALUE   1)
+  (TYPE-BOOL-RT-VALUE  2)
+  (TYPE-UNIT-RT-VALUE  3)
+  (TYPE-FLOAT-RT-VALUE 4)
+  (TYPE-CHAR-RT-VALUE  5)
+  (TYPE-DYN-RT-VALUE   6)
+  (TYPE-MAX-ATOMIC-RT-VALUE 7)
+  ;; shared indices for allocated types
+  (TYPE-TAG-INDEX 0)
+  (TYPE-HASH-INDEX 1)
+  (TYPE-INDEX-INDEX 2)
+  ;; hyper coercions
   (HC-PRJ-TAG-MASK  #b10)
   (HC-INJ-TAG-MASK  #b01)
   (HC-TAG-MASK      #b11)

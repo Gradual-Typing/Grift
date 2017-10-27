@@ -127,34 +127,35 @@ but a static single assignment is implicitly maintained.
                (lambda ([tag : D0-Expr])
                  : D0-Expr
                  (op$ binary-or shifted-imm tag))])
-         (case$ type
-           [(data:TYPE-INT-RT-VALUE) (tag-shifted-imm DYN-INT-TAG)]
-           [(data:TYPE-BOOL-RT-VALUE) (tag-shifted-imm DYN-BOOL-TAG)]
-           [(data:TYPE-UNIT-RT-VALUE) (tag-shifted-imm DYN-UNIT-TAG)]
-           [(data:TYPE-CHAR-RT-VALUE) (tag-shifted-imm DYN-CHAR-TAG)]
-           [(data:TYPE-FLOAT-RT-VALUE)
-            (sr-alloc
-             "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))]
-           [else
-            (sr-alloc
-             "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))])))]))
+         (cond$
+          [(atomic-type? type)
+           (case$ type
+             [(data:TYPE-INT-RT-VALUE) (tag-shifted-imm DYN-INT-TAG)]
+             [(data:TYPE-BOOL-RT-VALUE) (tag-shifted-imm DYN-BOOL-TAG)]
+             [(data:TYPE-UNIT-RT-VALUE) (tag-shifted-imm DYN-UNIT-TAG)]
+             [(data:TYPE-CHAR-RT-VALUE) (tag-shifted-imm DYN-CHAR-TAG)]
+             [(data:TYPE-FLOAT-RT-VALUE)
+              (sr-alloc
+               "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))]
+             [else
+              (op$ Print (Quote "bad base type"))
+              (op$ Exit EXIT-FAILURE) UNDEF-IMDT])]
+          [else
+           (sr-alloc
+            "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))])))]))
 
 (: tuple-type-glb ((Code-Label Uid) -> ((Var Uid) (Var Uid) -> D0-Expr)))
 (define ((tuple-type-glb tglb-label) t1 t2)
   (define-track-next-uid!$ hrt)
   (begin$
-    (assign$ t1-count
-      (sr-tagged-array-ref t1 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
-    (assign$ t2-count
-      (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
-    (assign$ smaller-count (If (op$ < t1-count t2-count) t1-count t2-count))
-    (assign$ bigger-count (If (op$ > t1-count t2-count) t1-count t2-count))
-    (assign$ rt (op$ Alloc (op$ + bigger-count TYPE-TUPLE-ELEMENTS-OFFSET)))
-    (assign$ iters (op$ + TYPE-TUPLE-ELEMENTS-OFFSET smaller-count))
-    (assign$ tagged-rt (sr-tag-value rt TYPE-TUPLE-TAG))
+    (assign$ t1-count (sr-array-ref t1 TYPE-TUPLE-COUNT-INDEX))
+    (assign$ t2-count (sr-array-ref t2 TYPE-TUPLE-COUNT-INDEX))
+    (assign$ rt (op$ Alloc (op$ + t1-count TYPE-TUPLE-ELEMENTS-OFFSET)))
+    (assign$ iters (op$ + TYPE-TUPLE-ELEMENTS-OFFSET t2-count))
+    (sr-array-set! rt TYPE-TAG-INDEX TYPE-TUPLE-TAG)
     (repeat$ (i TYPE-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
-      (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
-      (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
+      (assign$ t1a (sr-array-ref t1 i))
+      (assign$ t2a (sr-array-ref t2 i))
       (assign$ t-glb (app-code$ tglb-label t1a t2a))
       (sr-array-set! rt i t-glb))
     (cond$
@@ -162,38 +163,32 @@ but a static single assignment is implicitly maintained.
       (assign$ iters (op$ + t1-count TYPE-TUPLE-ELEMENTS-OFFSET))
       (assign$ i-init (op$ + t2-count TYPE-TUPLE-ELEMENTS-OFFSET))
       (repeat$ (i i-init iters) (_ UNIT-IMDT)
-        (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
+        (assign$ t1a (sr-array-ref t1 i))
         (sr-array-set! rt i t1a))]
-     [(op$ < t1-count t2-count)
-      (assign$ iters (op$ + t2-count TYPE-TUPLE-ELEMENTS-OFFSET))
-      (assign$ i-init (op$ + t1-count TYPE-TUPLE-ELEMENTS-OFFSET))
-      (repeat$ (i i-init iters) (_ UNIT-IMDT)
-        (assign$ t2a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
-        (sr-array-set! rt i t2a))]
      [else UNIT-IMDT])
-    (sr-array-set! rt TYPE-TUPLE-COUNT-INDEX bigger-count)
-    (Assign hrt (app-code$ (get-hashcons-types!) tagged-rt))
+    (sr-array-set! rt TYPE-TUPLE-COUNT-INDEX t1-count)
+    (Assign hrt (app-code$ (get-hashcons-types!) rt))
     (Var hrt)))
 
 (: fn-type-glb ((Code-Label Uid) -> ((Var Uid) (Var Uid) -> D0-Expr)))
 (define ((fn-type-glb tglb-label) t1 t2)
   (define-track-next-uid!$ hrt)
   (begin$
-    (assign$ arity (sr-tagged-array-ref t1 TYPE-FN-TAG TYPE-FN-ARITY-INDEX))
+    (assign$ arity (sr-array-ref t1 TYPE-FN-ARITY-INDEX))
     (assign$ rt (op$ Alloc (op$ + arity TYPE-FN-FMLS-OFFSET)))
     (assign$ iters (op$ + TYPE-FN-FMLS-OFFSET arity))
-    (assign$ tagged-rt (sr-tag-value rt TYPE-FN-TAG))
-    (assign$ t1-rt (sr-tagged-array-ref t1 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
-    (assign$ t2-rt (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
+    (assign$ t1-rt (sr-array-ref t1 TYPE-FN-RETURN-INDEX))
+    (assign$ t2-rt (sr-array-ref t2 TYPE-FN-RETURN-INDEX))
     (assign$ t-rt (app-code$ tglb-label t1-rt t2-rt))
+    (sr-array-set! rt TYPE-TAG-INDEX TYPE-FN-TAG)
     (repeat$ (i TYPE-FN-FMLS-OFFSET iters) (_ UNIT-IMDT)
-      (assign$ t1a (sr-tagged-array-ref t1 TYPE-FN-TAG i))
-      (assign$ t2a (sr-tagged-array-ref t2 TYPE-FN-TAG i))
+      (assign$ t1a (sr-array-ref t1 i))
+      (assign$ t2a (sr-array-ref t2 i))
       (assign$ t-glb (app-code$ tglb-label t1a t2a))
       (sr-array-set! rt i t-glb))
     (sr-array-set! rt TYPE-FN-ARITY-INDEX arity)
     (sr-array-set! rt TYPE-FN-RETURN-INDEX t-rt)
-    (Assign hrt (app-code$ (get-hashcons-types!) tagged-rt))
+    (Assign hrt (app-code$ (get-hashcons-types!) rt))
     (Var hrt)))
 
 (: get-mk-fn-crcn! (Uid -> (Code-Label Uid)))
@@ -205,20 +200,20 @@ but a static single assignment is implicitly maintained.
     (define mk-crcn-label (Code-Label mk-crcn))
     (define mk-fn-crcn-c : D0-Code
       (code$ (t1 t2 l)
-        (assign$ arity (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-ARITY-INDEX))
+        (assign$ arity (sr-array-ref t2 TYPE-FN-ARITY-INDEX))
         (assign$ tagged-arity
           (op$ + (op$ %<< arity COERCION-SECOND-TAG-SHIFT)
                COERCION-FN-SECOND-TAG))
-        (assign$ t1r (sr-tagged-array-ref t1 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
-        (assign$ t2r (sr-tagged-array-ref t2 TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
+        (assign$ t1r (sr-array-ref t1 TYPE-FN-RETURN-INDEX))
+        (assign$ t2r (sr-array-ref t2 TYPE-FN-RETURN-INDEX))
         (assign$ cr (app-code$ mk-crcn-label t1r t2r l))
         (assign$ crcn (op$ Alloc (op$ + arity COERCION-FN-FMLS-OFFSET)))
         (assign$ iters (op$ + TYPE-FN-FMLS-OFFSET arity))
         (sr-array-set! crcn COERCION-FN-ARITY-INDEX tagged-arity)
         (sr-array-set! crcn COERCION-FN-RETURN-INDEX cr)
         (repeat$ (i TYPE-FN-FMLS-OFFSET iters) (_ UNIT-IMDT)
-          (assign$ t1a (sr-tagged-array-ref t1 TYPE-FN-TAG i))
-          (assign$ t2a (sr-tagged-array-ref t2 TYPE-FN-TAG i))
+          (assign$ t1a (sr-array-ref t1 i))
+          (assign$ t2a (sr-array-ref t2 i))
           (assign$ val-crcn (app-code$ mk-crcn-label t2a t1a l))
           (assign$ c-i (op$ + (op$ - i TYPE-FN-FMLS-OFFSET)
                             COERCION-FN-FMLS-OFFSET))
@@ -354,17 +349,14 @@ but a static single assignment is implicitly maintained.
     (define cast-tuple-in-place-c : D0-Code
       (code$ (tpl-val t1 t2 l mono-addr)
         (begin$
-          (assign$ count
-            (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+          (assign$ count (sr-array-ref t2 TYPE-TUPLE-COUNT-INDEX))
           (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
             (begin$
               (assign$ val (op$ Array-ref tpl-val i))
               (assign$ t1a
-                (sr-tagged-array-ref
-                 t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
+                (sr-array-ref t1 (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
               (assign$ t2a
-                (sr-tagged-array-ref
-                 t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
+                (sr-array-ref t2 (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
               (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
               (assign$ new-val (app-code$ cast-label val t1a t2a l mono-addr))
               (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
@@ -387,15 +379,14 @@ but a static single assignment is implicitly maintained.
     (define cast-label (Code-Label cast))
     (define cast-tuple-c : D0-Code
       (code$ (val t1 t2 l)
-        (assign$ count
-          (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+        (assign$ count (sr-array-ref t2 TYPE-TUPLE-COUNT-INDEX))
         (assign$ new-val (op$ Alloc count))
         (assign$ iters (op$ + TYPE-TUPLE-ELEMENTS-OFFSET count))
         (repeat$ (i TYPE-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
           (assign$ val-i (op$ - i TYPE-TUPLE-ELEMENTS-OFFSET))
           (assign$ vala (op$ Array-ref val val-i))
-          (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
-          (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
+          (assign$ t1a (sr-array-ref t1 i))
+          (assign$ t2a (sr-array-ref t2 i))
           (assign$ casted-vala (app-code$ cast-label vala t1a t2a l ZERO-IMDT))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
@@ -419,16 +410,14 @@ but a static single assignment is implicitly maintained.
       ;; identities. It expects the length of the first tuple to be greater than
       ;; or equal to the length of the second.
       (code$ (t1 t2 l)
-        (assign$ t1-count
-          (sr-tagged-array-ref t1 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
-        (assign$ t2-count
-          (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+        (assign$ t1-count (sr-array-ref t1 TYPE-TUPLE-COUNT-INDEX))
+        (assign$ t2-count (sr-array-ref t2 TYPE-TUPLE-COUNT-INDEX))
         (assign$ crcn UNIT-IMDT)
         (assign$ id? TRUE-IMDT)
         (assign$ iters (op$ + TYPE-TUPLE-ELEMENTS-OFFSET t2-count))
         (repeat$ (i TYPE-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
-          (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
-          (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
+          (assign$ t1a (sr-array-ref t1 i))
+          (assign$ t2a (sr-array-ref t2 i))
           (assign$ val-crcn (app-code$ mk-crcn-label t1a t2a l))
           (cond$
            [id?
@@ -460,7 +449,7 @@ but a static single assignment is implicitly maintained.
           (assign$ iters (op$ + t1-count TYPE-TUPLE-ELEMENTS-OFFSET))
           (assign$ i-init (op$ + t2-count TYPE-TUPLE-ELEMENTS-OFFSET))
           (repeat$ (i i-init iters) (_ UNIT-IMDT)
-            (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
+            (assign$ t1a (sr-array-ref t1 i))
             (assign$ c-i (op$ + (op$ - i TYPE-TUPLE-ELEMENTS-OFFSET)
                               COERCION-TUPLE-ELEMENTS-OFFSET))
             (sr-array-set! crcn c-i COERCION-IDENTITY-IMDT))
@@ -536,70 +525,48 @@ but a static single assignment is implicitly maintained.
       [(data:TYPE-UNIT-RT-VALUE) TYPE-UNIT-RT-VALUE]
       [(data:TYPE-FLOAT-RT-VALUE) TYPE-FLOAT-RT-VALUE]
       [(data:TYPE-CHAR-RT-VALUE) TYPE-CHAR-RT-VALUE]
-      [else
-       (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-       (case$ tag
-         [(data:TYPE-GREF-TAG)
-          (sr-tagged-array-ref ty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX)]
-         [(data:TYPE-GVECT-TAG)
-          (sr-tagged-array-ref ty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX)]
-         [(data:TYPE-MREF-TAG)
-          (sr-tagged-array-ref ty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX)]
-         [(data:TYPE-MVECT-TAG)
-          (sr-tagged-array-ref ty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX)]
-         [(data:TYPE-TUPLE-TAG)
-          (sr-tagged-array-ref ty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX)]
-         [(data:TYPE-FN-TAG)
-          (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-HASH-INDEX)]
-         [else (op$ Print err-msg1) (op$ Exit (Quote 1)) UNDEF-IMDT])]))
+      [else (sr-array-ref ty TYPE-HASH-INDEX)]))
   (begin$
-    (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
+    (assign$ tag (sr-get-mem-tag ty))
     (case$ tag
       [(data:TYPE-GREF-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-GREF-TAG TYPE-GREF-TYPE-INDEX))
+       (assign$ arg-ty (sr-array-ref ty TYPE-GREF-TYPE-INDEX))
        (assign$ arg-type-hash (type-hash-access arg-ty))
        (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 1))]
       [(data:TYPE-GVECT-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-GVECT-TAG TYPE-GVECT-TYPE-INDEX))
+       (assign$ arg-ty (sr-array-ref ty TYPE-GVECT-TYPE-INDEX))
        (assign$ arg-type-hash (type-hash-access arg-ty))
        (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 2))]
       [(data:TYPE-MREF-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-MREF-TAG TYPE-MREF-TYPE-INDEX))
+       (assign$ arg-ty (sr-array-ref ty TYPE-MREF-TYPE-INDEX))
        (assign$ arg-type-hash (type-hash-access arg-ty))
        (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 3))]
       [(data:TYPE-MVECT-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-MVECT-TAG TYPE-MVECT-TYPE-INDEX))
+       (assign$ arg-ty (sr-array-ref ty TYPE-MVECT-TYPE-INDEX))
        (assign$ arg-type-hash (type-hash-access arg-ty))
        (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 4))]
       [(data:TYPE-FN-TAG)
-       (assign$ return-ty
-         (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
+       (assign$ return-ty (sr-array-ref ty TYPE-FN-RETURN-INDEX))
        (assign$ init-hash-code (type-hash-access return-ty))
-       (assign$ args-count
-         (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-ARITY-INDEX))
+       (assign$ args-count (sr-array-ref ty TYPE-FN-ARITY-INDEX))
        (assign$ iters-count (op$ + TYPE-FN-FMLS-OFFSET args-count))
        (op$ +
          (repeat$
              (i TYPE-FN-FMLS-OFFSET iters-count)
              (hash-code init-hash-code)
-           (assign$ arg-type (sr-tagged-array-ref ty TYPE-FN-TAG i))
+           (assign$ arg-type (sr-array-ref ty i))
            (assign$ arg-type-hash (type-hash-access arg-type))
            (op$ * (Quote 19) (op$ + hash-code arg-type-hash)))
          (Quote 5))]
       [(data:TYPE-TUPLE-TAG)
-       (assign$ elms-count
-         (sr-tagged-array-ref ty TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+       (assign$ elms-count (sr-array-ref ty TYPE-TUPLE-COUNT-INDEX))
        (assign$ iters-count
          (op$ + TYPE-TUPLE-ELEMENTS-OFFSET elms-count))
        (op$ +
          (repeat$
              (i TYPE-TUPLE-ELEMENTS-OFFSET iters-count)
              (hash-code (Quote 0))
-           (assign$ elem-type (sr-tagged-array-ref ty TYPE-TUPLE-TAG i))
+           (assign$ elem-type (sr-array-ref ty i))
            (assign$ elem-type-hash (type-hash-access elem-type))
            (op$ * (Quote 19) (op$ + hash-code elem-type-hash)))
          (Quote 6))]
@@ -615,7 +582,7 @@ but a static single assignment is implicitly maintained.
     (define hashcons-types-c : D0-Code
       (code$ (ty)
         (cond$
-         [(op$ <= ty TYPE-MAX-ATOMIC-RT-VALUE) ty]
+         [(atomic-type? ty) ty]
          [else
           (begin$
             (assign$ hcode (hash-type ty))
@@ -624,39 +591,8 @@ but a static single assignment is implicitly maintained.
              [(op$ = ty hty)
               (begin$
                 (assign$ index (op$ Types-gen-index!))
-                (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-                (case$ tag
-                  [(data:TYPE-GREF-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-GREF-TAG TYPE-GREF-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX hcode)]
-                  [(data:TYPE-GVECT-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-GVECT-TAG TYPE-GVECT-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX hcode)]
-                  [(data:TYPE-MREF-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-MREF-TAG TYPE-MREF-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX hcode)]
-                  [(data:TYPE-MVECT-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-MVECT-TAG TYPE-MVECT-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX hcode)]
-                  [(data:TYPE-TUPLE-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-TUPLE-TAG TYPE-TUPLE-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX hcode)]
-                  [(data:TYPE-FN-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-FN-TAG TYPE-FN-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-FN-TAG TYPE-FN-HASH-INDEX hcode)]
-                  [else (op$ Print err-msg) (op$ Exit (Quote 1)) UNDEF-IMDT])
+                (sr-array-set! hty TYPE-INDEX-INDEX index)
+                (sr-array-set! hty TYPE-HASH-INDEX hcode)
                 hty)]
              [else hty]))])))
     (add-new-code! (cons hashcons-types hashcons-types-c))
@@ -732,6 +668,7 @@ but a static single assignment is implicitly maintained.
         [(Code-Label u) (Code-Label u)]
         ;; Type Representation
         [(Type t) (sr-prim-type t)]
+        [(Atomic-Type-Huh (app recur t)) (atomic-type? t)]
         [(Type-Fn-Huh (app recur e)) (type-fn? e)]
         [(Type-Fn-arity (app recur e)) (type-fn-arity-access e)]
         [(Type-Fn-return (app recur e)) (type-fn-return-access e)]
@@ -1266,8 +1203,8 @@ but a static single assignment is implicitly maintained.
       [else (sr-tag-value alloc-var tag?)]))
   (Begin (append ass* (cons alloc-ass set*)) tag-return))
 
-(: sr-hashcons-types (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
-(define (sr-hashcons-types name tag? slots)
+(: sr-hashcons-types (String (Quote Natural) (Listof (Pair String D0-Expr)) -> D0-Expr))
+(define (sr-hashcons-types name tag slots)
   (: sr-alloc-init ((Var Uid) -> (Nonnegative-Fixnum D0-Expr -> D0-Expr)))
   (define ((sr-alloc-init mem) offset value)
     (op$ Array-set! mem (Quote offset) value))
@@ -1287,18 +1224,15 @@ but a static single assignment is implicitly maintained.
   (when (= size 0)
     (error 'specify-representation "Empty objects can not be allocated"))
   (define-values (ass* var*) (get-assignments/vars slots))
-  (define allocation-size (+ 2 size))
-  (define ind* (range 2 allocation-size))
+  (define allocation-size (+ 3 size))
+  (define ind* (range 3 allocation-size))
   (define-track-next-uid!$ alloc-id)
   (define alloc-var (Var alloc-id))
   (define alloc-ass (Assign alloc-id (op$ Alloc (Quote allocation-size))))
+  (define tag-assign (op$ Array-set! alloc-var TYPE-TAG-INDEX tag))
   (define init* (map (sr-alloc-init alloc-var) ind* var*))
-  (define tagged-ptr : D0-Expr
-    (cond
-      [(not tag?) alloc-var]
-      [else (sr-tag-value alloc-var tag?)]))
-  (Begin `(,alloc-ass ,@ass* ,@init*)
-         (app-code$ (get-hashcons-types!) tagged-ptr)))
+  (Begin `(,alloc-ass ,tag-assign ,@ass* ,@init*)
+         (app-code$ (get-hashcons-types!) alloc-var)))
 
 (: sr-prim-type (Immediate-Type -> D0-Expr))
 (define (sr-prim-type t)
@@ -1319,9 +1253,9 @@ but a static single assignment is implicitly maintained.
 ;; (define-types-memory-layout-helpers "type" "tuple" #b101
 ;;                               ("count" single) ("elements" many))
 ;; generates the following for a type called tuple:
-;; (define data:TYPE-TUPLE-COUNT-INDEX 0)
+;; (define data:TYPE-TUPLE-COUNT-INDEX 3)
 ;; (define TYPE-TUPLE-COUNT-INDEX data:TYPE-TUPLE-COUNT-INDEX)
-;; (define data:TYPE-TUPLE-ELEMENTS-OFFSET 1)
+;; (define data:TYPE-TUPLE-ELEMENTS-OFFSET 4)
 ;; (define TYPE-TUPLE-ELEMENTS-OFFSET data:TYPE-TUPLE-ELEMENTS-OFFSET)
 ;; (define data:TYPE-TUPLE-TAG #b101)
 ;; (define TYPE-TUPLE-TAG data:TYPE-TUPLE-TAG)
@@ -1330,12 +1264,11 @@ but a static single assignment is implicitly maintained.
 ;;                                    (map (lambda ([tmp3 : D0-Expr])
 ;;                                           (cons "elements" tmp3)) tmp2))))
 ;; (define (type-tuple? [tmp4 : D0-Expr]) : D0-Expr
-;;   (sr-check-tag=? tmp4 TYPE-TAG-MASK TYPE-TUPLE-TAG))
+;;   (op$ = (op$ Array-ref tmp4 TYPE-TAG-INDEX) TYPE-TUPLE-TAG))
 ;; (define (type-tuple-count-access [tmp5 : D0-Expr]) : D0-Expr
-;;   (sr-tagged-array-ref tmp5 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+;;   (sr-array-ref tmp5 TYPE-TUPLE-COUNT-INDEX))
 ;; (define (type-tuple-elements-access [tmp6 : D0-Expr] [tmp7 : D0-Expr]) : D0-Expr
-;;   (sr-tagged-array-ref tmp6 TYPE-TUPLE-TAG
-;;                        (match tmp7
+;;   (sr-array-ref tmp6 (match tmp7
 ;;                         [(Quote (? fixnum? k))
 ;;                           (Quote (+ data:TYPE-TUPLE-ELEMENTS-OFFSET k))]
 ;;                         [otherwise
@@ -1375,10 +1308,6 @@ but a static single assignment is implicitly maintained.
        (format-id stx "~a-~a?" namespace-string name-string))
      (define/with-syntax namespace-mask-def
        (format-id stx "~a-TAG-MASK" namespace-string-caps))
-     (define/with-syntax index-def
-       (format-id stx "~a-INDEX-INDEX" qualified-upcase-name))
-     (define/with-syntax hash-def
-       (format-id stx "~a-HASH-INDEX" qualified-upcase-name))
      (define/with-syntax tag-def (format-id stx "~a-TAG" qualified-upcase-name))
      (define/with-syntax (sindex/offset-def* ...)
        (if many-field-dtm (append index-def* (list offset-def)) index-def*))
@@ -1387,11 +1316,9 @@ but a static single assignment is implicitly maintained.
            (append index-data-def* (list offset-data-def))
            index-data-def*))
      (define/with-syntax tag-data-def (gen-data-id #'tag-def))
-     (define/with-syntax index-data-def (gen-data-id #'index-def))
-     (define/with-syntax hash-data-def (gen-data-id #'hash-def))
      (define/with-syntax (sindex/offset-val* ...)
-       (let ([n (+ 2 (length field-string*))])
-         (datum->syntax stx (range 2 (if many-field-dtm (add1 n) n)))))
+       (let ([n (+ 3 (length field-string*))])
+         (datum->syntax stx (range 3 (if many-field-dtm (add1 n) n)))))
      (define/with-syntax (alloc-arg* ...) temp*)
      (define/with-syntax (alloc-val* ...) field-val*)
      (define/with-syntax func-alloc
@@ -1419,51 +1346,51 @@ but a static single assignment is implicitly maintained.
          (define/with-syntax func-name (gen-access-func-name field-string))
          (define/with-syntax access-arg (generate-temporary))
          #`(define (func-name [access-arg : D0-Expr]) : D0-Expr
-             (sr-tagged-array-ref access-arg tag-def #,index-def)))
+             (sr-array-ref access-arg #,index-def)))
        (define (gen-offset-func-access)
          (define/with-syntax func-name (gen-access-func-name many-field-dtm))
          (define/with-syntax access-arg (generate-temporary))
          (define/with-syntax ind-arg (generate-temporary))
          #`(define (func-name [access-arg : D0-Expr] [ind-arg : D0-Expr]) : D0-Expr
-             (sr-tagged-array-ref
-              access-arg tag-def
+             (sr-array-ref
+              access-arg
               (match ind-arg
                 [(Quote (? fixnum? k)) (Quote (+ #,offset-data-def k))]
                 [otherwise (Op '+ (list #,offset-def ind-arg))]))))
        (let ([l (map gen-index-func-access field-string* index-def*)])
          (if many-field-dtm (append l (list (gen-offset-func-access))) l)))
-     (define/with-syntax index-index 0)
-     (define/with-syntax hash-index 1)
      (append-to-constants.h
       'append
       (lambda (in)
         (define define-line/in (define-line in))
         (define-line/in #'tag-def #'tag)
-        (define-line/in #'hash-def #'hash-index)
         (map define-line/in
              (syntax-e #'(sindex/offset-def* ...))
              (syntax-e #'(sindex/offset-val* ...)))))
      #`(begin
          (define tag-data-def tag)
          (define tag-def (Quote tag-data-def))
-         (define index-data-def index-index)
-         (define index-def (Quote index-data-def))
-         (define hash-data-def hash-index)
-         (define hash-def (Quote hash-data-def))
          (define sindex/offset-data-def* sindex/offset-val*) ...
          (define sindex/offset-def* (Quote sindex/offset-data-def*)) ...
          func-alloc
          (define (func-huh-name [equal-arg : D0-Expr]) : D0-Expr
-           (sr-check-tag=? equal-arg namespace-mask-def tag-def))
+           (let ([e (op$ = (op$ Array-ref equal-arg TYPE-TAG-INDEX) tag-def)])
+             (if (check-asserts?)
+                 (If (op$ > equal-arg TYPE-MAX-ATOMIC-RT-VALUE)
+                     e
+                     (begin$ (op$ Print (Quote (format "runtime precondition failed for type ~a" equal-arg)))
+                             (op$ Exit EXIT-FAILURE)
+                             UNDEF-IMDT))
+                 e)))
          #,@(gen-func-access*))]))
 
-(define-types-memory-layout-helpers "type" "gref" #b001 ("type" single))
-(define-types-memory-layout-helpers "type" "gvect" #b010 ("type" single))
-(define-types-memory-layout-helpers "type" "mref" #b011 ("type" single))
-(define-types-memory-layout-helpers "type" "mvect" #b100 ("type" single))
-(define-types-memory-layout-helpers "type" "fn" #b000
+(define-types-memory-layout-helpers "type" "gref" 1 ("type" single))
+(define-types-memory-layout-helpers "type" "gvect" 2 ("type" single))
+(define-types-memory-layout-helpers "type" "mref" 3 ("type" single))
+(define-types-memory-layout-helpers "type" "mvect" 4 ("type" single))
+(define-types-memory-layout-helpers "type" "fn" 0
   ("arity" single) ("return" single) ("fmls" many))
-(define-types-memory-layout-helpers "type" "tuple" #b101
+(define-types-memory-layout-helpers "type" "tuple" 5
   ("count" single) ("elements" many))
 
 (: allocate-bound-type (CoC6-Bnd-Type -> D0-Expr))
@@ -1766,3 +1693,9 @@ but a static single assignment is implicitly maintained.
 
 (: sr-get-tag (D0-Expr D0-Expr -> D0-Expr))
 (define (sr-get-tag e mask) (op$ binary-and e mask))
+
+(: sr-get-mem-tag (D0-Expr -> D0-Expr))
+(define (sr-get-mem-tag e) (op$ Array-ref e TYPE-TAG-INDEX))
+
+(: atomic-type? (D0-Expr -> D0-Expr))
+(define (atomic-type? t) (op$ < t TYPE-MAX-ATOMIC-RT-VALUE))

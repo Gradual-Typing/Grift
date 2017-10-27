@@ -78,6 +78,8 @@
      (values (Begin e* e) (set-union fv1 fv2))]
     ;; Type Representation
     [(Type t) (values (Type t) mt-set)]
+    [(Atomic-Type-Huh (app uf-expr t fv))
+     (values (Atomic-Type-Huh t) fv)]
     [(Type-GRef-Of (app uf-expr e f*))
      (values (Type-GRef-Of e) f*)]
     [(Type-GVect-Of (app uf-expr e f*))
