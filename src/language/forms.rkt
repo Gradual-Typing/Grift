@@ -224,22 +224,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Guarded-Proxy-Target guarded)
   (Guarded-Proxy-Blames guarded)
   (Guarded-Proxy-Coercion guarded)
-  (Guarded-Proxy-Huh expression)
-  #|
-  (GRep-proxied? expression)
-  (UGbox expression)
-  (UGbox-set! expression1 expression2)
-  (UGbox-ref expression)
-  (UGvect expression1 expression2)
-  (UGvect-set! expression1 expression2 expression3)
-  (UGvect-ref expression1 expression2)
-  (Gproxy for-exp from-exp to-exp blames-exp)
-  (Gproxy-for expression)
-  (Gproxy-from expression)
-  (Gproxy-to expression)
-  (Gproxy-blames expression)
-  |#
-  )
+  (Guarded-Proxy-Huh expression))
 
 (define-type (Switch-Case  e) (Pair (Listof Integer) e))
 (define-type (Switch-Case* e) (Listof (Switch-Case e)))
@@ -320,14 +305,6 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-syntax-rule (define-type+ id ([id* c*] ...) t)
   (begin (define-type id t)
 	 (define-type id* (c* id)) ...))
-
-#|
-(define ANY-TYPE (Any-Type))
-(define STRING-PTR (String-Ptr))
-(define ANY-VALUE (Any-Value))
-(define BOTTOM-TYPE (Bottom-Type))
-(define VOID-TYPE (Void-Type))
-|#
 
 ;; Are two types consistent at the top of the types?
 (: shallow-consistent? (Any Any -> Boolean))
@@ -473,33 +450,10 @@ class literal constants
       (grift-tuple? x)))
 
 (define-predicate grift-type*? Grift-Type*)
-#;(: grift-type*? (Any -> Boolean : Grift-Type*))
-#;
-(define (grift-type*? x)
-  (or (null? x)
-      (and (pair? x)
-           (grift-type? (car x))
-           (grift-type*? (cdr x)))))
 
 (define-predicate grift-fn? Grift-Fn-Type)
 (define-predicate grift-tuple? Grift-Tuple-Type)
-#;(: grift-fn? (Any -> Boolean : Grift-Fn-Type))
-#;(define (grift-fn? x)
-    (and (Fn? x)
-         (index? (Fn-arity x))
-         (grift-type*? (Fn-fmls x))
-         (grift-type? (Fn-ret x))))
-
-
 (define-predicate grift-ref? Grift-Ref-Type)
-#;(: grift-ref? (Any -> Boolean : Grift-Ref-Type))
-
-#;
-(define (grift-ref? x)
-  (or (and (GRef? x)  (grift-type? (GRef-arg x)))
-      (and (GVect? x) (grift-type? (GVect-arg x)))
-      (and (MRef? x)  (grift-type? (MRef-arg x)))
-      (and (MVect? x) (grift-type? (MVect-arg x)))))
 
 (define-type+ Grift-Fml ([Grift-Fml* Listof])
   (Fml Uid Grift-Type))
@@ -561,36 +515,8 @@ class literal constants
       (consistent-mrefs? t g)
       (consistent-mvects? t g)))
 
-#|
-Join :: type X type -> type
-This is the join of the least precise latice
-⊑ latice example:
-Int --> Int
-/   \
-/     \
-/       \        Joins ↑
-Dyn --> Int Int --> Dyn
-\       /        Meets ↓
-\     /
-\   /
-Dyn --> Dyn
-|
-Dyn
-|#
-
 (struct Bottom ([t1 : Grift-Type] [t2 : Grift-Type]) #:transparent)
 (define-type Grift-Type?! (U Bottom Grift-Type))
-
-#;(: join+ (Grift-Type* -> Grift-Type?!))
-#;(define (join+ t+)
-  (match t+
-    [(list) (error 'join+ "needs non-empty list")]
-    [(list t) t]
-    [(cons t t+)
-     (let ([t?! (join+ t+)])
-       (if (Bottom? t?!)
-           t?!
-           (join t t?!)))]))
 
 (: up ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type)))
 (define ((up exit) t g)
@@ -607,32 +533,6 @@ Dyn
     [(_ (and g (Dyn))) g]
     [(t t) t]
     [(t g) (exit (Bottom t g))]))
-  
-#;(: join (Grift-Type Grift-Type -> Grift-Type?!))
-#;(define (join t g)
-  ;; Typed racket made me do it...
-  (call/ec
-   (lambda ([exit : (Bottom -> Grift-Type)])
-     (: j (Grift-Type Grift-Type -> Grift-Type))
-     (define (j t g)
-       (match* (t g)
-         [((Dyn) g) g]
-         [(t (Dyn)) t]
-         [((Unit) (Unit)) UNIT-TYPE]
-         [((Int)  (Int))  INT-TYPE]
-         [((Bool) (Bool)) BOOL-TYPE]
-         [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
-          (Fn ta (map j ta* ga*) (j tr gr))]
-         [((STuple ta t*) (STuple ga g*)) #:when (= ta ga)
-          (STuple ta (map j t* g*))]
-         [((GRef t) (GRef g))
-          (GRef (j t g))]
-         [((GVect t) (GVect g))
-          (GVect (j t g))]
-         [((MRef t) (MRef g))
-          (j t g)]
-         [(t g) (exit (Bottom t g))]))
-     (j t g))))
 
 (: move :
    (Grift-Type Grift-Type -> Grift-Type)
@@ -682,7 +582,6 @@ Dyn
 (: meet+ : Grift-Type* -> Grift-Type?!)
 (define meet+ (move+ down))
 
-
 (define-forms
   (Coercion coercion)
   (Twosome type1 type2 lbl)
@@ -690,10 +589,6 @@ Dyn
   (Quote-Coercion const)
   (Compose-Coercions fst snd)
   (Make-Coercion t1 t2)
-  ;; I am swithing to using the Cast and Interpreted Cast for the following
-  ;; Forms
-  ;(Coerce coercion expression) 
-  ;(Interpreted-Coerce coercion expression)
   ;; Identity Cast
   ;; "Calculated No Op Cast"
   (Identity)
@@ -715,8 +610,6 @@ Dyn
   (Failed label)
   ;; Function Coercion
   ;; "Proxy a function call with args coercions and return coercion"
-  ;; I am switching over to using the Fn form for this
-  #;(Proxy-Fn arity args return)
   (Fn-Coercion-Arity c)
   (Fn-Coercion args return)
   (Fn-Coercion-Arg coercion index)
@@ -869,8 +762,6 @@ Dyn
      (CTuple Index (Listof Immediate-Coercion))
      (Ref Immediate-Coercion Immediate-Coercion)))
 
-;; TODO (andre) a more descriptive name for this would be
-;; Immediate-Type
 (define-type Immediate-Type (U Atomic-Type (Static-Id Uid)))
 
 ;; A type representing coercions that have already been
@@ -900,179 +791,6 @@ Dyn
 
 (define-type Coercion/Immediate-Type* (Listof Coercion/Immediate-Type))
 
-#;(define-type (Map-Expr E1 E2)
-  (case->
-   [(Type Grift-Type) -> (Type Grift-Type)]
-   [(Quote Grift-Literal) -> (Quote Grift-Literal)]
-   [(Quote Cast-Literal) -> (Quote Cast-Literal)]
-   [(Quote-Coercion Grift-Coercion) -> (Quote-Coercion Grift-Coercion)]
-   [(Quote-Coercion Immediate-Coercion) -> (Quote-Coercion Immediate-Coercion)]
-   [(Code-Label Uid) -> (Code-Label Uid)]
-   [(Var Uid) -> (Var Uid)]
-   [(Static-Id Uid) -> (Static-Id Uid)]
-   [No-Op -> No-Op]
-   [Halt -> Halt]
-   [Success -> Success] 
-   [(Lambda (Listof Uid) E1) -> (Lambda (Listof Uid) E2)]
-   [(Lambda (Listof (Fml Uid Grift-Type)) E1) ->
-    (Lambda (Listof (Fml Uid Grift-Type)) E2)]
-   [(App E1 (Listof E1)) -> (App E2 (Listof E2))]
-   [(App-Code E1 (Listof E1)) -> (App-Code E2 (Listof E2))]
-   [(App-Fn E1 (Listof E1)) -> (App-Fn E2 (Listof E2))]
-   [(App-Fn-or-Proxy Uid E1 (Listof E1)) -> (App-Fn-or-Proxy Uid E2 (Listof E2))]
-   [(App-Closure E1 E1 (Listof E1)) -> (App-Closure E2 E2 (Listof E2))]
-   [(If E1 E1 E1) -> (If E2 E2 E2)]
-   [(Observe E1 Grift-Type) -> (Observe E2 Grift-Type)]
-   [(Blame E1) -> (Blame E2)]
-   [(Repeat Uid E1 E1 E1) -> (Repeat Uid E2 E2 E2)]
-   [(Op Grift-Prim (Listof E1)) -> (Op Grift-Prim (Listof E2))]
-   [(Letrec (Listof (Pair Uid E1)) E1) -> (Letrec (Listof (Pair Uid E2)) E2)]
-   [(Letrec (Listof (Bnd Uid Grift-Type E1)) E1) -> (Letrec (Listof (Bnd Uid Grift-Type E2)) E2)]
-   [(Let (Listof (Pair Uid E1)) E1) -> (Let (Listof (Pair Uid E2)) E2)]
-   [(Let (Listof (Bnd Uid Grift-Type E1)) E1) -> (Let (Listof (Bnd Uid Grift-Type E2)) E2)]
-   [(Labels (Listof (Pair Uid (Code Uid* E1))) E1) ->
-    (Labels (Listof (Pair Uid (Code Uid* E2))) E2)]
-   [(Begin (Listof E1) E1) -> (Begin (Listof E2) E2)]
-   [(Gbox E1) -> (Gbox E2)]
-   [(Gunbox E1) -> (Gunbox E2)]
-   [(Gbox-set! E1 E1) -> (Gbox-set! E2 E2)]
-   [(Gvector E1 E1) -> (Gvector E2 E2)]
-   [(Gvector-set! E1 E1 E1) -> (Gvector-set! E2 E2 E2)]
-   [(Gvector-ref E1 E1) -> (Gvector-ref E2 E2)]
-   [(Cast E1 (Twosome Grift-Type Grift-Type Blame-Label)) ->
-    (Cast E2 (Twosome Grift-Type Grift-Type Blame-Label))]
-   [(Cast E1 (Coercion Grift-Coercion)) ->
-    (Cast E2 (Coercion Grift-Coercion))]
-   [(Interpreted-Cast E1 (Twosome E1 E1 E1)) -> (Interpreted-Cast E2 (Twosome E2 E2 E2))]
-   [(Interpreted-Cast E1 (Coercion E1)) -> (Interpreted-Cast E2 (Coercion E2))]
-   [(Fn-Caster E1) -> (Fn-Caster E2)]
-   [(Type-Dyn-Huh E1) -> (Type-Dyn-Huh E2)]
-   [(Type-Tag E1) -> (Type-Tag E2)] 
-   [(Type-Fn-arity E1) -> (Type-Fn-arity E2)]
-   [(Type-Fn-arg E1 E1) -> (Type-Fn-arg E2 E2)]
-   [(Type-Fn-return E1) -> (Type-Fn-return E2)]
-   [(Type-Fn-Huh E1) -> (Type-Fn-Huh E2)]
-   [(Type-GVect-Huh E1) -> (Type-GVect-Huh E2)]
-   [(Type-GRef-Huh E1) -> (Type-GRef-Huh E2)]
-   [(Type-GRef-Of E1) -> (Type-GRef-Of E2)]
-   [(Type-GVect-Of E1) -> (Type-GRef-Of E2)]
-   #;[(Let-Static* (Listof (Pair Uid Compact-Type))
-        (Listof (Pair Uid Compact-Coercion)) E1)
-      -> (Let-Static* (Listof (Pair Uid Compact-Type))
-           (Listof (Pair Uid Compact-Coercion)) E2)]
-   [(Dyn-tag E1) -> (Dyn-tag E2)]
-   [(Dyn-immediate E1) -> (Dyn-immediate E2)]
-   [(Dyn-type E1) -> (Dyn-type E2)]
-   [(Dyn-value E1) -> (Dyn-value E2)]
-   [(Fn-Proxy (List Index Uid) E1 E1) ->
-    (Fn-Proxy (List Index Uid) E2 E2)]
-   [(Fn-Proxy-Huh E1) ->
-    (Fn-Proxy-Huh E2)]
-   [(Fn-Proxy-Closure E1) ->
-    (Fn-Proxy-Closure E2)]
-   [(Fn-Proxy-Coercion E1) ->
-    (Fn-Proxy-Coercion E2)]
-   [(Compose-Coercions E1 E1) -> (Compose-Coercions E2 E2)]
-   [(Fn-Coercion-Arity E1) -> (Fn-Coercion-Arity E2)]
-   [(Fn-Coercion (Listof E1) E1) -> (Fn-Coercion (Listof E2) E2)]
-   [(Fn-Coercion-Arg E1 E1) -> (Fn-Coercion-Arg E2 E2)]
-   [(Fn-Coercion-Return E1) -> (Fn-Coercion-Return E2)]
-   [(Ref-Coercion E1 E1) -> (Ref-Coercion E2 E2)]
-   [(Ref-Coercion-Read E1) -> (Ref-Coercion-Read E2)]
-   [(Ref-Coercion-Write E1) -> (Ref-Coercion-Write E2)]
-   [(Hybrid-Proxy Uid E1 E1) -> (Hybrid-Proxy Uid E1 E2)]
-   [(Hybrid-Proxy-Huh E1) ->(Hybrid-Proxy-Huh E2)] 
-   [(Hybrid-Proxy-Closure E1) -> (Hybrid-Proxy-Closure E2)] 
-   [(Hybrid-Proxy-Coercion E1) -> (Hybrid-Proxy-Coercion E2)]
-   [(Sequence-Coercion E1 E1) -> (Sequence-Coercion E2 E2)]
-   [(Sequence-Coercion-Huh E1) -> (Sequence-Coercion-Huh E2)]
-   [(Sequence-Coercion-Fst E1) -> (Sequence-Coercion-Fst E2)]
-   [(Sequence-Coercion-Snd E1) -> (Sequence-Coercion-Snd E2)]
-   [(Project-Coercion E1 E1) -> (Project-Coercion E2 E2)]
-   [(Project-Coercion-Huh E1) ->   (Project-Coercion-Huh E2)]
-   [(Project-Coercion-Type E1) -> (Project-Coercion-Type E2)]
-   [(Project-Coercion-Label E1) -> (Project-Coercion-Label E2)]
-   [(Inject-Coercion E1) -> (Inject-Coercion E2)]
-   [(Inject-Coercion-Huh E1) -> (Inject-Coercion-Huh E2)]
-   [(Inject-Coercion-Type E1) -> (Inject-Coercion-Type E2)]
-   [(Failed-Coercion E1) ->   (Failed-Coercion E2)]
-   [(Failed-Coercion-Huh E1) -> (Failed-Coercion-Huh E2)]
-   [(Failed-Coercion-Label E1) -> (Failed-Coercion-Label E2)]
-   [(Ref-Coercion-Huh E1) -> (Ref-Coercion-Huh E2)]
-   [(Fn-Coercion-Huh E1) -> (Fn-Coercion-Huh E2)]
-   [(Make-Coercion E1 E1 E1) -> (Make-Coercion E2 E2 E2)]
-   [(Make-Fn-Coercion Uid E1 E1 E1) -> (Make-Fn-Coercion Uid E2 E2 E2)]
-   [(Id-Coercion-Huh E1) -> (Id-Coercion-Huh E2)]
-   [Id-Coercion -> Id-Coercion]   
-   [(Tag Tag-Symbol) -> (Tag Tag-Symbol)]))
-
-;; TODO submit a patch to racket so that this isn't necisarry
-;; adhoc polymorphism encoded by case lambda across all
-
-
-;(: map-expr (All (A B) (A -> B) -> (Map-Expr A B)))
-#;(define ((map-expr f) e)
-  (match e
-    [(and c (or (Type _) (Quote _) (Quote-Coercion _)
-                (Code-Label _) (Var _) (Static-Id _)
-                (Tag _)))
-     c]
-    [(and c (or (No-Op) (Halt) (Success))) c]
-    ;; Don't use compound forms anymore
-    [(Lambda i* e) (Lambda i* (f e))]
-    [(App e e*) (App (f e) (map f e*))]
-    [(App-Code e e*) (App-Code (f e) (map f e*))]
-    [(App-Fn e e*) (App-Fn (f e) (map f e*))]
-    [(App-Fn-or-Proxy u e e*) (App-Fn-or-Proxy u (f e) (map f e*))]
-    [(Fn-Proxy i e1 e2)
-     (Fn-Proxy i (f e1) (f e2))]
-    [(Fn-Proxy-Huh e) 
-     (Fn-Proxy-Huh (f e))]
-    [(Fn-Proxy-Closure e)
-     (Fn-Proxy-Closure (f e))]
-    [(Fn-Proxy-Coercion e)
-     (Fn-Proxy-Coercion (f e))]
-    [(If e1 e2 e3) (If (f e1) (f e2) (f e3))]
-    [(Op p e*) (Op p (map f e*))]
-    [(Letrec b* e) (Letrec (map (map-bnd f) b*) (f e))]
-    [(Let b* e) (Let (map (map-bnd f) b*) (f e))]
-    [(Labels b* e) (Labels (map (map-bnd-code f) b*) (f e))]
-    [(Begin e* e) (Begin (map f e*) (f e))]
-    [(Gbox e) (Gbox (f e))]
-    [(Gunbox e) (Gunbox (f e))]
-    [(Gbox-set! e1 e2) (Gbox-set! (f e1) (f e2))]
-    [(Gvector e1 e2) (Gvector (f e1) (f e1))]
-    [(Gvector-set! e1 e2 e3) (Gvector-set! (f e1) (f e2) (f e3))]
-    [(Gvector-ref e1 e2) (Gvector-ref (f e1) (f e2))]
-    [(Cast e i) (Cast (f e) i)]
-    [(Interpreted-Cast e1 (Twosome e2 e3 e4))
-     (Interpreted-Cast (f e1) (Twosome (f e2) (f e3) (f e4)))]
-    [(Interpreted-Cast e1 (Coercion e2))
-     (Interpreted-Cast (f e1) (Coercion (f e2)))]
-    [(Compose-Coercions e1 e2) (Compose-Coercions (f e1) (f e2))]
-    [(Compose-Fn-Coercion u c1 c2)
-     (Compose-Fn-Coercion u (f c1) (f c2))]
-    [(Id-Coercion-Huh e) (Id-Coercion-Huh (f e))]
-    [(and id (Id-Coercion)) id]
-    [(Fn-Caster e) (Fn-Caster (f e))]
-    [(Type-Dyn-Huh e) (Type-Dyn-Huh (f e))]
-    [(Type-Tag e) (Type-Tag (f e))] 
-    [(Type-Fn-arity e) (Type-Fn-arity (f e))]
-    [(Type-Fn-arg e1 e2) (Type-Fn-arg (f e1) (f e2))]
-    [(Type-Fn-return e) (Type-Fn-return (f e))]
-    [(Type-Fn-Huh e) (Type-Fn-Huh (f e))]
-    [(Type-GVect-Huh e) (Type-GVect-Huh (f e))]
-    [(Type-GRef-Huh e) (Type-GRef-Huh (f e))]
-    [(Type-GRef-Of e) (Type-GRef-Of (f e))]
-    [(Type-GVect-Of e) (Type-GRef-Of (f e))]
-    [(App-Closure e1 e2 e*) (App-Closure (f e1) (f e2) (map f e*))]
-    [(Let-Static* bt bc e) (Let-Static* bt bc (f e))]
-    [(Dyn-tag e) (Dyn-tag (f e))]
-    [(Dyn-immediate e) (Dyn-immediate (f e))]
-    [(Dyn-type e) (Dyn-type (f e))]
-    [(Dyn-value e) (Dyn-value (f e))]
-    [other (error 'forms/map-expr "match failed: ~a" other)]))
-
 (define-type (Map-Bnd E1 E2)
   (case->
    [(Bnd Uid Grift-Type E1) -> (Bnd Uid Grift-Type E2)]
@@ -1083,5 +801,3 @@ Dyn
   (match b
     [(Bnd i t e) (Bnd i t (f e))]
     [(cons i e) (cons i (f e))]))
-
-
