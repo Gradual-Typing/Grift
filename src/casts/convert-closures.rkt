@@ -317,8 +317,6 @@
          (Fn-Coercion-Huh e)]
         [(Make-Fn-Coercion u (app recur e1) (app recur e2) (app recur e3))
          (Make-Fn-Coercion u e1 e2 e3)]
-        [(Compose-Fn-Coercion u (app recur e1) (app recur e2))
-         (Compose-Fn-Coercion u e1 e2)]
         [(Fn-Coercion (app recur* e*) (app recur e))
          (Fn-Coercion e* e)]
         [(Fn-Coercion-Arity (app recur e))

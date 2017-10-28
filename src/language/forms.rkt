@@ -778,7 +778,6 @@ Dyn
   (Fn-Coercion-Huh crcn)
   ;; (Make-Coercion t1 t2 lbl)
   (Make-Fn-Coercion make-uid t1 t2 lbl)
-  (Compose-Fn-Coercion comp-uid c1 c2)
   (HC project? t1 label inject? t2 med)
   (Quote-HCoercion coercion)
   (HC-Project-Huh hc)
@@ -977,8 +976,6 @@ Dyn
    [(Fn-Proxy-Coercion E1) ->
     (Fn-Proxy-Coercion E2)]
    [(Compose-Coercions E1 E1) -> (Compose-Coercions E2 E2)]
-   [(Compose-Fn-Coercion Uid E1 E1) ->
-    (Compose-Fn-Coercion Uid E2 E2)]
    [(Fn-Coercion-Arity E1) -> (Fn-Coercion-Arity E2)]
    [(Fn-Coercion (Listof E1) E1) -> (Fn-Coercion (Listof E2) E2)]
    [(Fn-Coercion-Arg E1 E1) -> (Fn-Coercion-Arg E2 E2)]
@@ -1008,7 +1005,6 @@ Dyn
    [(Fn-Coercion-Huh E1) -> (Fn-Coercion-Huh E2)]
    [(Make-Coercion E1 E1 E1) -> (Make-Coercion E2 E2 E2)]
    [(Make-Fn-Coercion Uid E1 E1 E1) -> (Make-Fn-Coercion Uid E2 E2 E2)]
-   [(Compose-Fn-Coercion Uid E1 E1) -> (Compose-Fn-Coercion Uid E2 E2)]
    [(Id-Coercion-Huh E1) -> (Id-Coercion-Huh E2)]
    [Id-Coercion -> Id-Coercion]   
    [(Tag Tag-Symbol) -> (Tag Tag-Symbol)]))

@@ -211,8 +211,6 @@
        (Fn-Coercion-Arity e)]
       [(Make-Fn-Coercion u i t1 t2)
        (Make-Fn-Coercion u (ll-expr i) (ll-expr t1) (ll-expr t2))]
-      [(Compose-Fn-Coercion u c1 c2)
-       (Compose-Fn-Coercion u (ll-expr c1) (ll-expr c2))]
       [(Fn-Coercion-Huh e)
        (Fn-Coercion-Huh (ll-expr e))]
       [(Fn-Coercion-Arg e1 e2)

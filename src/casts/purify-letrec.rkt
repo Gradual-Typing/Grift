@@ -107,7 +107,6 @@
     [(Id-Coercion-Huh e) (recur e)]
     [(Fn-Coercion-Huh e) (recur e)]
     [(Make-Fn-Coercion u e1 e2 e3) (recur-all e1 e2 e3)]
-    [(Compose-Fn-Coercion u e1 e2) (recur-all e1 e2)]
     [(Fn-Coercion e* e) (and (recur e) (recur* e*))]
     [(Fn-Coercion-Arity e) (recur e)]
     [(Fn-Coercion-Arg e1 e2) (recur-all e1 e2)]
@@ -322,8 +321,6 @@
      (Fn-Coercion-Huh e)]
     [(Make-Fn-Coercion u (app recur e1)(app recur e2)e3)
      (Make-Fn-Coercion u e1 e2 e3)]
-    [(Compose-Fn-Coercion u (app recur e1) (app recur e2))
-     (Compose-Fn-Coercion u e1 e2)]
     [(Fn-Coercion (app recur* e*)(app recur e))
      (Fn-Coercion e* e)]
     [(Fn-Coercion-Arity (app recur e))
@@ -662,8 +659,6 @@
      (Fn-Coercion-Huh e)]
     [(Make-Fn-Coercion u (app pl-expr e1)(app pl-expr e2)(app pl-expr e3))
      (Make-Fn-Coercion u e1 e2 e3)]
-    [(Compose-Fn-Coercion u (app pl-expr e1) (app pl-expr e2))
-     (Compose-Fn-Coercion u e1 e2)]
     [(Fn-Coercion (app pl-expr* e*)(app pl-expr e))
      (Fn-Coercion e* e)]
     [(Fn-Coercion-Arity (app pl-expr e))
