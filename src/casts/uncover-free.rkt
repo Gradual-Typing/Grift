@@ -134,9 +134,6 @@
       u (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
      (values (Make-Fn-Coercion u e1 e2 e3)
              (set-union fv1 fv2 fv3))]
-    [(Compose-Fn-Coercion u (app uf-expr e1 fv1) (app uf-expr e2 fv2))
-     (values (Compose-Fn-Coercion u e1 e2)
-             (set-union fv1 fv2))]
     [(Fn-Coercion-Arity (app uf-expr e fv))
      (values (Fn-Coercion-Arity e) fv)]
     [(Fn-Coercion (app uf-expr* e* fv1) (app uf-expr e fv2))

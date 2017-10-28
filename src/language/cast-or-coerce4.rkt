@@ -46,7 +46,6 @@
           (Id-Coercion-Huh E)
           (Fn-Coercion-Huh E)
           (Make-Fn-Coercion Uid E E E)
-          (Compose-Fn-Coercion Uid E E)
           (Fn-Coercion (Listof E) E)
           (Fn-Coercion-Arity E)
           (Fn-Coercion-Arg E E)

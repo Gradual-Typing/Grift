@@ -43,7 +43,6 @@ but a static single assignment is implicitly maintained.
         (set-box! boxed-bnd-code* '())
         (set-box! mk-fn-coercion-code-label? #f)
         (set-box! mk-tuple-coercion-code-label? #f)
-        (set-box! comp-fn-coercion-code-label? #f)
         (set-box! comp-tuple-coercion-code-label? #f)
         (set-box! coerce-tuple-code-label? #f)
         (set-box! coerce-tuple-in-place-code-label? #f)
@@ -78,9 +77,6 @@ but a static single assignment is implicitly maintained.
 
 (: mk-fn-coercion-code-label? (Boxof (Option (Code-Label Uid))))
 (define mk-fn-coercion-code-label? (box #f))
-
-(: comp-fn-coercion-code-label? (Boxof (Option (Code-Label Uid))))
-(define comp-fn-coercion-code-label? (box #f))
 
 (: coerce-tuple-code-label? (Boxof (Option (Code-Label Uid))))
 (define coerce-tuple-code-label? (box #f))
@@ -227,58 +223,6 @@ but a static single assignment is implicitly maintained.
     mk-fn-crcn-label)
   (let ([cl? (unbox mk-fn-coercion-code-label?)])
     (or cl? (make-code! mk-crcn))))
-
-(: get-comp-fn-crcn! (Uid -> (Code-Label Uid)))
-(define (get-comp-fn-crcn! comp-crcn)
-  (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! comp-crcn)
-    (define-track-next-uid!$ comp-fn-crcn)
-    (define comp-fn-crcn-label (Code-Label comp-fn-crcn))
-    (define comp-crcn-label (Code-Label comp-crcn))
-    (define comp-fn-crcn-c : D0-Code
-      (code$ (crcn1 crcn2)
-        (assign$ tagged-arity
-          (sr-tagged-array-ref
-           crcn1 COERCION-MEDIATING-TAG COERCION-FN-ARITY-INDEX))
-        (assign$ arity (op$ %>> tagged-arity COERCION-SECOND-TAG-SHIFT))
-        (assign$ c1r
-          (sr-tagged-array-ref
-           crcn1 COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX))
-        (assign$ c2r
-          (sr-tagged-array-ref
-           crcn2 COERCION-MEDIATING-TAG COERCION-FN-RETURN-INDEX))
-        (assign$ cr (app-code$ comp-crcn-label c1r c2r))
-        (assign$ new-crcn UNIT-IMDT)
-        (assign$ iters (op$ + COERCION-FN-FMLS-OFFSET arity))
-        (assign$ id? (sr-check-tag=? cr COERCION-TAG-MASK COERCION-IDENTITY-TAG))
-        (repeat$ (i COERCION-FN-FMLS-OFFSET iters) (_ UNIT-IMDT)
-          (assign$ c1a (sr-tagged-array-ref crcn1 COERCION-MEDIATING-TAG i))
-          (assign$ c2a (sr-tagged-array-ref crcn2 COERCION-MEDIATING-TAG i))
-          (assign$ composed-crcn (app-code$ comp-crcn-label c1a c2a))
-          (cond$
-           [id?
-            (assign$ tmp-id?
-              (sr-check-tag=?
-               composed-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG))
-            (cond$
-             [(op$ not tmp-id?)
-              (Assign (Var-id new-crcn) (op$ Alloc (op$ + arity COERCION-FN-FMLS-OFFSET)))
-              (sr-array-set! new-crcn COERCION-FN-ARITY-INDEX tagged-arity)
-              (sr-array-set! new-crcn COERCION-FN-RETURN-INDEX cr)
-              (repeat$ (j COERCION-FN-FMLS-OFFSET i) (_ UNIT-IMDT)
-                (sr-array-set! new-crcn j COERCION-IDENTITY-IMDT))
-              (sr-array-set! new-crcn i composed-crcn)
-              (Assign (Var-id id?) FALSE-IMDT)]
-             [else UNIT-IMDT])]
-           [else (sr-array-set! new-crcn i composed-crcn)]))
-        (cond$
-         [id? COERCION-IDENTITY-IMDT]
-         [else (sr-tag-value new-crcn COERCION-MEDIATING-TAG)])))
-    (add-new-code! (cons comp-fn-crcn comp-fn-crcn-c))
-    (set-box! comp-fn-coercion-code-label? comp-fn-crcn-label)
-    comp-fn-crcn-label)
-  (let ([cl? (unbox comp-fn-coercion-code-label?)])
-    (or cl? (make-code! comp-crcn))))
 
 (: get-coerce-tuple! (Uid -> (Code-Label Uid)))
 (define (get-coerce-tuple! coerce)
@@ -842,8 +786,6 @@ but a static single assignment is implicitly maintained.
                              e*))))]
         [(Make-Fn-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-fn-crcn! mk-crcn) t1 t2 l)]
-        [(Compose-Fn-Coercion comp-crcn (app recur c1) (app recur c2))
-         (app-code$ (get-comp-fn-crcn! comp-crcn) c1 c2)]
         [(Id-Fn-Coercion (app recur a))
          (begin$
            (assign$ size a)
