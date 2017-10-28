@@ -361,10 +361,7 @@
        (Type-GRef-Huh e)]
       [(Type-GVect-Huh (app recur e))
        (Type-GVect-Huh e)]
-      [(Type-Tag (app recur e))
-       (Type-Tag e)]
-      [(Tag s)
-       (Tag s)]
+      [(Atomic-Type-Huh (app recur t)) (Atomic-Type-Huh t)]
       [(Letrec (app recur-bnd* b*) (app recur e))
        (Letrec b* e)]
       [(Let (app recur-bnd* b*) (app recur e))

@@ -17,11 +17,9 @@ TODO write unit tests
  "../language/syntax.rkt"
  "../language/cast-or-coerce3.rkt"
  "../language/cast0.rkt"
-;; "../helpers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
  "../unique-identifiers.rkt"
- "../language/cast-or-coerce3.rkt"
  (submod "../logging.rkt" typed))
 
 
@@ -163,7 +161,8 @@ TODO write unit tests
       (cond$
        [(op=? t1 t2) t1]
        [(type-dyn?$ t1) t2]
-       [(type-dyn?$  t2) t1]
+       [(type-dyn?$ t2) t1]
+       [(atomic-types?$ t1 t2) (Error (Quote "inconsistent types"))]
        [(and$ (type-fn?$ t1) (type-fn?$ t2)
               (op=? (type-fn-arity$ t1) (type-fn-arity$ t2)))
         (Make-GLB-Two-Fn-Types types-greatest-lower-bound t1 t2)]
@@ -652,13 +651,13 @@ TODO write unit tests
                [val val] 
                [t2 (Mbox-rtti-ref mref)]
                [cv (cond$
-                    [(and$ (type-tup?$ t1) (type-tup?$ t2))
+                    [(atomic-types-or-not-tuples?$ t1 t2) val]
+                    [else ;; they must be tuples
                      (let*$ ([n (Type-Tuple-num t2)]
                              [ctv (Copy-Tuple n val)])
                        (begin$
                          (Mbox-val-set! mref ctv)
-                         ctv))]
-                    [else val])]
+                         ctv))])]
                [ccv (cast cv t1 t2 (Quote "Monotonic ref write error") mref)])
          ;; Unclear: I don't understand why there is a conditional
          ;; write here. Perhaps it is due to the side channel mref in
@@ -688,12 +687,12 @@ TODO write unit tests
        (let*$ ([mvec mvec] [i i] [val val] 
                [t2 (Mvector-rtti-ref mvec)]
                [cvi (cond$
-                     [(and$ (type-tup?$ t1) (type-tup?$ t2))
+                     [(atomic-types-or-not-tuples?$ t1 t2) val]
+                     [else ;; they must be tuples
                       (let*$ ([n (Type-Tuple-num t2)]
                               [cvi (Copy-Tuple n val)])
                         (Mvector-val-set! mvec i cvi)
-                        cvi)]
-                     [else val])]
+                        cvi)])]
                [ccvi (cast cvi t1 t2 (Quote "Monotonic vect write error") mvec)])
          (If (op=? t2 (Mvector-rtti-ref mvec))
              (Mvector-val-set! mvec i ccvi)
@@ -1161,7 +1160,7 @@ TODO write unit tests
             (compile-mvec-cast v #:t1 (Type t1) (Type t2))]
            [((STuple n _) (STuple m _)) #:when (<= m n)
             (compile-tuple-cast v t1 t2 l mt)]
-           [(_ _) #;base-types (Blame l)])]           
+           [(_ _) #;base-types (Blame l)])]
         [((Type t1-t) t2) 
          (match t1-t
            [(Fn a _ _)
@@ -1237,8 +1236,14 @@ TODO write unit tests
        (error 'interp-cast/code-gen-med-cast "t2 = Dyn, precondition false")]
       [(t t) v]
       [((Type _) (Type _)) (aux v t1 t2 l mt)]
-      [(_ _) #:when know-not-eq? (aux v t1 t2 l mt)]
-      [(_ _) (If (op=? t1 t2) v (aux v t1 t2 l mt))])))
+      [(_ _) #:when know-not-eq?
+       (cond$
+        [(atomic-types?$ t1 t2) (Blame l)]
+        [else (aux v t1 t2 l mt)])]
+      [(_ _) (cond$
+              [(op=? t1 t2) v]
+              [(atomic-types?$ t1 t2) (Blame l)]
+              [else (aux v t1 t2 l mt)])])))
 
 
 (define interp-cast-project/inject-inline? (make-parameter #f))
@@ -1265,6 +1270,7 @@ TODO write unit tests
       [(Type-Dyn-Huh t2)
        (parameterize ([inject-inline-without-types? (interp-cast-project/inject-inline?)])
          (compile-inject v t1))]
+      [(atomic-types?$ t1 t2) (Blame l)]
       [else
        (parameterize ([med-cast-inline-without-types? (interp-cast-med-cast-inline?)])
          (compile-med-cast v t1 t2 l mt #:know-not-eq? #t))]))))
@@ -1688,11 +1694,11 @@ TODO write unit tests
   (define (copy-mbox-value-if-tuple mref)
     (let*$ ([mref mref] [t (Mbox-rtti-ref mref)] [v (Mbox-val-ref mref)])
       (cond$
-       [(type-tup?$ t)
+       [(atomic-type-or-not-tuple?$ t) v]
+       [else ;; it is a tuple
         (let$ ([cv (Copy-Tuple (Type-Tuple-num t) v)])
           (Mbox-val-set! mref cv)
-          cv)] 
-       [else v])))
+          cv)])))
 
   (: code-gen-full-mbox-cast : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
   (define (code-gen-full-mbox-cast e t2 l)
@@ -1817,7 +1823,15 @@ TODO write unit tests
             (Mvector-rtti-set! v t3)
             (let$ ([len (Mvector-length v)])
               (cond$
-               [(Type-Tuple-Huh t3)
+               [(atomic-type-or-not-tuple?$ t3)
+                (repeat$ (i (Quote 0) len) ()
+                  (let*$ ([vi (Mvector-val-ref v i)]
+                          [cvi (interp-cast vi t1 t3 l v)]
+                          [t4 (Mvector-rtti-ref v)])
+                    (If (op=? t3 t4)
+                        (Mvector-val-set! v i cvi)
+                        (Break-Repeat))))]
+               [else ;; it is a tuple
                 (let*$ ([n (Type-Tuple-num t3)])
                   (repeat$ (i (Quote 0) len) ()
                     (let*$ ([vi (Mvector-val-ref v i)]
@@ -1827,15 +1841,7 @@ TODO write unit tests
                               [t4 (Mvector-rtti-ref v)])
                         (If (op=? t3 t4)
                             (Mvector-val-set! v i ccvi)
-                            (Break-Repeat))))))]
-               [else
-                (repeat$ (i (Quote 0) len) ()
-                  (let*$ ([vi (Mvector-val-ref v i)]
-                          [cvi (interp-cast vi t1 t3 l v)]
-                          [t4 (Mvector-rtti-ref v)])
-                    (If (op=? t3 t4)
-                        (Mvector-val-set! v i cvi)
-                        (Break-Repeat))))]))
+                            (Break-Repeat))))))]))
             v]))])))
   (: code-gen-mvec-cast/tuple : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
   (define (code-gen-mvec-cast/tuple e t2 n l)

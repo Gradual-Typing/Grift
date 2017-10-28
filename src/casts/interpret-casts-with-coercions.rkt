@@ -152,7 +152,7 @@ form, to the shortest branch of the cast tree that is relevant.
             (Make-Fn-Coercion make-coercion-uid t1 t2 lbl)]
            [((STuple n _) (STuple m _)) #:when (<= n m)
             ;; Todo this should allocate a new coercion without the
-            ;; doing the map at runtime be we currently 
+            ;; doing the map at runtime be we currently
             (Make-Tuple-Coercion make-coercion-uid t1 t2 lbl)]
            [((GRef t1-t) (GRef t2-t))
             (define t1 (Type t1-t))
@@ -271,6 +271,7 @@ form, to the shortest branch of the cast tree that is relevant.
       [(type-dyn?$ t2)
        (Sequence-Coercion (Quote-Coercion (Identity))
                           (Inject-Coercion t1))]
+      [(atomic-types?$ t1 t2) (Blame lbl)]
       [else
        (cond
          [(monolithic-make-coercion?) (code-gen-make-med-coercion t1 t2 lbl)]
@@ -301,9 +302,11 @@ form, to the shortest branch of the cast tree that is relevant.
                (Sequence-Coercion ID-EXPR inj)))]
         ;; From here on any use of the type pattern is used to rule out
         ;; that variable from being dynamic
-        [((Type _) (Type _))
-         (compile-make-med-coercion t1 t2 lbl #:know-not-eq? #t)]
-        [((Var _) (Type _))
+        [((Type e1) (Type e2))
+         (if (or (atomic-type? e1) (atomic-type? e2))
+             (Blame lbl)
+             (compile-make-med-coercion t1 t2 lbl #:know-not-eq? #t))]
+        [((Var _) (Type e))
          (cond$
           [(type-dyn?$ t1) (r DYN-EXPR t2 lbl)]
           [else (compile-make-med-coercion t1 t2 lbl #:know-not-eq? #t)])]

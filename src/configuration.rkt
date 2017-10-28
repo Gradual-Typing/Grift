@@ -80,3 +80,5 @@
 ;; where is the runtime to be used located
 (define runtime-path : (Parameterof (Option Path)) (make-parameter #f))
 (define hashcons-path : (Parameterof (Option Path)) (make-parameter #f))
+(define constants-path : (Parameterof Path)
+  (make-parameter (build-path "src/backend-c/runtime/constants.h")))

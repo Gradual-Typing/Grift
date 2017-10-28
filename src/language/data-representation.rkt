@@ -1,5 +1,5 @@
 #lang typed/racket
-(require (for-syntax racket/syntax))
+(require (for-syntax racket/syntax "c-helpers.rkt"))
 (require "../language/forms.rkt")
 (provide (all-defined-out))
 
@@ -8,24 +8,31 @@
     [(_ (name val) ...)
      (let ([fmt (lambda (x) (format-id stx "data:~a" x))])
        (with-syntax ([(fmt-name ...) (map fmt (syntax->list #'(name ...)))])
+         (append-to-constants.h
+          'replace
+          (lambda (in)
+            (map (define-line in)
+                 (syntax-e #'(name ...))
+                 (syntax-e #'(val ...)))))
          #'(begin
              (define fmt-name val) ...
              (define name (Quote fmt-name)) ...)))]))
 
 (define-constants
   ;; types
-  (TYPE-TAG-MASK                  #b111)  
   ;; unallocated types
-  (TYPE-ATOMIC-TAG #b111) ;; This should be TYPE-IMDT-TAG
-  ;; Immediate types are tagged with #b111
-  (TYPE-DYN-RT-VALUE   #b000111)
-  (TYPE-INT-RT-VALUE   #b001111)
-  (TYPE-BOOL-RT-VALUE  #b010111)
-  (TYPE-UNIT-RT-VALUE  #b011111)
-  (TYPE-FLOAT-RT-VALUE #b100111)
-  (TYPE-CHAR-RT-VALUE  #b101111)
-  (TYPE-MAX-ATOMIC-RT-VALUE #b111111)
-
+  (TYPE-INT-RT-VALUE   1)
+  (TYPE-BOOL-RT-VALUE  2)
+  (TYPE-UNIT-RT-VALUE  3)
+  (TYPE-FLOAT-RT-VALUE 4)
+  (TYPE-CHAR-RT-VALUE  5)
+  (TYPE-DYN-RT-VALUE   6)
+  (TYPE-MAX-ATOMIC-RT-VALUE 7)
+  ;; shared indices for allocated types
+  (TYPE-TAG-INDEX 0)
+  (TYPE-HASH-INDEX 1)
+  (TYPE-INDEX-INDEX 2)
+  ;; hyper coercions
   (HC-PRJ-TAG-MASK  #b10)
   (HC-INJ-TAG-MASK  #b01)
   (HC-TAG-MASK      #b11)
@@ -137,4 +144,5 @@
   (FN-PROXY-CLOS-INDEX            0)
   (HYBRID-PROXY-TAG               #b001)
   (HYBRID-PROXY-CRCN-INDEX        2)
-  (HYBRID-PROXY-CLOS-INDEX        1))
+  (HYBRID-PROXY-CLOS-INDEX        1)
+  (EXIT-FAILURE                   1))

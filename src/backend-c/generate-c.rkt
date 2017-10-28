@@ -566,8 +566,7 @@
               (emit-value exp)
               (display ")")])]
     [('Types-hashcons! (list e hcode))
-     (display "hashcons(")
-     (display "types_ht,")
+     (display "hashcons(types_ht, (int64_t*)")
      (emit-value e)
      (display ",")
      (emit-value hcode)

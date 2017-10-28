@@ -94,7 +94,7 @@
       ;; And all the boring cases
       [(and nop (No-Op)) nop]
       [(Op p exp*) (Op p (map ll-expr exp*))]
-      [(Type-Tag e) (Type-Tag (ll-expr e))]
+      [(Atomic-Type-Huh t) (Atomic-Type-Huh (ll-expr t))]
       [(Type-Fn-arg e i) (Type-Fn-arg (ll-expr e) (ll-expr i))]
       [(Type-Fn-return e) (Type-Fn-return (ll-expr e))]
       [(Type-Fn-arity e) (Type-Fn-arity (ll-expr e))]
@@ -110,7 +110,6 @@
       [(Begin exp* exp) (Begin (map ll-expr exp*) (ll-expr exp))]
       [(Repeat i e1 e2 a e3 e4) (Repeat i (ll-expr e1) (ll-expr e2) a (ll-expr e3) (ll-expr e4))]
       [(Break-Repeat) (Break-Repeat)]
-      [(Tag s) (Tag s)]
       [(Construct t v (app ll-expr* e*))
        (Construct t v e*)]
       [(Access t f (app ll-expr e) i?) 

@@ -435,13 +435,16 @@ that can be located throughout this file:
        (ann (HC (Quote #t) t2 l (Quote #f) t2 ID-EXPR) CoC3-Expr)]
       [(Type-Dyn-Huh t2)
        (ann (HC (Quote #f) t1 (Quote #f) (Quote #t) t1 ID-EXPR) CoC3-Expr)]
+      [(atomic-types?$ t1 t2) (Blame l)]
       [else
        (let$ ([med (interp-make-med-coercion t1 t2 l)]) 
          (ann (HC (Quote #f) t1 (Quote #f) (Quote #f) t2 med) CoC3-Expr))])))
   (add-cast-runtime-binding!
    interp-make-med-coercion-uid
    (code$ (t1 t2 l)
-     (precondition$ (not$ (and$ (op=? t1 t2) (Type-Dyn-Huh t1) (Type-Dyn-Huh t2)))
+     (precondition$
+         (and$ (not$ (and$ (op=? t1 t2) (Type-Dyn-Huh t1) (Type-Dyn-Huh t2)))
+               (not$ (atomic-types?$ t1 t2)))
        (cond$
         [(and$ (Type-Fn-Huh t1) (Type-Fn-Huh t2) 
                (op=? (Type-Fn-arity t1) (Type-Fn-arity t2)))
@@ -492,10 +495,15 @@ that can be located throughout this file:
           (Quote-HCoercion m)]
          [other (error 'compile-make-coercion)])]
       [(t1 t2 l) #:when know-not-eq?
-       (interp-make-med-coercion t1 t2 l)]
+       (cond$
+          [(atomic-types?$ t1 t2) (Blame l)]
+          [else (interp-make-med-coercion t1 t2 l)])]
       [(t1 t2 l)
        (let$ ([t1 t1][t2 t2][l l])
-         (If (op=? t1 t2) ID-EXPR (interp-make-med-coercion t1 t2 l)))]))
+         (cond$
+          [(op=? t1 t2) ID-EXPR]
+          [(atomic-types?$ t1 t2) (Blame l)]
+          [else (interp-make-med-coercion t1 t2 l)]))]))
 
   (values compile-make-coercion compile-make-med-coercion))
 

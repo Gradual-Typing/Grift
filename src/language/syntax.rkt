@@ -208,6 +208,13 @@
 (define-syntax-rule (type-mbox-of$ t) (Type-MRef-Of t))
 (define-syntax-rule (type-mvec?$ t) (Type-MVect-Huh t))
 (define-syntax-rule (type-mvec-of$ t) (Type-MVect-Of t))
+(define-syntax-rule (atomic-type?$ t) (Atomic-Type-Huh t))
+(define-syntax-rule (atomic-types?$ t1 t2)
+  (or$ (atomic-type?$ t1) (atomic-type?$ t2)))
+(define-syntax-rule (atomic-type-or-not-tuple?$ t)
+  (or$ (atomic-type?$ t) (not$ (type-tup?$ t))))
+(define-syntax-rule (atomic-types-or-not-tuples?$ t1 t2)
+  (or$ (atomic-type-or-not-tuple?$ t1) (atomic-type-or-not-tuple?$ t2)))
 
 
 (define-syntax-rule (id-coercion?$ c) (Id-Coercion-Huh c))
