@@ -297,8 +297,6 @@
      (values (Type-Tuple-item e i) (set-union e-fv i-fv))]
     [(Make-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
      (values (Make-Tuple-Coercion uid e1 e2 e3) (set-union fv1 fv2 fv3))]
-    [(Compose-Tuple-Coercion uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
-     (values (Compose-Tuple-Coercion uid e1 e2) (set-union fv1 fv2))]
     [(Mediating-Coercion-Huh (app uf-expr e fv)) (values (Mediating-Coercion-Huh e) fv)]
     [(Construct t v (app uf-expr* e* fv))
      (values (Construct t v e*) fv)]

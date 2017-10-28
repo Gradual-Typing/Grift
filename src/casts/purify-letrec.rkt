@@ -205,7 +205,6 @@
     [(Type-Tuple-num e) (recur e)]
     [(Type-Tuple-item e i) (recur-all e i)]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (recur-all t1 t2 lbl)]
-    [(Compose-Tuple-Coercion uid e1 e2) (recur-all e1 e2)]
     [(Mediating-Coercion-Huh e) (recur e)]
     [(Construct t v e*) (recur* e*)]
     [(Access t f e i?)
@@ -845,7 +844,6 @@
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
     [(Type-Tuple-item e i) (Type-Tuple-item (pl-expr e) (pl-expr i))]
     [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]
-    [(Compose-Tuple-Coercion uid e1 e2) (Compose-Tuple-Coercion uid (pl-expr e1) (pl-expr e2))]
     [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (pl-expr e))]
     [other (error 'purify-letrec/expr "unmatched ~a" other)]))
 

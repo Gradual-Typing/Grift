@@ -43,7 +43,6 @@ but a static single assignment is implicitly maintained.
         (set-box! boxed-bnd-code* '())
         (set-box! mk-fn-coercion-code-label? #f)
         (set-box! mk-tuple-coercion-code-label? #f)
-        (set-box! comp-tuple-coercion-code-label? #f)
         (set-box! coerce-tuple-code-label? #f)
         (set-box! coerce-tuple-in-place-code-label? #f)
         (set-box! cast-tuple-code-label? #f)
@@ -92,9 +91,6 @@ but a static single assignment is implicitly maintained.
 
 (: mk-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
 (define mk-tuple-coercion-code-label? (box #f))
-
-(: comp-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
-(define comp-tuple-coercion-code-label? (box #f))
 
 (: hashcons-types-code-label? (Boxof (Option (Code-Label Uid))))
 (define hashcons-types-code-label? (box #f))
@@ -412,55 +408,6 @@ but a static single assignment is implicitly maintained.
     mk-tuple-crcn-label)
   (let ([cl? (unbox mk-tuple-coercion-code-label?)])
     (or cl? (make-code! mk-crcn))))
-
-(: get-comp-tuple-crcn! (Uid -> (Code-Label Uid)))
-(define (get-comp-tuple-crcn! comp-crcn)
-  (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! comp-crcn)
-    (define-track-next-uid!$ comp-tuple-crcn)
-    (define comp-tuple-crcn-label (Code-Label comp-tuple-crcn))
-    (define comp-crcn-label (Code-Label comp-crcn))
-    (define comp-tuple-crcn-c : D0-Code
-      ;; comp-tuple-crcn expects to compose two tuple coercions of the same
-      ;; length. This might change later when I formalize our tuple semantics.
-      ;; It also make sure to return an identity coercion if the two coercions
-      ;; are identical.
-      (code$ (crcn1 crcn2)
-        (assign$ tagged-count
-          (sr-tagged-array-ref
-           crcn1 COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
-        (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
-        (assign$ new-crcn UNIT-IMDT)
-        (assign$ iters (op$ + COERCION-TUPLE-ELEMENTS-OFFSET count))
-        (assign$ id? TRUE-IMDT)
-        (repeat$ (i COERCION-TUPLE-ELEMENTS-OFFSET iters) (_ UNIT-IMDT)
-          (assign$ c1a (sr-tagged-array-ref crcn1 COERCION-MEDIATING-TAG i))
-          (assign$ c2a (sr-tagged-array-ref crcn2 COERCION-MEDIATING-TAG i))
-          (assign$ composed-crcn (app-code$ comp-crcn-label c1a c2a))
-          (cond$
-           [id?
-            (assign$ tmp-id?
-              (sr-check-tag=?
-               composed-crcn COERCION-TAG-MASK COERCION-IDENTITY-TAG))
-            (cond$
-             [(op$ not tmp-id?)
-              (Assign (Var-id new-crcn)
-                (op$ Alloc (op$ + count COERCION-TUPLE-ELEMENTS-OFFSET)))
-              (sr-array-set! new-crcn COERCION-TUPLE-COUNT-INDEX tagged-count)
-              (repeat$ (j COERCION-TUPLE-ELEMENTS-OFFSET i) (_ UNIT-IMDT)
-                (sr-array-set! new-crcn j COERCION-IDENTITY-IMDT))
-              (sr-array-set! new-crcn i composed-crcn)
-              (Assign (Var-id id?) FALSE-IMDT)]
-             [else UNIT-IMDT])]
-           [else (sr-array-set! new-crcn i composed-crcn)]))
-        (cond$
-         [id? COERCION-IDENTITY-IMDT]
-         [else (sr-tag-value new-crcn COERCION-MEDIATING-TAG)])))
-    (add-new-code! (cons comp-tuple-crcn comp-tuple-crcn-c))
-    (set-box! comp-tuple-coercion-code-label? comp-tuple-crcn-label)
-    comp-tuple-crcn-label)
-  (let ([cl? (unbox comp-tuple-coercion-code-label?)])
-    (or cl? (make-code! comp-crcn))))
 
 (: hash-type ((Var Uid) -> D0-Expr))
 (define (hash-type ty)
@@ -1153,8 +1100,6 @@ but a static single assignment is implicitly maintained.
          (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]
-        [(Compose-Tuple-Coercion comp-crcn (app recur c1) (app recur c2))
-         (app-code$ (get-comp-tuple-crcn! comp-crcn) c1 c2)]
         [(Mediating-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK COERCION-MEDIATING-TAG)]
         [other (error 'specify-representation "unmatched ~a" other)]))
