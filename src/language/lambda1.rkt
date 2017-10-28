@@ -170,7 +170,6 @@
           (Type-Tuple-num E)
           (Type-Tuple-item E E)
           (Make-Tuple-Coercion Uid E E E)
-          (Compose-Tuple-Coercion Uid E E)
           (Mediating-Coercion-Huh E)
           No-Op)))
 
