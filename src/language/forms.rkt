@@ -130,8 +130,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (Bnd identifier type expression)
   ;; Different casts
   (Cast expression instruction)
-  ;; TODO Interpreted-Cast
-  (Interpreted-Cast expression instruction)
   (Fn-Caster expression)
   ;;Type Operations
   (Type-Dyn-Huh exp)

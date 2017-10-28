@@ -103,11 +103,6 @@
           ;;Primitives
           (Op Grift-Primitive (Listof E))
           (Quote Cast-Literal)
-          ;; Casts with different ways of getting the same semantics
-	  ;;(Cast E (Twosome Grift-Type Grift-Type Blame-Label))
-          ;;(Cast E (Coercion Grift-Coercion))
-          ;;(Interpreted-Cast E (Twosome E E E))
-          ;;(Interpreted-Cast E (Coercion E))
           ;; Observations
           (Blame E)
           (Observe E Grift-Type)
