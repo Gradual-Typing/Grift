@@ -134,7 +134,7 @@ run_experiment()
     local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" \
                               --name-end " Grift" --names $configs)
     local shared_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" \
-                              --name-sep "." --common $configs)
+                              --name-sep "_" --common $configs)
     
     echo "name,${config_str},Typed-Racket,OCaml" > "$logfile1"
     echo "name,${config_str},Racket,Chez Scheme" > "$logfile2"
@@ -159,7 +159,12 @@ run_experiment()
     run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
 
     run_benchmark $baseline_system_static $baseline_system_dynamic "n_body" "100000" ""
-    
+
+    local gmlog1=$(racket "${LIB_DIR}/geometric-mean.rkt" $logfile1)
+    local gmlog2=$(racket "${LIB_DIR}/geometric-mean.rkt" $logfile2)
+    echo "$gmlog1" > $logfile1
+    echo "$gmlog2" > $logfile2
+
     gen_fig static "Static Grift" "${shared_str}_static" "right"
     gen_fig dyn Gambit "${shared_str}_dynamic" "left"
 }
@@ -196,7 +201,7 @@ main()
     declare -r SRC_DIR="$TEST_DIR/src"
     declare -r INPUT_DIR="$TEST_DIR/inputs"
     declare -r PARAMS_LOG="$EXP_DIR/params.txt"
-
+    declare -r LIB_DIR="$TEST_DIR/lib"
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
     mkdir -p "$TMP_DIR"
