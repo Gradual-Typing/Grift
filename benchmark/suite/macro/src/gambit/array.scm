@@ -24,5 +24,6 @@
 
 (define (main)
   (let* ((input1 (read))
-	 (input2 (read)))
+         (input2 (read)))
     (pretty-print (go input1 input2 0))))
+

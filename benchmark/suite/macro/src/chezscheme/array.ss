@@ -1,6 +1,9 @@
 #! /usr/bin/env scheme-script
 (import (chezscheme))
+
 ;;; ARRAY1 -- One of the Kernighan and Van Wyk benchmarks.
+;;; port to fixnum ops to avoid dispatch of generic ops -andre
+
 
 (define (create-x n)
   (define result (make-vector n))

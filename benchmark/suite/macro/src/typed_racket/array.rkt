@@ -1,39 +1,51 @@
 #lang typed/racket/base
 
-(require racket/fixnum racket/pretty)
+(require racket/pretty)
 
 ;;; ARRAY1 -- One of the Kernighan and Van Wyk benchmarks.
 ;;; 9/27/2017 added types to support typed-racket by Andre Kuhlenschmidt
+;;; 10/9/2017 changed to use internal timing (Andre)
+;;;
+;;; We actively choose to not use racket racket/fixnum. Use of generic
+;;; numeric ops is disadvantage for racket but there is no safe
+;;; version of fixnum operations that avoids the overhead of
+;;; contracts, and we are only interested in comparing safe code.  The
+;;; racket/fixnum safe operations are generally no faster than using
+;;; generic primitives like +. (According to the documentation)
 
-(: create-x : Fixnum -> (Vectorof Fixnum))
+
+(: create-x : Integer -> (Vectorof Integer))
 (define (create-x n)
-  (define result : (Vectorof Fixnum) (make-vector n))
-  (do : (Vectorof Fixnum)
-    ((i : Fixnum 0 (fx+ i 1)))
-    ((fx>= i n) result)
+  (define result : (Vectorof Integer) (make-vector n))
+  (do : (Vectorof Integer)
+    ((i : Integer 0 (+ i 1)))
+    ((>= i n) result)
     (vector-set! result i i)))
 
-(: create-y : (Vectorof Fixnum) -> (Vectorof Fixnum))
+(: create-y : (Vectorof Integer) -> (Vectorof Integer))
 (define (create-y x)
-  (let* ((n : Fixnum (vector-length x))
-         (result : (Vectorof Fixnum) (make-vector n)))
-    (do : (Vectorof Fixnum)
-      ((i : Fixnum (fx- n 1) (fx- i 1)))
-      ((fx< i 0) result)
+  (let* ((n : Integer (vector-length x))
+         (result : (Vectorof Integer) (make-vector n)))
+    (do : (Vectorof Integer)
+      ((i : Integer (- n 1) (- i 1)))
+      ((< i 0) result)
       (vector-set! result i (vector-ref x i)))))
 
-(: my-try : Fixnum -> Fixnum)
+(: my-try : Integer -> Integer)
 (define (my-try n)
   (vector-length (create-y (create-x n))))
 
-(: go : Fixnum Fixnum Fixnum -> Fixnum)
+(: go : Integer Integer Integer -> Integer)
 (define (go m n r)
-  (if (fx> m 0)
-      (go (fx- m 1) n (my-try n))
+  (if (> m 0)
+      (go (- m 1) n (my-try n))
       r))
 
-(let* ((input1 : Any (read))
-       (input2 : Any (read)))
-  (unless (and (fixnum? input1) (fixnum? input2))
-    (error 'array.rkt "invalid-input: expected 2 fixnums"))
-  (pretty-print (go input1 input2 0)))
+(define (main)
+  (let* ((input1 : Any (read))
+         (input2 : Any (read)))
+    (unless (and (fixnum? input1) (fixnum? input2))
+      (error 'array.rkt "invalid-input: expected 2 fixnums"))
+    (pretty-print (go input1 input2 0))))
+
+(time (main))

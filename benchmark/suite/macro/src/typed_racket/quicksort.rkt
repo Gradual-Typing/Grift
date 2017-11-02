@@ -1,38 +1,44 @@
 #lang typed/racket/base
+;;; 10/9/2017 changed to use internal timing (Andre)
+;;;
+;;; We actively choose to not use racket racket/fixnum. Use of generic
+;;; numeric ops is disadvantage for racket but there is no safe
+;;; version of fixnum operations that avoids the overhead of
+;;; contracts, and we are only interested in comparing safe code.  The
+;;; racket/fixnum safe operations are generally no faster than using
+;;; generic primitives like +. (According to the documentation)
 
-(require racket/fixnum)
-
-(: sort : (Vectorof Fixnum) Fixnum Fixnum -> Fixnum)
+(: sort : (Vectorof Integer) Integer Integer -> Integer)
 (define (sort a p r)
-  (if (fx< p r)
+  (if (< p r)
       (let ([q (partition a p r)])
         (begin
-          (sort a p (fx- q 1))
-          (sort a (fx+ q 1) r)))
+          (sort a p (- q 1))
+          (sort a (+ q 1) r)))
       0))
 
-(: partition : (Vectorof Fixnum) Fixnum Fixnum -> Fixnum)
+(: partition : (Vectorof Integer) Integer Integer -> Integer)
 (define (partition a p r)
   ;; Why does this box exist?
-  (let ([i : (Boxof Fixnum) (box (fx- p 1))]
+  (let ([i : (Boxof Integer) (box (- p 1))]
         [x (vector-ref a r)])
     (begin
-      (let loop : Fixnum ([j : Fixnum p])
-       (if (fx< j r)
+      (let loop : Integer ([j : Integer p])
+       (if (< j r)
            (begin
-             (if (fx<= (vector-ref a j) x)
+             (if (<= (vector-ref a j) x)
                  (begin
-                   (set-box! i (fx+ (unbox i) 1))
+                   (set-box! i (+ (unbox i) 1))
                    (swap a (unbox i) j))
                  0)
-             (loop (fx+ j 1)))
+             (loop (+ j 1)))
            0))
-      (swap a (fx+ (unbox i) 1) r)
-      (fx+ (unbox i) 1))))
+      (swap a (+ (unbox i) 1) r)
+      (+ (unbox i) 1))))
 
-(: swap : (Vectorof Fixnum) Fixnum Fixnum -> Fixnum)
+(: swap : (Vectorof Integer) Integer Integer -> Integer)
 (define (swap a i j)
-  (if (fx= i j)
+  (if (= i j)
       0
       (let ([t (vector-ref a i)])
         (begin
@@ -40,17 +46,19 @@
           (vector-set! a j t)
           0))))
 
-(let ([size (read)])
-  (unless (fixnum? size)
-    (error 'quicksort "invalid input: expected fixnum"))
-  (let ([a : (Vectorof Fixnum) (make-vector size 1)])
-    (begin
-      (let loop ([i : Fixnum 0])
-        (when (fx< i size)
+(define (main)
+  (let ([size (read)])
+    (unless (fixnum? size)
+      (error 'quicksort "invalid input: expected fixnum"))
+    (let ([a : (Vectorof Integer) (make-vector size 1)])
+      (let loop ([i : Integer 0])
+        (when (< i size)
           (let ([e (read)])
             (unless (fixnum? e)
               (error 'quicksort.rkt "invalid input: expected integer"))
             (vector-set! a i e)
-            (loop (fx+ i 1)))))
-      (time (sort a 0 (fx- size 1)))
-      (print (vector-ref a (fx- size 1))))))
+            (loop (+ i 1)))))
+      (sort a 0 (- size 1))
+      (display (vector-ref a (- size 1))))))
+
+(time (main))
