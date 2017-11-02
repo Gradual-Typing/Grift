@@ -8,7 +8,7 @@ get_racket_runtime()
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
     
-    local benchmark_path="${TMP_DIR}/racket/internal/${benchmark}"
+    local benchmark_path="${TMP_DIR}/racket/${benchmark}"
     local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
@@ -29,7 +29,7 @@ get_typed_racket_runtime()
     local benchmark_args="$1"; shift
     local disk_aux_name="$1";  shift
     
-    local benchmark_path="${TMP_DIR}/typed_racket/internal/${benchmark}"
+    local benchmark_path="${TMP_DIR}/typed_racket/${benchmark}"
     local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then

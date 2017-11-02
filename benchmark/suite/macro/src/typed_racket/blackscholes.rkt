@@ -1,8 +1,16 @@
 #lang typed/racket/base
 
-(require racket/flonum racket/format racket/fixnum)
+(require racket/flonum)
 
 ;;; 9/27/2017 added types to support typed-racket by Andre Kuhlenschmidt
+;;; 10/9/2017 changed to use internal timing (Andre)
+;;;
+;;; We actively choose to not use racket racket/fixnum. Use of generic
+;;; numeric ops is disadvantage for racket but there is no safe
+;;; version of fixnum operations that avoids the overhead of
+;;; contracts, and we are only interested in comparing safe code.  The
+;;; racket/fixnum safe operations are generally no faster than using
+;;; generic primitives like +. (According to the documentation)
 
 (define inv-sqrt-2x-pi : Flonum 0.39894228040143270286)
 
@@ -27,7 +35,7 @@
                       (let ([OutputX (if sign (fl- #i1.0 x) x)])
                         OutputX))))))))))))
 
-(: black-scholes : Flonum Flonum Flonum Flonum Flonum Fixnum Flonum -> Flonum) 
+(: black-scholes : Flonum Flonum Flonum Flonum Flonum Integer Flonum -> Flonum) 
 (define (black-scholes spot strike rate volatility time option-type timet)
   (let ([log (fllog (fl/ spot strike))]
         [pow (fl* #i0.5 (fl* volatility volatility))]
@@ -37,7 +45,7 @@
         (let ([n-of-d1 (cummulative-normal-distribution d1)]
               [n-of-d2 (cummulative-normal-distribution d2)]
               [fut-value (fl* strike (flexp (fl* #i-1 (fl* rate time))))])
-          (let ([price (if (fx= option-type 0)
+          (let ([price (if (= option-type 0)
                            (fl- (fl* spot n-of-d1) (fl* fut-value n-of-d2))
                            (fl- (fl* fut-value (fl- #i1.0 n-of-d2))
                                 (fl* spot (fl- #i1.0 n-of-d1))))])
@@ -61,11 +69,11 @@
   (let ([c (read-char)])
     (when (eof-object? c)
       (error 'blackscholes.rkt "invalid input: expected option type"))
-    (if (fx= (char->integer c) (char->integer #\P))
+    (if (= (char->integer c) (char->integer #\P))
         c
-        (if (fx= (char->integer c) (char->integer #\C))
+        (if (= (char->integer c) (char->integer #\C))
             c
-            (if (fx= (char->integer c) (char->integer #\space))
+            (if (= (char->integer c) (char->integer #\space))
                 (read-option-type)
                 (error 'blackscholes.rkt "invalid input: expected option type"))))))
 
@@ -94,69 +102,72 @@
                                  dividend-rate volatility maturity-len
                                  option-type divs DerivGem-value)))))))))))
 
-(define number-of-runs : Fixnum 100)
+(define number-of-runs : Integer 100)
 
-(define number-of-options : Fixnum
-  (let ([n (read)])
-    (unless (fixnum? n)
-      (error 'blackscholes.rkt "invalid input: expected fixnum number of options"))
-    n))
+(define (main)
+  (define number-of-options : Integer
+    (let ([n (read)])
+      (unless (fixnum? n)
+        (error 'blackscholes.rkt
+               "invalid input: expected fixnum number of options"))
+      n))
 
-(define fake-data : Stock-Option
-  '#(#i0 #i0 #i0 #i0 #i0 #i0 #\P #i0 #i0))
+  (define fake-data : Stock-Option
+    '#(#i0 #i0 #i0 #i0 #i0 #i0 #\P #i0 #i0))
 
-(define data : (Vectorof Stock-Option)
-  (let ([v (make-vector number-of-options fake-data)])
-    (for ([i (in-range 0 number-of-options)])
-      (vector-set! v i (read-option)))
-    v))
+  (define data : (Vectorof Stock-Option)
+    (let ([v (make-vector number-of-options fake-data)])
+      (for ([i (in-range 0 number-of-options)])
+        (vector-set! v i (read-option)))
+      v))
   
 
-;; This seems really dumb but I am doing it because
-;; this is the way the original benchmark did it.
-(define spots : (Vectorof Flonum) (make-vector number-of-options #i0))
-(define strikes : (Vectorof Flonum) (make-vector number-of-options #i0))
-(define rates  : (Vectorof Flonum) (make-vector number-of-options #i0))
-(define volatilities : (Vectorof Flonum) (make-vector number-of-options #i0))
-(define otypes : (Vectorof Fixnum) (make-vector number-of-options 0))
-(define otimes : (Vectorof Flonum)
-  ;; This is done this way to prevent the unit value
-  ;; from printing out at the top level.
-  (let ([otimes : (Vectorof Flonum) (make-vector number-of-options #i0)])
-    (do ([i : Fixnum 0 (fx+ i 1)])
-        ((fx< i number-of-options))
-      (let ([od : Stock-Option (vector-ref data i)])
-        (vector-set! otypes i
-                     (if (fx= (char->integer (vector-ref od 6))
-                              (char->integer #\P))
-                         1
-                         0))
-        (vector-set! spots i (vector-ref od 0))
-        (vector-set! strikes i (vector-ref od 1))
-        (vector-set! rates i (vector-ref od 2))
-        (vector-set! volatilities i (vector-ref od 4))
-        (vector-set! otimes i (vector-ref od 5))))
-    otimes))
+  ;; This seems really dumb but I am doing it because
+  ;; this is the way the original benchmark did it.
+  (define spots : (Vectorof Flonum) (make-vector number-of-options #i0))
+  (define strikes : (Vectorof Flonum) (make-vector number-of-options #i0))
+  (define rates  : (Vectorof Flonum) (make-vector number-of-options #i0))
+  (define volatilities : (Vectorof Flonum) (make-vector number-of-options #i0))
+  (define otypes : (Vectorof Integer) (make-vector number-of-options 0))
+  (define otimes : (Vectorof Flonum)
+    ;; This is done this way to prevent the unit value
+    ;; from printing out at the top level.
+    (let ([otimes : (Vectorof Flonum) (make-vector number-of-options #i0)])
+      (do ([i : Integer 0 (+ i 1)])
+          ((< i number-of-options))
+        (let ([od : Stock-Option (vector-ref data i)])
+          (vector-set! otypes i
+                       (if (= (char->integer (vector-ref od 6))
+                                (char->integer #\P))
+                           1
+                           0))
+          (vector-set! spots i (vector-ref od 0))
+          (vector-set! strikes i (vector-ref od 1))
+          (vector-set! rates i (vector-ref od 2))
+          (vector-set! volatilities i (vector-ref od 4))
+          (vector-set! otimes i (vector-ref od 5))))
+      otimes))
 
-(define prices : (Vectorof Flonum)
-  (let ([prices : (Vectorof Flonum) (make-vector number-of-options #i0)])
-    (do ([j : Fixnum 0 (fx+ j 1)])
-        ((fx< j number-of-runs))
-      (do ([i : Fixnum 0 (fx+ i 1)])
-          ((fx< j number-of-options))
-        (vector-set! prices i
-                     (black-scholes (vector-ref spots i)
-                                    (vector-ref strikes i)
-                                    (vector-ref rates i)
-                                    (vector-ref volatilities i)
-                                    (vector-ref otimes i)
-                                    (vector-ref otypes i)
-                                    #i0))))
-    prices))
+  (define prices : (Vectorof Flonum)
+    (let ([prices : (Vectorof Flonum) (make-vector number-of-options #i0)])
+      (do ([j : Integer 0 (+ j 1)])
+          ((< j number-of-runs))
+        (do ([i : Integer 0 (+ i 1)])
+            ((< j number-of-options))
+          (vector-set! prices i
+                       (black-scholes (vector-ref spots i)
+                                      (vector-ref strikes i)
+                                      (vector-ref rates i)
+                                      (vector-ref volatilities i)
+                                      (vector-ref otimes i)
+                                      (vector-ref otypes i)
+                                      #i0))))
+      prices))
 
-(do : Void
-  ([i : Fixnum 0 (fx+ i 1)])
-  ((fx< i number-of-options))
-  (display (~r (vector-ref prices i) #:precision '(= 18)))
-  (newline))
+  (do : Void
+    ([i : Integer 0 (+ i 1)])
+    ((< i number-of-options))
+    (display (real->decimal-string (vector-ref prices i) 18))
+    (newline)))
 
+(time (main))

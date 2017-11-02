@@ -12,6 +12,15 @@
 ;; Made unsafe and optimized by Sam TH
 ;; Made safe by Andre Kuhlenschmidt
 ;; Added types for use with typed-racket by Andre Kuhlenschmidt
+;; 10/9/2017 changed to use internal timing (Andre)
+;;
+;;; We actively choose to not use racket racket/fixnum. Use of generic
+;;; numeric ops is disadvantage for racket but there is no safe
+;;; version of fixnum operations that avoids the overhead of
+;;; contracts, and we are only interested in comparing safe code.  The
+;;; racket/fixnum safe operations are generally no faster than using
+;;; generic primitives like +. (According to the documentation)
+
 #|
 Correct output N = 1000 is
 
@@ -19,7 +28,7 @@ Correct output N = 1000 is
 -0.169087605
 |#
 
-;; Removed racket/cmline and racket/require because we
+;; Removed racket/cmdline and racket/require because we
 ;; altered this code to read the input from standard in
 ;; in order to be uniform with other benchmarks in this
 ;; suite.
@@ -27,8 +36,7 @@ Correct output N = 1000 is
 ;; in safe program performance.
 (require 
 	 (for-syntax racket/base)
-	 racket/flonum
-	 racket/fixnum)
+	 racket/flonum)
 
 ;; ------------------------------
 ;; define planetary masses, initial positions & velocity
@@ -56,7 +64,8 @@ Correct output N = 1000 is
 (deffield 5 body-vz set-body-vz!)
 (deffield 6 body-mass set-body-mass!)
 
-(define *sun* : Body
+(define (main)
+  (define *sun* : Body
   (make-body 0.0 0.0 0.0 0.0 0.0 0.0 +solar-mass+))
 
 (define *jupiter* : Body
@@ -97,56 +106,56 @@ Correct output N = 1000 is
 
 (define-type System (Vector Body Body Body Body Body))
 (define *system* : System (vector *sun* *jupiter* *saturn* *uranus* *neptune*))
-(define *system-size* : Fixnum 5)
+(define *system-size* : Integer 5)
 ;; -------------------------------
 (: offset-momentum : -> Void)
 (define (offset-momentum)
-  (let loop-i ([i : Fixnum 0]
+  (let loop-i ([i : Integer 0]
                [px : Flonum 0.0]
                [py : Flonum 0.0]
                [pz : Flonum 0.0])
-    (if (fx= i *system-size*)
+    (if (= i *system-size*)
       (begin
         (set-body-vx! (vector-ref *system* 0) (fl/ (fl- 0.0 px) +solar-mass+))
         (set-body-vy! (vector-ref *system* 0) (fl/ (fl- 0.0 py) +solar-mass+))
         (set-body-vz! (vector-ref *system* 0) (fl/ (fl- 0.0 pz) +solar-mass+)))
       (let ([i1 (vector-ref *system* i)])
-        (loop-i (fx+ i 1)
+        (loop-i (+ i 1)
                 (fl+ px (fl* (body-vx i1) (body-mass i1)))
                 (fl+ py (fl* (body-vy i1) (body-mass i1)))
                 (fl+ pz (fl* (body-vz i1) (body-mass i1))))))))
 
 ;; -------------------------------
 (define (energy)
-  (let loop-o : Flonum ([o : Fixnum 0] [e : Flonum 0.0]) 
-   (if (fx= o *system-size*)
+  (let loop-o : Flonum ([o : Integer 0] [e : Flonum 0.0]) 
+   (if (= o *system-size*)
        e
        (let* ([o1 (vector-ref *system* o)]
               [e (fl+ e (fl* (fl* 0.5 (body-mass o1))
                              (fl+ (fl+ (fl* (body-vx o1) (body-vx o1))
                                        (fl* (body-vy o1) (body-vy o1)))
                                   (fl* (body-vz o1) (body-vz o1)))))])
-         (let loop-i : Flonum ([i : Fixnum (fx+ o 1)] [e : Flonum e])
-           (if (fx= i *system-size*)
-               (loop-o (fx+ o 1) e)
+         (let loop-i : Flonum ([i : Integer (+ o 1)] [e : Flonum e])
+           (if (= i *system-size*)
+               (loop-o (+ o 1) e)
                (let* ([i1   (vector-ref *system* i)]
                       [dx   (fl- (body-x o1) (body-x i1))]
                       [dy   (fl- (body-y o1) (body-y i1))]
                       [dz   (fl- (body-z o1) (body-z i1))]
                       [dist (flsqrt (fl+ (fl+ (fl* dx dx) (fl* dy dy)) (fl* dz dz)))]
                       [e    (fl- e (fl/ (fl* (body-mass o1) (body-mass i1)) dist))])
-                 (loop-i (fx+ i 1) e))))))))
+                 (loop-i (+ i 1) e))))))))
 
 ;; -------------------------------
 (define (advance)
-  (let loop-o : Void ([o : Fixnum 0])
-    (unless (fx= o *system-size*)
+  (let loop-o : Void ([o : Integer 0])
+    (unless (= o *system-size*)
       (let* ([o1 (vector-ref *system* o)])
-        (let loop-i ([i  (fx+ o 1)]
+        (let loop-i ([i  (+ o 1)]
                      [vx (body-vx o1)]
                      [vy (body-vy o1)]
                      [vz (body-vz o1)])
-          (if (fx< i *system-size*)
+          (if (< i *system-size*)
             (let* ([i1    (vector-ref *system* i)]
                    [dx    (fl- (body-x o1) (body-x i1))]
                    [dy    (fl- (body-y o1) (body-y i1))]
@@ -161,7 +170,7 @@ Correct output N = 1000 is
               (set-body-vx! i1 (fl+ (body-vx i1) (fl* dxmag om)))
               (set-body-vy! i1 (fl+ (body-vy i1) (fl* dymag om)))
               (set-body-vz! i1 (fl+ (body-vz i1) (fl* dzmag om)))
-              (loop-i (fx+ i 1)
+              (loop-i (+ i 1)
                       (fl- vx (fl* dxmag im))
                       (fl- vy (fl* dymag im))
                       (fl- vz (fl* dzmag im))))
@@ -171,9 +180,10 @@ Correct output N = 1000 is
                    (set-body-x! o1 (fl+ (body-x o1) (fl* +dt+ vx)))
                    (set-body-y! o1 (fl+ (body-y o1) (fl* +dt+ vy)))
                    (set-body-z! o1 (fl+ (body-z o1) (fl* +dt+ vz)))))))
-      (loop-o (fx+ o 1)))))
+      (loop-o (+ o 1)))))
 
 ;; -------------------------------
+
 (let ([n (read)])
   (unless (fixnum? n)
     (error 'n-body.rkt "invalid input: expected integer"))
@@ -181,8 +191,8 @@ Correct output N = 1000 is
    (offset-momentum)
    (printf "~a\n" (real->decimal-string (energy) 9))
    ;; Changed from for loop to do loop to ensure fixnum operations
-   (do ([i : Fixnum 0 (fx+ i 1)]) ((fx= i n)) (advance))
+   (do ([i : Integer 0 (+ i 1)]) ((= i n)) (advance))
    ;; (for ([i (in-range n)]) (advance))
-   (printf "~a\n" (real->decimal-string (energy) 9))
-   ))
-    
+   (printf "~a\n" (real->decimal-string (energy) 9)))))
+
+(time (main))
