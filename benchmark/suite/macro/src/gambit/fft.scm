@@ -1,5 +1,5 @@
-#!gsi-script -:d0
-
+#!gsi-script
+(declare (standard-bindings) (extended-bindings) (block))
 ;; Taken by Deyaaeldeen Almahallawi from http://www.iro.umontreal.ca/~gambit/bench.tar.gz
 
 (define n (read))
@@ -70,8 +70,11 @@
              (fx+ m 2)
              mmax wpr wpi)))
 
-(define (main . args)
+(define (run-benchmark)
   (begin
     (loop1 0 0) ;; bit-reversal section
     (loop3 2)   ;; Danielson-Lanczos section
-    (display (vector-ref data 0))))
+    (display (vector-ref data 0))
+    (newline)))
+
+(time (run-benchmark) (current-output-port))

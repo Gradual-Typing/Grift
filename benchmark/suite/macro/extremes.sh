@@ -21,8 +21,9 @@ write_grift_speedups()
     local logfile="$1";         shift
     
     for config_index in ${configs[@]}; do
-	get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}" "$benchmark_args" "$disk_aux_name" $config_index
-	printf ",$RETURN" >> $logfile
+	    get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}"\
+                          "$benchmark_args" "$disk_aux_name" $config_index
+	    printf ",$RETURN" >> $logfile
     done
 }
 
@@ -36,7 +37,7 @@ run_benchmark()
     local baseline_system_static="$1";  shift
     local baseline_system_dynamic="$1"; shift
     local name="$1";                    shift
-    local benchmark_args="$1";          shift
+    local input_file="$1";          shift
     local aux_name="$1";                shift
 
     local logfile1="${DATA_DIR}/static.log"
@@ -50,40 +51,46 @@ run_benchmark()
     fi
 
     local benchmark_args_file="${TMP_DIR}/${name}${disk_aux_name}.args"
+    local input="$(cat ${INPUT_DIR}/${name}/${input_file})"
     if [ -f benchmark_args_file ]; then
-	benchmark_args=$(cat "$benchmark_args_file")
+	    local old_input=$(cat "$benchmark_args_file")
+        if [ ! $old_input == $input ]; then
+            echo "input changed mid test" 1>&2
+            exit 1
+        fi
     else
-	printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
-	printf "Args\t\t:%s\n" "$benchmark_args" >> "$PARAMS_LOG"
-	echo "$benchmark_args" > "$benchmark_args_file"
+	    printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
+	    printf "Args\t\t:%s\n" "$input" >> "$PARAMS_LOG"
+	    echo "$input" > "$benchmark_args_file"
     fi
 
     # Record the runtime of Statically Typed Varients
     printf "$name$print_aux_name" >> "$logfile1"
-    write_grift_speedups $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name" static "$logfile1"
+    write_grift_speedups $baseline_system_static "$name" "$input_file"\
+                         "$disk_aux_name" static "$logfile1"
     # Typed Racket
-    get_speedup typed_racket $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name"
+    get_speedup typed_racket $baseline_system_static\
+                "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile1    
     # OCaml
-    get_speedup ocaml $baseline_system_static "$name" "$benchmark_args" "$disk_aux_name"
+    get_speedup ocaml $baseline_system_static\
+                "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile1    
      
     printf "\n" >> "$logfile1"
     
     printf "$name$print_aux_name" >> $logfile2
-    write_grift_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" dyn "$logfile2"
-    get_speedup racket $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
+
+    write_grift_speedups $baseline_system_dynamic "$name" "$input_file"\
+                         "$disk_aux_name" dyn "$logfile2"
+    get_speedup racket $baseline_system_dynamic\
+                "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
-    get_speedup chezscheme $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name"
+    get_speedup chezscheme $baseline_system_dynamic\
+                "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
     printf "\n" >> "$logfile2"
 
-    # local partial_path="${TMP_DIR}/partial/${name}"
-    # if [ -f "${partial_path}.grift" ]; then
-    # 	echo -n "$name$print_aux_name" >> "$logfile3"
-    # 	write_grift_speedups $baseline_system_dynamic "$name" "$benchmark_args" "$disk_aux_name" partial "$logfile3"
-    # fi
-    
     echo "finished ${name}${print_aux_name}"
 }
 
@@ -140,25 +147,29 @@ run_experiment()
     echo "name,${config_str},Racket,Chez Scheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
-    local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/slow.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "array" "$arr_bc_arg" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "array" "slow.txt" ""
     
-    local tak_bc_arg="\"$(cat "${INPUT_DIR}/tak/slow.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "tak" "$tak_bc_arg" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "tak" "slow.txt" ""
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic "ray" "" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "ray" "empty.txt" ""
 
-    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_64K.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "blackscholes" "$bs_bc_arg" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "blackscholes" "in_64K.txt" ""
     
-    run_benchmark $baseline_system_static $baseline_system_dynamic "matmult" "400" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "matmult" "400.txt" ""
     
-    local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend10000.txt")\""
-    run_benchmark $baseline_system_static $baseline_system_dynamic "quicksort" "$qs_wc_arg" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "quicksort" "in_descend10000.txt" ""
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic "fft" "65536" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "fft" "slow.txt" ""
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic "n_body" "100000" ""
+    run_benchmark $baseline_system_static $baseline_system_dynamic\
+                  "n_body" "slow.txt" ""
 
     local gmlog1=$(racket "${LIB_DIR}/geometric-mean.rkt" $logfile1)
     local gmlog2=$(racket "${LIB_DIR}/geometric-mean.rkt" $logfile2)
@@ -196,12 +207,32 @@ main()
     declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
     declare -r DATA_DIR="$EXP_DIR/data"
-    declare -r OUT_DIR="$EXP_DIR/output"
+    declare -r OUT_DIR="$EXP_DIR/outputs"
     declare -r TMP_DIR="$EXP_DIR/tmp"
     declare -r SRC_DIR="$TEST_DIR/src"
     declare -r INPUT_DIR="$TEST_DIR/inputs"
+    declare -r OUTPUT_DIR="$TEST_DIR/outputs"
     declare -r PARAMS_LOG="$EXP_DIR/params.txt"
     declare -r LIB_DIR="$TEST_DIR/lib"
+
+    # Check to see if all is right in the world
+    if [ ! -d $TEST_DIR ]; then
+        echo "test directory not found" 1>&2
+        exit 1
+    elif [ ! -d $SRC_DIR ]; then
+        echo "source directory not found" 1>&2
+        exit 1
+    elif [ ! -d $INPUT_DIR ]; then
+        echo "input directory not found" 1>&2
+        exit 1
+    elif [ ! -d $OUTPUT_DIR ]; then
+        echo "output directory not found" 1>&2
+        exit 1
+    elif [ ! -d $LIB_DIR ]; then
+        echo "lib directory not found" 1>&2
+        exit 1
+    fi
+    
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
     mkdir -p "$TMP_DIR"

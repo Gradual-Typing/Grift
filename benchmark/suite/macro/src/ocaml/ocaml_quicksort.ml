@@ -21,7 +21,7 @@ let rec sort a p r =
     sort a p (q - 1);
     sort a (q + 1) r
 
-let () =
+let run_benchmark () =
   let size = read_int () in
   let a = Array.make size 0 in
   for i = 0 to size - 1 do
@@ -29,3 +29,5 @@ let () =
   done; 
   sort a 0 (size-1);
   Printf.printf "%d\n" a.(size-1)
+
+let () = Time.time run_benchmark ()

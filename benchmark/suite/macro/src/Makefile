@@ -1,10 +1,14 @@
-.PHONY: clean
+LANGS=dyn static racket typed_racket chezscheme gambit ocaml
+LANGS_CLEAN=$(addsuffix .clean, $(LANGS))
 
-clean:
-	$(MAKE) -C dyn clean
-	$(MAKE) -C static clean
-	$(MAKE) -C racket clean
-	$(MAKE) -C typed_racket clean
-	$(MAKE) -C chezscheme clean
-	$(MAKE) -C gambit clean
-	$(MAKE) -C ocaml clean
+.PHONY: all clean $(LANGS) $(LANG_CLEAN)
+
+all: $(LANGS)
+
+clean: $(LANGS_CLEAN)
+
+$(LANGS):
+	$(MAKE) -C $@
+
+%.clean:
+	$(MAKE) -C $* clean

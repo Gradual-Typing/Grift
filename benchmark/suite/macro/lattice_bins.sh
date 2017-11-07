@@ -22,7 +22,7 @@ run_config()
     local baseline_system="$1"; shift
     local i="$1";               shift
     local path="$1";            shift
-    local args="$1";            shift
+    local input_file="$1";      shift
     local disk_aux_name="$1";   shift
     
     local name=$(basename "$path")
@@ -30,28 +30,41 @@ run_config()
     local logfile2="${DATA_DIR}/${name}${disk_aux_name}${i}.csv"
     local cache_file="${TMP_DIR}/static/${name}${disk_aux_name}${i}.cache"
     if [ -f $cache_file ]; then
-	RETURN=$(cat "$cache_file")
+	    RETURN=$(cat "$cache_file")
     else
-	local n=0 b
-	$baseline_system "$name" "$args" "$disk_aux_name"
-	local baseline="$RETURN"
-	echo "name,precision,time,slowdown,speedup" > "$logfile1"
-	for b in $(find "$path" -name "*.o$i"); do
-	    let n=n+1
-	    local binpath="${b%.*}"
-	    local bname=$(basename "$binpath")
-	    local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' < "${binpath}.grift")
-	    echo $b
-	    avg "$b" "$args" "${b}.runtimes"
-	    local t="$RETURN"
-	    local speedup=$(echo "${baseline}/${t}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
-	    local slowdown=$(echo "${t}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
-	    echo $n $b $speedup
-	    printf "%s,%.2f,%.${PRECISION}f,%.2f,%.2f\n" $bname $p $t $slowdown $speedup >> $logfile1
-	done
-	cut -d, -f4 "$logfile1" | sed -n '1!p' | sort | uniq -c | awk ' { t = $1; $1 = $2; $2 = t; print; } ' | awk '{ $1=$1" ,";; print }' > "$logfile2"
-	RETURN="$n"
-	echo "$RETURN" > "$cache_file"
+	    local n=0 b
+	    $baseline_system "$name" "$input_file" "$disk_aux_name"
+	    local baseline="$RETURN"
+	    echo "name,precision,time,slowdown,speedup" > "$logfile1"
+	    for b in $(find "$path" -name "*.o$i"); do
+	        let n=n+1
+	        local binpath="${b%.*}"
+	        local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' \
+                          < "${binpath}.grift")
+            local bname="$(basename $b)"
+            echo $b
+	        avg "$b" "${INPUT_DIR}/${name}/${input_file}"\
+                "static" "${OUTPUT_DIR}/static/${name}/${input_file}"\
+                "${b}.runtimes"
+	        local t="$RETURN"
+	        local speedup=$(echo "${baseline}/${t}" | \
+                                bc -l | \
+                                awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
+	        local slowdown=$(echo "${t}/${baseline}" | \
+                                 bc -l | \
+                                 awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
+	        echo $n $b $speedup
+	        printf "%s,%.2f,%.${PRECISION}f,%.2f,%.2f\n" \
+                   $bname $p $t $slowdown $speedup >> $logfile1
+	    done
+	    cut -d, -f4 "$logfile1" | \
+            sed -n '1!p' | \
+            sort | \
+            uniq -c | \
+            awk ' { t = $1; $1 = $2; $2 = t; print; } ' | \
+            awk '{ $1=$1" ,";; print }' > "$logfile2"
+	    RETURN="$n"
+	    echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -64,18 +77,22 @@ compute_typed_untyped_ratio()
 {
     local i="$1";              shift
     local name="$1";           shift
-    local benchmark_args="$1"; shift
+    local input_file="$1"; shift
     local disk_aux_name="$1";  shift
     
     local cache_file="${TMP_DIR}/${name}${disk_aux_name}${i}_typed_untyped_ratio"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	get_grift_runtime "${TMP_DIR}/static/${name}" "$benchmark_args" "$disk_aux_name" $i
-	t11="$RETURN"
-	get_grift_runtime "${TMP_DIR}/dyn/${name}" "$benchmark_args" "$disk_aux_name" $i
-	t12="$RETURN"
-	RETURN=$(echo "${t11}/${t12}" | bc -l | awk -v p="$PRECISION" '{printf "%.2f\n",$0}')
+	    get_grift_runtime "${TMP_DIR}/static/${name}"\
+                          "$input_file" "$disk_aux_name" $i
+	    t11="$RETURN"
+	    get_grift_runtime "${TMP_DIR}/dyn/${name}" \
+                          "$input_file" "$disk_aux_name" $i
+	    t12="$RETURN"
+	    RETURN=$(echo "${t11}/${t12}" | \
+                     bc -l | \
+                     awk -v p="$PRECISION" '{printf "%.2f\n",$0}')
         echo "$RETURN" > $cache_file
     fi
 }
@@ -94,7 +111,7 @@ gen_output()
     local c1="$1";              shift
     local c2="$1";              shift
     local path="$1";            shift
-    local benchmark_args="$1";  shift
+    local input_file="$1";      shift
     local dynamizer_out="$1";   shift
     local printname="$1";       shift
     local disk_aux_name="$1";   shift
@@ -126,41 +143,53 @@ gen_output()
     local logfile4="${DATA_DIR}/${name}${disk_aux_name}${c2}.csv"
 
     
-    # get_speedup static_schml $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
+    # get_speedup static_schml $baseline_system "$name" "$input_file" "$disk_aux_name"
     # local cr_t="$RETURN"
-    get_speedup gambit $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
+    get_speedup gambit $baseline_system "$name" "$input_file" "$disk_aux_name"
     local gr_t="$RETURN"
 
-    compute_typed_untyped_ratio "$c1" "$name" "$benchmark_args" "$disk_aux_name"
+    compute_typed_untyped_ratio "$c1" "$name" "$input_file" "$disk_aux_name"
     local typed_untyped_ratio1="$RETURN"
-    compute_typed_untyped_ratio "$c2" "$name" "$benchmark_args" "$disk_aux_name"
+    compute_typed_untyped_ratio "$c2" "$name" "$input_file" "$disk_aux_name"
     local typed_untyped_ratio2="$RETURN"
 
-    run_config $baseline_system "$c1" "$path" "$benchmark_args" "$disk_aux_name"
-    run_config $baseline_system "$c2" "$path" "$benchmark_args" "$disk_aux_name"
+    run_config $baseline_system "$c1" "$path" "$input_file" "$disk_aux_name"
+    run_config $baseline_system "$c2" "$path" "$input_file" "$disk_aux_name"
     local n="$RETURN"
 
+    # Should this really be geometric mean?
     speedup_geometric_mean "$logfile1"
     g1="$RETURN"
     speedup_geometric_mean "$logfile3"
     g2="$RETURN"
 
-    $baseline_system "$name" "$benchmark_args" "$disk_aux_name"
+    $baseline_system "$name" "$input_file" "$disk_aux_name"
     local baseline_mean="$RETURN"
 
-    get_static_schml_runtime "$name" "$benchmark_args" "$disk_aux_name"
+    get_static_schml_runtime "$name" "$input_file" "$disk_aux_name"
     local static_mean="$RETURN"
-    local static_speed_up=$(echo "${baseline_mean} ${static_mean}" | awk '{printf "%.2f", $1 / $2}')
+    local static_speed_up=$(echo "${baseline_mean} ${static_mean}" | \
+                                awk '{printf "%.2f", $1 / $2}')
     
     printf "%s:\t\t%d=%.2f\t%d=%.2f\n" $name $c1 $g1 $c2 $g2
     
-    local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile2")
-    local min2=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}' "$logfile4")
-    local max1=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' "$logfile2")
-    local max2=$(awk -v max=0 '{if($1>max){want=$1; max=$1}}END{print want}' "$logfile4")
+    local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}'\
+                 "$logfile2")
+    local min2=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}'\
+                     "$logfile4")
+    local max1=$(awk -v max=0 \
+                     '{if($1>max){want=$1; max=$1}}END{print want}'\
+                     "$logfile2")
+    local max2=$(awk -v max=0 \
+                     '{if($1>max){want=$1; max=$1}}END{print want}'\
+                     "$logfile4")
     local std1 std2 mean1 mean2
-    read std1 mean1 <<< $( cat "$logfile2" | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
-    read std2 mean2 <<< $( cat "$logfile4" | cut -d, -f1 | awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    read std1 mean1 <<< $(cat "$logfile2" |\
+                              cut -d, -f1 |\
+                              awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    read std2 mean2 <<< $(cat "$logfile4" |\
+                              cut -d, -f1 |\
+                              awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
 
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
       	   `"enhanced color font 'Verdana,10' ;"`
@@ -282,7 +311,7 @@ run_benchmark()
     local c1="$1";              shift
     local c2="$1";              shift
     local name="$1";            shift
-    local benchmark_args="$1";  shift
+    local input_file="$1";  shift
     local nsamples="$1";        shift
     local nbins="$1";           shift
     local aux_name="$1";        shift
@@ -294,19 +323,25 @@ run_benchmark()
 
     local disk_aux_name="" print_aux_name=""
     if [[ ! -z "${aux_name}" ]]; then
-	disk_aux_name="_${aux_name}"
-	print_aux_name=" (${aux_name})"
+	    disk_aux_name="_${aux_name}"
+	    print_aux_name=" (${aux_name})"
     fi
     
     local print_name="$(echo "$name" | tr _ "-")${print_aux_name}"
 
+
     local benchmark_args_file="${TMP_DIR}/${name}${disk_aux_name}.args"
+    local input="$(cat ${INPUT_DIR}/${name}/${input_file})"
     if [ -f benchmark_args_file ]; then
-	benchmark_args=$(cat "$benchmark_args_file")
+	    local old_input=$(cat "$benchmark_args_file")
+        if [ ! $old_input == $input ]; then
+            echo "input changed mid test" 1>&2
+            exit 1
+        fi
     else
-	printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
-	printf "Args\t\t:%s\n" "$benchmark_args" >> "$PARAMS_LOG"
-	echo "$benchmark_args" > "$benchmark_args_file"
+	    printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
+	    printf "Args\t\t:%s\n" "$input" >> "$PARAMS_LOG"
+	    echo "$input" > "$benchmark_args_file"
     fi
 
     local lattice_file="${lattice_path}/out"
@@ -318,7 +353,9 @@ run_benchmark()
     rm -f "${lattice_path}.grift"
     cp "$static_source_file" "${lattice_path}.grift"
 
-	local dynamizer_out=$(dynamizer "${lattice_path}.grift" "$nsamples" "$nbins" | sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+	local dynamizer_out=$(dynamizer "${lattice_path}.grift"\
+                                    "$nsamples" "$nbins" | \
+                              sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
 
@@ -343,7 +380,8 @@ run_benchmark()
     racket "${SCHML_DIR}/benchmark/benchmark.rkt" \
            -s "$c1 $c2" "${lattice_path}/"
     
-    gen_output $baseline_system $c1 $c2 "$lattice_path" "$benchmark_args" "$dynamizer_out" "$print_name" "$disk_aux_name"
+    gen_output $baseline_system $c1 $c2 "$lattice_path" "$input_file"\
+               "$dynamizer_out" "$print_name" "$disk_aux_name"
 }
 
 # $1 - baseline system
@@ -361,35 +399,32 @@ run_experiment()
 
     local g=()
 
-    local bs_bc_arg="\"$(cat "${INPUT_DIR}/blackscholes/in_4K.txt")\""
     run_benchmark $baseline_system $c1 $c2 "blackscholes" \
-                  "$bs_bc_arg" "$nsamples" "$nbins" ""
+                  "in_4K.txt" "$nsamples" "$nbins" ""
     g+=($RETURN)
     
-    local qs_wc_arg="\"$(cat "${INPUT_DIR}/quicksort/in_descend1000.txt")\""
     run_benchmark $baseline_system $c1 $c2 "quicksort" \
-                  "$qs_wc_arg" "$nsamples" "$nbins" ""
+                  "in_descend1000.txt" "$nsamples" "$nbins" ""
     g+=($RETURN)
     
-    run_benchmark $baseline_system \
-                 $c1 $c2 "matmult" "200" "$nsamples" "$nbins" ""
+    run_benchmark $baseline_system $c1 $c2 "matmult"\
+                  "400.txt" "$nsamples" "$nbins" ""
     g+=($RETURN)
 
-    run_benchmark $baseline_system \
-                 $c1 $c2 "n_body" "10000" "$nsamples" "$nbins" ""
+    run_benchmark $baseline_system $c1 $c2 "n_body"\
+                  "slow.txt" "$nsamples" "$nbins" ""
     g+=($RETURN)
 
-    run_benchmark $baseline_system \
-                 $c1 $c2 "fft" "32768" "$nsamples" "$nbins" ""
+    # run_benchmark $baseline_system $c1 $c2 "fft"\
+    #               "slow.txt" "$nsamples" "$nbins" ""
+    # g+=($RETURN)
+
+    run_benchmark $baseline_system $c1 $c2 "array" \
+                  "slow.txt" "$nsamples" "$nbins" ""
     g+=($RETURN)
 
-    local arr_bc_arg="\"$(cat "${INPUT_DIR}/array/slow.txt")\""
-    run_benchmark $baseline_system \
-                 $c1 $c2 "array" "$arr_bc_arg" "$nsamples" "$nbins" ""
-    g+=($RETURN)
-
-    local tak_bc_arg="\"$(cat "${INPUT_DIR}/tak/slow.txt")\""
-    run_benchmark $baseline_system $c1 $c2 "tak" "$tak_bc_arg" "$nsamples" "$nbins" ""
+    run_benchmark $baseline_system $c1 $c2 "tak"\
+                  "slow.txt" "$nsamples" "$nbins" ""
     g+=($RETURN)
     
     # # Dynamizer uses too much memory
@@ -399,8 +434,8 @@ run_experiment()
     max=$(echo "${g[*]}" | sort -nr | head -n1)
     min=$(echo "${g[*]}" | sort -n | head -n1)
     
-
-    echo "finished experiment comparing" $c1 "vs" $c2 ", where speedups range from " $min " to " $max
+    echo "finished experiment comparing" $c1 "vs" $c2 \
+         ", where speedups range from " $min " to " $max
 }
 
 main()
@@ -432,8 +467,28 @@ main()
     declare -r TMP_DIR="$EXP_DIR/tmp"
     declare -r SRC_DIR="$TEST_DIR/src"
     declare -r INPUT_DIR="$TEST_DIR/inputs"
+    declare -r OUTPUT_DIR="$TEST_DIR/outputs"
+    declare -r LIB_DIR="$TEST_DIR/lib"
     declare -r PARAMS_LOG="$EXP_DIR/params.txt"
 
+    # Check to see if all is right in the world
+    if [ ! -d $TEST_DIR ]; then
+        echo "test directory not found" 1>&2
+        exit 1
+    elif [ ! -d $SRC_DIR ]; then
+        echo "source directory not found" 1>&2
+        exit 1
+    elif [ ! -d $INPUT_DIR ]; then
+        echo "input directory not found" 1>&2
+        exit 1
+    elif [ ! -d $OUTPUT_DIR ]; then
+        echo "output directory not found" 1>&2
+        exit 1
+    elif [ ! -d $LIB_DIR ]; then
+        echo "lib directory not found" 1>&2
+        exit 1
+    fi
+    
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
     mkdir -p "$TMP_DIR/partial"

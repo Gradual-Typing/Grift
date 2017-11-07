@@ -7,7 +7,7 @@ BIN_SAMPLES ?= 3
 NUM_BINS ?= 30
 TIMING_SAMPLES ?= 30
 
-.PHONY: external internal all clean
+.PHONY: external internal all clean outputs
 
 all: external internal
 
@@ -25,5 +25,7 @@ clean:
 	rm -rf lattice lattice_bins extremes
 	$(MAKE) -C src clean
 
+outputs:
+	$(MAKE) -C outputs
 
 

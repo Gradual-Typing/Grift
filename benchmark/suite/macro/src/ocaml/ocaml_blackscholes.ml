@@ -101,7 +101,7 @@ let fake_data =
    divs         = 0.0;
    derivegem_val= 0.0}
 
-let () =
+let run_benchmark () =
   let number_of_options = read_int () in
   let data = Array.make number_of_options fake_data in
   for i = 0 to number_of_options - 1 do
@@ -133,3 +133,5 @@ let () =
   for i = 0 to number_of_options - 1 do
     Printf.printf "%.*f\n" 18 prices.(i);
   done
+
+let () = Time.time run_benchmark ()

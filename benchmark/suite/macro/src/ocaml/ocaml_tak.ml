@@ -7,8 +7,10 @@ let rec tak x y z =
            (tak (y - 1) z x)
            (tak (z - 1) x y)
 
-let () =
+let run_benchmark () =
   let x = read_int () in
   let y = read_int () in
   let z = read_int () in
   Printf.printf "%d\n" (tak x y z)
+
+let () = Time.time run_benchmark ()

@@ -85,7 +85,7 @@
 
 (define number-of-runs 100)
 
-(define (main)
+(define (run-benchmark)
   (define number-of-options (read))
 
   (define fake-data '#(#i0 #i0 #i0 #i0 #i0 #i0 #\P #i0 #i0))
@@ -135,11 +135,10 @@
                                     (vector-ref otypes i)
                                     #i0)))
       prices))
-
   (for ([i (in-range 0 number-of-options)])
     (display (real->decimal-string (vector-ref prices i) 18))
     (newline)))
 
-(time (main))
+(time (run-benchmark))
 
 

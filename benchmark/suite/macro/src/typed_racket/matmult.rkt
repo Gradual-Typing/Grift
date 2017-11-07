@@ -54,7 +54,8 @@
     (if (= ac br)
         (let ([a (create ar ac)]
               [b (create br bc)])
-          (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1)))
+          (display (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1)))
+          (newline))
         0))))
 
 (time (main))

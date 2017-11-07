@@ -26,6 +26,10 @@
       (go (fx- m 1) n (my-try n))
       r))
 
-(let* ((input1 (read))
-       (input2 (read)))
-  (pretty-print (go input1 input2 0)))
+(define (run-benchmark)
+  (let* ((input1 (read))
+         (input2 (read)))
+    (display (go input1 input2 0))
+    (newline)))
+
+(time (run-benchmark))

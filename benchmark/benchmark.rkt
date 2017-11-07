@@ -10,6 +10,8 @@
          "../src/configuration.rkt"
          "../tests/paths.rkt")
 
+(provide compile-file)
+
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
@@ -34,11 +36,10 @@
      (string-append ".o" (number->string i))))
   (parameterize ([specialize-cast-code-generation? specialize-casts?]
                  [hybrid-cast/coercion-runtime? hybrid-runtime?])
-    (if (not (file-exists? exe))
-        (begin
-          (printf "~a\n" exe)
-          (compile src #:output exe #:cast cast #:ref ref))
-        (void))))
+    (unless (file-exists? exe)
+      (printf "~a\n" exe)
+      (compile src #:output exe #:cast cast #:ref ref)))
+  exe)
 
 #;
 (define configs

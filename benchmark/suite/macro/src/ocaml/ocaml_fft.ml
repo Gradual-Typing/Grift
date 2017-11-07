@@ -1,5 +1,5 @@
 
-let () =
+let run_benchmark () =
   let n = read_int () in
   let data = Array.make n 0.0 in
   let pi_2 = 6.28318530717959 in
@@ -47,3 +47,5 @@ let () =
   loop 0 0; (* bit-reversal section *)
   loop3 2;(* Danielson-Lanczos section *)
   Printf.printf "%f\n" data.(0)
+
+let () = Time.time run_benchmark ()
