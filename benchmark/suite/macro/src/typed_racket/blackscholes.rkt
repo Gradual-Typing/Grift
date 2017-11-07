@@ -1,7 +1,4 @@
 #lang typed/racket/base
-
-(require racket/flonum)
-
 ;;; 9/27/2017 added types to support typed-racket by Andre Kuhlenschmidt
 ;;; 10/9/2017 changed to use internal timing (Andre)
 ;;;
@@ -11,6 +8,7 @@
 ;;; contracts, and we are only interested in comparing safe code.  The
 ;;; racket/fixnum safe operations are generally no faster than using
 ;;; generic primitives like +. (According to the documentation)
+(require racket/flonum)
 
 (define inv-sqrt-2x-pi : Flonum 0.39894228040143270286)
 
@@ -104,9 +102,9 @@
 
 (define number-of-runs : Integer 100)
 
-(define (main)
-  (define number-of-options : Integer
-    (let ([n (read)])
+(define (run-benchmark)
+  (define number-of-options : Integer 
+    (let ([n : Any (read)])
       (unless (fixnum? n)
         (error 'blackscholes.rkt
                "invalid input: expected fixnum number of options"))
@@ -133,12 +131,11 @@
     ;; This is done this way to prevent the unit value
     ;; from printing out at the top level.
     (let ([otimes : (Vectorof Flonum) (make-vector number-of-options #i0)])
-      (do ([i : Integer 0 (+ i 1)])
-          ((< i number-of-options))
+      (for ([i (in-range 0 number-of-options)])
         (let ([od : Stock-Option (vector-ref data i)])
           (vector-set! otypes i
                        (if (= (char->integer (vector-ref od 6))
-                                (char->integer #\P))
+                              (char->integer #\P))
                            1
                            0))
           (vector-set! spots i (vector-ref od 0))
@@ -150,24 +147,19 @@
 
   (define prices : (Vectorof Flonum)
     (let ([prices : (Vectorof Flonum) (make-vector number-of-options #i0)])
-      (do ([j : Integer 0 (+ j 1)])
-          ((< j number-of-runs))
-        (do ([i : Integer 0 (+ i 1)])
-            ((< j number-of-options))
-          (vector-set! prices i
-                       (black-scholes (vector-ref spots i)
-                                      (vector-ref strikes i)
-                                      (vector-ref rates i)
-                                      (vector-ref volatilities i)
-                                      (vector-ref otimes i)
-                                      (vector-ref otypes i)
-                                      #i0))))
+      (for* ([j (in-range 0 number-of-runs)]
+             [i (in-range 0 number-of-options)])
+        (vector-set! prices i
+                     (black-scholes (vector-ref spots i)
+                                    (vector-ref strikes i)
+                                    (vector-ref rates i)
+                                    (vector-ref volatilities i)
+                                    (vector-ref otimes i)
+                                    (vector-ref otypes i)
+                                    #i0)))
       prices))
-
-  (do : Void
-    ([i : Integer 0 (+ i 1)])
-    ((< i number-of-options))
+  (for ([i (in-range 0 number-of-options)])
     (display (real->decimal-string (vector-ref prices i) 18))
     (newline)))
 
-(time (main))
+(time (run-benchmark))

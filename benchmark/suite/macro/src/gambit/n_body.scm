@@ -1,4 +1,5 @@
 #!gsi-script
+(declare (standard-bindings) (extended-bindings) (block))
 
 ;; The Computer Language Benchmarks Game
 ;; http://shootout.alioth.debian.org/
@@ -165,11 +166,8 @@ Correct output N = 1000 is
               (body-z-set! o1 (fl+ (body-z o1) (fl* dt (body-vz o1))))
               (loop-o (cdr o))))))
 
-;; -------------------------------
-(define (main . args)
-  (let ((n (if (fx< (length args) 1)
-               (read)
-               (string->number (car args))))
+(define (run-benchmark)
+  (let ((n (read))
         (system (list *sun* *jupiter* *saturn* *uranus* *neptune*)))
     (offset-momentum system)
     (display (roundto 9 (energy system))) (newline)
@@ -177,3 +175,6 @@ Correct output N = 1000 is
         ((fx< n i))
       (advance system 0.01))
     (display (roundto 9 (energy system))) (newline)))
+
+(time (run-benchmark) (current-output-port))
+

@@ -162,11 +162,14 @@ Correct output N = 1000 is
               (loop-o (cdr o))))))
 
 ;; -------------------------------
-(let ((n (read))
-      (system (list *sun* *jupiter* *saturn* *uranus* *neptune*)))
-  (offset-momentum system)
-  (display (roundto 9 (energy system))) (newline)
-  (do ((i 1 (fx+ i 1)))
-      ((fx< n i))
-    (advance system 0.01))
-  (display (roundto 9 (energy system))) (newline))
+(define (run-benchmark)
+  (let ((n (read))
+        (system (list *sun* *jupiter* *saturn* *uranus* *neptune*)))
+    (offset-momentum system)
+    (display (roundto 9 (energy system))) (newline)
+    (do ((i 1 (fx+ i 1)))
+        ((fx< n i))
+      (advance system 0.01))
+    (display (roundto 9 (energy system))) (newline)))
+
+(time (run-benchmark))

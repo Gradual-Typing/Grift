@@ -24,8 +24,9 @@ let rec go m n r =
     go (m - 1) n (my_try n)
   else r
 
-let () =
+let run_benchmark () =
   let input1 = int_of_string(input_line stdin) in
   let input2 = int_of_string(input_line stdin) in
   Printf.printf "%d\n" (go input1 input2 0)
 
+let () = Time.time run_benchmark ()

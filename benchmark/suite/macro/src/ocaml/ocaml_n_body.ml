@@ -107,7 +107,7 @@ let sun = { x = 0.;  y = 0.;  z = 0.;  vx = 0.;  vy = 0.; vz = 0.;
 
 let bodies = [| sun; jupiter; saturn; uranus; neptune |]
 
-let () =
+let run_benchmark () =
   (* Changed this line to read from stdin intead of command line arg *)
   let n = int_of_string(input_line stdin) in
   offset_momentum bodies;
@@ -115,3 +115,4 @@ let () =
   for i = 1 to n do advance bodies 0.01 done;
   Printf.printf "%.9f\n" (energy bodies)
   
+let () = Time.time run_benchmark ()

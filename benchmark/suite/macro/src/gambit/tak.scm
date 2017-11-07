@@ -1,4 +1,5 @@
 #!gsi-script -:d0
+(declare (standard-bindings) (extended-bindings) (block))
 ;;; TAK -- A vanilla version of the TAKeuchi function.
 
 (define (tak x y z)
@@ -8,8 +9,12 @@
            (tak (fx- y 1) z x)
            (tak (fx- z 1) x y))))
 
-(define (main . args)
+(define (run-benchmark)
   (let* ([x (read)]
-	 [y (read)]
-	 [z (read)])
-    (pretty-print (tak x y z))))
+         [y (read)]
+         [z (read)])
+    (display (tak x y z))
+    (newline)))
+
+(time (run-benchmark) (current-output-port))
+  

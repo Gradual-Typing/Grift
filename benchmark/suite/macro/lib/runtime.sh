@@ -1,11 +1,14 @@
-
-# $2 - space-separated benchmark arguments
+# $1 - Name of the benchmark
+# $2 - file containing the input to the benchmark
 # $3 - disk aux name
 # $RETURN - the runtime for the racket benchmark
 get_racket_runtime()
 {
+    # name of the benchmark
     local benchmark="$1";      shift
-    local benchmark_args="$1"; shift
+    # input file
+    local input="$1"; shift
+    # I am not sure what this is. -andre
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/racket/${benchmark}"
@@ -15,7 +18,10 @@ get_racket_runtime()
         RETURN=$(cat "$cache_file")
     else
 	raco make "${benchmark_path}.rkt"
-	racket_avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file" "${benchmark_path}.tmp.txt"
+	avg "racket ${benchmark_path}.rkt"\
+        "${INPUT_DIR}/${benchmark}/${input}"\
+        "racket" "${OUTPUT_DIR}/racket/${benchmark}/${input}" \
+        "$runtimes_file" 
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -26,7 +32,7 @@ get_racket_runtime()
 get_typed_racket_runtime()
 {
     local benchmark="$1";      shift
-    local benchmark_args="$1"; shift
+    local input="$1"; shift
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/typed_racket/${benchmark}"
@@ -36,7 +42,10 @@ get_typed_racket_runtime()
         RETURN=$(cat "$cache_file")
     else
 	raco make "${benchmark_path}.rkt"
-	racket_avg "racket ${benchmark_path}.rkt" "$benchmark_args" "$runtimes_file" "${benchmark_path}.tmp.txt"
+	avg "racket ${benchmark_path}.rkt"\
+        "${INPUT_DIR}/${benchmark}/${input}"\
+        "typed_racket" "${OUTPUT_DIR}/typed_racket/${benchmark}/${input}"\
+        "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -47,18 +56,21 @@ get_typed_racket_runtime()
 get_ocaml_runtime()
 {
     local benchmark="$1";      shift
-    local benchmark_args="$1"; shift
+    local input="$1"; shift
     local disk_aux_name="$1";  shift
     
-    local benchmark_path="${TMP_DIR}/ocaml/ocaml_${benchmark}"
+    local benchmark_path="${TMP_DIR}/ocaml/${benchmark}"
     local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	ocamlopt -O3 -o "${benchmark_path}" "${benchmark_path}.ml"
-    avg "${benchmark_path}" "$benchmark_args" "$runtimes_file"
-	echo "$RETURN" > "$cache_file"
+    make -C "$(dirname $benchmark_path)"
+    avg "${benchmark_path}"\
+        "${INPUT_DIR}/${benchmark}/${input}"\
+        "ocaml" "${OUTPUT_DIR}/ocaml/${benchmark}/${input}"\
+        "$runtimes_file"
+    echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -79,7 +91,9 @@ get_chezscheme_runtime()
         RETURN=$(cat "$cache_file")
     else
 	echo "(compile-program \"${benchmark_path}.ss\")" | scheme -q
-	avg "${TMP_DIR}/chezscheme/./${benchmark}.so" "$benchmark_args" "$runtimes_file"
+	avg "${benchmark_path}.so" "${INPUT_DIR}/${benchmark}/${input}"\
+        "chezscheme" "${OUTPUT_DIR}/chezscheme/${benchmark}/${input}"\
+        "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
@@ -98,7 +112,7 @@ get_chezscheme_runtime()
 get_static_schml_runtime()
 {
     local benchmark="$1";      shift
-    local benchmark_args="$1"; shift
+    local input="$1"; shift
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/static/${benchmark}"
@@ -109,12 +123,15 @@ get_static_schml_runtime()
         RETURN=$(cat "$cache_file")
     else
         "${SCHML_DIR}/main.rkt" \
-               "--static" \
-               "-O" "3" \
-               "-o" "${benchmark_path}.static" \
-               "${benchmark_path}.schml"
-     
-        avg "${benchmark_path}.static" "$benchmark_args" "$runtimes_file"
+            "--static" \
+            "-O" "3" \
+            "-o" "${benchmark_path}.static" \
+            "${benchmark_path}.schml"
+
+        avg "${benchmark_path}.static" "${INPUT_DIR}/${benchmark}/${input}"\
+            "static" "${OUTPUT_DIR}/static/${benchmark}/${input}"\
+            "$runtimes_file"
+        
         echo "$RETURN" > "$cache_file"
     fi
 }
@@ -123,10 +140,11 @@ get_static_schml_runtime()
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
 # $RETURN - the runtime for the Grift benchmark
+# This function is out of date and isn't used anywhere
 get_grift_runtimes()
 {
     local benchmark_path="$1"; shift
-    local benchmark_args="$1"; shift
+    local input="$1"; shift
     local disk_aux_name="$1";  shift
 
     local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
@@ -134,10 +152,10 @@ get_grift_runtimes()
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
     else
-	racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
+    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
 	local configs=($(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -i))
 	for i in ${configs[@]}; do
-	    avg "${benchmark_path}.o${i}" "$benchmark_args" "$runtimes_file"
+	    avg "${benchmark_path}.o${i}" "${input}" "$runtimes_file"
 	    echo "$RETURN" >> "$cache_file"
 	done
 	readarray RETURN < "$cache_file"
@@ -152,18 +170,23 @@ get_grift_runtimes()
 get_grift_runtime()
 {
     local benchmark_path="$1"; shift
-    local benchmark_args="$1"; shift
+    local input="$1"; shift
     local disk_aux_name="$1";  shift
     local config_index="$1";   shift
-
+    local benchmark="$(basename $benchmark_path)"
+    
     local runtimes_file="${benchmark_path}${disk_aux_name}${config_index}.runtimes"
     local cache_file="${benchmark_path}${disk_aux_name}${config_index}.runtime"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	racket "${GRIFT_DIR}/benchmark/benchmark.rkt" --config $config_index "${benchmark_path}.grift"
-	avg "${benchmark_path}.o${config_index}" "$benchmark_args" "$runtimes_file"
-	echo "$RETURN" > "$cache_file"
+	    racket "${GRIFT_DIR}/benchmark/benchmark.rkt"\
+               --config $config_index "${benchmark_path}.grift"
+	    avg "${benchmark_path}.o${config_index}"\
+            "${INPUT_DIR}/${benchmark}/${input}"\
+            "static" "${OUTPUT_DIR}/static/${benchmark}/${input}"\
+            "$runtimes_file"
+	    echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -171,10 +194,11 @@ get_grift_runtime()
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
 # $RETURN - the slowdown factor for the C benchmark
+# This function is out of date and we no longer compare against c
 get_c_runtime()
 {
     local benchmark="$1";      shift
-    local benchmark_args="$1"; shift
+    local input="$1"; shift
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/c/${benchmark}"
@@ -184,10 +208,12 @@ get_c_runtime()
         RETURN=$(cat "$cache_file")
     else
 	clang "${benchmark_path}.c" "${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
-	avg "${benchmark_path}.o" "$benchmark_args" "$runtimes_file"
+	avg "${benchmark_path}.o" "${input}" "$runtimes_file"
 	echo "$RETURN" > "$cache_file"
     fi
 }
+
+
 
 # $1 - benchmark filename without extension
 # $2 - space-separated benchmark arguments
@@ -196,7 +222,7 @@ get_c_runtime()
 get_gambit_runtime()
 {
     local benchmark="$1";      shift
-    local benchmark_args="$1"; shift
+    local input="$1";          shift
     local disk_aux_name="$1";  shift
     
     local benchmark_path="${TMP_DIR}/gambit/${benchmark}"
@@ -205,9 +231,12 @@ get_gambit_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	gsc -prelude "(declare (standard-bindings) (block))" -exe -cc-options -O3 "${benchmark_path}.scm"
-	avg "${benchmark_path}" "$benchmark_args" "$runtimes_file"
-	echo "$RETURN" > "$cache_file"
+	    gsc -prelude "(declare (standard-bindings) (block))"\
+            -exe -cc-options -O3 "${benchmark_path}.scm"
+	    avg "${benchmark_path}" "${INPUT_DIR}/${benchmark}/${input}"\
+            "gambit" "${OUTPUT_DIR}/gambit/${benchmark}/${input}" \
+            $"runtimes_file"
+	    echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -243,7 +272,7 @@ get_grift_slowdowns()
 
 # $1 - baseline system
 # $2 - benchmark file path without extension
-# $3 - space-separated benchmark arguments
+# $3 - file containing the benchmark input
 # $4 - disk aux name
 # $5 - configuration index
 # $RETURN - the runtime for the racket benchmark
@@ -251,18 +280,20 @@ get_grift_slowdown()
 {
     local baseline_system="$1"; shift
     local benchmark_path="$1";  shift
-    local benchmark_args="$1";  shift
+    local input="$1";  shift
     local disk_aux_name="$1";   shift
     local config_index="$1";    shift
     
-    local cache_file="${benchmark_path}${disk_aux_name}${config_index}.slowdown_${baseline_system}"
+    local name="${benchmark_path}${disk_aux_name}${config_index}"
+    local cache_file="${name}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	local benchmark=$(basename "$benchmark_path")
-	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
 	local baseline="$RETURN" st sr;
-	get_grift_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
+	get_grift_runtime "$benchmark_path" "${input}"\
+                      "$disk_aux_name" $config_index
 	local st="$RETURN";
 	RETURN=$(echo "${st} ${baseline}" | awk '{printf "%.2f", $1 \ $2}')
 	echo "$RETURN" >> "$cache_file"
@@ -271,7 +302,7 @@ get_grift_slowdown()
 
 # $1 - baseline system
 # $2 - benchmark file path without extension
-# $3 - space-separated benchmark arguments
+# $3 - file containing the benchmark input
 # $4 - disk aux name
 # $5 - configuration index
 # $RETURN - the runtime for the racket benchmark
@@ -279,19 +310,20 @@ get_grift_speedup()
 {
     local baseline_system="$1"; shift
     local benchmark_path="$1";  shift
-    local benchmark_args="$1";  shift
+    local input="$1";  shift
     local disk_aux_name="$1";   shift
     local config_index="$1";    shift
 
     # Is this cache_file supose to be called .slowdown_ ?
-    local cache_file="${benchmark_path}${disk_aux_name}${config_index}.slowdown_${baseline_system}"
+    local name="${benchmark_path}${disk_aux_name}${config_index}"
+    local cache_file="${name}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
 	local benchmark=$(basename "$benchmark_path")
-	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
 	local baseline="$RETURN" st sr;
-	get_grift_runtime "$benchmark_path" "$benchmark_args" "$disk_aux_name" $config_index
+	get_grift_runtime "$benchmark_path" "${input}" "$disk_aux_name" $config_index
 	local st="$RETURN";
 	RETURN=$(echo "${baseline} ${st}" | awk '{printf "%.2f\n", $1 / $2}')
 	echo "$RETURN" >> "$cache_file"
@@ -301,7 +333,7 @@ get_grift_speedup()
 # $1 - system
 # $2 - baseline system
 # $3 - benchmark filename without extension
-# $4 - space-separated benchmark arguments
+# $4 - file containing the input to the benchmark
 # $5 - disk aux name
 # $6 - aux information
 # $RETURN - the slowdown factor for that system benchmark
@@ -310,17 +342,17 @@ get_slowdown()
     local system="$1";          shift
     local baseline_system="$1"; shift
     local benchmark="$1";       shift
-    local benchmark_args="$1";  shift
+    local input="$1";  shift
     local disk_aux_name="$1";   shift
     
-    local benchmark_path="${TMP_DIR}/${system}/${benchmark}"
-    local cache_file="${benchmark_path}${disk_aux_name}.slowdown_${baseline_system}"
+    local name="${TMP_DIR}/${system}/${benchmark}${disk_aux_name}"
+    local cache_file="${name}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
 	local baseline="$RETURN";
-	"get_${system}_runtime" "$benchmark" "$benchmark_args" "$disk_aux_name"
+	"get_${system}_runtime" "$benchmark" "${input}" "$disk_aux_name"
 	local ct="$RETURN"
 	local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
 	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
@@ -340,64 +372,75 @@ get_speedup()
     local system="$1";          shift
     local baseline_system="$1"; shift
     local benchmark="$1";       shift
-    local benchmark_args="$1";  shift
+    local input="$1";  shift
     local disk_aux_name="$1";   shift
     
-    local benchmark_path="${TMP_DIR}/${system}/${benchmark}"
-    local cache_file="${benchmark_path}${disk_aux_name}.slowdown_${baseline_system}"
+    local name="${TMP_DIR}/${system}/${benchmark}${disk_aux_name}"
+    local cache_file="${name}.slowdown_${baseline_system}"
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
 	local baseline="$RETURN";
-	"get_${system}_runtime" "$benchmark" "$benchmark_args" "$disk_aux_name"
+	"get_${system}_runtime" "$benchmark" "${input}" "$disk_aux_name"
 	local ct="$RETURN"
 	RETURN=$(echo "${baseline} ${ct}" | awk '{printf "%.2f", $1 / $2}')
 	echo "$RETURN" > "$cache_file"
     fi
 }
 
-# $1 - binary to run
-# $2 - stdin arguments
-# $3 - path to the file that will record individual runtimes
 # $RETURN - average runtime
 avg()
 {
-    local bin="$1";           shift
-    local arg="$1";           shift
-    local runtimes_file="$1"; shift
-    local c="time ( echo ${arg} | ${bin} ) 2>&1 1>/dev/null"
-    local avg_sum=0.0
-    local avg_i avg_t
-    for avg_i in `seq $LOOPS`; do
-	avg_t=$(eval "$c")
-	echo $avg_t >> "$runtimes_file"
-	avg_sum=$(echo "${avg_sum} ${avg_t}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 + $2}')
-    done
-    RETURN=$(echo "${avg_sum} ${LOOPS}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 / $2}')
-}
+    # $1 A shell command that will execute the benchmark
+    # This command cannot redirect the io of the benchmark
+    local cmd="$1";             shift
 
-# $1 - binary to run
-# $2 - stdin arguments
-# $3 - path to the file that will record individual runtimes
-# $RETURN - average runtime
-racket_avg()
-{
-    local bin="$1";             shift
-    local arg="$1";             shift
-    local runtimes_file="$1";   shift
-    local output_tmp_file="$1"; shift
-    local c="echo ${arg} | ${bin}"
-    local avg_sum=0.0
-    local avg_i avg_t output
-    for avg_i in `seq $LOOPS`; do
+    # $2 A path to the input communicated to the benchmark on stdin
+    local input_file="$1";      shift
+
+    # $3 The language being benchmarked
+    local lang="$1";      shift
+
+    # $4 A path to the expected output of the benchmark on stdout
+    local output_file="$1";     shift
     
-    $(eval "$c > ${output_tmp_file}")
-    avg_t=$(eval "cat ${output_tmp_file} | racket ${TEST_DIR}/lib/parse-racket-time.rkt")
-	echo $avg_t >> "$runtimes_file"
-	avg_sum=$(echo "${avg_sum} ${avg_t}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 + $2}')
+    # $5 A path to the file where the runtimes will be saved
+    # this path is also used to make tempory files to save io.
+    local runtimes_file="$1";   shift
+    
+    # extend the command to write to standard temp files and pipe input
+    local tmp_out="${runtimes_file}.tmp.out"
+    local tmp_err="${runtimes_file}.tmp.err"
+    cmd="cat ${input_file} | ${cmd} 1> ${tmp_out} 2> ${tmp_err}"
+    
+    for avg_i in `seq $LOOPS`; do
+        eval "$cmd"
+        local cmd_status=$?
+        if [ $cmd_status -ne 0 ]; then
+            echo "benchmark errored" 1>&2
+            cat ${tmp_err} 1>&2
+            exit 1
+        else
+            local pt_out="$(racket ${LIB_DIR}/parse-time.rkt \
+                                   --lang ${lang} \
+                                   --in ${tmp_out} \
+                                   --expect ${output_file})"
+            local pt_status=$?
+            if [ $pt_status -ne 0 ] || [ -z $pt_out ]; then
+                echo "Failed parse" 1>&2
+                exit 1
+            else
+                rm $tmp_out $tmp_err
+                echo $pt_out >> $runtimes_file
+            fi
+        fi
     done
-    RETURN=$(echo "${avg_sum} ${LOOPS}" | awk -v p="$PRECISION" '{printf "%.*f", p, $1 / $2}')
+    RETURN="$(racket ${LIB_DIR}/mean.rkt -d $PRECISION -f $runtimes_file)"
+    if [ $? -ne 0 ] || [ -z $RETURN ]; then
+        echo "Failed mean" 1>&2
+        exit 1
+    fi
 }
 
 # $1 - logfile

@@ -141,10 +141,9 @@
                  (fl- (point-y c) (point-y pt))
                  (fl- (point-z c) (point-z pt)))))
 
-(begin
+(define (run-benchmark)
   (let ([counter (box 29)])
-    (begin
-      (defsphere 32 0.0 -300.0 -1200.0 200.0 0.8)
+    (defsphere 32 0.0 -300.0 -1200.0 200.0 0.8)
       (defsphere 31 -80.0 -150.0 -1200.0 200.0 0.7)
       (defsphere 30 70.0 -100.0 -1200.0 200.0 0.9)
       (do ((x -2 (fx+ x 1)))
@@ -158,5 +157,7 @@
             (fl* (exact->inexact z) -400.0)
             40.0
             0.75)
-          (set-box! counter (- (unbox counter) 1))))))
+          (set-box! counter (- (unbox counter) 1)))))
   (tracer 1))
+
+(time (run-benchmark))

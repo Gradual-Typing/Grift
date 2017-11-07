@@ -15,10 +15,11 @@
            (tak (- y 1) z x)
            (tak (- z 1) x y))))
 
-(define (main)
+(define (run-benchmark)
   (let* ([x (read)]
          [y (read)]
          [z (read)])
     (display (tak x y z))))
 
-(time (main))
+(time (run-benchmark))
+

@@ -1,6 +1,5 @@
 #!gsi-script
-
-(declare (standard-bindings)(extended-bindings)(block) (safe))
+(declare (standard-bindings) (extended-bindings) (block))
 
 (define-macro (when test . body)
   `(if ,test 
@@ -134,9 +133,12 @@
            (loop (fx+ j 1) 0))))
     prices))
 
-(let loop ([i 0])
-  (when (fx< i number-of-options)
-   (display (vector-ref prices i))
-   (newline)
-   (loop (fx+ i 1))))
+(define (run-benchmark)
+  (let loop ([i 0])
+    (when (fx< i number-of-options)
+          (display (vector-ref prices i))
+          (newline)
+          (loop (fx+ i 1)))))
+
+(time (run-benchmark) (current-output-port))
 

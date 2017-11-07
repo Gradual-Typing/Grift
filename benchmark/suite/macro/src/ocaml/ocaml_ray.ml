@@ -99,7 +99,7 @@ let tracer res =
 let defsphere i x y z r c =
   world.(i) <- {color=c; radius=r; center={x=x;y=y;z=z}}
   
-let () =
+let run_benchmark () =
   let counter = ref 29 in
   defsphere 32    0.0  (-300.0) (-1200.0) 200.0 0.8;
   defsphere 31 (-80.0) (-150.0) (-1200.0) 200.0 0.7;
@@ -116,3 +116,5 @@ let () =
     done
   done;
   tracer 1
+
+let () = Time.time run_benchmark ()

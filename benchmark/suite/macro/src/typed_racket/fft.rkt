@@ -93,6 +93,7 @@
   (begin
     (loop1 0 0) ;; bit-reversal section
     (loop3 2)   ;; Danielson-Lanczos section
-    (vector-ref data 0)))
+    (display (vector-ref data 0))
+    (newline)))
 
 (time (main))
