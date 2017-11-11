@@ -83,6 +83,11 @@ run_benchmark()
 
     write_grift_speedups $baseline_system_dynamic "$name" "$input_file"\
                          "$disk_aux_name" dyn "$logfile2"
+
+    # The systems to compare against
+    get_speedup gambit $baseline_system_dynamic\
+                "$name" "$input_file" "$disk_aux_name"
+    printf ",$RETURN" >> $logfile2
     get_speedup racket $baseline_system_dynamic\
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
@@ -112,6 +117,7 @@ gen_fig()
             `" noenhanced color font 'Verdana,26' ;"`
             `"set output '${outfile}';"`
 	        `"set border 15 back;"`
+            `"set logscale y;"`
             `"set key ${key_position} font 'Verdana,20';"`
             `"set style data histogram;"`
             `"set style histogram cluster gap 1;"`
@@ -144,7 +150,7 @@ run_experiment()
                               --name-sep "_" --common $configs)
     
     echo "name,${config_str},Typed-Racket,OCaml" > "$logfile1"
-    echo "name,${config_str},Racket,Chez Scheme" > "$logfile2"
+    echo "name,${config_str},Gambit,Racket,Chez Scheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
     run_benchmark $baseline_system_static $baseline_system_dynamic\
@@ -177,7 +183,7 @@ run_experiment()
     echo "$gmlog2" > $logfile2
 
     gen_fig static "Static Grift" "${shared_str}_static" "right"
-    gen_fig dyn Gambit "${shared_str}_dynamic" "left"
+    gen_fig dyn Racket "${shared_str}_dynamic" "left"
 }
 
 main()
@@ -263,7 +269,7 @@ main()
 	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
     fi
 
-    run_experiment get_static_schml_runtime get_gambit_runtime
+    run_experiment get_static_schml_runtime get_racket_runtime
     echo "done."
 }
 
