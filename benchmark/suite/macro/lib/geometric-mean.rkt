@@ -3,7 +3,8 @@
          racket/function
          racket/match
          racket/sequence
-         racket/string)
+         racket/string
+         "./csv.rkt")
 
 ;; calculates the geometric mean of a non-empty list or vector
 (define (geometric-mean ns)
@@ -30,26 +31,6 @@
   (check-d=? (geometric-mean '(10 51.2 8)) 16 #i2e-15)
   (check-d=? (geometric-mean '(1 3 9 27 81)) 9 #i2e-15))
 
-;; convert a csv string to a list of lists of strings
-(define (string->csv s)
-  (define (parse-lines lns) (string-split lns "\n"))
-  (define (parse-line  ln) (string-split ln #px"\\s*,\\s*"))
-  (map parse-line (parse-lines s)))
-
-(define (file->csv p) (string->csv (file->string p)))
-
-;; print a csv file
-(define (csv->string csv)
-  (define (join-rows ls) (string-join ls ","))
-  (define (join-lines ls) (string-join ls "\n"))
-  (join-lines (map join-rows csv)))
-
-(define (string->file str file #:exists [ex 'replace])
-  (call-with-output-file file #:exists ex (lambda (p) (display str p))))
-
-(define (csv->file csv file #:exists [ex 'replace])
-  (string->file (csv->string csv) file #:exists ex))
-
 (define (gm-csv csv)
   (match csv
     [(list (list cname* ...) (list rname n** ...) ...)
@@ -67,7 +48,7 @@
          (define slice (for/list ([c (in-list n**)]) (list-ref c i)))
          (define gm (geometric-mean (map string->number slice))) 
          (number->string (exact->inexact gm))))
-     `(,cname* ,@(map cons rname n**) ("geometric mean" . ,gm*))]))
+     `(,cname* ("geometric mean" . ,gm*) ,@(map cons rname n**))]))
 
 
 (module+ main

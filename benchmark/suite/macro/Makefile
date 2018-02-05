@@ -22,10 +22,9 @@ test:
 	TIMING_SAMPLES=1 BIN_SAMPLES=1 $(MAKE) all
 
 clean:
-	rm -rf lattice lattice_bins extremes
+	find extremes lattice_bins -executable -and \( -not -type d \) -delete
+	find extremes lattice_bins -type d -and -name "compiled" -exec rm -r {} \;
 	$(MAKE) -C src clean
 
 outputs:
 	$(MAKE) -C outputs
-
-

@@ -1,0 +1,26 @@
+# line styles for ColorBrewer Dark2
+# for use with qualitative/categorical data
+# provides 8 dark colors based on Set2
+# compatible with gnuplot >=4.2
+# author: Anna Schneider
+# use "load 'path/to/dark-colors.pal'"
+
+
+set style line 1 lc rgb '#7570B3';
+set style line 7 lc rgb '#666666';
+set style line 2 lc rgb '#E7298A';
+set style line 4 lc rgb '#E6AB02';
+set style line 3 lc rgb '#66A61E';
+set style line 5 lc rgb '#1B9E77';
+set style line 6 lc rgb '#A6761D';
+
+
+# palette
+set palette maxcolors 7
+set palette defined ( 0 '#1B9E77',\
+                      1 '#7570B3',\
+                      2 '#66A61E',\
+                      3 '#E7298A',\
+                      4 '#A6761D',\
+                      5 '#E6AB02',\
+                      6 '#666666' )

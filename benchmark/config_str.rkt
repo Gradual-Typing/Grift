@@ -4,11 +4,10 @@ Description: Facilitates a user-friendly interface for Grift
              configurations. It is used mainly by the benchmarking
              scripts.
 |#
-
 #lang racket
 (require racket/runtime-path)
 
-(provide configs)
+(provide configs config->name name-sep name-end)
 
 (define configs
   (make-hash
@@ -53,13 +52,6 @@ Description: Facilitates a user-friendly interface for Grift
     (lambda (in)
       (write configs in))))
 
-(module+ main
-  (define (default-main)
-    (void))
-
-  
-  (define main-fn (make-parameter default-main))
-
   (define name-sep (make-parameter " "))
   (define name-end (make-parameter ""))
 
@@ -82,9 +74,22 @@ Description: Facilitates a user-friendly interface for Grift
   ;; representation of that name.
   (define (set->name s [sep (name-sep)] [end (name-end)])
     (define ls (set->list s))
-    (define sls (sort ls name-element<?))
+    (list->name (set->list s) sep end))
+
+  (define (list->name l [sep (name-sep)] [end (name-end)])
+    (define sls (sort l name-element<?))
     (define ss (map symbol->string sls)) 
     (string-join ss sep #:after-last end))
+  
+  (define (config->name c [sep (name-sep)] [end (name-end)])
+    (list->name (hash-ref configs c) sep end))
+    
+
+(module+ main
+  (define (default-main)
+    (void))
+  
+  (define main-fn (make-parameter default-main))
 
   (command-line
    #:once-each
