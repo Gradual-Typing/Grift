@@ -88,9 +88,11 @@ run_benchmark()
     get_speedup gambit $baseline_system_dynamic\
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
-    get_speedup racket $baseline_system_dynamic\
-                "$name" "$input_file" "$disk_aux_name"
-    printf ",$RETURN" >> $logfile2
+    
+    # get_speedup racket $baseline_system_dynamic\
+    #             "$name" "$input_file" "$disk_aux_name"
+    # printf ",$RETURN" >> $logfile2
+    
     get_speedup chezscheme $baseline_system_dynamic\
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
@@ -106,6 +108,9 @@ gen_fig()
     local sys="$1";  shift
     local outfile_name="$1"; shift
     local key_position="$1"; shift
+    local ymin="$1"; shift
+    local ymax="$1"; shift
+
     local logfile="${DATA_DIR}/${mode}.log"
     local outfile="${OUT_DIR}/${outfile_name}.png"
     local N=$(head -1 "${logfile}" | sed 's/[^,]//g' | wc -c)
@@ -117,11 +122,13 @@ gen_fig()
             `" noenhanced color font 'Verdana,26' ;"`
             `"set output '${outfile}';"`
 	        `"set border 15 back;"`
+            `"set yrange [${ymin}:${ymax}];"`
             `"set logscale y;"`
-            `"set key ${key_position} font 'Verdana,20';"`
+            `"set key font 'Verdana,20';"`
             `"set style data histogram;"`
             `"set style histogram cluster gap 1;"`
             `"set style fill pattern border -1;"`
+            `"load '${LIB_DIR}/dark-colors.pal';"`
             `"set boxwidth 0.9;"` 
 	        `"set ylabel \"  Speedup with respect to ${sys}\";"`
             `"set title \"\";"`
@@ -129,7 +136,8 @@ gen_fig()
 	        `"set grid ytics;"`
             `"set ytics add (\"1\" 1);"`
             `"plot '${logfile}' using 2:xtic(1) title col,"`
-            `"for [i=3:$N] \"\" using i title columnheader(i)"
+            `"  for [i=3:$N] \"\" "`
+            `"using i title columnheader(i) ls (i-1)"
 }
 
 
@@ -150,11 +158,11 @@ run_experiment()
                               --name-sep "_" --common $configs)
     
     echo "name,${config_str},Typed-Racket,OCaml" > "$logfile1"
-    echo "name,${config_str},Gambit,Racket,Chez Scheme" > "$logfile2"
+    echo "name,${config_str},Gambit,Chez Scheme" > "$logfile2"
     echo "name,${config_str}" > "$logfile3"
 
-    run_benchmark $baseline_system_static $baseline_system_dynamic\
-                  "array" "slow.txt" ""
+    # run_benchmark $baseline_system_static $baseline_system_dynamic\
+    #               "array" "slow.txt" ""
     
     run_benchmark $baseline_system_static $baseline_system_dynamic\
                   "tak" "slow.txt" ""
@@ -182,8 +190,8 @@ run_experiment()
     echo "$gmlog1" > $logfile1
     echo "$gmlog2" > $logfile2
 
-    gen_fig static "Static Grift" "${shared_str}_static" "right"
-    gen_fig dyn Racket "${shared_str}_dynamic" "left"
+    gen_fig static "Static Grift" "${shared_str}_static" "right" "" ""
+    gen_fig dyn Racket "${shared_str}_dynamic" "right" "0.02" "11"
 }
 
 main()

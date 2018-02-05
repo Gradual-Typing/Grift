@@ -29,6 +29,7 @@ run_config()
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${i}.log"
     local logfile2="${DATA_DIR}/${name}${disk_aux_name}${i}.csv"
     local cache_file="${TMP_DIR}/static/${name}${disk_aux_name}${i}.cache"
+    local bs=$(find "$path" -name "*.o$i")
     if [ -f $cache_file ]; then
 	    RETURN=$(cat "$cache_file")
     else
@@ -54,7 +55,7 @@ run_config()
                                  bc -l | \
                                  awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
 	        echo $n $b $speedup
-	        printf "%s,%.2f,%.${PRECISION}f,%.2f,%.2f\n" \
+	        printf "%s,%.2f,%.${PRECISION}f,%.${PRECISION}f,%.${PRECISION}f\n" \
                    $bname $p $t $slowdown $speedup >> $logfile1
 	    done
 	    cut -d, -f4 "$logfile1" | \
@@ -115,6 +116,8 @@ gen_output()
     local dynamizer_out="$1";   shift
     local printname="$1";       shift
     local disk_aux_name="$1";   shift
+    local ymin="$1"; shift
+    local ymax="$1"; shift
 
     local type_constructor_count=$(echo "$dynamizer_out" | sed -n 's/[0-9]\+.\([0-9]\+\)/\1/p')
     local less_precise_count=$(echo "$dynamizer_out" | sed -n 's/\([0-9]\+\).*/\1/p')
@@ -127,14 +130,15 @@ gen_output()
     local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
     local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
     local disk_name="${name}${disk_aux_name}_$(echo "$ct" | tr " " "_")"
-    
+
     cum_perf_lattice_fig="${OUT_DIR}/cumperflattice/${disk_name}.png"
     cum_perf_lattice_tbl="${OUT_DIR}/cumperflattice/${disk_name}.tex"
     perf_lattice_slowdown_fig="${OUT_DIR}/perflattice/slowdown/${disk_name}.png"
     perf_lattice_speedup_fig="${OUT_DIR}/perflattice/speedup/${disk_name}.png"
-    perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}.png"
-    perf_lattice_lin_fig="${OUT_DIR}/perflattice/log/lin_${disk_name}.png"
+    perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}_log.png"
+    perf_lattice_lin_fig="${OUT_DIR}/perflattice/log/${disk_name}_lin.png"
     
+
     # if [[ ! -f "$cum_perf_lattice_slowdown_fig" || ! -f "$cum_perf_lattice_tbl" || ! -f "$perf_lattice_slowdown_fig" ]]; then
     rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_slowdown_fig"
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${c1}.log"
@@ -162,17 +166,21 @@ gen_output()
     g1="$RETURN"
     speedup_geometric_mean "$logfile3"
     g2="$RETURN"
-
+    
     $baseline_system "$name" "$input_file" "$disk_aux_name"
     local baseline_mean="$RETURN"
 
-    get_static_schml_runtime "$name" "$input_file" "$disk_aux_name"
+    get_static_grift_runtime "$name" "$input_file" "$disk_aux_name"
     local static_mean="$RETURN"
     local static_speed_up=$(echo "${baseline_mean} ${static_mean}" | \
                                 awk '{printf "%.2f", $1 / $2}')
     
-    printf "%s:\t\t%d=%.2f\t%d=%.2f\n" $name $c1 $g1 $c2 $g2
+    printf "geometric means %s:\t\t%d=%.4f\t%d=%.4f\n" $name $c1 $g1 $c2 $g2
     
+    racket ${LIB_DIR}/csv-set.rkt --add "$name , $c1 , $g1"\
+                                  --add "$name , $c2 , $g2"\
+                                  --in "$GMEANS" --out "$GMEANS"
+
     local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}'\
                  "$logfile2")
     local min2=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}'\
@@ -190,18 +198,27 @@ gen_output()
     read std2 mean2 <<< $(cat "$logfile4" |\
                               cut -d, -f1 |\
                               awk -v var=$n '{sum+=$1; sumsq+=$1*$1}END{printf("%.2f %.2f\n", sqrt(sumsq/NR - (sum/NR)**2), (sum/var))}' )
+    
 
-    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-      	   `"enhanced color font 'Verdana,10' ;"`
-    	   `"set output '${cum_perf_lattice_fig}';"`
-	       `"set border 15 back;"`
-      	   `"set title \"${printname}\";"`
-    	   `"set xrange [0:10]; set yrange [0:${n}];"`
-    	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
-    	   `"set ytics nomirror 0,200;"`
-	       `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
-    	   `"plot '${logfile2}' using 1:2 with lines lw 2 dt 4 title '${c1t}' smooth cumulative,"`
-    	   `"'${logfile4}' using 1:2 with lines lw 2 dt 2 title '${c2t}' smooth cumulative"
+    local DPURPLE='#7b3294'
+    local DGREEN='#008837'
+    local SYELLOW='#fdb863'
+    local SPURPLE='#5e3c99'
+    local color1="$DGREEN"
+    local color2="$DPURPLE"
+
+
+    # gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+    #   	   `"enhanced color font 'Verdana,10' ;"`
+    # 	   `"set output '${cum_perf_lattice_fig}';"`
+	#        `"set border 15 back;"`
+    #   	   `"set title \"${printname}\";"`
+    # 	   `"set xrange [0:10]; set yrange [0:${n}];"`
+    # 	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
+    # 	   `"set ytics nomirror 0,200;"`
+	#        `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
+    # 	   `"plot '${logfile2}' using 1:2 with lines lw 2 dt 4 title '${c1t}' smooth cumulative,"`
+    # 	   `"     '${logfile4}' using 1:2 with lines lw 2 dt 2 title '${c2t}' smooth cumulative"
 
     echo "\begin{tabular}{|l|l|l|}
 \hline
@@ -258,18 +275,20 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 	            `"set key left font 'Verdana,20';"`
 	            `"set logscale y;"`
     	        `"set xrange [-5:105];"` 
-    	        `"set yrange [.009:100];"` 
-	            `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+    	        `"set yrange [${ymin}:${ymax}];"` 
+	            `"set ytics add ('1' 1, '' ${g1}, '' ${g2});"`
+                `"set ytics add (${ymin});"` 
+                `"set ytics add (${ymax});"` 
     	        `"set title \"${printname}\";"`
-	            `"set ylabel \"Speedup over Gambit (Log scale)\";"`
+	            `"set ylabel \"Speedup over Racket (Log scale)\";"`
 	            `"set xlabel \"How much of the code is typed\";"`
 	            `"plot '${logfile1}' using 2:5 with points"`
-                `"   pt 9 ps 3 lc rgb '#fdb863' title '${c1t}',"`
-	            `"${g1} lw 4 dt 2 lc rgb '#fdb863' title '${c1t} mean',"`
+                `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
+	            `"${g1} lw 4 dt 2 lc rgb '$color1' title '${c1t} mean',"`
     	        `"'${logfile3}' using 2:5 with points"`
-                `"   pt 6 ps 3 lc rgb '#5e3c99' title '${c2t}',"`
-	            `"${g2} lw 4 dt 4 lc rgb '#5e3c99' title '${c2t} mean',"`
-                `"1 lw 2 dt 2 lc rgb \"black\" title 'Gambit Scheme',"` 
+                `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"`
+	            `"${g2} lw 4 dt 4 lc rgb '$color2' title '${c2t} mean',"`
+                `"1 lw 2 dt 2 lc rgb \"black\" title 'Racket',"` 
                 `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'Static Grift';"
 
 
@@ -279,18 +298,20 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     	        `"set output '${perf_lattice_lin_fig}';"`
 	            `"set key left font 'Verdana,20';"`
     	        `"set xrange [-5:105];"`
-                `"set yrange [0:];"`
-	            `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+    	        `"set yrange [${ymin}:${ymax}];"` 
+	            `"set ytics add ('1' 1, '' ${g1}, '' ${g2});"`
+                `"set ytics add (${ymin});"` 
+                `"set ytics add (${ymax});"` 
     	        `"set title \"${printname}\";"`
-	            `"set ylabel \"Speedup over Gambit\";"`
+	            `"set ylabel \"Speedup over Racket\";"`
 	            `"set xlabel \"How much of the code is typed\";"`
 	            `"plot '${logfile1}' using 2:5 with points"` 
-                `"   pt 9 ps 3 lc rgb '#fdb863' title '${c1t}',"`
-	            `"${g1} lw 4 dt 2 lc rgb '#fdb863' title '${c1t} mean',"`
+                `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
+	            `"${g1} lw 4 dt 2 lc rgb '$color1' title '${c1t} mean',"`
     	        `"'${logfile3}' using 2:5 with points"`
-                `"   pt 6 ps 3 lc rgb '#5e3c99' title '${c2t}',"`
-	            `"${g2} lw 4 dt 4 lc rgb '#5e3c99'  title '${c2t} mean',"`
-                `"1 lw 2 dt 4 lc rgb \"black\" title 'Gambit Scheme',"` 
+                `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"`
+	            `"${g2} lw 4 dt 4 lc rgb '$color2'  title '${c2t} mean',"`
+                `"1 lw 2 dt 4 lc rgb \"black\" title 'Racket',"` 
                 `"${static_speed_up} lw 2 dt 2 lc \"black\" title 'Static Grift';"
 }
 
@@ -315,6 +336,8 @@ run_benchmark()
     local nsamples="$1";        shift
     local nbins="$1";           shift
     local aux_name="$1";        shift
+    local ymin="$1"; shift
+    local ymax="$1"; shift
 
     local lattice_path="${TMP_DIR}/partial/${name}"
     local benchmarks_path="${TMP_DIR}/static"
@@ -354,7 +377,7 @@ run_benchmark()
     cp "$static_source_file" "${lattice_path}.grift"
 
 	local dynamizer_out=$(dynamizer "${lattice_path}.grift"\
-                                    "$nsamples" "$nbins" | \
+                                    --samples "$nsamples" --bins "$nbins" | \
                               sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
 	echo "$dynamizer_out" > "$lattice_file"
     fi
@@ -364,24 +387,25 @@ run_benchmark()
 
     
     # check for/create/annotate 100% and 0%
-    local benchmark_100_file="${lattice_path}/static.schml"
+    local benchmark_100_file="${lattice_path}/static.grift"
     if [ ! -f benchmark_100_file ]; then
         cp "$static_source_file" "$benchmark_100_file"
         sed -i '1i;; 100.00%' "$benchmark_100_file"
         echo "100% created"
     fi
-    local benchmark_0_file="${lattice_path}/dyn.schml"
+    local benchmark_0_file="${lattice_path}/dyn.grift"
     if [ ! -f benchmark_0_file ]; then
         cp "$dyn_source_file" "$benchmark_0_file"
         sed -i '1i;; 0.0%' "$benchmark_0_file"
         echo "0% created"
     fi
     
-    racket "${SCHML_DIR}/benchmark/benchmark.rkt" \
+    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" \
            -s "$c1 $c2" "${lattice_path}/"
     
     gen_output $baseline_system $c1 $c2 "$lattice_path" "$input_file"\
-               "$dynamizer_out" "$print_name" "$disk_aux_name"
+               "$dynamizer_out" "$print_name" "$disk_aux_name" "$ymin" "$ymax" \
+              
 }
 
 # $1 - baseline system
@@ -398,37 +422,138 @@ run_experiment()
     local nbins="$1";           shift
 
     local g=()
-
+    
+    # Blackscholes
+    local bs_yminf="${DATA_DIR}/bs_ymin_${c1}_${c2}.txt"
+    local bs_ymin=""
+    if [ -f $bs_yminf ]; then
+        bs_ymin="$(cat $bs_yminf)"
+    fi
+    local bs_ymaxf="${DATA_DIR}/bs_ymax_${c1}_${c2}.txt"
+    local bs_ymax=""
+    if [ -f $bs_ymaxf ]; then
+        bs_ymax="$(cat $bs_ymaxf)";
+    fi
     run_benchmark $baseline_system $c1 $c2 "blackscholes" \
-                  "in_4K.txt" "$nsamples" "$nbins" ""
+                  "in_4K.txt" "$nsamples" "$nbins" ""\
+                  "$bs_ymin" "$bs_ymax" 
     g+=($RETURN)
     
+    # Quicksort
+    local qs_yminf="${DATA_DIR}/qs_ymin_${c1}_${c2}.txt"
+    local qs_ymin=""
+    if [ -f $qs_yminf ]; then
+        qs_ymin="$(cat $qs_yminf)"
+    fi
+    local qs_ymaxf="${DATA_DIR}/qs_ymax_${c1}_${c2}.txt"
+    local qs_ymax=""
+    if [ -f $qs_ymaxf ]; then
+        qs_ymax="$(cat $qs_ymaxf)";
+    fi
     run_benchmark $baseline_system $c1 $c2 "quicksort" \
-                  "in_descend1000.txt" "$nsamples" "$nbins" ""
+                  "in_descend1000.txt" "$nsamples" "$nbins" ""\
+                  "$qs_ymin" "$qs_ymax" 
     g+=($RETURN)
     
+    # Matrix Multiplication
+    local mm_yminf="${DATA_DIR}/mm_ymin_${c1}_${c2}.txt"
+    local mm_ymin=""
+    if [ -f $mm_yminf ]; then
+        mm_ymin="$(cat $mm_yminf)"
+    fi
+    local mm_ymaxf="${DATA_DIR}/mm_ymax_${c1}_${c2}.txt"
+    local mm_ymax=""
+    if [ -f $mm_ymaxf ]; then
+        mm_ymax="$(cat $mm_ymaxf)";
+    fi
     run_benchmark $baseline_system $c1 $c2 "matmult"\
-                  "400.txt" "$nsamples" "$nbins" ""
-    g+=($RETURN)
-
-    run_benchmark $baseline_system $c1 $c2 "n_body"\
-                  "slow.txt" "$nsamples" "$nbins" ""
-    g+=($RETURN)
-
-    # run_benchmark $baseline_system $c1 $c2 "fft"\
-    #               "slow.txt" "$nsamples" "$nbins" ""
-    # g+=($RETURN)
-
-    run_benchmark $baseline_system $c1 $c2 "array" \
-                  "slow.txt" "$nsamples" "$nbins" ""
-    g+=($RETURN)
-
-    run_benchmark $baseline_system $c1 $c2 "tak"\
-                  "slow.txt" "$nsamples" "$nbins" ""
+                  "400.txt" "$nsamples" "$nbins" ""\
+                  "$mm_ymin" "$mm_ymax"
     g+=($RETURN)
     
+    # N Body Simulation
+    local nb_yminf="${DATA_DIR}/nb_ymin_${c1}_${c2}.txt"
+    local nb_ymin=""
+    if [ -f $nb_yminf ]; then
+        nb_ymin="$(cat $nb_yminf)"
+    fi
+    local nb_ymaxf="${DATA_DIR}/nb_ymax_${c1}_${c2}.txt"
+    local nb_ymax=""
+    if [ -f $nb_ymaxf ]; then
+        nb_ymax="$(cat $nb_ymaxf)";
+    fi
+    run_benchmark $baseline_system $c1 $c2 "n_body"\
+                  "slow.txt" "$nsamples" "$nbins" ""\
+                  "$nb_ymin" "$nb_ymax"
+
+    g+=($RETURN)
+    
+    # Fast Fourier Transform
+    local fft_yminf="${DATA_DIR}/fft_ymin_${c1}_${c2}.txt"
+    local fft_ymin=""
+    if [ -f $fft_yminf ]; then
+        fft_ymin="$(cat $fft_yminf)"
+    fi
+    local fft_ymaxf="${DATA_DIR}/fft_ymax_${c1}_${c2}.txt"
+    local fft_ymax=""
+    if [ -f $fft_ymaxf ]; then
+        fft_ymax="$(cat $fft_ymaxf)";
+    fi
+    run_benchmark $baseline_system $c1 $c2 "fft"\
+                  "slow.txt" "$nsamples" "$nbins" ""\
+                  "$fft_ymin" "$fft_ymax"
+    g+=($RETURN)
+    
+    # Scheme Array Benchmark
+    local arr_yminf="${DATA_DIR}/arr_ymin_${c1}_${c2}.txt"
+    local arr_ymin=""
+    if [ -f $arr_yminf ]; then
+        arr_ymin="$(cat $arr_yminf)"
+    fi
+    local arr_ymaxf="${DATA_DIR}/arr_ymax_${c1}_${c2}.txt"
+    local arr_ymax=""
+    if [ -f $arr_ymaxf ]; then
+        arr_ymax="$(cat $arr_ymaxf)";
+    fi
+    run_benchmark $baseline_system $c1 $c2 "array" \
+                  "slow.txt" "$nsamples" "$nbins" ""\
+                  "$arr_ymin" "$arr_ymin"
+    g+=($RETURN)
+    
+    # Tak
+    local tak_yminf="${DATA_DIR}/tak_ymin_${c1}_${c2}.txt"
+    local tak_ymin=""
+    if [ -f $tak_yminf ]; then
+        tak_ymin="$(cat $tak_yminf)"
+    fi
+    local tak_ymaxf="${DATA_DIR}/tak_ymax_${c1}_${c2}.txt"
+    local tak_ymax=""
+    if [ -f $tak_ymaxf ]; then
+        tak_ymax="$(cat $tak_ymaxf)";
+    fi
+    run_benchmark $baseline_system $c1 $c2 "tak"\
+                  "slow.txt" "$nsamples" "$nbins" ""\
+                  "$tak_ymin" "$tak_ymax"
+    g+=($RETURN)
+
+    # Ray
     # # Dynamizer uses too much memory
     # #run_benchmark $baseline_system $c1 $c2 "ray" "" "$nsamples" "$nbins" ""
+    local ray_yminf="${DATA_DIR}/ray_ymin_${c1}_${c2}.txt"
+    local ray_ymin=""
+    if [ -f $ray_yminf ]; then
+        ray_ymin="$(cat $ray_yminf)"
+    fi
+    local ray_ymaxf="${DATA_DIR}/ray_ymax_${c1}_${c2}.txt"
+    local ray_ymax=""
+    if [ -f $ray_ymaxf ]; then
+        ray_ymax="$(cat $ray_ymaxf)";
+    fi
+    run_benchmark $baseline_system $c1 $c2 "ray"\
+                  "empty.txt" "$nsamples" "$nbins" ""\
+                  "$ray_ymin" "$ray_ymax"
+    g+=($RETURN)
+    
 
     IFS=$'\n'
     max=$(echo "${g[*]}" | sort -nr | head -n1)
@@ -450,42 +575,49 @@ main()
     LOOPS="$1";          shift
     local date="$1";     shift
 
-    if [ "$date" == "fresh" ]; then
-	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
-    else
-	declare -r DATE="$date"
-	if [ ! -d "$GRIFT_DIR/benchmark/suite/macro/lattice_bins/$DATE" ]; then
-	    echo "Directory not found"
-	    exit 1
-	fi
-    fi
     
     declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
-    declare -r EXP_DIR="$TEST_DIR/lattice_bins/$DATE"
+    declare -r LB_DIR="$TEST_DIR/lattice_bins/"
+    if [ "$date" == "fresh" ]; then
+        declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
+        mkdir "$LB_DIR/$DATE"
+    else
+	    declare -r DATE="$date"
+	    if [ ! -d "$LB_DIR/$DATE" ]; then
+	        echo "$LB_DIR/$DATE" "Directory not found"
+	        exit 1
+	    fi
+    fi
+    
+    declare -r EXP_DIR="$LB_DIR/$DATE"
     declare -r DATA_DIR="$EXP_DIR/data"
     declare -r OUT_DIR="$EXP_DIR/output"
+    declare -r GMEANS="${OUT_DIR}/geometric-means.csv"
     declare -r TMP_DIR="$EXP_DIR/tmp"
     declare -r SRC_DIR="$TEST_DIR/src"
     declare -r INPUT_DIR="$TEST_DIR/inputs"
     declare -r OUTPUT_DIR="$TEST_DIR/outputs"
     declare -r LIB_DIR="$TEST_DIR/lib"
     declare -r PARAMS_LOG="$EXP_DIR/params.txt"
-
+    
     # Check to see if all is right in the world
     if [ ! -d $TEST_DIR ]; then
-        echo "test directory not found" 1>&2
+        echo "directory not found: $TEST_DIR" 1>&2
         exit 1
+    elif [ ! -d $EXP_DIR ]; then
+	    echo "Directory not found: $EXP_DIR"
+	    exit 1
     elif [ ! -d $SRC_DIR ]; then
-        echo "source directory not found" 1>&2
+        echo "directory not found: $SRC_DIR" 1>&2
         exit 1
     elif [ ! -d $INPUT_DIR ]; then
-        echo "input directory not found" 1>&2
+        echo "directory not found: $INPUT_DIR" 1>&2
         exit 1
     elif [ ! -d $OUTPUT_DIR ]; then
-        echo "output directory not found" 1>&2
+        echo "directory not found: $OUTPUT_DIR" 1>&2
         exit 1
     elif [ ! -d $LIB_DIR ]; then
-        echo "lib directory not found" 1>&2
+        echo "directory not found: $LIB_DIR" 1>&2
         exit 1
     fi
     
@@ -496,14 +628,16 @@ main()
     mkdir -p "$OUT_DIR/perflattice/slowdown"
     mkdir -p "$OUT_DIR/perflattice/speedup"
     mkdir -p "$OUT_DIR/perflattice/log"
+    rm -f $GMEANS 
+    touch $GMEANS
 
     . "lib/runtime.sh"
 
     cd "$GRIFT_DIR"
 
-    local baseline_system=get_gambit_runtime
-    local static_system=get_static_schml_runtime
-
+    local baseline_system=get_racket_runtime
+    local static_system=get_static_grift_runtime
+    
     
     if [ "$date" == "fresh" ]; then
 	# copying the benchmarks to a temporary directory
@@ -546,7 +680,21 @@ main()
 	    run_experiment $baseline_system $i $j $nsamples $nbins
 	done
     fi
+
+    racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
+        --si 2 \
+        -o ${OUT_DIR}/gm-total.csv 
+    racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
+        --si 2 --su 0 \
+        -o ${OUT_DIR}/gm-benchmart.csv
+    racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
+        --si 2 --su 1 \
+        -o ${OUT_DIR}/gm-config.csv
+    
+    
     echo "done."
+
+
 }
 
 main "$@"

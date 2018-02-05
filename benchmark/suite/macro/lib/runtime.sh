@@ -414,7 +414,16 @@ avg()
     local tmp_err="${runtimes_file}.tmp.err"
     cmd="cat ${input_file} | ${cmd} 1> ${tmp_out} 2> ${tmp_err}"
     
-    for avg_i in `seq $LOOPS`; do
+    
+    local loops_done="0"
+    # if the there is no file then we have done no loops
+    if [ -f $runtimes_file ]; then
+        # one loop per line
+        loops_done="$(cat ${runtimes_file} | sed '/^\s*$/d' | wc -l)"
+    fi
+    
+    # if not enough runtimes have occurred
+    for avg_i in `seq $(expr $LOOPS - ${loops_done})`; do
         eval "$cmd"
         local cmd_status=$?
         if [ $cmd_status -ne 0 ]; then
@@ -436,6 +445,7 @@ avg()
             fi
         fi
     done
+    
     RETURN="$(racket ${LIB_DIR}/mean.rkt -d $PRECISION -f $runtimes_file)"
     if [ $? -ne 0 ] || [ -z $RETURN ]; then
         echo "Failed mean" 1>&2
