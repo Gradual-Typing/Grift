@@ -1658,10 +1658,12 @@ TODO write unit tests
               [(and$ (id-coercion? r-read) (id-coercion? r-write))
                 old-v]
               [else
-               (Guarded-Proxy old-v (Coercion (Ref-Coercion
-                                               r-read
-                                               r-write
-                                               (Ref-Coercion-Ref-Huh old-m))))])))]
+               (Guarded-Proxy
+                old-v
+                (Coercion (Ref-Coercion
+                           r-read
+                           r-write
+                           (Ref-Coercion-Ref-Huh old-m))))])))]
         [else (Guarded-Proxy v (Coercion m))]))
      (define c1 (make-coercion t1 t2 l #:top-level? #f))
      (define c2 (make-coercion t2 t1 l #:top-level? #f))
@@ -1721,7 +1723,12 @@ TODO write unit tests
            [(and$ (id-coercion-huh r-read) (id-coercion-huh r-write))
             old-v]
            [else
-            (Guarded-Proxy old-v (Coercion (Ref-Coercion r-read r-write (Ref-Coercion-Ref-Huh m))))])))]
+            (Guarded-Proxy
+             old-v
+             (Coercion (Ref-Coercion
+                        r-read
+                        r-write
+                        (Ref-Coercion-Ref-Huh m))))])))]
      [else (Guarded-Proxy v (Coercion m))])))
 
 

@@ -71,6 +71,8 @@
 (define-type GC (U 'Boehm 'None))
 (define garbage-collector : (Parameterof GC)
   (make-parameter 'Boehm))
+(define cast-profiler? : (Parameterof Boolean)
+  (make-parameter #f))
 
 
 

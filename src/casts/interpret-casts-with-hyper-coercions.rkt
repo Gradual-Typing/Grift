@@ -613,7 +613,8 @@ that can be located throughout this file:
            (If (and$ (HC-Identity-Huh com-read)
                      (HC-Identity-Huh com-write))
                (Quote-Coercion IDENTITY)
-               (Ref-Coercion com-read com-write (Ref-Coercion-Ref-Huh fst))))]
+               (Ref-Coercion
+                com-read com-write (Ref-Coercion-Ref-Huh fst))))]
         [(and$ (MRef-Coercion-Huh fst) (MRef-Coercion-Huh snd))
          (let*$ ([fst_type  (MRef-Coercion-Type fst)]
                  [snd_type  (MRef-Coercion-Type snd)]
