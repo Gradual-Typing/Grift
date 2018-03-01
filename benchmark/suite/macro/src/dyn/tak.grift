@@ -7,7 +7,13 @@
            (tak (- y 1) z x)
            (tak (- z 1) x y))))
 
-(let ([x : Dyn (read-int)])
-  (let ([y : Dyn (read-int)])
-    (let ([z : Dyn (read-int)])
-      (tak x y z))))
+(define (run-benchmark)
+  (let ([x : Dyn (read-int)])
+    (let ([y : Dyn (read-int)])
+      (let ([z : Dyn (read-int)])
+        (print-int (tak x y z))))))
+
+(time
+ (begin
+   (run-benchmark)
+   (display-char #\newline)))

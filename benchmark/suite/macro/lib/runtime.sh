@@ -99,7 +99,7 @@ get_chezscheme_runtime()
 }
 
 
-# run the static variant of the schml compiler on a static
+# run the static variant of the grift compiler on a static
 # benchmark and return the average runtime creating
 # a couple utility files along the way.
 # It relies on the TMP_DIR variable being set and the static
@@ -109,7 +109,7 @@ get_chezscheme_runtime()
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name
 # $RETURN - the average runtime
-get_static_schml_runtime()
+get_static_grift_runtime()
 {
     local benchmark="$1";      shift
     local input="$1"; shift
@@ -122,11 +122,11 @@ get_static_schml_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-        "${SCHML_DIR}/main.rkt" \
+        "${GRIFT_DIR}/main.rkt" \
             "--static" \
             "-O" "3" \
             "-o" "${benchmark_path}.static" \
-            "${benchmark_path}.schml"
+            "${benchmark_path}.grift"
 
         avg "${benchmark_path}.static" "${INPUT_DIR}/${benchmark}/${input}"\
             "static" "${OUTPUT_DIR}/static/${benchmark}/${input}"\
@@ -235,7 +235,7 @@ get_gambit_runtime()
             -exe -cc-options -O3 "${benchmark_path}.scm"
 	    avg "${benchmark_path}" "${INPUT_DIR}/${benchmark}/${input}"\
             "gambit" "${OUTPUT_DIR}/gambit/${benchmark}/${input}" \
-            $"runtimes_file"
+            "$runtimes_file"
 	    echo "$RETURN" > "$cache_file"
     fi
 }
@@ -412,7 +412,7 @@ avg()
     # extend the command to write to standard temp files and pipe input
     local tmp_out="${runtimes_file}.tmp.out"
     local tmp_err="${runtimes_file}.tmp.err"
-    cmd="cat ${input_file} | ${cmd} 1> ${tmp_out} 2> ${tmp_err}"
+    run_cmd="cat ${input_file} | ${cmd} 1> ${tmp_out} 2> ${tmp_err}"
     
     
     local loops_done="0"
@@ -424,10 +424,10 @@ avg()
     
     # if not enough runtimes have occurred
     for avg_i in `seq $(expr $LOOPS - ${loops_done})`; do
-        eval "$cmd"
+        eval "$run_cmd"
         local cmd_status=$?
         if [ $cmd_status -ne 0 ]; then
-            echo "benchmark errored" 1>&2
+            echo "benchmark $cmd errored" 1>&2
             cat ${tmp_err} 1>&2
             exit 1
         else
@@ -437,7 +437,7 @@ avg()
                                    --expect ${output_file})"
             local pt_status=$?
             if [ $pt_status -ne 0 ] || [ -z $pt_out ]; then
-                echo "Failed parse" 1>&2
+                echo "Failed to parse output of $cmd" 1>&2
                 exit 1
             else
                 rm $tmp_out $tmp_err

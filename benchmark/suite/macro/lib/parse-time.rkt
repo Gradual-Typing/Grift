@@ -54,9 +54,7 @@ eos
   (match result-str
     [(regexp time-rx (list _ time)) (time->seconds time)]
     [other
-     (error 'parse-racket-time
-            "Failed to parse racket time:\n~v"
-            result-str)]))
+     (error 'parse-time "Failed to parse time:\n~v" result-str)]))
 
 (define ((strip-time time-rx) result-str)
   ;; Assumes the usable result comes just before the time

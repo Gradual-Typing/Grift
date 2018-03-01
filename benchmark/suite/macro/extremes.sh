@@ -24,6 +24,7 @@ write_grift_speedups()
 	    get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}"\
                           "$benchmark_args" "$disk_aux_name" $config_index
 	    printf ",$RETURN" >> $logfile
+        echo "grift $config_index speedup: $RETURN"
     done
 }
 
@@ -69,18 +70,22 @@ run_benchmark()
     write_grift_speedups $baseline_system_static "$name" "$input_file"\
                          "$disk_aux_name" static "$logfile1"
     # Typed Racket
+    printf "Typed Racket speedup: "
     get_speedup typed_racket $baseline_system_static\
                 "$name" "$input_file" "$disk_aux_name"
-    printf ",$RETURN" >> $logfile1    
+    printf ",$RETURN" >> $logfile1
+    echo "$RETURN"
+    
     # OCaml
     get_speedup ocaml $baseline_system_static\
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile1    
-     
-    printf "\n" >> "$logfile1"
-    
-    printf "$name$print_aux_name" >> $logfile2
+    echo "OCaml speedup: $RETURN"
 
+    
+    printf "\n" >> "$logfile1"
+    printf "$name$print_aux_name" >> $logfile2
+    
     write_grift_speedups $baseline_system_dynamic "$name" "$input_file"\
                          "$disk_aux_name" dyn "$logfile2"
 
@@ -88,7 +93,7 @@ run_benchmark()
     get_speedup gambit $baseline_system_dynamic\
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
-    
+    echo "Gambit Speedup: $RETURN"
     # get_speedup racket $baseline_system_dynamic\
     #             "$name" "$input_file" "$disk_aux_name"
     # printf ",$RETURN" >> $logfile2
@@ -96,6 +101,8 @@ run_benchmark()
     get_speedup chezscheme $baseline_system_dynamic\
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
+    echo "Chez speedup: $RETURN"
+    
     printf "\n" >> "$logfile2"
 
     echo "finished ${name}${print_aux_name}"
@@ -152,9 +159,9 @@ run_experiment()
     local logfile2="${DATA_DIR}/dyn.log"
     local logfile3="${DATA_DIR}/partial.log"
 
-    local config_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" \
+    local config_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" \
                               --name-end " Grift" --names $configs)
-    local shared_str=$(racket "${SCHML_DIR}/benchmark/config_str.rkt" \
+    local shared_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" \
                               --name-sep "_" --common $configs)
     
     echo "name,${config_str},Typed-Racket,OCaml" > "$logfile1"
@@ -205,18 +212,20 @@ main()
     local date="$1";     shift
     configs="$@"
     echo "$configs"
-    
-    if [ "$date" == "fresh" ]; then
-	declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
-    else
-	declare -r DATE="$date"
-	if [ ! -d "$GRIFT_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
-	    echo "Directory not found"
-	    exit 1
-	fi
-    fi
 
     GRIFT_DIR=${GRIFT_DIR:=`pwd`/../../..}
+    
+    if [ "$date" == "fresh" ]; then
+	    declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
+    elif [ "$date" == "test" ]; then
+        declare -r DATE="test"
+    else
+	    declare -r DATE="$date"
+        if [ ! -d "$GRIFT_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
+	        echo "Directory not found"
+	        exit 1
+	    fi
+    fi
     
     declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
@@ -249,17 +258,18 @@ main()
     
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
-    mkdir -p "$TMP_DIR"
     mkdir -p "$OUT_DIR"
 
     . "lib/runtime.sh"
 
     cd "$GRIFT_DIR"
 
-    if [ "$date" == "fresh" ]; then
+    if [ ! -d $TMP_DIR ]; then
 	# copying the benchmarks to a temporary directory
-	cp -r ${SRC_DIR}/* $TMP_DIR
+	cp -r $SRC_DIR $TMP_DIR
 
+    
+    
 	# logging
 	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
 	MYEMAIL="`id -un`@`hostname -f`"
@@ -277,7 +287,7 @@ main()
 	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
     fi
 
-    run_experiment get_static_schml_runtime get_racket_runtime
+    run_experiment get_static_grift_runtime get_racket_runtime
     echo "done."
 }
 
