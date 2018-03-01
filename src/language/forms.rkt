@@ -627,12 +627,13 @@ class literal constants
   (Tuple-Coercion-Item-Set! tuple index item)
   (Make-Tuple-Coercion make-uid t1 t2 lbl)
   (Mediating-Coercion-Huh c)
-  ;; Guarded Reference Coercion
-  ;; "Proxy a Guarded Reference's Reads and writes"
-  (Ref read write)
-  (Ref-Coercion read write)
+  ;; Proxied Reference Coercion
+  ;; "Proxy a Proxied Reference's Reads and writes"
+  (Ref read write choice) ;; the choice indicates whether it is a ref or a vector coercion
+  (Ref-Coercion read write flag)
   (Ref-Coercion-Read expression)
   (Ref-Coercion-Write ref)
+  (Ref-Coercion-Ref-Huh crcn) ;; checks if the ref coercion is for a ref or a vector value
   (MonoRef type) ;; Monotonic Reference Coercion
   (MonoVect type)
   (MRef-Coercion type)
@@ -689,12 +690,13 @@ class literal constants
                            'Fn 'Atomic 'Boxed 'GRef
                            'GVect 'MRef 'MVect 'STuple))
 
+(define-type Proxied-Symbol (U 'GRef 'GVect))
 
 (define-type (Mediating-Coercion C)
   (U Identity
      (Fn Index (Listof C) C)
      (CTuple Index (Listof C))
-     (Ref C C)
+     (Ref C C Proxied-Symbol)
      (MonoRef Grift-Type)
      (MonoVect Grift-Type)
      (Failed Blame-Label)))
@@ -760,7 +762,7 @@ class literal constants
      (MonoRef Immediate-Type)
      (MonoVect Immediate-Type)
      (CTuple Index (Listof Immediate-Coercion))
-     (Ref Immediate-Coercion Immediate-Coercion)))
+     (Ref Immediate-Coercion Immediate-Coercion Proxied-Symbol)))
 
 (define-type Immediate-Type (U Atomic-Type (Static-Id Uid)))
 
@@ -784,7 +786,7 @@ class literal constants
             (Inject Immediate-Type)
             (Sequence C C)
             (Fn Index (Listof C) C)
-            (Ref C C)
+            (Ref C C Proxied-Symbol)
             (MonoRef Immediate-Type)
             (MonoVect Immediate-Type)
             (CTuple Index (Listof C)))))

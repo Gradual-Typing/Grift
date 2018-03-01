@@ -775,7 +775,7 @@ but a static single assignment is implicitly maintained.
              (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-TAG-INDEX))
            (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-REF-SECOND-TAG))]
-        [(Ref-Coercion (app recur r) (app recur w))
+        [(Ref-Coercion (app recur r) (app recur w) (app recur flag))
          (begin$
            (assign$ second-tag
              (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
@@ -783,11 +783,17 @@ but a static single assignment is implicitly maintained.
            (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
                      `(("tag" . ,second-tag)
                        ("read-coercion" . ,r)
-                       ("write-coercion" . ,w))))]        
+                       ("write-coercion" . ,w)
+                       ("flag" . ,flag))))]
         [(Ref-Coercion-Read (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-READ-INDEX)]
         [(Ref-Coercion-Write (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-WRITE-INDEX)]
+        [(Ref-Coercion-Ref-Huh (app recur e))
+         (begin$
+           (assign$ flag
+             (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-FLAG-INDEX))
+           (op$ = flag COERCION-REF-REF-FLAG))]
         [(Failed-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK COERCION-FAILED-TAG)]
         ;; For now I am allocating the blame label in a box.
@@ -1408,14 +1414,17 @@ but a static single assignment is implicitly maintained.
                    ,(map (lambda ([a : Immediate-Coercion])
                            (cons "argument" (sr-immediate-coercion a)))
                          a*))))]
-    [(Ref (app sr-immediate-coercion r) (app sr-immediate-coercion w))
+    [(Ref (app sr-immediate-coercion r) (app sr-immediate-coercion w) flag)
      (begin$
        (assign$ second-tag (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
                                 COERCION-REF-SECOND-TAG))
        (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
                  `(("tag" . ,second-tag)
                    ("read-coercion" . ,r)
-                   ("write-coercion" . ,w))))]
+                   ("write-coercion" . ,w)
+                   ("flag" . ,(case flag
+                                [(GRef)  COERCION-REF-REF-FLAG]
+                                [(GVect) COERCION-REF-VEC-FLAG])))))]
     [(MonoRef (app sr-prim-type t))
      (begin$
        (assign$ second-tag (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)

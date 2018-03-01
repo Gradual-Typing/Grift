@@ -77,6 +77,9 @@
   (COERCION-REF-TAG-INDEX         0)
   (COERCION-REF-READ-INDEX        1)
   (COERCION-REF-WRITE-INDEX       2)
+  (COERCION-REF-FLAG-INDEX        3)
+  (COERCION-REF-REF-FLAG          0)
+  (COERCION-REF-VEC-FLAG          1)
   ;; values
   ;; simple dynamic value representation
   (DYN-TAG-MASK                   #b111)
