@@ -118,6 +118,12 @@ that can be located throughout this file:
           #:make-coercion compile-make-coercion
           #:compose-coercions compose-coercions
           #:id-coercion? HC-Identity-Huh))
+
+       (define compile-pvec-cast/coercions
+         (make-compile-cast-pvec/coercions
+          #:make-coercion compile-make-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? HC-Identity-Huh))
        
        (define compile-mbox-cast/type-based
          (make-compile-mbox-cast
@@ -133,7 +139,8 @@ that can be located throughout this file:
          (make-interp-med-cast-runtime!
           #:fn-cast    compile-fn-cast/coercions
           #:tuple-cast compile-tuple-cast/type-based
-          #:ref-cast   compile-pref-cast/coercions
+          #:pref-cast  compile-pref-cast/coercions
+          #:pvec-cast  compile-pvec-cast/coercions
           #:mbox-cast  compile-mbox-cast/type-based
           #:mvec-cast  compile-mvec-cast/type-based))
          
@@ -141,7 +148,8 @@ that can be located throughout this file:
          (make-compile-med-cast
           #:fn-cast    compile-fn-cast/coercions
           #:tuple-cast compile-tuple-cast/type-based
-          #:ref-cast   compile-pref-cast/coercions
+          #:pref-cast  compile-pref-cast/coercions
+          #:pvec-cast  compile-pvec-cast/coercions
           #:mbox-cast  compile-mbox-cast/type-based
           #:mvec-cast  compile-mvec-cast/type-based
           #:interp-med-cast interp-med-cast))
@@ -198,6 +206,12 @@ that can be located throughout this file:
           #:make-coercion compile-make-coercion
           #:compose-coercions compose-coercions
           #:id-coercion? HC-Identity-Huh))
+
+       (define compile-pvec-cast/coercions
+         (make-compile-cast-pvec/coercions
+          #:make-coercion compile-make-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? HC-Identity-Huh))
        
        (define compile-mbox-cast/coercions
          (make-compile-mbox-cast
@@ -221,7 +235,8 @@ that can be located throughout this file:
          (make-compile-med-cast
           #:fn-cast    compile-fn-cast/coercions
           #:tuple-cast compile-tuple-cast/coercions
-          #:ref-cast   compile-pref-cast/coercions
+          #:pref-cast  compile-pref-cast/coercions
+          #:pvec-cast  compile-pvec-cast/coercions
           #:mbox-cast  compile-mbox-cast/coercions
           #:mvec-cast  compile-mvec-cast/coercions
           #:interp-med-cast interp-med-cast/coercions))
@@ -402,9 +417,9 @@ that can be located throughout this file:
         [((STuple n1 t1*) (STuple n2 t2*)) #:when (= n1 n2)
          (HC #f t1 #f #f t2 (CTuple n1 (map recur t1* t2*)))]
         [((GRef t1) (GRef t2))
-         (HC #f t1 #f #f t2 (Ref (recur t1 t2) (recur t2 t1)))]
+         (HC #f t1 #f #f t2 (Ref (recur t1 t2) (recur t2 t1) 'GRef))]
         [((GVect t1) (GVect t2))
-         (HC #f t1 #f #f t2 (Ref (recur t1 t2) (recur t2 t1)))]
+         (HC #f t1 #f #f t2 (Ref (recur t1 t2) (recur t2 t1) 'GVect))]
         [((MRef _) (MRef t2))
          (HC #f t1 #f #f t2 (MonoRef t2))]
         [((MVect _) (MVect t2))
@@ -459,13 +474,13 @@ that can be located throughout this file:
                  [gv2_of (Type-GVect-Of t2)]
                  [write_crcn (interp-make-coercion gv2_of gv1_of l)]
                  [read_crcn  (interp-make-coercion gv1_of gv2_of l)])
-           (Ref-Coercion read_crcn write_crcn))]
+           (vec-coercion$ read_crcn write_crcn))]
         [(and$ (Type-GRef-Huh t1) (Type-GRef-Huh t2))
          (let*$ ([gr1_of (Type-GRef-Of t1)]
                  [gr2_of (Type-GRef-Of t2)]
                  [write_crcn (interp-make-coercion gr2_of gr1_of l)]
                  [read_crcn  (interp-make-coercion gr1_of gr2_of l)])
-           (Ref-Coercion read_crcn write_crcn))]
+           (ref-coercion$ read_crcn write_crcn))]
         ;; TODO should these two line be (glb t1 t2)?
         [(and$ (Type-MRef-Huh t1) (Type-MRef-Huh t2))
          (MRef-Coercion (type-mbox-of$ t2))]
@@ -598,7 +613,7 @@ that can be located throughout this file:
            (If (and$ (HC-Identity-Huh com-read)
                      (HC-Identity-Huh com-write))
                (Quote-Coercion IDENTITY)
-               (Ref-Coercion com-read com-write)))]
+               (Ref-Coercion com-read com-write (Ref-Coercion-Ref-Huh fst))))]
         [(and$ (MRef-Coercion-Huh fst) (MRef-Coercion-Huh snd))
          (let*$ ([fst_type  (MRef-Coercion-Type fst)]
                  [snd_type  (MRef-Coercion-Type snd)]

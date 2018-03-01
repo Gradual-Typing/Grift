@@ -102,7 +102,8 @@
     (make-interp-med-cast-runtime!
      #:fn-cast    compile-fn-cast
      #:tuple-cast compile-tuple-cast
-     #:ref-cast   compile-cast-pref/type-based
+     #:pref-cast   compile-cast-pref/type-based
+     #:pvec-cast  compile-cast-pvec/type-based
      #:mbox-cast  compile-mbox-cast
      #:mvec-cast  compile-mvec-cast))
   
@@ -110,7 +111,8 @@
     (make-compile-med-cast
      #:fn-cast    compile-fn-cast
      #:tuple-cast compile-tuple-cast
-     #:ref-cast   compile-cast-pref/type-based
+     #:pref-cast  compile-cast-pref/type-based
+     #:pvec-cast  compile-cast-pvec/type-based
      #:mbox-cast  compile-mbox-cast
      #:mvec-cast  compile-mvec-cast
      #:interp-med-cast interp-med-cast))
@@ -281,6 +283,3 @@
     [else
      (values interp-pbox-ref interp-pbox-set!
              interp-pvec-ref interp-pvec-set! interp-pvec-len)]))
-
-  
-

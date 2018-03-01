@@ -116,10 +116,11 @@
     [(Fn-Coercion-Return-Set! f r) (recur-all f r)]
     [(Tuple-Coercion-Item-Set! t i e) (recur-all t i e)]
     [(Id-Tuple-Coercion a) (recur a)]
-    [(Ref-Coercion e1 e2) (recur-all e1 e2)]
+    [(Ref-Coercion e1 e2 flag) (recur-all e1 e2)]
     [(Ref-Coercion-Huh e) (recur e)]
     [(Ref-Coercion-Read e) (recur e)]
     [(Ref-Coercion-Write e) (recur e)]
+    [(Ref-Coercion-Ref-Huh e) (recur e)]
     [(Sequence-Coercion e1 e2) (recur-all e1 e2)]
     [(Sequence-Coercion-Huh e) (recur e)]
     [(Sequence-Coercion-Fst e) (recur e)]
@@ -337,14 +338,16 @@
      (Tuple-Coercion-Item-Set! t i e)]
     [(Id-Tuple-Coercion (app recur a))
      (Id-Tuple-Coercion a)]
-    [(Ref-Coercion (app recur e1) (app recur e2))
-     (Ref-Coercion e1 e2)]
+    [(Ref-Coercion (app recur e1) (app recur e2) (app recur flag))
+     (Ref-Coercion e1 e2 flag)]
     [(Ref-Coercion-Huh (app recur e))
      (Ref-Coercion-Huh e)]
     [(Ref-Coercion-Read (app recur e))
      (Ref-Coercion-Read e)]
     [(Ref-Coercion-Write (app recur e))
      (Ref-Coercion-Write e)]
+    [(Ref-Coercion-Ref-Huh (app recur e))
+     (Ref-Coercion-Ref-Huh e)]
     [(Sequence-Coercion (app recur e1) (app recur e2))
      (Sequence-Coercion e1 e2)]
     [(Sequence-Coercion-Huh (app recur e))
@@ -675,14 +678,16 @@
      (Tuple-Coercion-Item-Set! t i e)]
     [(Id-Tuple-Coercion (app pl-expr a))
      (Id-Tuple-Coercion a)]
-    [(Ref-Coercion (app pl-expr e1) (app pl-expr e2))
-     (Ref-Coercion e1 e2)]
+    [(Ref-Coercion (app pl-expr e1) (app pl-expr e2) (app pl-expr flag))
+     (Ref-Coercion e1 e2 flag)]
     [(Ref-Coercion-Huh (app pl-expr e))
      (Ref-Coercion-Huh e)]
     [(Ref-Coercion-Read (app pl-expr e))
      (Ref-Coercion-Read e)]
     [(Ref-Coercion-Write (app pl-expr e))
      (Ref-Coercion-Write e)]
+    [(Ref-Coercion-Ref-Huh (app pl-expr e))
+     (Ref-Coercion-Ref-Huh e)]
     [(Sequence-Coercion (app pl-expr e1) (app pl-expr e2))
      (Sequence-Coercion e1 e2)]
     [(Sequence-Coercion-Huh (app pl-expr e))

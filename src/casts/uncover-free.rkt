@@ -152,14 +152,16 @@
      (values (Tuple-Coercion-Item-Set! t i e) (set-union t-fv i-fv e-fv))]
     [(Id-Tuple-Coercion (app uf-expr a a-fv))
      (values (Id-Tuple-Coercion a) a-fv)]
-    [(Ref-Coercion (app uf-expr e1 fv1) (app uf-expr e2 fv2))
-     (values (Ref-Coercion e1 e2) (set-union fv1 fv2))]
+    [(Ref-Coercion (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
+     (values (Ref-Coercion e1 e2 e3) (set-union fv1 fv2 fv3))]
     [(Ref-Coercion-Huh (app uf-expr e fv))
      (values (Ref-Coercion-Huh e) fv)]
     [(Ref-Coercion-Read (app uf-expr e fv))
      (values (Ref-Coercion-Read e) fv)]
     [(Ref-Coercion-Write (app uf-expr e fv))
      (values (Ref-Coercion-Write e) fv)]
+    [(Ref-Coercion-Ref-Huh (app uf-expr e fv))
+     (values (Ref-Coercion-Ref-Huh e) fv)]
     [(Sequence-Coercion (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Sequence-Coercion e1 e2) (set-union fv1 fv2))]
     [(Sequence-Coercion-Huh (app uf-expr e fv))

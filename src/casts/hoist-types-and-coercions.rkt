@@ -204,8 +204,8 @@
          (ci! n (HC p? t1 l? i? t2 m))]
         [(Fn i (app recur* a* m) (app recur r n))
          (ci! (max m n) (Fn i a* r))]
-        [(Ref (app recur r m) (app recur w n))
-         (ci! (max m n) (Ref r w))]
+        [(Ref (app recur r m) (app recur w n) flag)
+         (ci! (max m n) (Ref r w flag))]
         [(MonoRef (app ti! t))
          (ci! 0 (MonoRef t))]
         [(MonoVect (app ti! t))
@@ -305,14 +305,16 @@
        (Tuple-Coercion-Item-Set! t i e)]
       [(Id-Tuple-Coercion (app recur a))
        (Id-Tuple-Coercion a)]
-      [(Ref-Coercion (app recur e1) (app recur e2))
-       (Ref-Coercion e1 e2)]
+      [(Ref-Coercion (app recur e1) (app recur e2) (app recur flag))
+       (Ref-Coercion e1 e2 flag)]
       [(Ref-Coercion-Huh (app recur e))
        (Ref-Coercion-Huh e)]
       [(Ref-Coercion-Read (app recur e))
        (Ref-Coercion-Read e)]
       [(Ref-Coercion-Write (app recur e))
        (Ref-Coercion-Write e)]
+      [(Ref-Coercion-Ref-Huh (app recur e))
+       (Ref-Coercion-Ref-Huh e)]
       [(Sequence-Coercion (app recur e1) (app recur e2))
        (Sequence-Coercion e1 e2)]
       [(Sequence-Coercion-Huh (app recur e))

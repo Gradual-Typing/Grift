@@ -17,6 +17,7 @@ TODO write unit tests
  "../language/syntax.rkt"
  "../language/cast-or-coerce3.rkt"
  "../language/cast0.rkt"
+ "../language/data-representation.rkt"
 ;; "../helpers.rkt"
  "../errors.rkt"
  "../configuration.rkt"
@@ -104,7 +105,7 @@ TODO write unit tests
   (->* (CoC3-Expr CoC3-Expr) (CoC3-Expr #:t1 CoC3-Expr) CoC3-Expr))
 (define-type Fn-Cast-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type Tuple-Cast-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Ref-Cast-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Proxied-Cast-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type Project-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type Inject-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
@@ -1053,7 +1054,8 @@ TODO write unit tests
    (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr
                    #:fn-cast     Fn-Cast-Type
                    #:tuple-cast  Tuple-Cast-Type
-                   #:ref-cast    Ref-Cast-Type
+                   #:pref-cast   Proxied-Cast-Type
+                   #:pvec-cast   Proxied-Cast-Type
                    #:mbox-cast   Monotonic-Cast-Type
                    #:mvec-cast   Monotonic-Cast-Type)
        CoC3-Expr))
@@ -1062,7 +1064,8 @@ TODO write unit tests
 (define (code-gen-entire-med-cast v t1 t2 l mt 
                                   #:fn-cast    compile-fn-cast
                                   #:tuple-cast compile-tuple-cast
-                                  #:ref-cast   compile-ref-cast
+                                  #:pref-cast  compile-pref-cast
+                                  #:pvec-cast  compile-pvec-cast
                                   #:mbox-cast  compile-mbox-cast
                                   #:mvec-cast  compile-mvec-cast)
   ;; Assumes it will always be given values
@@ -1080,9 +1083,9 @@ TODO write unit tests
             (op<=? (Type-Tuple-num t2) (Type-Tuple-num t1)))
       (compile-tuple-cast v t1 t2 l mt)]
      [(and$ (Type-GRef-Huh t1) (Type-GRef-Huh t2))
-      (compile-ref-cast v (Type-GRef-Of t1) (Type-GRef-Of t2) l)]
+      (compile-pref-cast v (Type-GRef-Of t1) (Type-GRef-Of t2) l)]
      [(and$ (Type-GVect-Huh t1) (Type-GVect-Huh t2))
-      (compile-ref-cast v (Type-GVect-Of t1) (Type-GVect-Of t2) l)]
+      (compile-pvec-cast v (Type-GVect-Of t1) (Type-GVect-Of t2) l)]
      [(and$ (Type-MRef-Huh t1) (Type-MRef-Huh t2))
       (compile-mbox-cast v (Type-MRef-Of t2))]
      [(and$ (Type-MVect-Huh t1) (Type-MVect-Huh t2))
@@ -1093,7 +1096,8 @@ TODO write unit tests
 (: make-interp-med-cast-runtime!
    (->* (#:fn-cast     Fn-Cast-Type
          #:tuple-cast  Tuple-Cast-Type
-         #:ref-cast    Ref-Cast-Type
+         #:pref-cast   Proxied-Cast-Type
+         #:pvec-cast   Proxied-Cast-Type
          #:mbox-cast   Monotonic-Cast-Type
          #:mvec-cast   Monotonic-Cast-Type)
         Cast-Type))
@@ -1101,7 +1105,8 @@ TODO write unit tests
 (define (make-interp-med-cast-runtime!
          #:fn-cast    compile-fn-cast
          #:tuple-cast compile-tuple-cast
-         #:ref-cast   compile-ref-cast
+         #:pref-cast  compile-pref-cast
+         #:pvec-cast  compile-pvec-cast
          #:mbox-cast  compile-mbox-cast
          #:mvec-cast  compile-mvec-cast)
 
@@ -1118,7 +1123,8 @@ TODO write unit tests
       v t1 t2 l mt
       #:fn-cast    compile-fn-cast
       #:tuple-cast compile-tuple-cast
-      #:ref-cast   compile-ref-cast
+      #:pref-cast  compile-pref-cast
+      #:pvec-cast  compile-pvec-cast
       #:mbox-cast  compile-mbox-cast
       #:mvec-cast  compile-mvec-cast)))
   
@@ -1127,7 +1133,8 @@ TODO write unit tests
 (: make-compile-med-cast
    (->* (#:fn-cast     Fn-Cast-Type
          #:tuple-cast  Tuple-Cast-Type
-         #:ref-cast    Ref-Cast-Type
+         #:pref-cast   Proxied-Cast-Type
+         #:pvec-cast   Proxied-Cast-Type
          #:mbox-cast   Monotonic-Cast-Type
          #:mvec-cast   Monotonic-Cast-Type
          #:interp-med-cast Cast-Type)
@@ -1136,7 +1143,8 @@ TODO write unit tests
 (define ((make-compile-med-cast
           #:fn-cast    compile-fn-cast
           #:tuple-cast compile-tuple-cast
-          #:ref-cast   compile-ref-cast
+          #:pref-cast  compile-pref-cast
+          #:pvec-cast  compile-pvec-cast
           #:mbox-cast  compile-mbox-cast
           #:mvec-cast  compile-mvec-cast
           #:interp-med-cast interp-med-cast)
@@ -1152,9 +1160,9 @@ TODO write unit tests
            [((Fn a _ _) (Fn a _ _))
             (compile-fn-cast v t1 t2 l)]
            [((GRef t1) (GRef t2))
-            (compile-ref-cast v (Type t1) (Type t2) l)]
+            (compile-pref-cast v (Type t1) (Type t2) l)]
            [((GVect t1) (GVect t2))
-            (compile-ref-cast v (Type t1) (Type t2) l)]
+            (compile-pvec-cast v (Type t1) (Type t2) l)]
            [((MRef t1) (MRef t2))
             (compile-mbox-cast v #:t1 (Type t1) (Type t2))]
            [((MVect t1) (MVect t2))
@@ -1170,11 +1178,11 @@ TODO write unit tests
                 (Blame l))]
            [(GRef t1-t)
             (If (Type-GRef-Huh t2)
-                (compile-ref-cast v (Type t1-t) (Type-GRef-Of t2) l)
+                (compile-pref-cast v (Type t1-t) (Type-GRef-Of t2) l)
                 (Blame l))]
            [(GVect t1-t)
             (If (Type-GVect-Huh t2)
-                (compile-ref-cast v (Type t1-t) (Type-GVect-Of t2) l)
+                (compile-pvec-cast v (Type t1-t) (Type-GVect-Of t2) l)
                 (Blame l))]
            [(MRef t1-t)
             (If (Type-MRef-Huh t2)
@@ -1197,11 +1205,11 @@ TODO write unit tests
                 (Blame l))]
            [(GRef t2-t)
             (If (Type-GRef-Huh t1)
-                (compile-ref-cast v (Type-GRef-Of t1) (Type t2-t) l)
+                (compile-pref-cast v (Type-GRef-Of t1) (Type t2-t) l)
                 (Blame l))]
            [(GVect t2-t)
             (If (Type-GVect-Huh t1)
-                (compile-ref-cast v (Type-GVect-Of t1) (Type t2-t) l)
+                (compile-pvec-cast v (Type-GVect-Of t1) (Type t2-t) l)
                 (Blame l))]
            [(MRef t2-t)
             (If (Type-MRef-Huh t1)
@@ -1224,7 +1232,8 @@ TODO write unit tests
              v t1 t2 l mt
              #:fn-cast    compile-fn-cast
              #:tuple-cast compile-tuple-cast
-             #:ref-cast   compile-ref-cast
+             #:pref-cast  compile-pref-cast
+             #:pvec-cast  compile-pvec-cast
              #:mbox-cast  compile-mbox-cast
              #:mvec-cast  compile-mvec-cast)]
            [else (interp-med-cast v t1 t2 l mt)])]))
@@ -1567,22 +1576,62 @@ TODO write unit tests
 ;; the sub-component of the GRef or GVect type so that the proxying
 ;; code can be the same for both.
 
-(: compile-cast-pref/type-based Ref-Cast-Type)
-(define (compile-cast-pref/type-based e t1 t2 l)
+(: compile-cast-proxied/type-based Proxied-Cast-Type)
+(define (compile-cast-proxied/type-based e t1 t2 l)
   (Guarded-Proxy e (Twosome t1 t2 l)))
+
+(: compile-cast-pref/type-based Proxied-Cast-Type)
+(define (compile-cast-pref/type-based e t1 t2 l)
+  (compile-cast-proxied/type-based e t1 t2 l))
+
+(: compile-cast-pvec/type-based Proxied-Cast-Type)
+(define (compile-cast-pvec/type-based e t1 t2 l)
+  (compile-cast-proxied/type-based e t1 t2 l))
 
 (: make-compile-cast-pref/coercions
    (->* (#:make-coercion Compile-Make-Coercion-Type
          #:compose-coercions Compose-Coercions-Type
          #:id-coercion? Id-Coercion-Huh-Type)
-        Ref-Cast-Type))
+        Proxied-Cast-Type))
 (define (make-compile-cast-pref/coercions
           #:make-coercion make-coercion
           #:compose-coercions compose-coercions
           #:id-coercion? id-coercion?)
+  (make-compile-cast-proxied/coercions
+   #:make-coercion make-coercion
+   #:compose-coercions compose-coercions
+   #:id-coercion? id-coercion?
+   'GRef))
 
-  (: code-gen-cast-pref Ref-Cast-Type)
-  (define (code-gen-cast-pref e t1 t2 l)
+(: make-compile-cast-pvec/coercions
+   (->* (#:make-coercion Compile-Make-Coercion-Type
+         #:compose-coercions Compose-Coercions-Type
+         #:id-coercion? Id-Coercion-Huh-Type)
+        Proxied-Cast-Type))
+(define (make-compile-cast-pvec/coercions
+          #:make-coercion make-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? id-coercion?)
+  (make-compile-cast-proxied/coercions
+   #:make-coercion make-coercion
+   #:compose-coercions compose-coercions
+   #:id-coercion? id-coercion?
+   'GVect))
+
+(: make-compile-cast-proxied/coercions
+   (->* (#:make-coercion Compile-Make-Coercion-Type
+         #:compose-coercions Compose-Coercions-Type
+         #:id-coercion? Id-Coercion-Huh-Type
+         Proxied-Symbol)
+        Proxied-Cast-Type))
+(define (make-compile-cast-proxied/coercions
+          #:make-coercion make-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? id-coercion?
+          proxy-kind)
+
+  (: code-gen-cast-proxied Proxied-Cast-Type)
+  (define (code-gen-cast-proxied e t1 t2 l)
     (debug off t1 t2)
     (define ret
     (bind-value$
@@ -1609,31 +1658,37 @@ TODO write unit tests
               [(and$ (id-coercion? r-read) (id-coercion? r-write))
                 old-v]
               [else
-               (Guarded-Proxy old-v (Coercion (Ref-Coercion r-read r-write)))])))]
+               (Guarded-Proxy old-v (Coercion (Ref-Coercion
+                                               r-read
+                                               r-write
+                                               (Ref-Coercion-Ref-Huh old-m))))])))]
         [else (Guarded-Proxy v (Coercion m))]))
      (define c1 (make-coercion t1 t2 l #:top-level? #f))
      (define c2 (make-coercion t2 t1 l #:top-level? #f))
+     (define flag (case proxy-kind
+                    [(GRef)  COERCION-REF-REF-FLAG]
+                    [(GVect) COERCION-REF-VEC-FLAG]))
      (debug off c1 c2)
      (match* (c1 c2)
        [((and m-read (Quote-Coercion readc))
          (and m-write (Quote-Coercion writec)))
         ;; This is the optimal case because m should be statically allocated
-        (aux (Quote-Coercion (Ref readc writec)) m-read m-write)]
+        (aux (Quote-Coercion (Ref readc writec proxy-kind)) m-read m-write)]
        [(readc writec)
         (let$ ([m-read  readc]
                [m-write writec])
-          (aux (Ref-Coercion m-read m-write) m-read m-write))]))))
+          (aux (Ref-Coercion m-read m-write flag) m-read m-write))]))))
     (debug off t1 t2 ret)
     ret)
   ;; TODO add switch to allow this to be close coded
   (cond
-    [#t code-gen-cast-pref]
+    [#t code-gen-cast-proxied]
     [else
      (define uid (next-uid! "cast-proxied-reference/coercion"))
      (add-cast-runtime-binding!
       uid
-      (code$ (v t1 t2 l mt) (code-gen-cast-pref v t1 t2 l mt)))
-     (: build-call Ref-Cast-Type)
+      (code$ (v t1 t2 l mt) (code-gen-cast-proxied v t1 t2 l mt)))
+     (: build-call Proxied-Cast-Type)
      (define (build-call v t1 t2 mt)
        (apply-code uid v t1 t2 mt))
      build-call]))
@@ -1666,7 +1721,7 @@ TODO write unit tests
            [(and$ (id-coercion-huh r-read) (id-coercion-huh r-write))
             old-v]
            [else
-            (Guarded-Proxy old-v (Coercion (Ref-Coercion r-read r-write)))])))]
+            (Guarded-Proxy old-v (Coercion (Ref-Coercion r-read r-write (Ref-Coercion-Ref-Huh m))))])))]
      [else (Guarded-Proxy v (Coercion m))])))
 
 

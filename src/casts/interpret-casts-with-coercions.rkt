@@ -60,8 +60,8 @@ form, to the shortest branch of the cast tree that is relevant.
          (Sequence IDENTITY (Inject t1)))]
     [((Fn n t1* t1) (Fn n t2* t2)) (Fn n (map r t2* t1*) (r t1 t2))]
     [((STuple n t1*) (STuple n t2*)) (CTuple n (map r t1* t2*))]
-    [((GRef t1)(GRef t2))    (Ref (r t1 t2) (r t2 t1))]
-    [((GVect t1) (GVect t2)) (Ref (r t1 t2) (r t2 t1))]
+    [((GRef t1)(GRef t2))    (Ref (r t1 t2) (r t2 t1) 'GRef)]
+    [((GVect t1) (GVect t2)) (Ref (r t1 t2) (r t2 t1) 'GVect)]
     [((MRef t1) (MRef t2))   (MonoRef t2)]
     [((MVect t1) (MVect t2)) (MonoVect t2)]
     [(_ _) (Failed lbl)]))
@@ -116,14 +116,14 @@ form, to the shortest branch of the cast tree that is relevant.
                       [pvof2 (type-pvec-of$ t2)]
                       [read_crcn  (interp-make-coercion pvof1 pvof2 lbl)]
                       [write_crcn (interp-make-coercion pvof2 pvof1 lbl)])
-                (Ref-Coercion read_crcn write_crcn))
+                (vec-coercion$ read_crcn write_crcn))
               CoC3-Expr)]
         [(and$ (type-pbox?$ t1) (type-pbox?$ t2))
          (ann (let*$ ([pbof1 (type-pbox-of$ t1)]
                       [pbof2 (type-pbox-of$ t2)]
                       [read_crcn  (interp-make-coercion pbof1 pbof2 lbl)]
                       [write_crcn (interp-make-coercion pbof2 pbof1 lbl)])
-                (Ref-Coercion read_crcn write_crcn))
+                (ref-coercion$ read_crcn write_crcn))
               CoC3-Expr)]
         [(and$ (type-mvec?$ t1) (type-mvec?$ t2))
          (ann (let$ ([t (type-mvec-of$ t2)])
@@ -157,13 +157,13 @@ form, to the shortest branch of the cast tree that is relevant.
            [((GRef t1-t) (GRef t2-t))
             (define t1 (Type t1-t))
             (define t2 (Type t2-t))
-            (Ref-Coercion (interp-make-coercion t1 t2 lbl)
-                          (interp-make-coercion t2 t1 lbl))]
+            (ref-coercion$ (interp-make-coercion t1 t2 lbl)
+                           (interp-make-coercion t2 t1 lbl))]
            [((GVect t1-t) (GVect t2-t))
             (define t1 (Type t1-t))
             (define t2 (Type t2-t))
-            (Ref-Coercion (interp-make-coercion t1 t2 lbl)
-                          (interp-make-coercion t2 t1 lbl))]
+            (vec-coercion$ (interp-make-coercion t1 t2 lbl)
+                           (interp-make-coercion t2 t1 lbl))]
            [((MRef _) (MRef t2))
             (Quote-Coercion (MonoRef t2))]
            [((MVect _) (MVect t2))
@@ -183,15 +183,15 @@ form, to the shortest branch of the cast tree that is relevant.
             (define t1 (Type t1-t))
             (If (type-pbox?$ t2)
                 (let$ ([t2 (type-pbox-of$ t2)])
-                  (Ref-Coercion (interp-make-coercion t1 t2 lbl)
-                                (interp-make-coercion t2 t1 lbl)))
+                  (ref-coercion$ (interp-make-coercion t1 t2 lbl)
+                                 (interp-make-coercion t2 t1 lbl)))
                 (Failed-Coercion lbl))]
            [(GVect t1-t)
             (define t1 (Type t1-t))
             (If (type-pvec?$ t2)
                 (let$ ([t2 (type-pvec-of$ t2)])
-                  (Ref-Coercion (interp-make-coercion t1 t2 lbl)
-                                (interp-make-coercion t2 t1 lbl)))
+                  (vec-coercion$ (interp-make-coercion t1 t2 lbl)
+                                 (interp-make-coercion t2 t1 lbl)))
                 (Failed-Coercion lbl))]
            [(MRef _)
             (If (type-mbox?$ t2)
@@ -216,15 +216,15 @@ form, to the shortest branch of the cast tree that is relevant.
             (define t2 (Type t2-t))
             (If (type-pbox?$ t1)
                 (let$ ([t1 (type-pbox-of$ t1)])
-                  (Ref-Coercion (interp-make-coercion t1 t2 lbl)
-                                (interp-make-coercion t2 t1 lbl)))
+                  (ref-coercion$ (interp-make-coercion t1 t2 lbl)
+                                 (interp-make-coercion t2 t1 lbl)))
                 (Failed-Coercion lbl))]
            [(GVect t2-t)
             (define t2 (Type t2-t))
             (If (type-pvec?$ t1)
                 (let$ ([t1 (type-pvec-of$ t1)])
-                  (Ref-Coercion (interp-make-coercion t1 t2 lbl)
-                                (interp-make-coercion t2 t1 lbl)))
+                  (vec-coercion$ (interp-make-coercion t1 t2 lbl)
+                                 (interp-make-coercion t2 t1 lbl)))
                 (Failed-Coercion lbl))]
            [(MRef t2-t)
             (If (type-mbox?$ t1)
@@ -442,7 +442,7 @@ form, to the shortest branch of the cast tree that is relevant.
       [(Quote-Coercion (Inject t1))    (inject v (Type t1))]
       [(Quote-Coercion (Fn _ _ _))     (apply-fn-coercion v c)]
       [(Quote-Coercion (CTuple _ _))   (apply-tup-coercion v c mt)]
-      [(Quote-Coercion (Ref _ _))      (apply-ref-coercion v c)]
+      [(Quote-Coercion (Ref _ _ _))    (apply-ref-coercion v c)]
       [(Quote-Coercion (MonoRef t2))   (mbox-cast v (Type t2))]
       [(Quote-Coercion (MonoVect t2))  (mvec-cast v (Type t2))]
       [(Quote-Coercion (Failed l))     (Blame (Quote l))]
@@ -625,6 +625,12 @@ form, to the shortest branch of the cast tree that is relevant.
           #:compose-coercions compose-coercions
           #:id-coercion? Id-Coercion-Huh))
 
+       (define compile-pvec-cast/coercions
+         (make-compile-cast-pvec/coercions
+          #:make-coercion compile-make-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? Id-Coercion-Huh))
+
        (define compile-mbox-cast/type-based
          (make-compile-mbox-cast
           #:interp-cast interp-cast
@@ -639,7 +645,8 @@ form, to the shortest branch of the cast tree that is relevant.
          (make-interp-med-cast-runtime!
           #:fn-cast    compile-fn-cast/coercions
           #:tuple-cast compile-tuple-cast/type-based
-          #:ref-cast   compile-pref-cast/coercions
+          #:pref-cast  compile-pref-cast/coercions
+          #:pvec-cast  compile-pvec-cast/coercions
           #:mbox-cast  compile-mbox-cast/type-based
           #:mvec-cast  compile-mvec-cast/type-based))
        
@@ -647,7 +654,8 @@ form, to the shortest branch of the cast tree that is relevant.
          (make-compile-med-cast
           #:fn-cast    compile-fn-cast/coercions
           #:tuple-cast compile-tuple-cast/type-based
-          #:ref-cast   compile-pref-cast/coercions
+          #:pref-cast  compile-pref-cast/coercions
+          #:pvec-cast  compile-pvec-cast/coercions
           #:mbox-cast  compile-mbox-cast/type-based
           #:mvec-cast  compile-mvec-cast/type-based
           #:interp-med-cast interp-med-cast))
@@ -703,6 +711,12 @@ form, to the shortest branch of the cast tree that is relevant.
           #:compose-coercions compose-coercions
           #:id-coercion? Id-Coercion-Huh))
 
+       (define compile-pvec-cast/coercions
+         (make-compile-cast-pvec/coercions
+          #:make-coercion compile-make-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? Id-Coercion-Huh))
+
        (define compile-mbox-cast/coercions
          (make-compile-mbox-cast
           #:interp-cast interp-cast/coercions
@@ -717,7 +731,8 @@ form, to the shortest branch of the cast tree that is relevant.
          (make-compile-med-cast
           #:fn-cast    compile-fn-cast/coercions
           #:tuple-cast compile-tuple-cast/coercions
-          #:ref-cast   compile-pref-cast/coercions
+          #:pref-cast  compile-pref-cast/coercions
+          #:pvec-cast  compile-pvec-cast/coercions
           #:mbox-cast  compile-mbox-cast/coercions
           #:mvec-cast  compile-mvec-cast/coercions
           #:interp-med-cast interp-med-cast/coercions))

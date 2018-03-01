@@ -228,12 +228,14 @@
        (Id-Tuple-Coercion a)]
       [(Ref-Coercion-Huh e)
        (Ref-Coercion-Huh (ll-expr e))]
-      [(Ref-Coercion e1 e2)
-       (Ref-Coercion (ll-expr e1) (ll-expr e2))]
+      [(Ref-Coercion e1 e2 flag)
+       (Ref-Coercion (ll-expr e1) (ll-expr e2) (ll-expr flag))]
       [(Ref-Coercion-Read e)
        (Ref-Coercion-Read (ll-expr e))]
       [(Ref-Coercion-Write e)
        (Ref-Coercion-Write (ll-expr e))]
+      [(Ref-Coercion-Ref-Huh (app ll-expr e))
+       (Ref-Coercion-Ref-Huh e)]
       [(Mbox (app ll-expr e) t) (Mbox e t)]
       [(Mbox-val-set! (app ll-expr e1) (app ll-expr e2)) (Mbox-val-set! e1 e2)]
       [(Mbox-val-ref (app ll-expr e)) (Mbox-val-ref e)]
