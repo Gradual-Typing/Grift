@@ -213,7 +213,12 @@
 	     (vector-set! o1 2 (fl+ (vector-ref o1 2) (fl* dt vz)))
 	     ())))
 
-(begin (offset-momentum) (: (energy) Float))
-(begin (repeat (i 0 (read-int)) (a : Dyn ()) (advance))
-       (: (energy) Float))
+(define (run-benchmark)
+  (begin (offset-momentum)
+         (print-float (energy) 9)
+         (display-char #\newline)
+         (repeat (i 0 (read-int)) (a : Dyn ()) (advance))
+         (print-float (energy) 9)
+         (display-char #\newline)))
 
+(time (run-benchmark))

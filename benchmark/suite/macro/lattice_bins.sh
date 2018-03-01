@@ -574,13 +574,19 @@ main()
     local nbins="$1"; shift
     LOOPS="$1";          shift
     local date="$1";     shift
-
+    
+    GRIFT_DIR=${GRIFT_DIR:=`pwd`/../../..}
     
     declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r LB_DIR="$TEST_DIR/lattice_bins/"
     if [ "$date" == "fresh" ]; then
         declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
         mkdir "$LB_DIR/$DATE"
+    elif [ "$date" == "test" ]; then
+        declare -r DATE="test"
+        if [ ! -d "$LB_DIR/$DATE" ]; then
+            mkdir "$LB_DIR/$DATE"
+        fi
     else
 	    declare -r DATE="$date"
 	    if [ ! -d "$LB_DIR/$DATE" ]; then
@@ -623,7 +629,6 @@ main()
     
     # create the result directory if it does not exist
     mkdir -p "$DATA_DIR"
-    mkdir -p "$TMP_DIR/partial"
     mkdir -p "$OUT_DIR/cumperflattice"
     mkdir -p "$OUT_DIR/perflattice/slowdown"
     mkdir -p "$OUT_DIR/perflattice/speedup"
@@ -639,10 +644,11 @@ main()
     local static_system=get_static_grift_runtime
     
     
-    if [ "$date" == "fresh" ]; then
+    if [ ! -d $TMP_DIR ]; then
 	# copying the benchmarks to a temporary directory
-	cp -r ${SRC_DIR}/* $TMP_DIR
-
+	cp -r ${SRC_DIR} $TMP_DIR
+    mkdir -p "$TMP_DIR/partial"
+    
 	# logging
 	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
 	MYEMAIL="`id -un`@`hostname -f`"

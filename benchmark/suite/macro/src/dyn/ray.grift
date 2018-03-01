@@ -1,6 +1,6 @@
 ;;; RAY -- Ray-trace a simple scene with spheres, generating a ".pgm" file.
 ;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
-;;; And then translated to Grift by Deyaaeldeen Almahallawi
+;;; And then translated to Schml by Deyaaeldeen Almahallawi
 
 (define (make-point [x : Dyn] [y : Dyn] [z : Dyn]) : Dyn
   (tuple x y z))
@@ -163,20 +163,25 @@
                  (fl- (point-y c) (point-y pt))
                  (fl- (point-z c) (point-z pt)))))
 
-(begin
-  (defsphere 32 #i0.0 #i-300.0 #i-1200.0 #i200.0 #i0.8)
-  (defsphere 31 #i-80.0 #i-150.0 #i-1200.0 #i200.0 #i0.7)
-  (defsphere 30 #i70.0 #i-100.0 #i-1200.0 #i200.0 #i0.9)
-  (let ([counter : (Ref Dyn) (box 29)])
-    (repeat (x -2 3) (_ : Dyn ())
-      (repeat (z 2 8) (_ : Dyn ())
-        (begin
-          (defsphere
-            (unbox counter)
-            (fl* (int->float x) #i200.0)
-            #i300.0
-            (fl* (int->float z) #i-400.0)
-            #i40.0
-            #i0.75)
-          (box-set! counter (- (unbox counter) 1))))))
-  (tracer 1))
+(define (run-benchmark)
+  (begin
+    (defsphere 32 #i0.0 #i-300.0 #i-1200.0 #i200.0 #i0.8)
+    (defsphere 31 #i-80.0 #i-150.0 #i-1200.0 #i200.0 #i0.7)
+    (defsphere 30 #i70.0 #i-100.0 #i-1200.0 #i200.0 #i0.9)
+    (let ([counter : (Ref Dyn) (box 29)])
+      (repeat (x -2 3) (_ : Dyn ())
+              (repeat (z 2 8) (_ : Dyn ())
+                      (begin
+                        (defsphere
+                          (unbox counter)
+                          (fl* (int->float x) #i200.0)
+                          #i300.0
+                          (fl* (int->float z) #i-400.0)
+                          #i40.0
+                          #i0.75)
+                        (box-set! counter (- (unbox counter) 1))))))
+    (tracer 1)))
+
+(time
+ (begin (run-benchmark)
+        (display-char #\newline)))
