@@ -775,25 +775,32 @@ but a static single assignment is implicitly maintained.
              (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-TAG-INDEX))
            (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-REF-SECOND-TAG))]
-        [(Ref-Coercion (app recur r) (app recur w) (app recur flag))
+        [(Ref-Coercion (app recur r) (app recur w) flag)
          (begin$
            (assign$ second-tag
              (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
                   COERCION-REF-SECOND-TAG))
-           (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
+           (if (cast-profiler?)
+               (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
                      `(("tag" . ,second-tag)
                        ("read-coercion" . ,r)
                        ("write-coercion" . ,w)
-                       ("flag" . ,flag))))]
+                       ("flag" . ,(recur flag))))
+               (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
+                     `(("tag" . ,second-tag)
+                       ("read-coercion" . ,r)
+                       ("write-coercion" . ,w)))))]
         [(Ref-Coercion-Read (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-READ-INDEX)]
         [(Ref-Coercion-Write (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-WRITE-INDEX)]
         [(Ref-Coercion-Ref-Huh (app recur e))
-         (begin$
-           (assign$ flag
-             (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-FLAG-INDEX))
-           (op$ = flag COERCION-REF-REF-FLAG))]
+         (if (cast-profiler?)
+             (begin$
+               (assign$ flag
+                 (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-FLAG-INDEX))
+               (op$ = flag COERCION-REF-REF-FLAG))
+             NO-OP)]
         [(Failed-Coercion-Huh (app recur e))
          (sr-check-tag=? e COERCION-TAG-MASK COERCION-FAILED-TAG)]
         ;; For now I am allocating the blame label in a box.
@@ -1418,13 +1425,18 @@ but a static single assignment is implicitly maintained.
      (begin$
        (assign$ second-tag (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
                                 COERCION-REF-SECOND-TAG))
-       (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
-                 `(("tag" . ,second-tag)
-                   ("read-coercion" . ,r)
-                   ("write-coercion" . ,w)
-                   ("flag" . ,(case flag
-                                [(GRef)  COERCION-REF-REF-FLAG]
-                                [(GVect) COERCION-REF-VEC-FLAG])))))]
+       (if (cast-profiler?)
+           (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
+                     `(("tag" . ,second-tag)
+                       ("read-coercion" . ,r)
+                       ("write-coercion" . ,w)
+                       ("flag" . ,(case flag
+                                    [(GRef)  COERCION-REF-REF-FLAG]
+                                    [(GVect) COERCION-REF-VEC-FLAG]))))
+           (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
+                     `(("tag" . ,second-tag)
+                       ("read-coercion" . ,r)
+                       ("write-coercion" . ,w)))))]
     [(MonoRef (app sr-prim-type t))
      (begin$
        (assign$ second-tag (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
