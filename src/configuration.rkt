@@ -32,8 +32,10 @@
 (define-type Ref-Semantics (U 'Monotonic 'Proxied))
 (define reference-semantics : (Parameterof (U 'Monotonic 'Proxied))
   (make-parameter 'Proxied))
-(: inline-guarded-branch? (Parameterof Boolean))
-(define inline-guarded-branch? (make-parameter #t))
+(: inline-proxied-branch? (Parameterof Boolean))
+(define inline-proxied-branch? (make-parameter #t))
+(: inline-monotonic-branch? (Parameterof Boolean))
+(define inline-monotonic-branch? (make-parameter #t))
 
 ;; Cast behavior
 ;; TODO this is largely setup based on how the main
@@ -52,6 +54,8 @@
 ;; TODO if this is faster we should default to this
 (define hybrid-cast/coercion-runtime? : (Parameterof Boolean)
   (make-parameter #f))
+(define cast-profiler? : (Parameterof Boolean)
+  (make-parameter #t))
 
 
 
@@ -71,8 +75,6 @@
 (define-type GC (U 'Boehm 'None))
 (define garbage-collector : (Parameterof GC)
   (make-parameter 'Boehm))
-(define cast-profiler? : (Parameterof Boolean)
-  (make-parameter #f))
 
 
 

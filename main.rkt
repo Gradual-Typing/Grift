@@ -172,6 +172,15 @@
    [("--profile")
     "Invoke c compiler with profiling flags"
     (c-flags (cons "-pg" (c-flags)))]
+   [("--no-inline-proxied-branch")
+    "Do not inline proxied operations"
+    (inline-proxied-branch? #f)]
+   [("--inline-monotonic-branch")
+    "Do not inline monotonic operations"
+    (inline-monotonic-branch? #f)]
+   [("--cast-profiler")
+    "Turn on the runtime cast profiler"
+    (cast-profiler? #t)]
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
