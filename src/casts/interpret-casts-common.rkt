@@ -196,7 +196,6 @@ TODO write unit tests
   (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type Id-Coercions-Huh-Type (CoC3-Expr -> CoC3-Expr))
 
-
 ;; Functions for use sites of guarded references with coercions
 (define-type PBox-Ref-Type (CoC3-Expr -> CoC3-Expr))
 (define-type PBox-Set-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
@@ -468,9 +467,6 @@ TODO write unit tests
             (Fn-Proxy (list #{arity :: Index} apply-coercion-uid) fun crcn)))))
   (values casting-code-name casting-code))
 
-
-
-
 (: make-fn-cast-helpers : (Nat -> (Values Uid CoC3-Code)) -> (Nat -> Uid))
 (define (make-fn-cast-helpers build-caster!)
   ;; A map from arity to the binding of the code that handles that arity
@@ -601,7 +597,6 @@ TODO write unit tests
          v t1 t2 l [mt : CoC3-Expr ZERO-EXPR])
   ;; TODO help compile coercion
   (apply-coercion v (make-coercion t1 t2 l) mt))
-
 
 (: make-monotonic-helpers
    (->* ()
@@ -1086,7 +1081,6 @@ TODO write unit tests
       (compile-mvec-cast v (Type-MVect-Of t2))] 
      [else (Blame l)])))
 
-
 (: make-interp-med-cast-runtime!
    (->* (#:fn-cast     Fn-Cast-Type
          #:tuple-cast  Tuple-Cast-Type
@@ -1243,7 +1237,6 @@ TODO write unit tests
       [(_ _) #:when know-not-eq? (aux v t1 t2 l mt)]
       [(_ _) (If (op=? t1 t2) v (aux v t1 t2 l mt))])))
 
-
 (define interp-cast-project/inject-inline? (make-parameter #f))
 (define interp-cast-med-cast-inline? (make-parameter #f))
 (: make-interp-cast-runtime!
@@ -1340,7 +1333,6 @@ TODO write unit tests
     [(specialize-cast-code-generation?) compile-cast]
     [else compile-cast/interp]))
 
-
 (: make-compile-project
    (->* (#:compile-med-cast Compile-Med-Cast-Type)
         Project-Type))
@@ -1400,8 +1392,6 @@ TODO write unit tests
              (code-gen-full-project v t2 l mt)
              (interp-project v t2 l mt))])))
   compile-project)
-
-
 
 (: make-compile-inject : -> (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define (make-compile-inject)
@@ -1507,8 +1497,6 @@ TODO write unit tests
          (App-Code (Fn-Caster v) (list v t1 t2 l)))]))
   compile-fn-cast)
 
-
-
 ;; TODO introduce assignments that are unboxed as long as they do not
 ;; escape. Implement tup-cast here instead of at specify representation
 ;; worrying about the overhead of allocation here is too much.
@@ -1523,7 +1511,6 @@ TODO write unit tests
        (If (Op '= (list (Quote 0) mt))
            (Coerce-Tuple apply-coercion-uid v m)
            (Coerce-Tuple-In-Place apply-coercion-uid v m mt)))]))
-
 
 (: make-compile-cast-tuple/coercions
    (->* (#:apply-coercion-uid Uid
@@ -1563,8 +1550,6 @@ TODO write unit tests
                   (Cast-Tuple-In-Place cast-uid v t1 t2 l mt)))
             CoC3-Expr)]))
   compile-cast-tuple)
-
-
 
 ;; Note that the compile-cast-proxy-ref functions expects t1 and t2 to be
 ;; the sub-component of the GRef or GVect type so that the proxying
