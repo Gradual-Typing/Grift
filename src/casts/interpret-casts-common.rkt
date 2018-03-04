@@ -28,7 +28,6 @@ TODO write unit tests
 (define function-cast-representation
   (make-parameter 'Hybrid))
 
-
 (define project-inline-without-types? : (Parameterof Boolean)
   (make-parameter #f))
 
@@ -43,7 +42,6 @@ TODO write unit tests
 
 (define types-greatest-lower-bound-code-label? : (Parameterof (Option (Code-Label Uid)))
   (make-parameter #f))
-
 
 (: apply-code (->* (Uid) #:rest CoC3-Expr CoC3-Expr))
 (define (apply-code u . a*)
@@ -76,24 +74,6 @@ TODO write unit tests
        (add-cast-runtime-binding! uid code)
        uid]))
   get-uid!)
-
-;; (: make-lazy-add-cast-runtime-binding-interp :
-;;    String ((->* () #:rest CoC3-Code CoC3-Code) -> CoC3-Code) -> (->* () #:rest CoC3-Code CoC3-Code))
-;; (define (make-lazy-add-cast-runtime-binding-interp name code)
-;;   (define boxed-interp? : (Boxof (Option (->* () #:rest CoC3-Code CoC3-Code))) (box #f))
-;;   (: apply-interp (->* () #:rest CoC3-Code CoC3-Code))
-;;   (define (apply-interp . a)
-;;     (define interp? (unbox boxed-interp?))
-;;     (cond
-;;       [interp? (apply interp? a)]
-;;       [else
-;;        (define uid (next-uid! name))
-;;        (define interp (apply-code-curry uid))
-;;        ((inst set-box! (Option (->* () #:rest CoC3-Code CoC3-Code))) boxed-interp? interp)
-;;        (add-cast-runtime-binding! uid (code interp))
-;;        (apply interp a)]))
-;;   apply-interp)
-
 
 (define-type Monotonic-Cast-Type
   (->* (CoC3-Expr CoC3-Expr) (CoC3-Expr #:t1 CoC3-Expr) CoC3-Expr))
@@ -144,6 +124,29 @@ TODO write unit tests
 (define-type MVec-Ref-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type MVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
+(define-type Compose-Coercions-Type
+  (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Compile-Cast-Type
+  (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
+       (CoC3-Expr #:t1-not-dyn Boolean #:t2-not-dyn Boolean)
+       CoC3-Expr))
+(define-type Cast-Type (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
+(define-type Cast-Tuple-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Copy-Mref-Type (CoC3-Expr -> CoC3-Expr))
+(define-type Make-Coercion-Type
+  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Id-Coercions-Huh-Type (CoC3-Expr -> CoC3-Expr))
+
+;; Functions for use sites of guarded references with coercions
+(define-type PBox-Ref-Type (CoC3-Expr -> CoC3-Expr))
+(define-type PBox-Set-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type PVec-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type PVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type PVec-Len-Type (CoC3-Expr -> CoC3-Expr))
+
+;; This next section of code are the procedures that build all
+;; of the runtime code for hyper coercions based casting.
+
 (: make-compile-types-greatest-lower-bound : -> (Code-Label Uid))
 (define (make-compile-types-greatest-lower-bound)
   (define (make-code!)
@@ -179,29 +182,6 @@ TODO write unit tests
     types-greatest-lower-bound-label)
   (let ([cl? (types-greatest-lower-bound-code-label?)])
     (or cl? (make-code!))))
-
-;; This next section of code are the procedures that build all
-;; of the runtime code for hyper coercions based casting.
-
-(define-type Compose-Coercions-Type
-  (CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Compile-Cast-Type
-  (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
-       (CoC3-Expr #:t1-not-dyn Boolean #:t2-not-dyn Boolean)
-       CoC3-Expr))
-(define-type Cast-Type (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
-(define-type Cast-Tuple-Type (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Copy-Mref-Type (CoC3-Expr -> CoC3-Expr))
-(define-type Make-Coercion-Type
-  (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type Id-Coercions-Huh-Type (CoC3-Expr -> CoC3-Expr))
-
-;; Functions for use sites of guarded references with coercions
-(define-type PBox-Ref-Type (CoC3-Expr -> CoC3-Expr))
-(define-type PBox-Set-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type PVec-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type PVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-(define-type PVec-Len-Type (CoC3-Expr -> CoC3-Expr))
 
 (define (make-map-expr
          #:compile-cast    [compile-cast : Compile-Cast-Type]
