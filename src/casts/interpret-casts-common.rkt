@@ -22,12 +22,6 @@ TODO write unit tests
 (provide (all-defined-out))
 
 
-(define-type Function-Proxy-Rep (U 'Data 'Hybrid 'Functional))
-
-(: function-cast-representation (Parameterof Function-Proxy-Rep))
-(define function-cast-representation
-  (make-parameter 'Hybrid))
-
 (define project-inline-without-types? : (Parameterof Boolean)
   (make-parameter #f))
 
@@ -529,46 +523,6 @@ TODO write unit tests
           code-gen-pvec-ref
           code-gen-pvec-set!
           code-gen-pvec-len))
-
-(: make-proxied-reference/coercions-compile-helpers
-   (->* (#:apply-coercion Apply-Coercion-Type)
-        (Values PBox-Ref-Type PBox-Set-Type
-                PVec-Ref-Type PVec-Set-Type PVec-Len-Type
-                CoC3-Bnd-Code*)))
-(define (make-proxied-reference/coercions-compile-helpers #:apply-coercion apply-coercion)
-  (define-values (code-gen-pbox-ref code-gen-pbox-set!
-                                    code-gen-pvec-ref code-gen-pvec-set! code-gen-pvec-len)
-    (make-proxied-reference/coercions-code-gen-helpers
-     #:apply-coercion apply-coercion))
-  (cond
-    [(inline-guarded-branch?)
-     ;; we just hand back the code generators to build
-     ;; inline code everywhere.
-     (values code-gen-pbox-ref code-gen-pbox-set!
-             code-gen-pvec-ref code-gen-pvec-set! code-gen-pvec-len
-             '())]
-    [else
-     ;; If they are not inlined then the compiler we generate
-     ;; the runtime binding and returns procedures that builds
-     ;; invokations of this runtime code.
-     (let ([pbr   (next-uid! "rt_pbox_ref")] 
-           [pbs   (next-uid! "rt_pbox_set")]
-           [pvr   (next-uid! "rt_pvec_ref")]
-           [pvs   (next-uid! "rt_pvec_set")]
-           [pvl   (next-uid! "rt_pvec_len")])
-       (values
-        (apply-code-curry pbr) (apply-code-curry pbs)
-        (apply-code-curry pvr) (apply-code-curry pvs) (apply-code-curry pvl)
-        `([,pbr . ,(code$ (pbox)
-                     (code-gen-pbox-ref pbox))]
-          [,pbs . ,(code$ (pbox value)
-                     (code-gen-pbox-set! pbox value))]
-          [,pvr . ,(code$ (pvec index)
-                     (code-gen-pvec-ref pvec index))]
-          [,pvs . ,(code$ (pvec index value)
-                     (code-gen-pvec-set! pvec index value))]
-          [,pvl . ,(code$ (pvec)
-                     (code-gen-pvec-len pvec))])))]))
 
 (: apply-coercion/make-coercion->compile-cast :
    Apply-Coercion-Type Make-Coercion-Type -> Cast-Type)
