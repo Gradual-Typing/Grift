@@ -6,16 +6,8 @@
 ;;   value of cast-specialization variable.
 
 (require
- scribble/srcdoc
  racket/match
- racket/format
  racket/list
- racket/set
- (for-syntax racket/base)
- (except-in  "../helpers.rkt" logging)
- (submod "../logging.rkt" typed)
- "../unique-identifiers.rkt"
- "../errors.rkt"
  "../configuration.rkt"
  "../language/cast0.rkt"
  "../language/cast-or-coerce3.rkt"
@@ -23,13 +15,7 @@
  "../language/syntax.rkt"
  "interpret-casts-common.rkt")
 
-(provide
- interpret-casts/type-based-casts
- (all-from-out
-  "../language/cast0.rkt"
-  "../language/cast-or-coerce3.rkt"))
-
-
+(provide interpret-casts/type-based-casts)
 
 
 (: interpret-casts/type-based-casts : -> (C0-Expr -> CoC3-Expr))
