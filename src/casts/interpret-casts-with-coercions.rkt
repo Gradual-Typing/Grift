@@ -61,11 +61,6 @@ form, to the shortest branch of the cast tree that is relevant.
 (define make-coercion-inline/both-vars? : (Parameterof Boolean)
   (make-parameter #f))
 
-(define-type CoC3-Value (U (Quote Grift-Literal)
-                           (Quote-Coercion Coercion)
-                           (Type Grift-Type)
-                           (Var Uid)))
-
 (define (make-compile-make-coercion/make-med-coercion)
   : (Values Compile-Make-Coercion-Type Make-Med-Coercion-Type)
   (define make-coercion-uid (next-uid! "make-coercion"))
@@ -397,49 +392,6 @@ form, to the shortest branch of the cast tree that is relevant.
       [else
        (precondition$ (Failed-Coercion-Huh c)
          (Blame (Failed-Coercion-Label c)))]))))
-
-(: make-compile-apply-coercion
-   (->* (#:apply-coercion-uid Uid
-         #:apply-coercion Apply-Coercion-Type
-         #:project Project-Type
-         #:inject  Inject-Type
-         #:apply-fn-coercion  Apply-Coercion-Type
-         #:apply-tup-coercion Apply-Coercion-Type
-         #:apply-ref-coercion Apply-Coercion-Type
-         #:mbox-cast Monotonic-Cast-Type
-         #:mvec-cast Monotonic-Cast-Type)
-        Apply-Coercion-Type))
-
-(define (make-compile-apply-coercion
-         #:apply-coercion-uid apply-coercion-uid
-         #:apply-coercion apply-coercion
-         #:project project
-         #:inject  inject
-         #:apply-fn-coercion apply-fn-coercion
-         #:apply-tup-coercion apply-tup-coercion
-         #:apply-ref-coercion apply-ref-coercion
-         #:mbox-cast mbox-cast
-         #:mvec-cast mvec-cast)
-  
-  (: compile-apply-coercion Apply-Coercion-Type)
-  (define (compile-apply-coercion v c [mt ZERO-EXPR])
-    (match c
-      [(Quote-Coercion (Identity)) v]
-      [(Quote-Coercion (Sequence c1 c2))
-       (let$ ([v (compile-apply-coercion v (Quote-Coercion c1))])
-         (compile-apply-coercion v (Quote-Coercion c2)))]
-      [(Quote-Coercion (Project t2 l)) (project v (Type t2) (Quote l) mt)]
-      [(Quote-Coercion (Inject t1))    (inject v (Type t1))]
-      [(Quote-Coercion (Fn _ _ _))     (apply-fn-coercion v c)]
-      [(Quote-Coercion (CTuple _ _))   (apply-tup-coercion v c mt)]
-      [(Quote-Coercion (Ref _ _ _))    (apply-ref-coercion v c)]
-      [(Quote-Coercion (MonoRef t2))   (mbox-cast v (Type t2))]
-      [(Quote-Coercion (MonoVect t2))  (mvec-cast v (Type t2))]
-      [(Quote-Coercion (Failed l))     (Blame (Quote l))]
-      [non-literal-coercion
-       (apply-coercion v c)]))
-  compile-apply-coercion)
-
 
 (: make-compose-coercions
    (->* (#:make-coercion Make-Coercion-Type
