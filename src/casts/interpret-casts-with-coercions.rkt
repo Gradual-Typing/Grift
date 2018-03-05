@@ -19,25 +19,15 @@ form, to the shortest branch of the cast tree that is relevant.
 +-----------------------------------------------------------------------------|#
 
 (require
- scribble/srcdoc
  racket/match
- racket/format
- racket/list
- racket/set
  (submod "../logging.rkt" typed)
- "../unique-identifiers.rkt"
- "../errors.rkt"
  "../configuration.rkt"
  "../language/syntax.rkt"
  "../language/cast0.rkt"
  "../language/cast-or-coerce3.rkt"
  "./interpret-casts-common.rkt")
 
-(provide
- interpret-casts/coercions
- (all-from-out
-  "../language/cast0.rkt"
-  "../language/cast-or-coerce3.rkt"))
+(provide interpret-casts/coercions)
 
 
 (: make-coercion
