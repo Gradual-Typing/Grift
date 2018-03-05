@@ -29,7 +29,6 @@
                        [mt : CoC3-Expr ZERO-EXPR])
     (apply-code interp-cast-uid v t1 t2 l mt))
   
-
   ;; Compiling Function Casts
   (: build-fn-caster : Nat -> (Values Uid CoC3-Code))
   (define (build-fn-caster ary)
@@ -171,7 +170,6 @@
    #:dyn-mvec-set    dyn-mvec-set!
    #:dyn-fn-app      dyn-fn-app
    #:dyn-tup-prj     dyn-tup-prj))
-
 
 ;; Functions for use sites of guarded references with coercions
 (: make-proxied-reference-helpers/type-based-casts
