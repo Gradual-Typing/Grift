@@ -277,35 +277,35 @@ TODO write unit tests
       [(Gvector-length (app recur e))
        (cast-profile/inc-vector-uses$ (pvec-len e))]
       [(MBoxCastedRef (app recur e) t)
-       (mbox-ref e (Type t))]
+       (cast-profile/inc-ref-uses$ (mbox-ref e (Type t)))]
       [(MBoxCastedSet! (app recur e1) (app recur e2) t)
-       (mbox-set! e1 e2 (Type t))]
+       (cast-profile/inc-ref-uses$ (mbox-set! e1 e2 (Type t)))]
       [(MVectCastedRef (app recur e) (app recur i) t)
-       (mvec-ref e i (Type t))]
+       (cast-profile/inc-vector-uses$ (mvec-ref e i (Type t)))]
       [(MVectCastedSet! (app recur e1) (app recur i) (app recur e2) t)
-       (mvec-set! e1 i e2 (Type t))]
+       (cast-profile/inc-vector-uses$ (mvec-set! e1 i e2 (Type t)))]
       [(Dyn-MRef-Ref (app recur e) l)
-       (dyn-mbox-ref e (Quote l))]
+       (cast-profile/inc-ref-uses$ (dyn-mbox-ref e (Quote l)))]
       [(Dyn-MRef-Set! (app recur e1) (app recur e2) t l)
-       (dyn-mbox-set! e1 e2 (Type t) (Quote l))]
+       (cast-profile/inc-ref-uses$ (dyn-mbox-set! e1 e2 (Type t) (Quote l)))]
       [(Dyn-MVector-Ref (app recur e) (app recur i) l)
-       (dyn-mvec-ref e i (Quote l))]
+       (cast-profile/inc-vector-uses$ (dyn-mvec-ref e i (Quote l)))]
       [(Dyn-MVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
-       (dyn-mvec-set! e1 i e2 (Type t) (Quote l))]
+       (cast-profile/inc-vector-uses$ (dyn-mvec-set! e1 i e2 (Type t) (Quote l)))]
       [(Mvector-ref (app recur e1) (app recur e2))
-       (stc-mvec-ref e1 e2)]
+       (cast-profile/inc-vector-uses$ (stc-mvec-ref e1 e2))]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
-       (stc-mvec-set! e1 e2 e3)]
+       (cast-profile/inc-vector-uses$ (stc-mvec-set! e1 e2 e3))]
       [(Munbox (app recur e))
-       (stc-mbox-ref e)]
+       (cast-profile/inc-ref-uses$ (stc-mbox-ref e))]
       [(Mbox-set! (app recur e1) (app recur e2))
-       (stc-mbox-set! e1 e2)]
+       (cast-profile/inc-ref-uses$ (stc-mbox-set! e1 e2))]
       [(Mvector-length (app recur e)) 
-       (mvec-len e)]
+       (cast-profile/inc-vector-uses$ (mvec-len e))]
       [(Mbox (app recur e) t)
-       (mbox e t)]
+       (cast-profile/inc-uncasted-ref-values$ (mbox e t))]
       [(Mvector (app recur e1) (app recur e2) t)
-       (mvec e1 e2 t)]      
+       (cast-profile/inc-uncasted-vector-values$ (mvec e1 e2 t))]
       ;; While tuples don't get any special attention in this pass
       ;; dynamic tuple projection needs to get dusugared
       [(Create-tuple e*)
@@ -1780,21 +1780,22 @@ TODO write unit tests
                               ;; away some of the code if it is provided
                               ;; t1 is only used at compile time
                               #:t1 [t1 : (Option CoC3-Expr) #f])
-    (match* (t1 t2)
-      [(_ (Type (Dyn))) e]
-      [((Type (STuple a _)) _)
-       (define n (Quote a))
-       (if (monotonic-cast-close-code-specialization?)
-           (interp-mbox-cast/tuple e t2 n l)
-           (code-gen-mbox-cast/tuple e t2 n l))]
-      [((Type (not (Dyn))) _)
-       (if (monotonic-cast-close-code-specialization?)
-           (interp-mbox-cast/non-tuple e t2 l)
-           (code-gen-mbox-cast/non-tuple e t2 l))]
-      [(_ _)
-       (if (monotonic-cast-inline-without-types?)
-           (code-gen-full-mbox-cast e t2 l)
-           (interp-mbox-cast e t2 l))]))
+    (cast-profile/inc-ref-casts$
+     (match* (t1 t2)
+       [(_ (Type (Dyn))) e]
+       [((Type (STuple a _)) _)
+        (define n (Quote a))
+        (if (monotonic-cast-close-code-specialization?)
+            (interp-mbox-cast/tuple e t2 n l)
+            (code-gen-mbox-cast/tuple e t2 n l))]
+       [((Type (not (Dyn))) _)
+        (if (monotonic-cast-close-code-specialization?)
+            (interp-mbox-cast/non-tuple e t2 l)
+            (code-gen-mbox-cast/non-tuple e t2 l))]
+       [(_ _)
+        (if (monotonic-cast-inline-without-types?)
+            (code-gen-full-mbox-cast e t2 l)
+            (interp-mbox-cast e t2 l))])))
   compile-mbox-cast)
 
 
@@ -1910,21 +1911,22 @@ TODO write unit tests
            [l : CoC3-Expr (Quote "Monotonic")]
            #:t1 [t1 : (Option CoC3-Expr) #f])
     : CoC3-Expr 
-    (match* (t1 t2)
-      [(_ (Type (Dyn))) e]
-      [((Type (STuple a _)) _)
-       (define n (Quote a))
-       (if (monotonic-cast-close-code-specialization?)
-           (interp-mvec-cast/tuple e t2 n l)
-           (code-gen-mvec-cast/tuple e t2 n l))]
-      [((Type (not (Dyn))) _)
-       (if (monotonic-cast-close-code-specialization?)
-           (interp-mvec-cast/non-tuple e t2 l)
-           (code-gen-mvec-cast/non-tuple e t2 l))]
-      [(_ _)
-       (if (monotonic-cast-inline-without-types?)
-           (code-gen-full-mvec-cast e t2 l)
-           (interp-mvec-cast e t2 l))]))
+    (cast-profile/inc-vector-casts$
+     (match* (t1 t2)
+       [(_ (Type (Dyn))) e]
+       [((Type (STuple a _)) _)
+        (define n (Quote a))
+        (if (monotonic-cast-close-code-specialization?)
+            (interp-mvec-cast/tuple e t2 n l)
+            (code-gen-mvec-cast/tuple e t2 n l))]
+       [((Type (not (Dyn))) _)
+        (if (monotonic-cast-close-code-specialization?)
+            (interp-mvec-cast/non-tuple e t2 l)
+            (code-gen-mvec-cast/non-tuple e t2 l))]
+       [(_ _)
+        (if (monotonic-cast-inline-without-types?)
+            (code-gen-full-mvec-cast e t2 l)
+            (interp-mvec-cast e t2 l))])))
   compile-mvec-cast)
 
 (: make-compose-fn-coercions
