@@ -6,7 +6,7 @@
 (define-syntax (define-constants stx)
   (syntax-case stx ()
     [(_ (name val) ...)
-     (let ([fmt (lambda (x) (format-id stx "data:~a" x))])
+     (let ([fmt (lambda (x) (format-id x "data:~a" x))])
        (with-syntax ([(fmt-name ...) (map fmt (syntax->list #'(name ...)))])
          #'(begin
              (define fmt-name val) ...
