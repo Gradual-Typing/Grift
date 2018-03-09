@@ -1285,10 +1285,6 @@ but a static single assignment is implicitly maintained.
      (define/with-syntax tag-def (format-id stx "~a-TAG" qualified-upcase-name))
      (define/with-syntax (sindex/offset-def* ...)
        (if many-field-dtm (append index-def* (list offset-def)) index-def*))
-     (define/with-syntax (sindex/offset-data-def* ...)
-       (if many-field-dtm
-           (append index-data-def* (list offset-data-def))
-           index-data-def*))
      (define/with-syntax tag-data-def (gen-data-id #'tag-def))
      (define/with-syntax index-data-def (gen-data-id #'index-def))
      (define/with-syntax hash-data-def (gen-data-id #'hash-def))
@@ -1336,14 +1332,11 @@ but a static single assignment is implicitly maintained.
        (let ([l (map gen-index-func-access field-string* index-def*)])
          (if many-field-dtm (append l (list (gen-offset-func-access))) l)))
      #`(begin
-         (define tag-data-def tag)
-         (define tag-def (Quote tag-data-def))
-         (define index-data-def 0)
-         (define index-def (Quote index-data-def))
-         (define hash-data-def 1)
-         (define hash-def (Quote hash-data-def))
-         (define sindex/offset-data-def* sindex/offset-val*) ...
-         (define sindex/offset-def* (Quote sindex/offset-data-def*)) ...
+         (define-constants
+           (tag-def tag)
+           (index-def 0)
+           (hash-def 1)
+           (sindex/offset-def* sindex/offset-val*) ...)
          func-alloc
          (define (func-huh-name [equal-arg : D0-Expr]) : D0-Expr
            (sr-check-tag=? equal-arg namespace-mask-def tag-def))
