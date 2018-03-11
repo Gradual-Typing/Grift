@@ -36,4 +36,4 @@
 (define-runtime-path none-gc.o-path "runtime/nonegc.o")
 (define-runtime-path none-gc.c-path "runtime/nonegc.c")
 
-
+(define-runtime-path constants.h-path "runtime/constants.h")
