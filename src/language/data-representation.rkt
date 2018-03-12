@@ -1,5 +1,5 @@
 #lang typed/racket
-(require (for-syntax racket/syntax))
+(require (for-syntax racket/syntax "c-helpers.rkt"))
 (require "../language/forms.rkt")
 (provide (all-defined-out))
 
@@ -8,6 +8,12 @@
     [(_ (name val) ...)
      (let ([fmt (lambda (x) (format-id x "data:~a" x))])
        (with-syntax ([(fmt-name ...) (map fmt (syntax->list #'(name ...)))])
+         (replace/append-to-constants.h
+          'append
+          (lambda (in)
+            (map (define-line in)
+                 (syntax-e #'(name ...))
+                 (syntax-e #'(val ...)))))
          #'(begin
              (define fmt-name val) ...
              (define name (Quote fmt-name)) ...)))]))
