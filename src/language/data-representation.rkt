@@ -140,4 +140,5 @@
   (FN-PROXY-CLOS-INDEX            0)
   (HYBRID-PROXY-TAG               #b001)
   (HYBRID-PROXY-CRCN-INDEX        2)
-  (HYBRID-PROXY-CLOS-INDEX        1))
+  (HYBRID-PROXY-CLOS-INDEX        1)
+  (EXIT-FAILURE                   1))
