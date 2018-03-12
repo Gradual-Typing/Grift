@@ -114,20 +114,20 @@ but a static single assignment is implicitly maintained.
      (begin$
        (assign$ val e1)
        (assign$ type (sr-expr e2))
-       (assign$ tag (sr-get-tag type TYPE-TAG-MASK))
-       (Switch
-           type
-         (let* ([shifted-imm (op$ %<< val DYN-IMDT-SHIFT)]
-                [tag-shifted-imm
-                 (lambda ([tag : D0-Expr])
-                   : D0-Expr
-                   (op$ binary-or shifted-imm tag))])
-           `([(,data:TYPE-INT-RT-VALUE)  . ,(tag-shifted-imm DYN-INT-TAG)]
-             [(,data:TYPE-BOOL-RT-VALUE) . ,(tag-shifted-imm DYN-BOOL-TAG)]
-             [(,data:TYPE-UNIT-RT-VALUE) . ,(tag-shifted-imm DYN-UNIT-TAG)]
-             [(,data:TYPE-CHAR-RT-VALUE) . ,(tag-shifted-imm DYN-CHAR-TAG)]))
-         ;; Notice that float types fall into this case also
-         (sr-alloc "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))))]))
+       (let* ([shifted-imm (op$ %<< val DYN-IMDT-SHIFT)]
+              [tag-shifted-imm
+               (lambda ([tag : D0-Expr])
+                 : D0-Expr
+                 (op$ binary-or shifted-imm tag))])
+         (case$ type
+           [(data:TYPE-INT-RT-VALUE) (tag-shifted-imm DYN-INT-TAG)]
+           [(data:TYPE-BOOL-RT-VALUE) (tag-shifted-imm DYN-BOOL-TAG)]
+           [(data:TYPE-UNIT-RT-VALUE) (tag-shifted-imm DYN-UNIT-TAG)]
+           [(data:TYPE-CHAR-RT-VALUE) (tag-shifted-imm DYN-CHAR-TAG)]
+           ;; float is handled in the else branch
+           [else
+            (sr-alloc
+             "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))])))]))
 
 (: tuple-type-glb ((Code-Label Uid) -> ((Var Uid) (Var Uid) -> D0-Expr)))
 (define ((tuple-type-glb tglb-label) t1 t2)
@@ -492,7 +492,7 @@ but a static single assignment is implicitly maintained.
            (assign$ elem-type-hash (type-hash-access elem-type))
            (op$ * (Quote 19) (op$ + hash-code elem-type-hash)))
          (Quote 6))]
-      [else (op$ Print err-msg2) (op$ Exit (Quote 1)) UNDEF-IMDT])))
+      [else (op$ Print err-msg2) (op$ Exit EXIT-FAILURE) UNDEF-IMDT])))
 
 (: get-hashcons-types! (-> (Code-Label Uid)))
 (define (get-hashcons-types!)
@@ -847,13 +847,13 @@ but a static single assignment is implicitly maintained.
          (begin$
            (assign$ tmp e)
            (assign$ tag (sr-get-tag tmp DYN-TAG-MASK))
-           (Switch tag
-             `([(,data:DYN-BOXED-TAG) . ,(op$ Array-ref tmp DYN-TYPE-INDEX)]
-               [(,data:DYN-INT-TAG) . ,TYPE-INT-RT-VALUE]
-               [(,data:DYN-BOOL-TAG) . ,TYPE-BOOL-RT-VALUE]
-               [(,data:DYN-UNIT-TAG) . ,TYPE-UNIT-RT-VALUE]
-               [(,data:DYN-CHAR-TAG) . ,TYPE-CHAR-RT-VALUE])
-             (begin$ (op$ Print err-msg) (op$ Exit  (Quote 1)) UNDEF-IMDT)))]
+           (case$ tag
+             [(data:DYN-BOXED-TAG) (op$ Array-ref tmp DYN-TYPE-INDEX)]
+             [(data:DYN-INT-TAG) TYPE-INT-RT-VALUE]
+             [(data:DYN-BOOL-TAG) TYPE-BOOL-RT-VALUE]
+             [(data:DYN-UNIT-TAG) TYPE-UNIT-RT-VALUE]
+             [(data:DYN-CHAR-TAG) TYPE-CHAR-RT-VALUE]
+             [else (op$ Print err-msg) (op$ Exit EXIT-FAILURE) UNDEF-IMDT]))]
         [(Access (Dyn) 'immediate-value (app recur e) #f)
          (op$ %>> e DYN-IMDT-SHIFT)]
         [(Access (Dyn) 'immediate-tag (app recur e) #f)
@@ -876,7 +876,7 @@ but a static single assignment is implicitly maintained.
            [other (error 'dyn-immediate-tag=? "expected type literal: ~a" t)])]
         ;; Observable Results Representation
         [(Blame (app recur e))
-         (begin$ (op$ Print e) (op$ Exit (Quote -1)) UNDEF-IMDT)]
+         (begin$ (op$ Print e) (op$ Exit EXIT-FAILURE) UNDEF-IMDT)]
         [(Observe (app recur e) t) (sr-observe next-uid! e t)]
         [(and nop (No-Op)) nop]
         ;; References Representation
@@ -912,10 +912,10 @@ but a static single assignment is implicitly maintained.
                        (op$ Array-ref vect (op$ + ind UGVECT-OFFSET))
                        (begin$
                          (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit (Quote -1))))
+                         (op$ Exit EXIT-FAILURE)))
                    (begin$
                      (op$ Printf (Quote "index out of bound %ld\n") ind)
-                     (op$ Exit (Quote -1))))
+                     (op$ Exit EXIT-FAILURE)))
                (op$ Array-ref vect (op$ + ind UGVECT-OFFSET))))]
         [(Unguarded-Vect-Set! (app recur e1) (app recur e2) (app recur e3))
          (begin$
@@ -927,10 +927,10 @@ but a static single assignment is implicitly maintained.
                        (op$ Array-set! vect (op$ + ind UGVECT-OFFSET) e3)
                        (begin$
                          (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit (Quote -1))))
+                         (op$ Exit EXIT-FAILURE)))
                    (begin$
                      (op$ Printf (Quote "index out of bound %ld\n") ind)
-                     (op$ Exit (Quote -1))))
+                     (op$ Exit EXIT-FAILURE)))
                (op$ Array-set! vect (op$ + ind UGVECT-OFFSET) e3)))]
         [(Guarded-Proxy-Huh (app recur e))
          (op$ = (sr-get-tag e GREP-TAG-MASK) GPROXY-TAG)]
@@ -987,10 +987,10 @@ but a static single assignment is implicitly maintained.
                        (op$ Array-ref mvect (op$ + ind MVECT-OFFSET))
                        (begin$
                          (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit (Quote -1))))
+                         (op$ Exit EXIT-FAILURE)))
                    (begin$
                      (op$ Printf (Quote "index out of bound %ld\n") ind)
-                     (op$ Exit (Quote -1))))
+                     (op$ Exit EXIT-FAILURE)))
                (op$ Array-ref mvect (op$ + ind MVECT-OFFSET))))]
         [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3))
          (begin$
@@ -1002,13 +1002,13 @@ but a static single assignment is implicitly maintained.
                        (op$ Array-set! mvect (op$ + ind MVECT-OFFSET) e3)
                        (begin$
                          (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit (Quote -1))))
+                         (op$ Exit EXIT-FAILURE)))
                    (begin$
                      (op$ Printf (Quote "index out of bound %ld\n") ind)
-                     (op$ Exit (Quote -1))))
+                     (op$ Exit EXIT-FAILURE)))
                (begin$
                  (op$ Printf (Quote "index out of bound %ld\n") ind)
-                 (op$ Exit (Quote -1)))))]
+                 (op$ Exit EXIT-FAILURE))))]
         [(Type-MVect (app recur e)) (sr-type-mvect e)]
         [(Type-MVect-Huh (app recur e)) (type-mvect? e)]
         [(Type-MVect-Of (app recur e)) (type-mvect-type-access e)]
@@ -1069,7 +1069,7 @@ but a static single assignment is implicitly maintained.
         [(Type-MRef-Huh (app recur e)) (type-mref? e)]
         [(Type-MRef-Of (app recur e)) (type-mref-type-access e)]
         [(Error (app recur e))
-         (begin$ (op$ Print e) (op$ Exit (Quote -1)) UNDEF-IMDT)]
+         (begin$ (op$ Print e) (op$ Exit EXIT-FAILURE) UNDEF-IMDT)]
         [(Create-tuple (app recur* e*))
          (sr-alloc "tuple" #f (map (lambda ([e : D0-Expr]) (cons "element" e)) e*))]
         [(Copy-Tuple (app recur n) (app recur v))
