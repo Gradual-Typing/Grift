@@ -1,7 +1,7 @@
 all:
 	racket -v
-	cd src/backend-c/runtime/; make
 	raco make -v -j 4 main.rkt
+	cd src/backend-c/runtime/; make
 
 timed:
 	time raco make main.rkt
