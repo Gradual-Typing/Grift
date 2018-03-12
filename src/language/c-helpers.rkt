@@ -21,10 +21,20 @@
         (string-append "printf(\"I do not know what is " str "\\n\");exit(-1)")))
    in))
 
-(: replace/append-to-constants.h ((U 'replace 'append) (Output-Port -> Void) -> Void))
-(define (replace/append-to-constants.h exists f)
+(: replace/append-to-cheader (Path-String (U 'replace 'append) (Output-Port -> Void) -> Void))
+(define (replace/append-to-cheader path exists f)
   (call-with-output-file
-    constants.h-path
+    path
     #:mode 'text
     #:exists exists
     (lambda (in) (f in))))
+
+(define fresh-constants.h? (box #t))
+
+(: replace/append-to-constants.h ((Output-Port -> Void) -> Void))
+(define (replace/append-to-constants.h f)
+  (if (unbox fresh-constants.h?)
+      (begin
+        (replace/append-to-cheader constants.h-path 'replace f)
+        (set-box! fresh-constants.h? #f))
+      (replace/append-to-cheader constants.h-path 'append f)))

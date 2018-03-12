@@ -23,6 +23,7 @@ form, to the shortest branch of the cast tree that is relevant.
  (submod "../logging.rkt" typed)
  "../configuration.rkt"
  "../language/syntax.rkt"
+  "../language/syntax-with-constants.rkt"
  "../language/cast0.rkt"
  "../language/cast-or-coerce3.rkt"
  "./interpret-casts-common.rkt")

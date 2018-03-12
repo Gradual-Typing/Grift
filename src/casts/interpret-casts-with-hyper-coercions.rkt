@@ -11,6 +11,7 @@ due to better locality, space consumption, and code organization.
 (require "../language/cast-or-coerce3.rkt"
          "../language/cast0.rkt"
          "../language/syntax.rkt"
+         "../language/syntax-with-constants.rkt"
          "../configuration.rkt"
          "./interpret-casts-common.rkt"
          (submod "../logging.rkt" typed)

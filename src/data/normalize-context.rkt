@@ -15,7 +15,7 @@
          "../configuration.rkt"
          "../language/data0.rkt"
          "../language/data1.rkt"
-         "../language/data-representation.rkt"
+         "../casts/constants-and-codes.rkt"
          (submod "../language/make-begin.rkt" typed))
 
 ;; Only the pass is provided by this module
