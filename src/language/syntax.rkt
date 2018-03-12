@@ -10,7 +10,6 @@
 (require (for-syntax racket/syntax)
          "forms.rkt"
          "../configuration.rkt"
-         "../language/data-representation.rkt"
          syntax/location)
 (require/typed racket/base
   [srcloc->string (srcloc -> (Option String))])
@@ -229,8 +228,6 @@
 (define-syntax-rule (tup-coercion?$ c) (Tuple-Coercion-Huh c))
 (define-syntax-rule (tup-coercion-arity$ c) (Tuple-Coercion-Num c))
 (define-syntax-rule (ref-coercion?$ c) (Ref-Coercion-Huh c))
-(define-syntax-rule (ref-coercion$ c1 c2) (Ref-Coercion c1 c2 COERCION-REF-REF-FLAG))
-(define-syntax-rule (vec-coercion$ c1 c2) (Ref-Coercion c1 c2 COERCION-REF-VEC-FLAG))
 (define-syntax-rule (ref-coercion-read$ c) (Ref-Coercion-Read c))
 (define-syntax-rule (ref-coercion-write$ c) (Ref-Coercion-Write c))
 (define-syntax-rule (fn-coercion?$ c) (Fn-Coercion-Huh c))
