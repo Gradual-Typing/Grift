@@ -38,6 +38,8 @@
     ;; Interesting Cases
     ;; Free variables of an expression are returned in the set
     [(Var u) (values (Var u) (set u))]
+    [(Global s) (values (Global s) (set))]
+    [(Assign u/s (app uf-expr e v*)) (values (Assign u/s e) v*)]
     ;; All binding forms must both filter variables bound at
     ;; this site and return the free variables of the expression
     [(Letrec (app uf-bnd-lambda* b*-bvars b* b*-fvars)

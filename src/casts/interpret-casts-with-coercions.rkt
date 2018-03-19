@@ -26,7 +26,8 @@ form, to the shortest branch of the cast tree that is relevant.
   "../language/syntax-with-constants.rkt"
  "../language/cast0.rkt"
  "../language/cast-or-coerce3.rkt"
- "./interpret-casts-common.rkt")
+ "./interpret-casts-common.rkt"
+ "cast-profiler.rkt")
 
 (provide interpret-casts/coercions)
 
@@ -332,7 +333,8 @@ form, to the shortest branch of the cast tree that is relevant.
          #:inject  Inject-Type
          #:apply-fn-coercion  Apply-Coercion-Type
          #:apply-tup-coercion Apply-Coercion-Type
-         #:apply-ref-coercion Apply-Coercion-Type
+         #:apply-pref-coercion Apply-Coercion-Type
+         #:apply-pvec-coercion Apply-Coercion-Type
          #:mbox-cast Monotonic-Cast-Type
          #:mvec-cast Monotonic-Cast-Type)
         Void))
@@ -342,7 +344,8 @@ form, to the shortest branch of the cast tree that is relevant.
          #:inject  inject
          #:apply-fn-coercion apply-fn-coercion
          #:apply-tup-coercion apply-tup-coercion
-         #:apply-ref-coercion apply-ref-coercion
+         #:apply-pref-coercion apply-pref-coercion
+         #:apply-pvec-coercion apply-pvec-coercion
          #:mbox-cast mbox-cast
          #:mvec-cast mvec-cast)
 
@@ -385,7 +388,12 @@ form, to the shortest branch of the cast tree that is relevant.
        (cond$
         [(Fn-Coercion-Huh c) (apply-fn-coercion v c)]
         [(Tuple-Coercion-Huh c) (apply-tup-coercion v c mt)]
-        [(Ref-Coercion-Huh c) (apply-ref-coercion v c)] 
+        [(Ref-Coercion-Huh c)
+         (if (cast-profiler?)
+             (cond$
+              [(Ref-Coercion-Ref-Huh c) (apply-pref-coercion v c)]
+              [else (apply-pvec-coercion v c)])
+             (apply-pref-coercion v c))] 
         [(MRef-Coercion-Huh c) (mbox-cast v (MRef-Coercion-Type c))]
         [(MVect-Coercion-Huh c) (mvec-cast v (MRef-Coercion-Type c))]
         [else (Blame (Quote "bad implemention of mediating coercions"))])]
@@ -518,7 +526,8 @@ form, to the shortest branch of the cast tree that is relevant.
   
   (: compile-app App-Type)
   (define (compile-app e e*)
-    (App-Fn-or-Proxy apply-coercion-uid e e*))
+    (cast-profile/max-function-chain$
+     (App-Fn-or-Proxy apply-coercion-uid e e*)))
   
   (define compile-fn-cast/coercions
     (make-compile-fn-cast/coercions
@@ -535,8 +544,13 @@ form, to the shortest branch of the cast tree that is relevant.
     (make-compile-apply-tuple-coercion
      #:apply-coercion-uid apply-coercion-uid))
   
-  (define compile-apply-ref-coercion
-    (make-compile-apply-ref-coercion
+  (define compile-apply-pref-coercion
+    (make-compile-apply-pref-coercion
+     #:compose-coercions compose-coercions
+     #:id-coercion? Id-Coercion-Huh))
+
+  (define compile-apply-pvec-coercion
+    (make-compile-apply-pvec-coercion
      #:compose-coercions compose-coercions
      #:id-coercion? Id-Coercion-Huh))
   
@@ -618,7 +632,8 @@ form, to the shortest branch of the cast tree that is relevant.
         #:inject  compile-inject
         #:apply-fn-coercion compile-apply-fn-coercion
         #:apply-tup-coercion compile-apply-tup-coercion
-        #:apply-ref-coercion compile-apply-ref-coercion
+        #:apply-pref-coercion compile-apply-pref-coercion
+        #:apply-pvec-coercion compile-apply-pvec-coercion
         #:mbox-cast compile-mbox-cast/type-based
         #:mvec-cast compile-mvec-cast/type-based)
        
@@ -689,7 +704,8 @@ form, to the shortest branch of the cast tree that is relevant.
         #:inject  compile-inject
         #:apply-fn-coercion compile-apply-fn-coercion
         #:apply-tup-coercion compile-apply-tup-coercion
-        #:apply-ref-coercion compile-apply-ref-coercion
+        #:apply-pref-coercion compile-apply-pref-coercion
+        #:apply-pvec-coercion compile-apply-pvec-coercion
         #:mbox-cast compile-mbox-cast/coercions
         #:mvec-cast compile-mvec-cast/coercions)
        

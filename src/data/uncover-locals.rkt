@@ -134,28 +134,14 @@
 (: ul-value* (-> (Listof D1-Value) (Setof Uid) (Setof Uid)))
 (define (ul-value* exp* lv*) (foldl ul-value lv* exp*))
 
-#|
-(: ul-bnd (->  D1-Bnd Uid* (values D2-Effect (Setof Uid))))
-(define (ul-bnd bnd lv*)
-  (match-let ([(cons uid rhs) bnd])
-    (let-values ([(rhs lv*^) (ul-value rhs)])
-      (values (Assign uid rhs) (cons uid (append lv*^ lv*))))))
-
-(: ul-bnd* (->  D1-Bnd* Uid* (values D2-Effect* (Setof Uid))))
-(define (ul-bnd* bnd* lv*)
-  (if (null? bnd*)
-      (values bnd* lv*)
-      (let*-values ([(a) (car bnd*)]
-                    [(d) (cdr bnd*)]
-                    [(a lv*) (ul-bnd a lv*)]
-                    [(a* lv*) (ul-bnd* d lv*)])
-        (values (cons a a*) lv*))))
-|#
-
-(: ul-effect (D1-Effect (Setof Uid) ->  (Setof Uid)))
+(: ul-effect (D1-Effect (Setof Uid) -> (Setof Uid)))
 (define (ul-effect eff lv*)
   (match eff
-    [(Assign u e1) (set-add (ul-value e1 lv*) u)]
+    [(Assign u e1)
+     (let ([lv* (ul-value e1 lv*)])
+       (if (Uid? u)
+           (set-add lv* u)
+           lv*))]
     [(If t c a)
      (let*-values ([(lv*) (ul-pred t lv*)]
                    [(lv*) (ul-effect c lv*)]

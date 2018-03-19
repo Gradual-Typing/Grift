@@ -64,6 +64,7 @@
            (Begin (list (Op p v*)) UNIT-IMDT)
            (nc-value-op p v*))]
       [(Var i)  (Var i)]
+      [(Global s) (Global s)]
       [(Code-Label i) (Code-Label i)]
       [(Quote k) (Quote k)]
       [(Halt) (Halt)]
@@ -104,6 +105,7 @@
            (Begin (list (Op p v*)) UNIT-IMDT)
            (nc-value-op p v*))]
       [(Var i)  (Var i)]
+      [(Global s) (Global s)]
       [(Code-Label i) (Code-Label i)]
       [(Quote k) (Quote k)]
       [(Halt) (Halt)]
@@ -143,6 +145,7 @@
            ;; evaluate values for their effects
            (make-begin (nc-effect* exp*) NO-OP))]
       [(Var i)  NO-OP]
+      [(Global s) NO-OP]
       [(Code-Label i) NO-OP]
       [(Quote k) NO-OP]
       [(No-Op) NO-OP]

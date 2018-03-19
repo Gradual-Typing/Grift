@@ -56,6 +56,7 @@
        (make-begin s* (Return (Op p t*)))]
       [(and cl (Code-Label i)) (Return cl)]
       [(and v  (Var i))        (Return v)]
+      [(and g  (Global _))     (Return g)]
       [(and d  (Quote k))      (Return d)]
       [(and h  (Halt))         (Return h)]
       [(and h  (Break-Repeat)) (Return h)]
@@ -126,6 +127,7 @@
        (make-begin s* (Op p t*))]
       [(and cl (Code-Label i)) cl]
       [(and v  (Var i))        v]
+      [(and g  (Global _))     g]
       [(and d  (Quote k))      d]
       [(and h  (Halt))         h]
       [(and h  (Break-Repeat)) h]))
@@ -164,6 +166,7 @@
        (values (list (Assign u (Halt))) (Var u))]
       [(and c (Code-Label _)) (values '() c)]
       [(and v (Var _)) (values '() v)]
+      [(and g (Global _)) (values '() g)]
       [(and d (Quote _)) (values '() d)]
       [(and d (Break-Repeat)) (values '() d)]))
   (: trivialize-value* (D2-Value* -> (Values D3-Effect* D3-Trivial*)))

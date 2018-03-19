@@ -92,8 +92,13 @@ that can be located throughout this file:
     (make-compile-apply-tuple-coercion
      #:apply-coercion-uid apply-coercion-uid))
 
-  (define compile-apply-ref-coercion
-    (make-compile-apply-ref-coercion
+  (define compile-apply-pref-coercion
+    (make-compile-apply-pref-coercion
+     #:compose-coercions compose-coercions
+     #:id-coercion? HC-Identity-Huh))
+
+  (define compile-apply-pvec-coercion
+    (make-compile-apply-pvec-coercion
      #:compose-coercions compose-coercions
      #:id-coercion? HC-Identity-Huh))
   
@@ -168,7 +173,8 @@ that can be located throughout this file:
         #:apply-med-coercion-uid apply-med-coercion-uid 
         #:apply-fn-coercion compile-apply-fn-coercion
         #:apply-tup-coercion compile-apply-tup-coercion
-        #:apply-ref-coercion compile-apply-ref-coercion
+        #:apply-ref-coercion compile-apply-pref-coercion
+        #:apply-vec-coercion compile-apply-pvec-coercion
         #:mbox-cast compile-mbox-cast/type-based
         #:mvec-cast compile-mvec-cast/type-based)
 
@@ -228,7 +234,8 @@ that can be located throughout this file:
         #:apply-med-coercion-uid apply-med-coercion-uid 
         #:apply-fn-coercion compile-apply-fn-coercion
         #:apply-tup-coercion compile-apply-tup-coercion
-        #:apply-ref-coercion compile-apply-ref-coercion
+        #:apply-ref-coercion compile-apply-pref-coercion
+        #:apply-vec-coercion compile-apply-pvec-coercion
         #:mbox-cast compile-mbox-cast/coercions
         #:mvec-cast compile-mvec-cast/coercions)
 
@@ -352,6 +359,7 @@ that can be located throughout this file:
          #:apply-fn-coercion  Apply-Coercion-Type
          #:apply-tup-coercion Apply-Coercion-Type
          #:apply-ref-coercion Apply-Coercion-Type
+         #:apply-vec-coercion Apply-Coercion-Type
          #:mbox-cast Monotonic-Cast-Type
          #:mvec-cast Monotonic-Cast-Type)
         Void))
@@ -359,7 +367,8 @@ that can be located throughout this file:
          #:apply-med-coercion-uid apply-med-coercion-uid
          #:apply-fn-coercion apply-fn-coercion
          #:apply-tup-coercion apply-tup-coercion
-         #:apply-ref-coercion apply-ref-coercion
+         #:apply-ref-coercion apply-pref-coercion
+         #:apply-vec-coercion apply-pvec-coercion
          #:mbox-cast mbox-cast
          #:mvec-cast mvec-cast)
 
@@ -375,7 +384,7 @@ that can be located throughout this file:
          (cond$
           [(Fn-Coercion-Huh m)    (apply-fn-coercion v m)]
           [(Tuple-Coercion-Huh m) (apply-tup-coercion v m mt)]
-          [(Ref-Coercion-Huh m)   (apply-ref-coercion v m)]
+          [(Ref-Coercion-Huh m)   (apply-pref-coercion v m)]
           [(MRef-Coercion-Huh m)
            (mbox-cast v (MRef-Coercion-Type m))]
           [(MVect-Coercion-Huh m)
