@@ -37,7 +37,7 @@
              (Switch-Case* (Begin D5-Effect* No-Op))
              (Begin D5-Effect* No-Op))
      (UIL-Op! D5-Trivial)
-     (Assign Uid D5-Value)
+     (Assign Id D5-Value)
      No-Op))
 
 (define-type D5-Value
@@ -50,6 +50,7 @@
 (define-type D5-Trivial
   (U (Code-Label Uid)
      (Var Uid)
+     (Global String)
      (Quote D5-Literal)))
 
 (define-type D5-Trivial* (Listof D5-Trivial))

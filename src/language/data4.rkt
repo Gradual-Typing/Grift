@@ -41,7 +41,7 @@
          (Begin D4-Effect* No-Op)
          (Repeat Uid D4-Trivial D4-Trivial #f #f E)
          (UIL-Op! D4-Trivial)
-         (Assign Uid D4-Value)
+         (Assign Id D4-Value)
          Break-Repeat
          No-Op)))
 
@@ -54,6 +54,7 @@
 (define-type D4-Trivial
   (U (Code-Label Uid)
      (Var Uid)
+     (Global String)
      (Quote D4-Literal)))
 
 

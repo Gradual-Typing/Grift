@@ -27,9 +27,10 @@
             (Repeat Uid E E Uid E E)
             Break-Repeat
 	    (Var Uid)
+            (Global String)
 	    (Code-Label Uid)
 	    (Quote D0-Literal)
-            (Assign Uid E)
+            (Assign Id E)
             Success)))
 
 (define-type D0-Expr* (Listof D0-Expr))

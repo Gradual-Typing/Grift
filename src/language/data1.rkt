@@ -26,8 +26,8 @@
       (App-Code D1-Value D1-Value*)
       (Op UIL-Expr-Prim D1-Value*)
       (Var Uid)
+      (Global String)
       Halt Success
-      (Var Uid)
       (Code-Label Uid)
       (Quote D1-Literal))))
 
@@ -40,6 +40,7 @@
          (Op UIL-Expr-Prim (Listof V))
          Halt
          (Var Uid)
+         (Global String)
          (Code-Label Uid)
          (Quote D1-Literal))))
 
@@ -59,7 +60,7 @@
          Break-Repeat
          (App-Code D1-Value D1-Value*)
          (UIL-Op! D1-Value)
-         (Assign Uid D1-Value)
+         (Assign Id D1-Value)
          No-Op)))
 
 

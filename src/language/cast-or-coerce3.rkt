@@ -92,6 +92,8 @@
 	  (Letrec CoC3-Bnd* E)
 	  (Let CoC3-Bnd* E)
           (Var Uid)
+          (Global String)
+          (Assign Id E)
           ;; Control Flow
           (If E E E)
           (Switch E (Switch-Case* E) E)

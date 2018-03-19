@@ -50,6 +50,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (App operator operands)
   ;; Variable node
   (Var id)
+  ;; Global is for referencing global variables by their names as strings
+  (Global id)
   ;; Conditionals
   (If test then else)
   ;; Type ascription
@@ -803,3 +805,5 @@ class literal constants
   (match b
     [(Bnd i t e) (Bnd i t (f e))]
     [(cons i e) (cons i (f e))]))
+
+(define-type Id (U Uid String))
