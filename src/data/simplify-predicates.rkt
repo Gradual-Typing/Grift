@@ -87,6 +87,7 @@
       ;; typed racket made me do it
       [(and v (Halt)) v]
       [(and v (Var _)) v]
+      [(and g (Global _)) g]
       [(and v (Quote _)) v]
       [(and v (Code-Label _)) v]))
   (: sp-effect (D4-Effect -> D5-Effect*))

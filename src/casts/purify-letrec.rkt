@@ -62,6 +62,8 @@
   (match expr
     ;; The really interesting choices
     [(Var x) (set-member? uid* x)]
+    [(Global _) #f]
+    [(Assign _ (app recur e)) e]
     [(Lambda _ (Castable ctr e))
      (and (> depth 0) (simple? e uid* (+ 1 depth) #t))]
     [(App-Fn e e*) 
@@ -262,6 +264,8 @@
                     v
                     (Blame (Quote (format "reference to unintialized binding: ~a" x))))])]
        [else v])]
+    [(Global s) (Global s)]
+    [(Assign u/s (app recur e)) (Assign u/s e)]
     ;; Every other case is just a boring flow agnostic tree traversal
     [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
     [(or (Code-Label _) (Tag _) (No-Op)) expr]
@@ -748,6 +752,10 @@
      (Let b* e)]
     [(Var i)
      (Var i)]
+    [(Global s)
+     (Global s)]
+    [(Assign u/s (app pl-expr e))
+     (Assign u/s e)]
     [(If (app pl-expr t) (app pl-expr c) (app pl-expr a))
      (If t c a)]
     [(Switch e c* d)

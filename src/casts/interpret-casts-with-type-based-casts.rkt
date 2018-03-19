@@ -13,7 +13,8 @@
  "../language/cast-or-coerce3.rkt"
  "constants-and-codes.rkt"
  "../language/syntax.rkt"
- "interpret-casts-common.rkt")
+ "interpret-casts-common.rkt"
+  "cast-profiler.rkt")
 
 (provide interpret-casts/type-based-casts)
 
@@ -50,8 +51,9 @@
     (define t2-ret (Type-Fn-return t2-var))
     (define call (App-Fn fn-var args))
     (define cast-call (interp-cast call t1-ret t2-ret lbl-var (Quote 0)))
-    (define then-cast (Lambda uid* (Castable name cast-call)))
-    (values name (Code caster-fmls then-cast)))
+    (define then-cast (Lambda uid* (Castable name (cast-profile/inc-function-proxies-accessed$
+                                                   cast-call))))
+    (values name (Code caster-fmls (cast-profile/inc-function-casts$ then-cast))))
 
   (: compile-app App-Type)
   (define compile-app App-Fn)
@@ -65,7 +67,7 @@
   (: compile-lambda Lambda-Type)
   (define (compile-lambda fml* e)
     (define ctr (get-fn-cast! (length fml*)))
-    (Lambda fml* (Castable ctr e)))
+    (Lambda fml* (Castable ctr (cast-profile/max-function-chain$ e))))
 
   (define compile-tuple-cast
     (make-compile-cast-tuple #:interp-cast-uid interp-cast-uid))
@@ -171,7 +173,8 @@
    #:dyn-fn-app      dyn-fn-app
    #:dyn-tup-prj     dyn-tup-prj))
 
-;; Functions for use sites of guarded references with coercions
+;; Functions for use sites of guarded references with type based
+
 (: make-proxied-reference-helpers/type-based-casts
    (->* (#:cast Cast-Type)
         (Values PBox-Ref-Type PBox-Set-Type
@@ -179,17 +182,19 @@
 (define (make-proxied-reference-helpers/type-based-casts #:cast cast)
   (define pbox-ref-uid (next-uid! "pbox-ref"))
   (: interp-pbox-ref PBox-Ref-Type)
-  (define (interp-pbox-ref b) (apply-code pbox-ref-uid b))
+  (define (interp-pbox-ref b)
+    (cast-profile/max-ref-chain$ (apply-code pbox-ref-uid b)))
   (: code-gen-pbox-ref PBox-Ref-Type)
   (define (code-gen-pbox-ref b)
     (let$ ([b b])
       (If (Guarded-Proxy-Huh b)
-          (let*$ ([u  (Guarded-Proxy-Ref b)]
-                  [t1 (Guarded-Proxy-Source b)]
-                  [t2 (Guarded-Proxy-Target b)]
-                  [l  (Guarded-Proxy-Blames b)]
-                  [v  (interp-pbox-ref u)])
-            (cast v t1 t2 l))
+          (cast-profile/inc-ref-proxies-accessed$
+           (let*$ ([u  (Guarded-Proxy-Ref b)]
+                   [t1 (Guarded-Proxy-Source b)]
+                   [t2 (Guarded-Proxy-Target b)]
+                   [l  (Guarded-Proxy-Blames b)]
+                   [v  (interp-pbox-ref u)])
+             (cast v t1 t2 l)))
           (Unguarded-Box-Ref b))))
   (add-cast-runtime-binding!
    pbox-ref-uid
@@ -197,17 +202,18 @@
   (define pbox-set!-uid (next-uid! "pbox-set!"))
   (: interp-pbox-set! PBox-Set-Type)
   (define (interp-pbox-set! b v)
-    (apply-code pbox-set!-uid b v))
+    (cast-profile/max-ref-chain$ (apply-code pbox-set!-uid b v)))
   (: code-gen-pbox-set! PBox-Set-Type)
   (define (code-gen-pbox-set! b v)
     (let$ ([b b][v v])
       (If (Guarded-Proxy-Huh b)
-          (let*$ ([u  (Guarded-Proxy-Ref b)]
-                  [t1 (Guarded-Proxy-Source b)]
-                  [t2 (Guarded-Proxy-Target b)]
-                  [l  (Guarded-Proxy-Blames b)]
-                  [v  (cast v t2 t1 l)])
-            (interp-pbox-set! u v))
+          (cast-profile/inc-ref-proxies-accessed$
+           (let*$ ([u  (Guarded-Proxy-Ref b)]
+                   [t1 (Guarded-Proxy-Source b)]
+                   [t2 (Guarded-Proxy-Target b)]
+                   [l  (Guarded-Proxy-Blames b)]
+                   [v  (cast v t2 t1 l)])
+             (interp-pbox-set! u v)))
           (Unguarded-Box-Set! b v))))
   (add-cast-runtime-binding!
    pbox-set!-uid
@@ -215,17 +221,18 @@
   (define pvec-ref-uid (next-uid! "pvec-ref"))
   (: interp-pvec-ref PVec-Ref-Type)
   (define (interp-pvec-ref v i)
-    (apply-code pvec-ref-uid v i))
+    (cast-profile/max-vector-chain$ (apply-code pvec-ref-uid v i)))
   (: code-gen-pvec-ref PVec-Ref-Type)
   (define (code-gen-pvec-ref v i)
     (let$ ([v v] [i i])
       (If (Guarded-Proxy-Huh v)
-          (let*$ ([u  (Guarded-Proxy-Ref v)]
-                  [t1 (Guarded-Proxy-Source v)]
-                  [t2 (Guarded-Proxy-Target v)]
-                  [l  (Guarded-Proxy-Blames v)]
-                  [r  (interp-pvec-ref u i)])
-            (cast r t1 t2 l))
+          (cast-profile/inc-vector-proxies-accessed$
+           (let*$ ([u  (Guarded-Proxy-Ref v)]
+                   [t1 (Guarded-Proxy-Source v)]
+                   [t2 (Guarded-Proxy-Target v)]
+                   [l  (Guarded-Proxy-Blames v)]
+                   [r  (interp-pvec-ref u i)])
+             (cast r t1 t2 l)))
           (Unguarded-Vect-Ref v i))))
   (add-cast-runtime-binding!
    pvec-ref-uid
@@ -233,16 +240,17 @@
   (define pvec-set!-uid (next-uid! "pvec-set!"))
   (: interp-pvec-set! PVec-Set-Type)
   (define (interp-pvec-set! v i w)
-    (apply-code pvec-set!-uid v i w))
+    (cast-profile/max-vector-chain$ (apply-code pvec-set!-uid v i w)))
   (: code-gen-pvec-set! PVec-Set-Type)
   (define (code-gen-pvec-set! v i w)
     (If (Guarded-Proxy-Huh v)
-        (let*$ ([u (Guarded-Proxy-Ref v)]
-                [t1 (Guarded-Proxy-Source v)]
-                [t2 (Guarded-Proxy-Target v)]
-                [l  (Guarded-Proxy-Blames v)]
-                [w  (cast w t2 t1 i)])
-          (interp-pvec-set! u i w))
+        (cast-profile/inc-vector-proxies-accessed$
+         (let*$ ([u (Guarded-Proxy-Ref v)]
+                 [t1 (Guarded-Proxy-Source v)]
+                 [t2 (Guarded-Proxy-Target v)]
+                 [l  (Guarded-Proxy-Blames v)]
+                 [w  (cast w t2 t1 i)])
+           (interp-pvec-set! u i w)))
         (Unguarded-Vect-Set! v i w)))
   (add-cast-runtime-binding!
    pvec-set!-uid
@@ -250,18 +258,19 @@
   (define pvec-len-uid (next-uid! "pvec-length"))
   (: interp-pvec-len PVec-Len-Type)
   (define (interp-pvec-len v)
-    (apply-code pvec-len-uid v))
+    (cast-profile/max-vector-chain$ (apply-code pvec-len-uid v)))
   (: code-gen-pvec-len PVec-Len-Type)
   (define (code-gen-pvec-len v)
     (let$ ([v v])
       (If (Guarded-Proxy-Huh v)
-          (interp-pvec-len (Guarded-Proxy-Ref v))
+          (cast-profile/inc-vector-proxies-accessed$
+           (interp-pvec-len (Guarded-Proxy-Ref v)))
           (Unguarded-Vect-length v))))
   (add-cast-runtime-binding!
    pvec-len-uid
    (code$ (v) (code-gen-pvec-len v)))
   (cond
-    [(inline-guarded-branch?)
+    [(inline-proxied-branch?)
      (values code-gen-pbox-ref code-gen-pbox-set!
              code-gen-pvec-ref code-gen-pvec-set! code-gen-pvec-len)]
     [else

@@ -11,6 +11,7 @@
 (require "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
+         "cast-profiler.rkt"
          "../language/cast-or-coerce5.rkt"
          "../language/cast-or-coerce6.rkt")
 (provide
@@ -219,7 +220,7 @@
                        (If (Fn-Proxy-Huh (Var prox))
                            (Let (list (cons func (Fn-Proxy-Closure pvar))
                                       (cons crcn (Fn-Proxy-Coercion pvar)))
-                                (cast-apply-cast cast-uid fvar e*^ cvar))
+                             (cast-apply-cast cast-uid fvar e*^ cvar))
                            (App-Closure (Closure-code pvar) pvar e*^)))])]
               [else (error 'covert-closures "Unkown Fn-Proxy Representaion")])]
            [else (error 'covert-closures "Unkown Cast Representaion")])]
@@ -258,6 +259,8 @@
         ;; varibles that are free are extracted from the closure
         ;; while variable that are not bound by the closure are rebuilt
         [(Var u) (lookup data-env selfp u)]
+        [(Global s) (Global s)]
+        [(Assign u/s (app recur e)) (Assign u/s e)]
         ;; The rest of the cases are just recuring into sub expressions
         [(Let (app (cc-bnd-data* recur) b*) (app recur e)) (Let b* e)]
         [(If (app recur t) (app recur c) (app recur a)) (If t c a)]
@@ -514,9 +517,10 @@
   (: help (CoC6-Expr Integer -> CoC6-Expr))
   (define (help e i)
     (App-Code cast (list e (Fn-Coercion-Arg crcn (Quote i)) (Quote 0))))
-  (App-Code cast (list (App-Closure (Closure-code fun) fun (map help arg* i*))
-                       (Fn-Coercion-Return crcn)
-                       (Quote 0))))
+  (cast-profile/inc-function-proxies-accessed$
+   (App-Code cast (list (App-Closure (Closure-code fun) fun (map help arg* i*))
+                        (Fn-Coercion-Return crcn)
+                        (Quote 0)))))
 
 
 ;; Lookup a variables local access instruction

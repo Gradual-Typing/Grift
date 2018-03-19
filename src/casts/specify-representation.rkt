@@ -460,6 +460,8 @@ but a static single assignment is implicitly maintained.
          (op$ Array-ref (op$ binary-and (Var clos) CLOSURE-VALUE-MASK)
               (Quote (cenv clos fvar)))]
         [(Var i) (lookup env i)]
+        [(Global s) (Global s)]
+        [(Assign u/s (app recur e)) (Assign u/s e)]
         [(Labels (app (sr-bnd-code* recur/env) b*) e)
          (let* ([u* (map (inst car Uid Any) b*)]
                 [l* (map label u*)])

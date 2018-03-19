@@ -105,6 +105,8 @@
       [(Switch e c* d)
        (Switch (ll-expr e) (map-switch-case* ll-expr c*) (ll-expr d))]
       [(Var i) (Var i)]
+      [(Global s) (Global s)]
+      [(Assign u/s (app ll-expr e)) (Assign u/s e)]
       [(Type t) (Type t)]
       [(Quote k) (Quote k)]
       [(Begin exp* exp) (Begin (map ll-expr exp*) (ll-expr exp))]

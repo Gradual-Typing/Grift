@@ -17,6 +17,7 @@ TODO write unit tests
  "../language/cast0.rkt"
  "constants-and-codes.rkt"
  "../configuration.rkt"
+  "cast-profiler.rkt"
  (submod "../logging.rkt" typed))
 
 (provide (all-defined-out))
@@ -228,11 +229,13 @@ TODO write unit tests
        (compile-cast e (Type t1) (Type t2) (Quote l))]
       ;; Lambdas add a extra meta information field that ultimately
       ;; turns into a method for casting a particular arrity at runtime.
-      [(Lambda f* (app recur exp)) (compile-lambda f* exp)]
+      [(Lambda f* (app recur exp))
+       (cast-profile/inc-uncasted-function-values$ (compile-lambda f* exp))]
       ;; Applications get turned into an application that "checks for the
       ;; the presence of proxies" This eventually gets optimized aways
       ;; into a functional proxy representation. 
-      [(App (app recur e) (app recur* e*)) (compile-app e e*)]
+      [(App (app recur e) (app recur* e*))
+       (cast-profile/inc-function-uses$ (compile-app e e*))]
       ;; Use make coercion to implement dynamic application without
       ;; allocating a one time use coercion.
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
@@ -243,35 +246,36 @@ TODO write unit tests
       ;; proxied reads and writes.
       ;;-------------------------------------------------------------------
       ;; Every Guarded Reference Starts As an Unguarded box
-      [(Gbox (app recur e)) (Unguarded-Box e)]
-      [(Gvector (app recur n) (app recur init)) (Unguarded-Vect n init)]
+      [(Gbox (app recur e)) (cast-profile/inc-uncasted-ref-values$ (Unguarded-Box e))]
+      [(Gvector (app recur n) (app recur init))
+       (cast-profile/inc-uncasted-vector-values$ (Unguarded-Vect n init))]
       ;; Unboxing calls off to the helpers we have defined
       [(Gvector-ref (app recur v) (app recur i))
-       (pvec-ref v i)]
+       (cast-profile/inc-vector-uses$ (pvec-ref v i))]
       [(Gunbox (app recur b))
-       (pbox-ref b)]
+       (cast-profile/inc-ref-uses$ (pbox-ref b))]
       [(Dyn-GRef-Ref (app recur e) l)
-       (dyn-pbox-ref e (Quote l))]
+       (cast-profile/inc-ref-uses$ (dyn-pbox-ref e (Quote l)))]
       [(Dyn-GVector-Ref (app recur e) (app recur i) l)
-       (dyn-pvec-ref e i (Quote l))]
+       (cast-profile/inc-vector-uses$ (dyn-pvec-ref e i (Quote l)))]
       ;; Setting a Gaurded reference results in iteratively applying
       ;; all the guarding casts to the value to be written.
       ;; Most of the work is already done but the code requires values
       ;; so there is a little repetative to let bind any values that
       ;; haven't been evaluated.
       [(Gbox-set! (app recur b) (app recur w))
-       (pbox-set! b w)]
+       (cast-profile/inc-ref-uses$ (pbox-set! b w))]
       [(Gvector-set! (app recur v) (app recur i) (app recur w))
-       (pvec-set! v i w)]
+       (cast-profile/inc-vector-uses$ (pvec-set! v i w))]
       [(Dyn-GRef-Set! (app recur e1) (app recur e2) t l)
-       (dyn-pbox-set! e1 e2 (Type t) (Quote l))]
+       (cast-profile/inc-ref-uses$ (dyn-pbox-set! e1 e2 (Type t) (Quote l)))]
       [(Dyn-GVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
-       (dyn-pvec-set! e1 i e2 (Type t) (Quote l))]
+       (cast-profile/inc-vector-uses$ (dyn-pvec-set! e1 i e2 (Type t) (Quote l)))]
       ;; TODO add tests for dyn-gvector-len
       [(Dyn-GVector-Len (app recur e) (app recur l))
-       (dyn-pvec-len e l)]
+       (cast-profile/inc-vector-uses$ (dyn-pvec-len e l))]
       [(Gvector-length (app recur e))
-       (pvec-len e)]
+       (cast-profile/inc-vector-uses$ (pvec-len e))]
       [(MBoxCastedRef (app recur e) t)
        (mbox-ref e (Type t))]
       [(MBoxCastedSet! (app recur e1) (app recur e2) t)
@@ -288,11 +292,6 @@ TODO write unit tests
        (dyn-mvec-ref e i (Quote l))]
       [(Dyn-MVector-Set! (app recur e1) (app recur i) (app recur e2) t l)
        (dyn-mvec-set! e1 i e2 (Type t) (Quote l))]
-      ;; Completely statically typed monotonic need no runtime proceedures.
-      ;; They are only kept different seperate from unguarded ops because
-      ;; there layout is slightly different latter. 
-      ;; Long-Term TODO: Why does the name ove these change?
-      ;; Does their semantics change?
       [(Mvector-ref (app recur e1) (app recur e2))
        (stc-mvec-ref e1 e2)]
       [(Mvector-set! (app recur e1) (app recur e2) (app recur e3))
@@ -309,10 +308,11 @@ TODO write unit tests
        (mvec e1 e2 t)]      
       ;; While tuples don't get any special attention in this pass
       ;; dynamic tuple projection needs to get dusugared
-      [(Create-tuple e*) (Create-tuple (recur* e*))]
-      [(Tuple-proj e i) (Tuple-proj (recur e) (Quote i))]
+      [(Create-tuple e*)
+       (cast-profile/inc-uncasted-tuple-values$ (Create-tuple (recur* e*)))]
+      [(Tuple-proj e i) (cast-profile/inc-tuple-uses$ (Tuple-proj (recur e) (Quote i)))]
       [(Dyn-Tuple-Proj (app recur e) (app recur i) (app recur l))
-       (dyn-tup-prj e i l)]
+       (cast-profile/inc-tuple-uses$ (dyn-tup-prj e i l))]
       ;; Simple Recursion Patterns
       [(Observe (app recur e) t)
        (Observe e t)]
@@ -418,27 +418,28 @@ TODO write unit tests
         (error 'lower-function-cast/build-fn-cast-with-coercion
                "arity grew too large to be a valid index"))
       (code$ (fun crcn)
-        ;; Is the closure we are casting a hybrid proxy
-        (If (Fn-Proxy-Huh fun)
-            ;; If so we have to compose the old and new fn-coercions
-            ;; First get the old fn-coercion
-            ;; i.e. destructure old proxy
-            (let$ ([old-crcn (Fn-Proxy-Coercion fun)]
-                   [raw-clos (Fn-Proxy-Closure  fun)])
-              ;; Then compose each sub coercion
-              ;; this loop reverses the list arguments hence the
-              ;; reverse that is used in the argument list
-              (Let (composed-coercions-bindings old-crcn crcn)
-                ;; Check if all Composes resulted in Id Coercions
-                (If all-result-in-id-huh
-                    ;; If so the original closure is the correct type
-                    raw-clos
-                    ;; Otherwise a new proxy is needed
-                    (Fn-Proxy (list #{arity :: Index} apply-coercion-uid)
-                              raw-clos
-                              (new-fn-crcn t1 t2 arity arg* ret)))))
-            ;; Closure is unproxied --> just make a new proxy
-            (Fn-Proxy (list #{arity :: Index} apply-coercion-uid) fun crcn)))))
+        (cast-profile/inc-function-casts$
+         ;; Is the closure we are casting a hybrid proxy
+         (If (Fn-Proxy-Huh fun)
+             ;; If so we have to compose the old and new fn-coercions
+             ;; First get the old fn-coercion
+             ;; i.e. destructure old proxy
+             (let$ ([old-crcn (Fn-Proxy-Coercion fun)]
+                    [raw-clos (Fn-Proxy-Closure  fun)])
+               ;; Then compose each sub coercion
+               ;; this loop reverses the list arguments hence the
+               ;; reverse that is used in the argument list
+               (Let (composed-coercions-bindings old-crcn crcn)
+                 ;; Check if all Composes resulted in Id Coercions
+                 (If all-result-in-id-huh
+                     ;; If so the original closure is the correct type
+                     raw-clos
+                     ;; Otherwise a new proxy is needed
+                     (Fn-Proxy (list #{arity :: Index} apply-coercion-uid)
+                               raw-clos
+                               (new-fn-crcn t1 t2 arity arg* ret)))))
+             ;; Closure is unproxied --> just make a new proxy
+             (Fn-Proxy (list #{arity :: Index} apply-coercion-uid) fun crcn))))))
   (values casting-code-name casting-code))
 
 (: make-fn-cast-helpers : (Nat -> (Values Uid CoC3-Code)) -> (Nat -> Uid))
@@ -477,46 +478,56 @@ TODO write unit tests
   ;; TODO: Abstract the common code between coercions and hyper-coercions
   (: code-gen-pbox-ref : PBox-Ref-Type)
   (define (code-gen-pbox-ref e-gref)
-    (let$ ([v e-gref])
-      (If (Guarded-Proxy-Huh v)
-          (let$ ([u (Guarded-Proxy-Ref v)]
-                 [c (Guarded-Proxy-Coercion v)])
-            (apply-coercion (Unguarded-Box-Ref u) (Ref-Coercion-Read c)))
-          (Unguarded-Box-Ref v))))
+    (cast-profile/max-ref-chain$
+     (let$ ([v e-gref])
+       (If (Guarded-Proxy-Huh v)
+           (cast-profile/inc-ref-proxies-accessed$
+            (let$ ([u (Guarded-Proxy-Ref v)]
+                   [c (Guarded-Proxy-Coercion v)])
+              (apply-coercion (Unguarded-Box-Ref u) (Ref-Coercion-Read c))))
+           (Unguarded-Box-Ref v)))))
   
   (: code-gen-pbox-set! PBox-Set-Type)
   (define (code-gen-pbox-set! e-gref w-val)
-    (let$ ([v e-gref][w w-val])
-      (If (Guarded-Proxy-Huh v)
-          (let$ ([u (Guarded-Proxy-Ref v)]
-                 [c (Ref-Coercion-Write (Guarded-Proxy-Coercion v))])
-            (Unguarded-Box-Set! u (apply-coercion w c)))
-          (Unguarded-Box-Set! v w))))
+    (cast-profile/max-ref-chain$
+     (let$ ([v e-gref][w w-val])
+       (If (Guarded-Proxy-Huh v)
+           (cast-profile/inc-ref-proxies-accessed$
+            (let$ ([u (Guarded-Proxy-Ref v)]
+                   [c (Ref-Coercion-Write (Guarded-Proxy-Coercion v))])
+              (Unguarded-Box-Set! u (apply-coercion w c))))
+           (Unguarded-Box-Set! v w)))))
 
   (: code-gen-pvec-ref PVec-Ref-Type)
   (define (code-gen-pvec-ref e-gref i-index)
-    (let$ ([v e-gref][i i-index])
-      (If (Guarded-Proxy-Huh v)
-          (let$ ([u (Unguarded-Vect-Ref (Guarded-Proxy-Ref v) i)]
-                 [c (Ref-Coercion-Read (Guarded-Proxy-Coercion v))])
-            (apply-coercion u c))
-          (Unguarded-Vect-Ref v i))))
+    (cast-profile/max-vector-chain$
+     (let$ ([v e-gref][i i-index])
+       (If (Guarded-Proxy-Huh v)
+           (cast-profile/inc-vector-proxies-accessed$
+            (let$ ([u (Unguarded-Vect-Ref (Guarded-Proxy-Ref v) i)]
+                   [c (Ref-Coercion-Read (Guarded-Proxy-Coercion v))])
+              (apply-coercion u c)))
+           (Unguarded-Vect-Ref v i)))))
 
   (: code-gen-pvec-set! PVec-Set-Type)
   (define (code-gen-pvec-set! e-gref i-index w-val)
-    (let$ ([v e-gref][i i-index][w w-val])
-      (If (Guarded-Proxy-Huh v)
-          (let$ ([u (Guarded-Proxy-Ref v)]
-                 [w (apply-coercion w (Ref-Coercion-Write (Guarded-Proxy-Coercion v)))])
-            (Unguarded-Vect-Set! u i w))
-          (Unguarded-Vect-Set! v i w))))
+    (cast-profile/max-vector-chain$
+     (let$ ([v e-gref][i i-index][w w-val])
+       (If (Guarded-Proxy-Huh v)
+           (cast-profile/inc-vector-proxies-accessed$
+            (let$ ([u (Guarded-Proxy-Ref v)]
+                   [w (apply-coercion w (Ref-Coercion-Write (Guarded-Proxy-Coercion v)))])
+              (Unguarded-Vect-Set! u i w)))
+           (Unguarded-Vect-Set! v i w)))))
   
   (: code-gen-pvec-len PVec-Len-Type)
   (define (code-gen-pvec-len e-gvec)
-    (let$ ([v e-gvec])
-      (If (Guarded-Proxy-Huh v)
-          (Unguarded-Vect-length (Guarded-Proxy-Ref v))
-          (Unguarded-Vect-length v))))
+    (cast-profile/max-vector-chain$
+     (let$ ([v e-gvec])
+       (If (Guarded-Proxy-Huh v)
+           (cast-profile/inc-vector-proxies-accessed$
+            (Unguarded-Vect-length (Guarded-Proxy-Ref v)))
+           (Unguarded-Vect-length v)))))
 
   (values code-gen-pbox-ref
           code-gen-pbox-set!
@@ -624,8 +635,7 @@ TODO write unit tests
              (Quote '()))))))
   
   (cond
-    ;; TODO this shouldn't be the switch that decides if monotonic is inlined
-    [(inline-guarded-branch?)
+    [(inline-monotonic-branch?)
      (values code-gen-mbox-ref code-gen-mbox-set!
              code-gen-mvec-ref code-gen-mvec-set!)]
     [else
@@ -646,7 +656,7 @@ TODO write unit tests
       mvec-set!-uid
       (code$ (mbox i v t1) (code-gen-mvec-set! mbox i v t1)))
      (values (apply-code-curry mbox-ref-uid) (apply-code-curry mbox-set!-uid)
-             (apply-code-curry mvec-ref-uid) (apply-code-curry mbox-set!-uid))]))
+             (apply-code-curry mvec-ref-uid) (apply-code-curry mvec-set!-uid))]))
 
 (: make-dynamic-operations-helpers
    (->* (#:compile-app App-Type
@@ -672,16 +682,6 @@ TODO write unit tests
          #:mbox-ref mbox-ref #:mbox-set mbox-set!
          #:mvec-ref mvec-ref #:mvec-set mvec-set!
          #:compile-cast compile-cast)
-  
-  #;
-  (define cast : Cast-Type
-    (cond
-      [compile-cast compile-cast]
-      [(and apply-coercion make-coercion)
-       (apply-coercion/make-coercion->compile-cast apply-coercion
-                                                   make-coercion)]
-      [else (error 'make-dynamic-operations-helpers
-                   "expected compile-cast/apply-coercion-make-coercion")]))
   
   (: code-gen-dyn-pbox-ref Dyn-PBox-Ref-Type)
   (define (code-gen-dyn-pbox-ref dyn lbl)
@@ -1473,16 +1473,17 @@ TODO write unit tests
 (define (make-compile-cast-tuple #:interp-cast-uid cast-uid)
   (: compile-cast-tuple Cast-Tuple-Type)
   (define (compile-cast-tuple e t1 t2 l mt)
-    (match mt
-      ;; Todo make specializing on the arity, and sub types
-      [(Quote 0)
-       (ann (Cast-Tuple cast-uid e t1 t2 l) CoC3-Expr)]
-      [_ 
-       (ann (let$ ([v e] [t1 t1] [t2 t2] [l l] [mt mt])
-              (If (op=? mt ZERO-EXPR)
-                  (Cast-Tuple cast-uid v t1 t2 l)
-                  (Cast-Tuple-In-Place cast-uid v t1 t2 l mt)))
-            CoC3-Expr)]))
+    (cast-profile/inc-tuple-casts$
+     (match mt
+       ;; Todo make specializing on the arity, and sub types
+       [(Quote 0)
+        (ann (Cast-Tuple cast-uid e t1 t2 l) CoC3-Expr)]
+       [_ 
+        (ann (let$ ([v e] [t1 t1] [t2 t2] [l l] [mt mt])
+               (If (op=? mt ZERO-EXPR)
+                   (Cast-Tuple cast-uid v t1 t2 l)
+                   (Cast-Tuple-In-Place cast-uid v t1 t2 l mt)))
+             CoC3-Expr)])))
   compile-cast-tuple)
 
 ;; Note that the compile-cast-proxy-ref functions expects t1 and t2 to be
@@ -1495,41 +1496,45 @@ TODO write unit tests
 
 (: compile-cast-pref/type-based Proxied-Cast-Type)
 (define (compile-cast-pref/type-based e t1 t2 l)
-  (compile-cast-proxied/type-based e t1 t2 l))
+  (cast-profile/inc-ref-casts$ (compile-cast-proxied/type-based e t1 t2 l)))
 
 (: compile-cast-pvec/type-based Proxied-Cast-Type)
 (define (compile-cast-pvec/type-based e t1 t2 l)
-  (compile-cast-proxied/type-based e t1 t2 l))
+  (cast-profile/inc-vector-casts$ (compile-cast-proxied/type-based e t1 t2 l)))
 
 (: make-compile-cast-pref/coercions
    (->* (#:make-coercion Compile-Make-Coercion-Type
          #:compose-coercions Compose-Coercions-Type
          #:id-coercion? Id-Coercion-Huh-Type)
         Proxied-Cast-Type))
-(define (make-compile-cast-pref/coercions
+(define ((make-compile-cast-pref/coercions
           #:make-coercion make-coercion
           #:compose-coercions compose-coercions
-          #:id-coercion? id-coercion?)
-  (make-compile-cast-proxied/coercions
-   #:make-coercion make-coercion
-   #:compose-coercions compose-coercions
-   #:id-coercion? id-coercion?
-   'GRef))
+          #:id-coercion? id-coercion?) e t1 t2 lbl)
+  (cast-profile/inc-ref-casts$
+   ((make-compile-cast-proxied/coercions
+     #:make-coercion make-coercion
+     #:compose-coercions compose-coercions
+     #:id-coercion? id-coercion?
+     'GRef)
+    e t1 t2 lbl)))
 
 (: make-compile-cast-pvec/coercions
    (->* (#:make-coercion Compile-Make-Coercion-Type
          #:compose-coercions Compose-Coercions-Type
          #:id-coercion? Id-Coercion-Huh-Type)
         Proxied-Cast-Type))
-(define (make-compile-cast-pvec/coercions
+(define ((make-compile-cast-pvec/coercions
           #:make-coercion make-coercion
           #:compose-coercions compose-coercions
-          #:id-coercion? id-coercion?)
-  (make-compile-cast-proxied/coercions
-   #:make-coercion make-coercion
-   #:compose-coercions compose-coercions
-   #:id-coercion? id-coercion?
-   'GVect))
+          #:id-coercion? id-coercion?) e t1 t2 lbl)
+  (cast-profile/inc-vector-casts$
+   ((make-compile-cast-proxied/coercions
+     #:make-coercion make-coercion
+     #:compose-coercions compose-coercions
+     #:id-coercion? id-coercion?
+     'GVect)
+    e t1 t2 lbl)))
 
 (: make-compile-cast-proxied/coercions
    (->* (#:make-coercion Compile-Make-Coercion-Type
@@ -1549,7 +1554,7 @@ TODO write unit tests
     (define ret
     (bind-value$
      ;; Let literals through while let binding expressions
-   ([v e] [t1 t1] [t2 t2] [l l])
+     ([v e] [t1 t1] [t2 t2] [l l])
    ;; There is a small amount of specialization here because
    ;; we know precisely which case of inter-compose-med will
    ;; match...
@@ -1562,14 +1567,14 @@ TODO write unit tests
         [(Guarded-Proxy-Huh v)
          (precondition$ (Ref-Coercion-Huh (Guarded-Proxy-Coercion v))
            (let*$ ([old-v (Guarded-Proxy-Ref v)]
-                    [old-m (Guarded-Proxy-Coercion v)]
-                    [o-write (Ref-Coercion-Write old-m)] 
-                    [r-write (compose-coercions m-write o-write)]
-                    [o-read (Ref-Coercion-Read old-m)]
-                    [r-read (compose-coercions o-read m-read)])
+                   [old-m (Guarded-Proxy-Coercion v)]
+                   [o-write (Ref-Coercion-Write old-m)] 
+                   [r-write (compose-coercions m-write o-write)]
+                   [o-read (Ref-Coercion-Read old-m)]
+                   [r-read (compose-coercions o-read m-read)])
              (cond$
               [(and$ (id-coercion? r-read) (id-coercion? r-write))
-                old-v]
+               old-v]
               [else
                (Guarded-Proxy
                 old-v
@@ -1599,7 +1604,7 @@ TODO write unit tests
   (cond
     [#t code-gen-cast-proxied]
     [else
-     (define uid (next-uid! "cast-proxied-reference/coercion"))
+     (define uid (next-uid! "cast-proxied/coercion"))
      (add-cast-runtime-binding!
       uid
       (code$ (v t1 t2 l mt) (code-gen-cast-proxied v t1 t2 l mt)))
@@ -1608,11 +1613,35 @@ TODO write unit tests
        (apply-code uid v t1 t2 mt))
      build-call]))
 
-(: make-compile-apply-ref-coercion
+(: make-compile-apply-pref-coercion
    (->* (#:compose-coercions Compose-Coercions-Type
          #:id-coercion? Id-Coercion-Huh-Type)
         Apply-Coercion-Type))
-(define ((make-compile-apply-ref-coercion
+(define ((make-compile-apply-pref-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? id-coercion-huh) e m [mt (Quote 0)])
+  (cast-profile/inc-ref-casts$
+   ((make-compile-apply-proxied-coercion
+     #:compose-coercions compose-coercions
+     #:id-coercion? id-coercion-huh) e m mt)))
+
+(: make-compile-apply-pvec-coercion
+   (->* (#:compose-coercions Compose-Coercions-Type
+         #:id-coercion? Id-Coercion-Huh-Type)
+        Apply-Coercion-Type))
+(define ((make-compile-apply-pvec-coercion
+          #:compose-coercions compose-coercions
+          #:id-coercion? id-coercion-huh) e m [mt (Quote 0)])
+  (cast-profile/inc-vector-casts$
+   ((make-compile-apply-proxied-coercion
+     #:compose-coercions compose-coercions
+     #:id-coercion? id-coercion-huh) e m mt)))
+
+(: make-compile-apply-proxied-coercion
+   (->* (#:compose-coercions Compose-Coercions-Type
+         #:id-coercion? Id-Coercion-Huh-Type)
+        Apply-Coercion-Type))
+(define ((make-compile-apply-proxied-coercion
           #:compose-coercions compose-coercions
           #:id-coercion? id-coercion-huh) e m [mt (Quote 0)])
   ;; The mt is ignored here
@@ -1643,8 +1672,6 @@ TODO write unit tests
                         r-write
                         (Ref-Coercion-Ref-Huh m))))])))]
      [else (Guarded-Proxy v (Coercion m))])))
-
-
 
 (define monotonic-cast-inline-without-types? : (Parameterof Boolean)
   (make-parameter #f))

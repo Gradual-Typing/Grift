@@ -371,6 +371,10 @@
        (Let b* e)]
       [(Var i)
        (Var i)]
+      [(Global s)
+       (Global s)]
+      [(Assign u/s (app recur e))
+       (Assign u/s e)]
       [(If (app recur t) (app recur c) (app recur a))
        (If t c a)]
       [(Switch e c* d)

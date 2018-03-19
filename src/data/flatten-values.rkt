@@ -102,6 +102,7 @@ becuse it is actually more of a stmt contexts itself.
       [(Op p t*) (cons '() (Op p (fv-trivial* t*)))]
       [(Halt) (cons '() (Halt))]
       [(Var i) (cons '() (Var i))]
+      [(Global s) (cons '() (Global s))]
       [(Quote k) (cons '() (Quote k))]))
 
   (: fv-pred (D3-Pred -> D4-Pred))
@@ -151,11 +152,12 @@ becuse it is actually more of a stmt contexts itself.
   (: fv-effect* (D3-Effect* -> D4-Effect*))
   (define (fv-effect* effect*) (map fv-effect effect*))
 
-  (: simplify-assignment (Uid D3-Value -> D4-Effect))
+  (: simplify-assignment (Id D3-Value -> D4-Effect))
   (define (simplify-assignment var val)
     (define (sa [val : D3-Value]) (simplify-assignment var val))
     (match val
       [(Var u) (Assign var (Var u))]
+      [(Global s) (Assign var (Global s))]
       [(Code-Label u) (Assign var (Code-Label u))]
       [(Quote k) (Assign var (Quote k))]
       [(Op p t*) (Assign var (Op p (map fv-trivial t*)))]
@@ -172,6 +174,7 @@ becuse it is actually more of a stmt contexts itself.
 (define (fv-trivial triv)
   (match triv
     [(Var u) (Var u)]
+    [(Global s) (Global s)]
     [(Code-Label u) (Code-Label u)]
     [(Quote k) (Quote k)]))
 
