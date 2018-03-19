@@ -38,3 +38,11 @@
         (replace/append-to-cheader constants.h-path 'replace f)
         (set-box! fresh-constants.h? #f))
       (replace/append-to-cheader constants.h-path 'append f)))
+
+(: create-cast-profiler.h ((Output-Port -> Void) -> Void))
+(define (create-cast-profiler.h f)
+  (replace/append-to-cheader cast-profiler.h-path 'replace f))
+
+(: create-cast-profiler.c ((Output-Port -> Void) -> Void))
+(define (create-cast-profiler.c f)
+  (replace/append-to-cheader cast-profiler.c-path 'replace f))
