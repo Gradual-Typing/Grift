@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include "hashcons.h"
+#include "castprofiler.h"
 
 extern table types_ht;
 extern int64_t types_unique_index_counter;

@@ -85,8 +85,12 @@
     (match (system-type 'os)
      ['unix "-lm"]
      ['macosx ""]))
+  (define rt-cast-profiler
+    (if (cast-profiler?)
+        cast-profiler.o-path
+        ""))
   (define cmd
-    (format "clang -o ~a ~a ~a ~a ~a ~a ~a" out in rt hc rt-math gc flags))
+    (format "clang -o ~a ~a ~a ~a ~a ~a ~a ~a" out in rt hc rt-math gc rt-cast-profiler flags))
   (when (trace? 'Vomit)
     (logf "System call: ~a" cmd))
   (flush-output (current-log-port))
