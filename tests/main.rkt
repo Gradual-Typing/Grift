@@ -45,6 +45,7 @@
     (vector  . ,vector-tests)
     (tuples  . ,tuple-tests)
     (tool    . ,tool-tests)
+    (mu      . ,recursive-type-tests)
     (program . ,program-tests)
     (large   . ,large-tests)))
 

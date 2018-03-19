@@ -1,0 +1,4 @@
+;; This function test iso-recusive type equality
+;; because
+(define (step) : (Rec X (-> X)) step)
+step

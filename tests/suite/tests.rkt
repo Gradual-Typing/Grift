@@ -12,7 +12,8 @@
          "tools/tests.rkt"
          "program/tests.rkt"
          "large/tests.rkt"
-         "static/tests.rkt")
+         "static/tests.rkt"
+         "mu/tests.rkt")
 
 (provide (all-defined-out)
          (all-from-out
@@ -25,7 +26,8 @@
           "tools/tests.rkt"
           "program/tests.rkt"
           "large/tests.rkt"
-          "static/tests.rkt"))
+          "static/tests.rkt"
+          "mu/tests.rkt"))
 
 (define most-tests : Test
   (test-suite
@@ -37,6 +39,7 @@
    monovector-tests
    vector-tests
    tuple-tests
+   recursive-type-tests
    tool-tests
    program-tests))
 
