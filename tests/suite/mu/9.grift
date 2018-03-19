@@ -1,0 +1,2 @@
+;; This test is simply to make sure iso-recursive definitional equality holds
+(ann (ann () Dyn) (Rec X ()))
