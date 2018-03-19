@@ -37,3 +37,6 @@
 (define-runtime-path none-gc.c-path "runtime/nonegc.c")
 
 (define-runtime-path constants.h-path "runtime/constants.h")
+(define-runtime-path cast-profiler.h-path "runtime/castprofiler.h")
+(define-runtime-path cast-profiler.c-path "runtime/castprofiler.c")
+(define-runtime-path cast-profiler.o-path "runtime/castprofiler.o")
