@@ -53,7 +53,7 @@
          Break-Repeat
          (App-Code D3-Trivial D3-Trivial*)
          (UIL-Op! D3-Trivial)
-         (Assign Uid D3-Value)
+         (Assign Id D3-Value)
          No-Op)))
 
 ;; (TODO halt is not trivial though because we are targeting c it may be treated so)
@@ -61,6 +61,7 @@
 (define-type D3-Trivial
   (U (Code-Label Uid)
      (Var Uid)
+     (Global String)
      (Quote D3-Literal)))
 
 (define-type D3-Value* (Listof D3-Value))

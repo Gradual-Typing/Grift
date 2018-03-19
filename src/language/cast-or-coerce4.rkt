@@ -92,6 +92,8 @@
 	  (Letrec CoC4-Bnd-Lambda* E)
 	  (Let CoC4-Bnd-Data* E)
           (Var Uid)
+          (Global String)
+          (Assign Id E)
           ;; Controll Flow
           (If E E E)
           (Switch E (Switch-Case* E) E)

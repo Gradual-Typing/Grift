@@ -92,6 +92,8 @@
 	  (Letrec L1-Bnd-Lambda* E)
 	  (Let L1-Bnd* E)
           (Var Uid)
+          (Global String)
+          (Assign Id E)
           ;; Controll Flow
           (If E E E)
           (Switch E (Switch-Case* E) E)
