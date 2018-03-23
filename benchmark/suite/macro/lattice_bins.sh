@@ -578,7 +578,7 @@ main()
     GRIFT_DIR=${GRIFT_DIR:=`pwd`/../../..}
     
     declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
-    declare -r LB_DIR="$TEST_DIR/lattice_bins/"
+    declare -r LB_DIR="$TEST_DIR/lattice_bins"
     if [ "$date" == "fresh" ]; then
         declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
         mkdir -p "$LB_DIR/$DATE"
