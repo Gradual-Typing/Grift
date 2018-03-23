@@ -239,7 +239,7 @@ TODO write unit tests
       ;; Use make coercion to implement dynamic application without
       ;; allocating a one time use coercion.
       [(Dyn-Fn-App (app recur e) (app recur* e*) t* l)
-       (dyn-fn-app e e* t* (Quote l))]
+       (cast-profile/inc-function-uses$ (dyn-fn-app e e* t* (Quote l)))]
       ;; Transformation to lower guarded reference types
       ;; Guarded Operations on Guarded values are turned into
       ;; calls/inlinings of the runtime proceedures that perform
