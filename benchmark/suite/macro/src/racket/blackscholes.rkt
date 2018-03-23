@@ -5,7 +5,7 @@
 ;;
 ;; Reference Source: Options, Futures, and Other Derivatives,
 ;;   3rd Edition, Prentice Hall, John C. Hull,
-;; Edited for use in The Schml Benchmark Project By Andre Kuhlenschmidt
+;; Edited for use in The Grift Benchmark Project By Andre Kuhlenschmidt
 
 ;;; Here we actively choose to not use racket racket/fixnum. Use of
 ;;; generic numeric ops is disadvantage for racket but there is no

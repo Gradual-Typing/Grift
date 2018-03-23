@@ -5,8 +5,8 @@ grift=../../../../../main.rkt
 all: $(targets)
 
 clean:
-	find . -not \( -name "*.schml" -or -name "Makefile" \) -delete
+	find . -not \( -name "*.grift" -or -name "Makefile" \) -delete
 
 %:
-	$(grift) -O 3 -o $@ $@.schml
+	$(grift) -O 3 -o $@ $@.grift
 
