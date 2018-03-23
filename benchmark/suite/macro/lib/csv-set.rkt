@@ -1,5 +1,8 @@
 #lang racket
 
+;; This program allows you to compare two files of floating point numbers for
+;; agreement up to a given delta.
+
 (require csv-reading "../../../config_str.rkt")
 
 (define (map-col csv col p)
