@@ -581,11 +581,11 @@ main()
     declare -r LB_DIR="$TEST_DIR/lattice_bins/"
     if [ "$date" == "fresh" ]; then
         declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
-        mkdir "$LB_DIR/$DATE"
+        mkdir -p "$LB_DIR/$DATE"
     elif [ "$date" == "test" ]; then
         declare -r DATE="test"
         if [ ! -d "$LB_DIR/$DATE" ]; then
-            mkdir "$LB_DIR/$DATE"
+            mkdir -p "$LB_DIR/$DATE"
         fi
     else
 	    declare -r DATE="$date"
