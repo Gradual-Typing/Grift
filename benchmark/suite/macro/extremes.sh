@@ -21,9 +21,9 @@ write_grift_speedups()
     local logfile="$1";         shift
     
     for config_index in ${configs[@]}; do
-	    get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}"\
+        get_grift_speedup $baseline_system "${TMP_DIR}/${dir}/${name}"\
                           "$benchmark_args" "$disk_aux_name" $config_index
-	    printf ",$RETURN" >> $logfile
+        printf ",$RETURN" >> $logfile
         echo "grift $config_index speedup: $RETURN"
     done
 }
@@ -38,7 +38,7 @@ run_benchmark()
     local baseline_system_static="$1";  shift
     local baseline_system_dynamic="$1"; shift
     local name="$1";                    shift
-    local input_file="$1";          shift
+    local input_file="$1";              shift
     local aux_name="$1";                shift
 
     local logfile1="${DATA_DIR}/static.log"
@@ -47,22 +47,22 @@ run_benchmark()
 
     local disk_aux_name="" print_aux_name=""
     if [[ ! -z "${aux_name}" ]]; then
-	disk_aux_name="_${aux_name}"
-	print_aux_name="(${aux_name})"
+        disk_aux_name="_${aux_name}"
+        print_aux_name="(${aux_name})"
     fi
 
     local benchmark_args_file="${TMP_DIR}/${name}${disk_aux_name}.args"
     local input="$(cat ${INPUT_DIR}/${name}/${input_file})"
     if [ -f benchmark_args_file ]; then
-	    local old_input=$(cat "$benchmark_args_file")
+        local old_input=$(cat "$benchmark_args_file")
         if [ ! $old_input == $input ]; then
             echo "input changed mid test" 1>&2
             exit 1
         fi
     else
-	    printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
-	    printf "Args\t\t:%s\n" "$input" >> "$PARAMS_LOG"
-	    echo "$input" > "$benchmark_args_file"
+        printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
+        printf "Args\t\t:%s\n" "$input" >> "$PARAMS_LOG"
+        echo "$input" > "$benchmark_args_file"
     fi
 
     # Record the runtime of Statically Typed Varients
@@ -94,9 +94,6 @@ run_benchmark()
                 "$name" "$input_file" "$disk_aux_name"
     printf ",$RETURN" >> $logfile2
     echo "Gambit Speedup: $RETURN"
-    # get_speedup racket $baseline_system_dynamic\
-    #             "$name" "$input_file" "$disk_aux_name"
-    # printf ",$RETURN" >> $logfile2
     
     get_speedup chezscheme $baseline_system_dynamic\
                 "$name" "$input_file" "$disk_aux_name"
@@ -128,7 +125,7 @@ gen_fig()
             `"set terminal pngcairo size 1280,960"`
             `" noenhanced color font 'Verdana,26' ;"`
             `"set output '${outfile}';"`
-	        `"set border 15 back;"`
+                `"set border 15 back;"`
             `"set yrange [${ymin}:${ymax}];"`
             `"set logscale y;"`
             `"set key font 'Verdana,20';"`
@@ -137,10 +134,10 @@ gen_fig()
             `"set style fill pattern border -1;"`
             `"load '${LIB_DIR}/dark-colors.pal';"`
             `"set boxwidth 0.9;"` 
-	        `"set ylabel \"  Speedup with respect to ${sys}\";"`
+            `"set ylabel \"  Speedup with respect to ${sys}\";"`
             `"set title \"\";"`
-	        `"set xtic rotate by -45 scale 0;"`
-	        `"set grid ytics;"`
+            `"set xtic rotate by -45 scale 0;"`
+            `"set grid ytics;"`
             `"set ytics add (\"1\" 1);"`
             `"plot '${logfile}' using 2:xtic(1) title col,"`
             `"  for [i=3:$N] \"\" "`
@@ -169,7 +166,7 @@ run_experiment()
     echo "name,${config_str}" > "$logfile3"
 
     # run_benchmark $baseline_system_static $baseline_system_dynamic\
-    #               "array" "slow.txt" ""
+        #               "array" "slow.txt" ""
     
     run_benchmark $baseline_system_static $baseline_system_dynamic\
                   "tak" "slow.txt" ""
@@ -211,22 +208,21 @@ main()
     LOOPS="$1";          shift
     local date="$1";     shift
     configs="$@"
-    echo "$configs"
 
     GRIFT_DIR=${GRIFT_DIR:=`pwd`/../../..}
     
     if [ "$date" == "fresh" ]; then
-	    declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
+        declare -r DATE=`date +%Y_%m_%d_%H_%M_%S`
     elif [ "$date" == "test" ]; then
         declare -r DATE="test"
     else
-	    declare -r DATE="$date"
+        declare -r DATE="$date"
         if [ ! -d "$GRIFT_DIR/benchmark/suite/macro/extremes/$DATE" ]; then
-	        echo "Directory not found"
-	        exit 1
-	    fi
+            echo "Directory not found"
+            exit 1
+        fi
     fi
-    
+
     declare -r TEST_DIR="$GRIFT_DIR/benchmark/suite/macro"
     declare -r EXP_DIR="$TEST_DIR/extremes/$DATE"
     declare -r DATA_DIR="$EXP_DIR/data"
@@ -265,26 +261,26 @@ main()
     cd "$GRIFT_DIR"
 
     if [ ! -d $TMP_DIR ]; then
-	# copying the benchmarks to a temporary directory
-	cp -r $SRC_DIR $TMP_DIR
+        # copying the benchmarks to a temporary directory
+        cp -r $SRC_DIR $TMP_DIR
 
-    
-    
-	# logging
-	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
-	MYEMAIL="`id -un`@`hostname -f`"
-	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
-	grift_ver=$(git rev-parse HEAD)
-	printf "Grift ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
-	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
-	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-	printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
-	racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
-	printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
-	chezscheme_ver=$(scheme --version 2>&1)
-	printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
-	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
+        
+        
+        # logging
+        printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
+        MYEMAIL="`id -un`@`hostname -f`"
+        printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
+        grift_ver=$(git rev-parse HEAD)
+        printf "Grift ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
+        clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+        printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
+        gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+        printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
+        racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
+        printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
+        chezscheme_ver=$(scheme --version 2>&1)
+        printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
+        printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
     fi
 
     run_experiment get_static_grift_runtime get_racket_runtime
