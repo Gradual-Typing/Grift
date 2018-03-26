@@ -38,14 +38,3 @@
 (define (csv-row? x) (and (list? x) (andmap string? x)))
 (define (index-list? x)
   (and (list? x) (andmap exact-nonnegative-integer? x)))
-
-
-       
-
-  
-
-
-
-
-
-
