@@ -17,12 +17,12 @@ get_racket_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	raco make "${benchmark_path}.rkt"
-	avg "racket ${benchmark_path}.rkt"\
-        "${INPUT_DIR}/${benchmark}/${input}"\
-        "racket" "${OUTPUT_DIR}/racket/${benchmark}/${input}" \
-        "$runtimes_file" 
-	echo "$RETURN" > "$cache_file"
+        raco make "${benchmark_path}.rkt"
+        avg "racket ${benchmark_path}.rkt"\
+            "${INPUT_DIR}/${benchmark}/${input}"\
+            "racket" "${OUTPUT_DIR}/racket/${benchmark}/${input}" \
+            "$runtimes_file"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -41,12 +41,12 @@ get_typed_racket_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	raco make "${benchmark_path}.rkt"
-	avg "racket ${benchmark_path}.rkt"\
-        "${INPUT_DIR}/${benchmark}/${input}"\
-        "typed_racket" "${OUTPUT_DIR}/typed_racket/${benchmark}/${input}"\
-        "$runtimes_file"
-	echo "$RETURN" > "$cache_file"
+        raco make "${benchmark_path}.rkt"
+        avg "racket ${benchmark_path}.rkt"\
+            "${INPUT_DIR}/${benchmark}/${input}"\
+            "typed_racket" "${OUTPUT_DIR}/typed_racket/${benchmark}/${input}"\
+            "$runtimes_file"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -65,12 +65,12 @@ get_ocaml_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-    make -C "$(dirname $benchmark_path)"
-    avg "${benchmark_path}"\
-        "${INPUT_DIR}/${benchmark}/${input}"\
-        "ocaml" "${OUTPUT_DIR}/ocaml/${benchmark}/${input}"\
-        "$runtimes_file"
-    echo "$RETURN" > "$cache_file"
+	make -C "$(dirname $benchmark_path)"
+	avg "${benchmark_path}"\
+            "${INPUT_DIR}/${benchmark}/${input}"\
+            "ocaml" "${OUTPUT_DIR}/ocaml/${benchmark}/${input}"\
+            "$runtimes_file"
+	echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -90,11 +90,11 @@ get_chezscheme_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	echo "(compile-program \"${benchmark_path}.ss\")" | scheme -q
-	avg "${benchmark_path}.so" "${INPUT_DIR}/${benchmark}/${input}"\
-        "chezscheme" "${OUTPUT_DIR}/chezscheme/${benchmark}/${input}"\
-        "$runtimes_file"
-	echo "$RETURN" > "$cache_file"
+        echo "(compile-program \"${benchmark_path}.ss\")" | scheme -q
+        avg "${benchmark_path}.so" "${INPUT_DIR}/${benchmark}/${input}"\
+            "chezscheme" "${OUTPUT_DIR}/chezscheme/${benchmark}/${input}"\
+            "$runtimes_file"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -152,13 +152,13 @@ get_grift_runtimes()
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
     else
-    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
-	local configs=($(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -i))
-	for i in ${configs[@]}; do
-	    avg "${benchmark_path}.o${i}" "${input}" "$runtimes_file"
-	    echo "$RETURN" >> "$cache_file"
-	done
-	readarray RETURN < "$cache_file"
+	racket "${GRIFT_DIR}/benchmark/benchmark.rkt" "${benchmark_path}.grift"
+        local configs=($(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -i))
+        for i in ${configs[@]}; do
+            avg "${benchmark_path}.o${i}" "${input}" "$runtimes_file"
+            echo "$RETURN" >> "$cache_file"
+        done
+        readarray RETURN < "$cache_file"
     fi
 }
 
@@ -180,13 +180,13 @@ get_grift_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	    racket "${GRIFT_DIR}/benchmark/benchmark.rkt"\
+        racket "${GRIFT_DIR}/benchmark/benchmark.rkt"\
                --config $config_index "${benchmark_path}.grift"
-	    avg "${benchmark_path}.o${config_index}"\
+        avg "${benchmark_path}.o${config_index}"\
             "${INPUT_DIR}/${benchmark}/${input}"\
             "static" "${OUTPUT_DIR}/static/${benchmark}/${input}"\
             "$runtimes_file"
-	    echo "$RETURN" > "$cache_file"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -207,9 +207,9 @@ get_c_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	clang "${benchmark_path}.c" "${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
-	avg "${benchmark_path}.o" "${input}" "$runtimes_file"
-	echo "$RETURN" > "$cache_file"
+        clang "${benchmark_path}.c" "${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/lib/libgc.a" -I"${GRIFT_DIR}/src/backend-c/runtime/boehm-gc-install/include" -pthread -lm -O3 -o "${benchmark_path}.o"
+        avg "${benchmark_path}.o" "${input}" "$runtimes_file"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -231,12 +231,12 @@ get_gambit_runtime()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	    gsc -prelude "(declare (standard-bindings) (block))"\
+        gsc -prelude "(declare (standard-bindings) (block))"\
             -exe -cc-options -O3 "${benchmark_path}.scm"
-	    avg "${benchmark_path}" "${INPUT_DIR}/${benchmark}/${input}"\
+        avg "${benchmark_path}" "${INPUT_DIR}/${benchmark}/${input}"\
             "gambit" "${OUTPUT_DIR}/gambit/${benchmark}/${input}" \
             "$runtimes_file"
-	    echo "$RETURN" > "$cache_file"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -256,17 +256,17 @@ get_grift_slowdowns()
     if [ -f $cache_file ]; then
         readarray RETURN < "$cache_file"
     else
-	local benchmark=$(basename "$benchmark_path")
-	$baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
-	local baseline="$RETURN" st sr;
-	get_grift_runtimes "$benchmark_path" "$benchmark_args" "$disk_aux_name"
-	st=${RETURN[@]}
-	for st in ${st[@]}; do
-	    sr=$(echo "${st}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	    RETURN=$(echo "$sr" | awk '{printf "%.2f\n",$0}')
-	    echo "$RETURN" >> "$cache_file"
-	done
-	readarray RETURN < "$cache_file"
+        local benchmark=$(basename "$benchmark_path")
+        $baseline_system "$benchmark" "$benchmark_args" "$disk_aux_name"
+        local baseline="$RETURN" st sr;
+        get_grift_runtimes "$benchmark_path" "$benchmark_args" "$disk_aux_name"
+        st=${RETURN[@]}
+        for st in ${st[@]}; do
+            sr=$(echo "${st}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
+            RETURN=$(echo "$sr" | awk '{printf "%.2f\n",$0}')
+            echo "$RETURN" >> "$cache_file"
+        done
+        readarray RETURN < "$cache_file"
     fi
 }
 
@@ -289,14 +289,14 @@ get_grift_slowdown()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	local benchmark=$(basename "$benchmark_path")
-	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
-	local baseline="$RETURN" st sr;
-	get_grift_runtime "$benchmark_path" "${input}"\
-                      "$disk_aux_name" $config_index
-	local st="$RETURN";
-	RETURN=$(echo "${st} ${baseline}" | awk '{printf "%.2f", $1 \ $2}')
-	echo "$RETURN" >> "$cache_file"
+        local benchmark=$(basename "$benchmark_path")
+        $baseline_system "$benchmark" "${input}" "$disk_aux_name"
+        local baseline="$RETURN" st sr;
+        get_grift_runtime "$benchmark_path" "${input}"\
+			  "$disk_aux_name" $config_index
+        local st="$RETURN";
+        RETURN=$(echo "${st} ${baseline}" | awk '{printf "%.2f", $1 \ $2}')
+        echo "$RETURN" >> "$cache_file"
     fi
 }
 
@@ -320,13 +320,13 @@ get_grift_speedup()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	local benchmark=$(basename "$benchmark_path")
-	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
-	local baseline="$RETURN" st sr;
-	get_grift_runtime "$benchmark_path" "${input}" "$disk_aux_name" $config_index
-	local st="$RETURN";
-	RETURN=$(echo "${baseline} ${st}" | awk '{printf "%.2f\n", $1 / $2}')
-	echo "$RETURN" >> "$cache_file"
+        local benchmark=$(basename "$benchmark_path")
+        $baseline_system "$benchmark" "${input}" "$disk_aux_name"
+        local baseline="$RETURN" st sr;
+        get_grift_runtime "$benchmark_path" "${input}" "$disk_aux_name" $config_index
+        local st="$RETURN";
+        RETURN=$(echo "${baseline} ${st}" | awk '{printf "%.2f\n", $1 / $2}')
+        echo "$RETURN" >> "$cache_file"
     fi
 }
 
@@ -350,13 +350,13 @@ get_slowdown()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
-	local baseline="$RETURN";
-	"get_${system}_runtime" "$benchmark" "${input}" "$disk_aux_name"
-	local ct="$RETURN"
-	local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
-	RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
-	echo "$RETURN" > "$cache_file"
+        $baseline_system "$benchmark" "${input}" "$disk_aux_name"
+        local baseline="$RETURN";
+        "get_${system}_runtime" "$benchmark" "${input}" "$disk_aux_name"
+        local ct="$RETURN"
+        local cr=$(echo "${ct}/${baseline}" | bc -l | awk -v p="$PRECISION" '{printf "%.*f\n",p, $0}')
+        RETURN=$(echo "$cr" | awk '{printf "%.2f\n",$0}')
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -380,12 +380,12 @@ get_speedup()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	$baseline_system "$benchmark" "${input}" "$disk_aux_name"
-	local baseline="$RETURN";
-	"get_${system}_runtime" "$benchmark" "${input}" "$disk_aux_name"
-	local ct="$RETURN"
-	RETURN=$(echo "${baseline} ${ct}" | awk '{printf "%.2f", $1 / $2}')
-	echo "$RETURN" > "$cache_file"
+        $baseline_system "$benchmark" "${input}" "$disk_aux_name"
+        local baseline="$RETURN";
+        "get_${system}_runtime" "$benchmark" "${input}" "$disk_aux_name"
+        local ct="$RETURN"
+        RETURN=$(echo "${baseline} ${ct}" | awk '{printf "%.2f", $1 / $2}')
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
