@@ -31,41 +31,47 @@ run_config()
     local cache_file="${TMP_DIR}/static/${name}${disk_aux_name}${i}.cache"
     local bs=$(find "$path" -name "*.o$i")
     if [ -f $cache_file ]; then
-	    RETURN=$(cat "$cache_file")
+        RETURN=$(cat "$cache_file")
     else
-	    local n=0 b
-	    $baseline_system "$name" "$input_file" "$disk_aux_name"
-	    local baseline="$RETURN"
-	    echo "name,precision,time,slowdown,speedup" > "$logfile1"
-	    for b in $(find "$path" -name "*.o$i"); do
-	        let n=n+1
-	        local binpath="${b%.*}"
-	        local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' \
+        local n=0 b
+        $baseline_system "$name" "$input_file" "$disk_aux_name"
+        local baseline="$RETURN"
+        echo "name,precision,time,slowdown,speedup" > "$logfile1"
+        for b in $(find "$path" -name "*.o$i"); do
+            let n=n+1
+            local binpath="${b%.*}"
+            local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' \
                           < "${binpath}.grift")
             local bname="$(basename $b)"
             echo $b
-	        avg "$b" "${INPUT_DIR}/${name}/${input_file}"\
+            local input="${INPUT_DIR}/${name}/${input_file}"
+            
+            if [ "$CAST_PROFILER" = true ] ; then
+                # run the cast profiler
+                eval "cat ${input} | ${b}.prof"
+            fi
+            avg "$b" "$input"\
                 "static" "${OUTPUT_DIR}/static/${name}/${input_file}"\
                 "${b}.runtimes"
-	        local t="$RETURN"
-	        local speedup=$(echo "${baseline}/${t}" | \
+            local t="$RETURN"
+            local speedup=$(echo "${baseline}/${t}" | \
                                 bc -l | \
                                 awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
-	        local slowdown=$(echo "${t}/${baseline}" | \
+            local slowdown=$(echo "${t}/${baseline}" | \
                                  bc -l | \
                                  awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
-	        echo $n $b $speedup
-	        printf "%s,%.2f,%.${PRECISION}f,%.${PRECISION}f,%.${PRECISION}f\n" \
+            echo $n $b $speedup
+            printf "%s,%.2f,%.${PRECISION}f,%.${PRECISION}f,%.${PRECISION}f\n" \
                    $bname $p $t $slowdown $speedup >> $logfile1
-	    done
-	    cut -d, -f4 "$logfile1" | \
+        done
+        cut -d, -f4 "$logfile1" | \
             sed -n '1!p' | \
             sort | \
             uniq -c | \
             awk ' { t = $1; $1 = $2; $2 = t; print; } ' | \
             awk '{ $1=$1" ,";; print }' > "$logfile2"
-	    RETURN="$n"
-	    echo "$RETURN" > "$cache_file"
+        RETURN="$n"
+        echo "$RETURN" > "$cache_file"
     fi
 }
 
@@ -85,13 +91,13 @@ compute_typed_untyped_ratio()
     if [ -f $cache_file ]; then
         RETURN=$(cat "$cache_file")
     else
-	    get_grift_runtime "${TMP_DIR}/static/${name}"\
+        get_grift_runtime "${TMP_DIR}/static/${name}"\
                           "$input_file" "$disk_aux_name" $i
-	    t11="$RETURN"
-	    get_grift_runtime "${TMP_DIR}/dyn/${name}" \
+        t11="$RETURN"
+        get_grift_runtime "${TMP_DIR}/dyn/${name}" \
                           "$input_file" "$disk_aux_name" $i
-	    t12="$RETURN"
-	    RETURN=$(echo "${t11}/${t12}" | \
+        t12="$RETURN"
+        RETURN=$(echo "${t11}/${t12}" | \
                      bc -l | \
                      awk -v p="$PRECISION" '{printf "%.2f\n",$0}')
         echo "$RETURN" > $cache_file
@@ -146,9 +152,6 @@ gen_output()
     local logfile3="${DATA_DIR}/${name}${disk_aux_name}${c2}.log"
     local logfile4="${DATA_DIR}/${name}${disk_aux_name}${c2}.csv"
 
-    
-    # get_speedup static_schml $baseline_system "$name" "$input_file" "$disk_aux_name"
-    # local cr_t="$RETURN"
     get_speedup gambit $baseline_system "$name" "$input_file" "$disk_aux_name"
     local gr_t="$RETURN"
 
@@ -178,11 +181,11 @@ gen_output()
     printf "geometric means %s:\t\t%d=%.4f\t%d=%.4f\n" $name $c1 $g1 $c2 $g2
     
     racket ${LIB_DIR}/csv-set.rkt --add "$name , $c1 , $g1"\
-                                  --add "$name , $c2 , $g2"\
-                                  --in "$GMEANS" --out "$GMEANS"
+           --add "$name , $c2 , $g2"\
+           --in "$GMEANS" --out "$GMEANS"
 
     local min1=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}'\
-                 "$logfile2")
+                     "$logfile2")
     local min2=$(awk 'NR == 1 || $3 < min {line = $1; min = $3}END{print line}'\
                      "$logfile4")
     local max1=$(awk -v max=0 \
@@ -208,17 +211,17 @@ gen_output()
     local color2="$DPURPLE"
 
 
-    # gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-    #   	   `"enhanced color font 'Verdana,10' ;"`
-    # 	   `"set output '${cum_perf_lattice_fig}';"`
-	#        `"set border 15 back;"`
-    #   	   `"set title \"${printname}\";"`
-    # 	   `"set xrange [0:10]; set yrange [0:${n}];"`
-    # 	   `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
-    # 	   `"set ytics nomirror 0,200;"`
-	#        `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
-    # 	   `"plot '${logfile2}' using 1:2 with lines lw 2 dt 4 title '${c1t}' smooth cumulative,"`
-    # 	   `"     '${logfile4}' using 1:2 with lines lw 2 dt 2 title '${c2t}' smooth cumulative"
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+                `"enhanced color font 'Verdana,10' ;"`
+                `"set output '${cum_perf_lattice_fig}';"`
+                `"set border 15 back;"`
+                `"set title \"${printname}\";"`
+                `"set xrange [0:10]; set yrange [0:${n}];"`
+                `"set xtics nomirror (\"1x\" 1,\"2x\" 2,\"3x\" 3,\"4x\" 4,\"5x\" 5, \"6x\" 6,\"7x\" 7, \"8x\" 8, \"9x\" 9, \"10x\" 10, \"15x\" 15, \"20x\" 20);"`
+                `"set ytics nomirror 0,200;"`
+                `"set arrow from 1,graph(0,0) to 1,graph(1,1) nohead lc rgb \"black\" lw 2;"`
+                `"plot '${logfile2}' using 1:2 with lines lw 2 dt 4 title '${c1t}' smooth cumulative,"`
+                `"     '${logfile4}' using 1:2 with lines lw 2 dt 2 title '${c2t}' smooth cumulative"
 
     echo "\begin{tabular}{|l|l|l|}
 \hline
@@ -235,88 +238,86 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 \end{tabular}
 \end{table}" > "${cum_perf_lattice_tbl}"
 
-    # gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-    #   	   `"enhanced color font 'Verdana,10' ;"`
-    # 	   `"set output '${perf_lattice_slowdown_fig}';"`
-	#        `"set key left;"`
-    # 	   `"set xrange [0:100];"`
-	#        `"set ytics add (\"\" 0, \"1\" 1);"`
-	#        `"set ytics font \", 13\";"`
-	#        `"set xtics font \", 13\";"`
-	#        `"set grid ytics;"`
-    # 	   `"set title \"${printname}\";"`
-    #        `"set ylabel \"Slowdown with respect to Gambit\";"`
-	#        `"set xlabel \"How much of the code is typed\";"`
-    #        `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
-    #        `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+                `"enhanced color font 'Verdana,10' ;"`
+                `"set output '${perf_lattice_slowdown_fig}';"`
+                `"set key left;"`
+                `"set xrange [0:100];"`
+                `"set ytics add (\"\" 0, \"1\" 1);"`
+                `"set ytics font \", 13\";"`
+                `"set xtics font \", 13\";"`
+                `"set grid ytics;"`
+                `"set title \"${printname}\";"`
+                `"set ylabel \"Slowdown with respect to Gambit\";"`
+                `"set xlabel \"How much of the code is typed\";"`
+                `"plot '${logfile1}' using 2:4 with points pointtype 6 lc rgb \"#3182bd\" title '${c1t}',"`
+                `"'${logfile3}' using 2:4 with points pointtype 8 lc rgb \"#fdae6b\" title '${c2t}'"
 
-    # gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
-    #     	   `"enhanced color font 'Verdana,13' ;"`
-    #            `"set output '${perf_lattice_speedup_fig}';"`
-    #            `"set key outside center bottom font \",10\";"`
-    # 	       `"set xrange [-5:105];"`
-    # 	       `"set yrange [0.1:4];"`
-	#            `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
-    # 	       `"set title \"${printname}\";"`
-	#            `"set ylabel \"Speedup over Gambit\";"`
-	#            `"set xlabel \"How much of the code is typed\";"`
-	#            `"plot '${logfile1}' using 2:5 with points pointtype 6 lc rgb \"#0072B2\" title '${c1t}',"`
-    # 	       `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb \"#E69F00\" title '${c2t}',"`
-	#            `"${g1} lw 2 dt 3 lc rgb \"#0072B2\" notitle '${c1t} mean',"`
-	#            `"${g2} lw 2 dt 3 lc rgb \"#E69F00\" notitle '${c2t} mean',"`
-    #            `"1 lw 2 dt 2 lc rgb \"black\" title 'No Gradual Overhead (Gambit Scheme)',"` 
-    #            `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'No Gradual Overhead (Grift STLC)';"
+    gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
+                `"enhanced color font 'Verdana,13' ;"`
+                `"set output '${perf_lattice_speedup_fig}';"`
+                `"set key outside center bottom font \",10\";"`
+                `"set xrange [-5:105];"`
+                `"set yrange [0.1:4];"`
+                `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
+                `"set title \"${printname}\";"`
+                `"set ylabel \"Speedup over Gambit\";"`
+                `"set xlabel \"How much of the code is typed\";"`
+                `"plot '${logfile1}' using 2:5 with points "`
+                `"   pt 6 lc rgb '$color1' title '${c1t}',"`
+                `"'${logfile3}' using 2:5 with points pointtype 8 lc rgb '$color1' title '${c2t}',"`
+                `"${g1} lw 2 dt 3 lc rgb '$color2' notitle '${c1t} mean',"`
+                `"${g2} lw 2 dt 3 lc rgb '$color2' notitle '${c2t} mean',"`
+                `"1 lw 2 dt 2 lc rgb \"black\" title 'No Gradual Overhead (Gambit Scheme)',"` 
+                `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'No Gradual Overhead (Grift STLC)';"
     
     
-     gnuplot -e "set datafile separator \",\";"`
-      	        `"set terminal pngcairo size 1280,960"`
+    gnuplot -e "set datafile separator \",\";"`
+                `"set terminal pngcairo size 1280,960"`
                 `"   noenhanced color font 'Verdana,26' ;"`
                 `"set output '${perf_lattice_log_fig}';"`
-	            `"set key left font 'Verdana,20';"`
-	            `"set logscale y;"`
-    	        `"set xrange [-5:105];"` 
-    	        `"set yrange [${ymin}:${ymax}];"` 
-	            `"set ytics add ('1' 1, '' ${g1}, '' ${g2});"`
+                `"set key left font 'Verdana,20';"`
+                `"set logscale y;"`
+                `"set xrange [-5:105];"` 
+                `"set yrange [${ymin}:${ymax}];"` 
+                `"set ytics add ('1' 1, '' ${g1}, '' ${g2});"`
                 `"set ytics add (${ymin});"` 
                 `"set ytics add (${ymax});"` 
-    	        `"set title \"${printname}\";"`
-	            `"set ylabel \"Speedup over Racket (Log scale)\";"`
-	            `"set xlabel \"How much of the code is typed\";"`
-	            `"plot '${logfile1}' using 2:5 with points"`
+                `"set title \"${printname}\";"`
+                `"set ylabel \"Speedup over Racket (Log scale)\";"`
+                `"set xlabel \"How much of the code is typed\";"`
+                `"plot '${logfile1}' using 2:5 with points"`
                 `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-	            `"${g1} lw 4 dt 2 lc rgb '$color1' title '${c1t} mean',"`
-    	        `"'${logfile3}' using 2:5 with points"`
+                `"${g1} lw 4 dt 2 lc rgb '$color1' title '${c1t} mean',"`
+                `"'${logfile3}' using 2:5 with points"`
                 `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"`
-	            `"${g2} lw 4 dt 4 lc rgb '$color2' title '${c2t} mean',"`
+                `"${g2} lw 4 dt 4 lc rgb '$color2' title '${c2t} mean',"`
                 `"1 lw 2 dt 2 lc rgb \"black\" title 'Racket',"` 
                 `"${static_speed_up} lw 1 dt 2 lc \"black\" title 'Static Grift';"
 
 
-     gnuplot -e "set datafile separator \",\";"`
+    gnuplot -e "set datafile separator \",\";"`
                 `"set terminal pngcairo size 1280,960"`
                 `"   noenhanced color font 'Verdana,26' ;"`
-    	        `"set output '${perf_lattice_lin_fig}';"`
-	            `"set key left font 'Verdana,20';"`
-    	        `"set xrange [-5:105];"`
-    	        `"set yrange [${ymin}:${ymax}];"` 
-	            `"set ytics add ('1' 1, '' ${g1}, '' ${g2});"`
+                `"set output '${perf_lattice_lin_fig}';"`
+                `"set key left font 'Verdana,20';"`
+                `"set xrange [-5:105];"`
+                `"set yrange [${ymin}:${ymax}];"` 
+                `"set ytics add ('1' 1, '' ${g1}, '' ${g2});"`
                 `"set ytics add (${ymin});"` 
                 `"set ytics add (${ymax});"` 
-    	        `"set title \"${printname}\";"`
-	            `"set ylabel \"Speedup over Racket\";"`
-	            `"set xlabel \"How much of the code is typed\";"`
-	            `"plot '${logfile1}' using 2:5 with points"` 
+                `"set title \"${printname}\";"`
+                `"set ylabel \"Speedup over Racket\";"`
+                `"set xlabel \"How much of the code is typed\";"`
+                `"plot '${logfile1}' using 2:5 with points"` 
                 `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-	            `"${g1} lw 4 dt 2 lc rgb '$color1' title '${c1t} mean',"`
-    	        `"'${logfile3}' using 2:5 with points"`
+                `"${g1} lw 4 dt 2 lc rgb '$color1' title '${c1t} mean',"`
+                `"'${logfile3}' using 2:5 with points"`
                 `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"`
-	            `"${g2} lw 4 dt 4 lc rgb '$color2'  title '${c2t} mean',"`
+                `"${g2} lw 4 dt 4 lc rgb '$color2'  title '${c2t} mean',"`
                 `"1 lw 2 dt 4 lc rgb \"black\" title 'Racket',"` 
                 `"${static_speed_up} lw 2 dt 2 lc \"black\" title 'Static Grift';"
 }
-
-##3182bd
-##fdae6b
 
 # $1 - baseline system
 # $2 - first config index
@@ -346,8 +347,8 @@ run_benchmark()
 
     local disk_aux_name="" print_aux_name=""
     if [[ ! -z "${aux_name}" ]]; then
-	    disk_aux_name="_${aux_name}"
-	    print_aux_name=" (${aux_name})"
+        disk_aux_name="_${aux_name}"
+        print_aux_name=" (${aux_name})"
     fi
     
     local print_name="$(echo "$name" | tr _ "-")${print_aux_name}"
@@ -356,33 +357,37 @@ run_benchmark()
     local benchmark_args_file="${TMP_DIR}/${name}${disk_aux_name}.args"
     local input="$(cat ${INPUT_DIR}/${name}/${input_file})"
     if [ -f benchmark_args_file ]; then
-	    local old_input=$(cat "$benchmark_args_file")
+        local old_input=$(cat "$benchmark_args_file")
         if [ ! $old_input == $input ]; then
             echo "input changed mid test" 1>&2
             exit 1
         fi
     else
-	    printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
-	    printf "Args\t\t:%s\n" "$input" >> "$PARAMS_LOG"
-	    echo "$input" > "$benchmark_args_file"
+        printf "Benchmark\t:%s\n" "$name" >> "$PARAMS_LOG"
+        printf "Args\t\t:%s\n" "$input" >> "$PARAMS_LOG"
+        echo "$input" > "$benchmark_args_file"
     fi
 
     local lattice_file="${lattice_path}/out"
 
     if [ -f "$lattice_file" ]; then
-    local dynamizer_out=$(cat "$lattice_file")
+	local dynamizer_out=$(cat "$lattice_file")
     else
-    rm -rf "$lattice_path"
-    rm -f "${lattice_path}.grift"
-    cp "$static_source_file" "${lattice_path}.grift"
+	rm -rf "$lattice_path"
+	rm -f "${lattice_path}.grift"
+	cp "$static_source_file" "${lattice_path}.grift"
 
-	local dynamizer_out=$(dynamizer "${lattice_path}.grift"\
-                                    --samples "$nsamples" --bins "$nbins" | \
-                              sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
-	echo "$dynamizer_out" > "$lattice_file"
+        local dynamizer_out=$(dynamizer "${lattice_path}.grift"\
+					--samples "$nsamples" --bins "$nbins" | \
+				  sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+        echo "$dynamizer_out" > "$lattice_file"
     fi
 
-    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" -s "$c1 $c2" "${lattice_path}/"
+    if [ "$CAST_PROFILER" = true ] ; then
+        racket "${GRIFT_DIR}/benchmark/benchmark.rkt" --cast-profiler -s "$c1 $c2" "${lattice_path}/"
+    else
+        racket "${GRIFT_DIR}/benchmark/benchmark.rkt" -s "$c1 $c2" "${lattice_path}/"
+    fi
     dynamizer_out=$(cat "$lattice_file")
 
     
@@ -405,7 +410,7 @@ run_benchmark()
     
     gen_output $baseline_system $c1 $c2 "$lattice_path" "$input_file"\
                "$dynamizer_out" "$print_name" "$disk_aux_name" "$ymin" "$ymax" \
-              
+               
 }
 
 # $1 - baseline system
@@ -536,9 +541,6 @@ run_experiment()
                   "$tak_ymin" "$tak_ymax"
     g+=($RETURN)
 
-    # Ray
-    # # Dynamizer uses too much memory
-    # #run_benchmark $baseline_system $c1 $c2 "ray" "" "$nsamples" "$nbins" ""
     local ray_yminf="${DATA_DIR}/ray_ymin_${c1}_${c2}.txt"
     local ray_ymin=""
     if [ -f $ray_yminf ]; then
@@ -567,8 +569,8 @@ main()
 {
     USAGE="Usage: $0 nsamples nbins loops [fresh|date] n_1,n_2 ... n_n"
     if [ "$#" == "0" ]; then
-	echo "$USAGE"
-	exit 1
+        echo "$USAGE"
+        exit 1
     fi
     local nsamples="$1"; shift
     local nbins="$1"; shift
@@ -588,11 +590,11 @@ main()
             mkdir -p "$LB_DIR/$DATE"
         fi
     else
-	    declare -r DATE="$date"
-	    if [ ! -d "$LB_DIR/$DATE" ]; then
-	        echo "$LB_DIR/$DATE" "Directory not found"
-	        exit 1
-	    fi
+        declare -r DATE="$date"
+        if [ ! -d "$LB_DIR/$DATE" ]; then
+            echo "$LB_DIR/$DATE" "Directory not found"
+            exit 1
+        fi
     fi
     
     declare -r EXP_DIR="$LB_DIR/$DATE"
@@ -611,8 +613,8 @@ main()
         echo "directory not found: $TEST_DIR" 1>&2
         exit 1
     elif [ ! -d $EXP_DIR ]; then
-	    echo "Directory not found: $EXP_DIR"
-	    exit 1
+        echo "Directory not found: $EXP_DIR"
+        exit 1
     elif [ ! -d $SRC_DIR ]; then
         echo "directory not found: $SRC_DIR" 1>&2
         exit 1
@@ -645,57 +647,57 @@ main()
     
     
     if [ ! -d $TMP_DIR ]; then
-	# copying the benchmarks to a temporary directory
-	cp -r ${SRC_DIR} $TMP_DIR
-    mkdir -p "$TMP_DIR/partial"
-    
-	# logging
-	printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
-	MYEMAIL="`id -un`@`hostname -f`"
-	printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
-	grift_ver=$(git rev-parse HEAD)
-	printf "Grift ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
-	clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-	printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
-	gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
-	printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
-	racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
-	printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
-	chezscheme_ver=$(scheme --version 2>&1)
-	printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
-	printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
-	printf "nsamples\t:%s\n" "$nsamples" >> "$PARAMS_LOG"
-	printf "nbins\t:%s\n" "$nbins" >> "$PARAMS_LOG"
+        # copying the benchmarks to a temporary directory
+        cp -r ${SRC_DIR} $TMP_DIR
+	mkdir -p "$TMP_DIR/partial"
+	
+        # logging
+        printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
+        MYEMAIL="`id -un`@`hostname -f`"
+        printf "Machine\t\t:%s\n" "$MYEMAIL" >> "$PARAMS_LOG"
+        grift_ver=$(git rev-parse HEAD)
+        printf "Grift ver.\t:%s\n" "$grift_ver" >> "$PARAMS_LOG"
+        clang_ver=$(clang --version | sed -n 's/clang version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+        printf "Clang ver.\t:%s\n" "$clang_ver" >> "$PARAMS_LOG"
+        gambit_ver=$(gsc -v | sed -n 's/v\([0-9]*.[0-9]*.[0-9]*\) .*/\1/p;q')
+        printf "Gambit ver.\t:%s\n" "$gambit_ver" >> "$PARAMS_LOG"
+        racket_ver=$(racket -v | sed -n 's/.* v\([0-9]*.[0-9]*\).*/\1/p;q')
+        printf "Racket ver.\t:%s\n" "$racket_ver" >> "$PARAMS_LOG"
+        chezscheme_ver=$(scheme --version 2>&1)
+        printf "ChezScheme ver.\t:%s\n" "$chezscheme_ver" >> "$PARAMS_LOG"
+        printf "loops:\t\t:%s\n" "$LOOPS" >> "$PARAMS_LOG"
+        printf "nsamples\t:%s\n" "$nsamples" >> "$PARAMS_LOG"
+        printf "nbins\t:%s\n" "$nbins" >> "$PARAMS_LOG"
     fi
     
 
     local i j
     if [ "$#" == "1" ]; then
-	local config="$1";   shift
-	for i in `seq ${config}`; do
-	    for j in `seq ${i} ${config}`; do
-		if [ ! $i -eq $j ]; then
-		    run_experiment $baseline_system $i $j $nsamples $nbins
-		fi
-	    done
-	done
+        local config="$1";   shift
+        for i in `seq ${config}`; do
+            for j in `seq ${i} ${config}`; do
+                if [ ! $i -eq $j ]; then
+                    run_experiment $baseline_system $i $j $nsamples $nbins
+                fi
+            done
+        done
     else
-	while (( "$#" )); do
-	    i=$1; shift
-	    j=$1; shift
-	    run_experiment $baseline_system $i $j $nsamples $nbins
-	done
+        while (( "$#" )); do
+            i=$1; shift
+            j=$1; shift
+            run_experiment $baseline_system $i $j $nsamples $nbins
+        done
     fi
 
     racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
-        --si 2 \
-        -o ${OUT_DIR}/gm-total.csv 
+           --si 2 \
+           -o ${OUT_DIR}/gm-total.csv 
     racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
-        --si 2 --su 0 \
-        -o ${OUT_DIR}/gm-benchmart.csv
+           --si 2 --su 0 \
+           -o ${OUT_DIR}/gm-benchmart.csv
     racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
-        --si 2 --su 1 \
-        -o ${OUT_DIR}/gm-config.csv
+           --si 2 --su 1 \
+           -o ${OUT_DIR}/gm-config.csv
     
     
     echo "done."
