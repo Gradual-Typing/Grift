@@ -22,6 +22,7 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
             [uncasted-ids (box '())]
             [casts-ids (box '())]
             [uses-ids (box '())]
+            [ls (syntax->list #'(name ...))]
             [fmt
             (lambda (f b)
               (lambda (x)
@@ -30,21 +31,54 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
                   (set-box! b (cons var-str (unbox b)))
                   (cons (format-id stx f x) var-str))))])
        (with-syntax ([((single-use-name . single-use-val) ...)
-                      (map (fmt "single-~a-proxies-accessed" single-ids) (syntax->list #'(name ...)))]
+                      (map (fmt "single-~a-proxies-accessed" single-ids) ls)]
                      [((max-use-name . max-use-val) ...)
-                      (map (fmt "max-~a-proxies-accessed" max-ids) (syntax->list #'(name ...)))]
+                      (map (fmt "max-~a-proxies-accessed" max-ids) ls)]
                      [((total-use-name . total-use-val) ...)
-                      (map (fmt "total-~a-proxies-accessed" total-ids) (syntax->list #'(name ...)))]
+                      (map (fmt "total-~a-proxies-accessed" total-ids) ls)]
                      [((value-use-name . value-use-val) ...)
-                      (map (fmt "uncasted-~a-values" uncasted-ids) (syntax->list #'(name ...)))]
+                      (map (fmt "uncasted-~a-values" uncasted-ids) ls)]
                      [((casts-name . casts-val) ...)
-                      (map (fmt "~a-casts" casts-ids) (syntax->list #'(name ...)))]
+                      (map (fmt "~a-casts" casts-ids) ls)]
                      [((uses-name . uses-val) ...)
-                      (map (fmt "~a-uses" uses-ids) (syntax->list #'(name ...)))]
-                     [external-c-decl* (format-id stx "~a" "cast-profiler/external-c-decl*")])
-         (define decl* (string-append "int64_t " (string-join (unbox ids) ", ") ";\n"))
+                      (map (fmt "~a-uses" uses-ids) ls)]
+                     [external-c-decl*
+                      (format-id stx "~a" "cast-profiler/external-c-decl*")])
+         (define decl*
+           (string-append "int64_t " (string-join (unbox ids) ", ") ";\n"))
          (define r-total-ids (reverse (unbox total-ids)))
          (define r-uses-ids (reverse (unbox uses-ids)))
+
+         (define (build-results-str call width sep)
+           (define w (number->string width))
+           (string-append
+            "  " call "\"                               %" w "s" sep
+            "%" w "s" sep "%" w "s" sep "%" w "s\\n\","
+            (string-join (map (lambda (x)
+                                (string-append "\"" (symbol->string x) "\""))
+                              (map syntax-e ls)) ", ") ");\n"
+            "  " call "\"total values allocated:        " sep "%" w "\"PRId64\""
+            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
+            "\\n\"," (string-join (reverse (unbox uncasted-ids)) ", ") ");\n"
+            "  " call "\"total casts:                   " sep "%" w "\"PRId64\""
+            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
+            "\\n\"," (string-join (reverse (unbox casts-ids)) ", ") ");\n"
+            "  " call "\"longest proxy chain:           " sep "%" w "\"PRId64\""
+            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
+            "\\n\"," (string-join (reverse (unbox max-ids)) ", ") ");\n"
+            "  " call "\"total proxies accessed:        " sep "%" w "\"PRId64\""
+            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
+            "\\n\"," (string-join r-total-ids ", ") ");\n"
+            "  " call "\"total uses:                    " sep "%" w "\"PRId64\""
+            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
+            "\\n\"," (string-join r-uses-ids ", ") ");\n"
+            "  " call "\"proxies accesses / value uses: " sep "%" w ".2f" sep
+            "%" w ".2f" sep "%" w ".2f" sep "%" w ".2f\\n\","
+            (string-join (map (lambda (x y)
+                                (string-append
+                                 y " == 0 ? 0 : (float)" x "/(float)" y))
+                              r-total-ids r-uses-ids) ", ") ");\n"))
+         
          (create-cast-profiler.h
           (lambda (in)
             (displayln
@@ -57,6 +91,7 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
                            "\n")
               decl* "\n"
               "void print_cast_profiler_results();\n"
+              "void write_cast_profiler_results_file(char*);\n"
               "#endif")
              in)))
          (create-cast-profiler.c
@@ -64,33 +99,45 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
             (displayln
              (string-append
               (string-join (list
-                            "#include <stdint.h>"
                             "#include <inttypes.h>"
+                            "#include <libgen.h>"
+                            "#include <stdint.h>"
                             "#include <stdio.h>"
+                            "#include <stdlib.h>"
+                            "#include <string.h>"
+                            "#include <unistd.h>"
                             "#include \"castprofiler.h\""
                             "\n\n")
                            "\n")
+
               "int64_t " (string-join (unbox ids) " = 0;\nint64_t ") " = 0;\n\n"
+
               "void print_cast_profiler_results() {\n"
-              "  printf(\"------------------------------Cast Profiler------------------------------\\n\");\n"
-              "  printf(\"                               %-12s%-12s%-12s%-12s\\n\","
-              (string-join (map (lambda (x) (string-append "\"" (symbol->string x) "\""))
-                                (map syntax-e (syntax->list #'(name ...)))) ", ") ");\n"
-              ;; "  printf(\"                               functions   vectors     refs        tuples\\n\");\n"
-              "  printf(\"total values allocated:        %-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"\\n\","
-              (string-join (reverse (unbox uncasted-ids)) ", ") ");\n"
-              "  printf(\"total casts:                   %-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"\\n\","
-              (string-join (reverse (unbox casts-ids)) ", ") ");\n"
-              "  printf(\"longest proxy chain:           %-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"\\n\","
-              (string-join (reverse (unbox max-ids)) ", ") ");\n"
-              "  printf(\"total proxies accessed:        %-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"\\n\","
-              (string-join r-total-ids ", ") ");\n"
-              "  printf(\"total uses:                    %-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"%-12\"PRId64\"\\n\","
-              (string-join r-uses-ids ", ") ");\n"
-              "  printf(\"proxies accesses / value uses: %-12.2f%-12.2f%-12.2f%-12.2f\\n\","
-              (string-join (map (lambda (x y) (string-append y " == 0 ? 0 : (float)" x "/(float)" y))
-                                r-total-ids r-uses-ids) ", ") ");\n"
-              "}")
+              "  printf(\"------------------------------Cast Profiler----------"
+              "--------------------\\n\");\n"
+              (build-results-str "printf(" -12 "")
+              "}\n\n"
+
+              "void write_cast_profiler_results_file(char* f) {\n"
+              "  char* file_name;\n"
+              "  char cwd[1024];\n"
+              "  if (getcwd(cwd, sizeof(cwd)) == NULL)\n"
+              "    fprintf(stderr,\"castprofiler.c/write_cast_profiler_results_"
+              "file: getcwd failed!\\n\");\n"
+              "  if((file_name = malloc(strlen(f)+strlen(cwd)+1+5+1)) != NULL) {\n"
+              "    file_name[0] = '\0';\n"
+              "    strcat(file_name, cwd);\n"
+              "    strcat(file_name, \"/\");\n"
+              "    strcat(file_name, basename(f));\n"
+              "    strcat(file_name, \".prof\");\n  } else {\n"
+              "    fprintf(stderr,\"castprofiler.c/write_cast_profiler_results_"
+              "file: malloc failed!\\n\");\n  }"
+              "  FILE *h = fopen(file_name, \"w\");\n"
+              "  if (h == NULL) {\n    printf(\"Error writing cast profiler "
+              "results to disk!\\n\");\n    exit(1);\n  }\n"
+              (build-results-str "fprintf(h, " 1 ",")
+              "  fclose(h);\n}"
+              )
              in)))
          #`(begin
              (define single-use-name single-use-val) ...

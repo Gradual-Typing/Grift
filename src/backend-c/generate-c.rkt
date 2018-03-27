@@ -140,7 +140,8 @@
 
 (define (print-cast-profile-result)
   (when (cast-profiler?)
-      (display "print_cast_profiler_results();")))
+    (display "print_cast_profiler_results();\n")
+    (display "write_cast_profiler_results_file(argv[0]);")))
 
 (: emit-boiler-plate (-> Void))
 (define (emit-boiler-plate)
@@ -183,7 +184,7 @@
 (define (emit-main b)
   (display "\n//Obviously this is the main function\n")
   (match-let ([(Locals local-var* tail) b])
-    (emit-function-prototype "int" "main" '())
+    (display "int main(int argc, char** argv)")
     (let ([local-var* (map uid->string local-var*)])
       (display "{\n")
       (display-seq local-var* "" (string-append IMDT-C-TYPE " ") "" ";\n" "")
