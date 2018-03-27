@@ -55,7 +55,7 @@
 (define hybrid-cast/coercion-runtime? : (Parameterof Boolean)
   (make-parameter #f))
 (define cast-profiler? : (Parameterof Boolean)
-  (make-parameter #t))
+  (make-parameter #f))
 
 
 
