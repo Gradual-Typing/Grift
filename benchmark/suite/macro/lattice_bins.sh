@@ -142,10 +142,9 @@ gen_output()
     perf_lattice_slowdown_fig="${OUT_DIR}/perflattice/slowdown/${disk_name}.png"
     perf_lattice_speedup_fig="${OUT_DIR}/perflattice/speedup/${disk_name}.png"
     perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}_log.png"
-    perf_lattice_lin_fig="${OUT_DIR}/perflattice/log/${disk_name}_lin.png"
+    perf_lattice_lin_fig="${OUT_DIR}/perflattice/linear/${disk_name}_lin.png"
     
 
-    # if [[ ! -f "$cum_perf_lattice_slowdown_fig" || ! -f "$cum_perf_lattice_tbl" || ! -f "$perf_lattice_slowdown_fig" ]]; then
     rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_slowdown_fig"
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${c1}.log"
     local logfile2="${DATA_DIR}/${name}${disk_aux_name}${c1}.csv"
@@ -164,7 +163,6 @@ gen_output()
     run_config $baseline_system "$c2" "$path" "$input_file" "$disk_aux_name"
     local n="$RETURN"
 
-    # Should this really be geometric mean?
     speedup_geometric_mean "$logfile1"
     g1="$RETURN"
     speedup_geometric_mean "$logfile3"
@@ -241,7 +239,7 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
                 `"enhanced color font 'Verdana,10' ;"`
                 `"set output '${perf_lattice_slowdown_fig}';"`
-                `"set key left;"`
+                `"set key left font \"Verdana,20\";"`
                 `"set xrange [0:100];"`
                 `"set ytics add (\"\" 0, \"1\" 1);"`
                 `"set ytics font \", 13\";"`
@@ -256,7 +254,7 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
     gnuplot -e "set datafile separator \",\"; set terminal pngcairo "`
                 `"enhanced color font 'Verdana,13' ;"`
                 `"set output '${perf_lattice_speedup_fig}';"`
-                `"set key outside center bottom font \",10\";"`
+                `"set key left font \"Verdana,20\";"`
                 `"set xrange [-5:105];"`
                 `"set yrange [0.1:4];"`
                 `"set ytics add (\"1\" 1, \"\" ${g1}, \"\" ${g2});"`
@@ -369,26 +367,20 @@ run_benchmark()
     fi
 
     local lattice_file="${lattice_path}/out"
+    local dynamizer_out=""
 
     if [ -f "$lattice_file" ]; then
-	local dynamizer_out=$(cat "$lattice_file")
+        dynamizer_out=$(cat "$lattice_file")
     else
 	rm -rf "$lattice_path"
 	rm -f "${lattice_path}.grift"
 	cp "$static_source_file" "${lattice_path}.grift"
 
-        local dynamizer_out=$(dynamizer "${lattice_path}.grift"\
-					--samples "$nsamples" --bins "$nbins" | \
-				  sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+        dynamizer_out=$(dynamizer "${lattice_path}.grift"\
+                                        --samples "$nsamples" --bins "$nbins" | \
+                                  sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
         echo "$dynamizer_out" > "$lattice_file"
     fi
-
-    if [ "$CAST_PROFILER" = true ] ; then
-        racket "${GRIFT_DIR}/benchmark/benchmark.rkt" --cast-profiler -s "$c1 $c2" "${lattice_path}/"
-    else
-        racket "${GRIFT_DIR}/benchmark/benchmark.rkt" -s "$c1 $c2" "${lattice_path}/"
-    fi
-    dynamizer_out=$(cat "$lattice_file")
 
     
     # check for/create/annotate 100% and 0%
@@ -405,12 +397,16 @@ run_benchmark()
         echo "0% created"
     fi
     
-    racket "${GRIFT_DIR}/benchmark/benchmark.rkt" \
-           -s "$c1 $c2" "${lattice_path}/"
-    
+    if [ "$CAST_PROFILER" = true ] ; then
+        racket "${GRIFT_DIR}/benchmark/benchmark.rkt" --cast-profiler \
+               -s "$c1 $c2" "${lattice_path}/"
+    else
+        racket "${GRIFT_DIR}/benchmark/benchmark.rkt"\
+               -s "$c1 $c2" "${lattice_path}/"
+    fi
+
     gen_output $baseline_system $c1 $c2 "$lattice_path" "$input_file"\
-               "$dynamizer_out" "$print_name" "$disk_aux_name" "$ymin" "$ymax" \
-               
+               "$dynamizer_out" "$print_name" "$disk_aux_name" "$ymin" "$ymax"
 }
 
 # $1 - baseline system
@@ -635,6 +631,7 @@ main()
     mkdir -p "$OUT_DIR/perflattice/slowdown"
     mkdir -p "$OUT_DIR/perflattice/speedup"
     mkdir -p "$OUT_DIR/perflattice/log"
+    mkdir -p "$OUT_DIR/perflattice/linear"
     rm -f $GMEANS 
     touch $GMEANS
 
