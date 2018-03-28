@@ -125,7 +125,7 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
               "    fprintf(stderr,\"castprofiler.c/write_cast_profiler_results_"
               "file: getcwd failed!\\n\");\n"
               "  if((file_name = malloc(strlen(f)+strlen(cwd)+1+5+1)) != NULL) {\n"
-              "    file_name[0] = '\0';\n"
+              "    file_name[0] = '\\0';\n"
               "    strcat(file_name, cwd);\n"
               "    strcat(file_name, \"/\");\n"
               "    strcat(file_name, basename(f));\n"
