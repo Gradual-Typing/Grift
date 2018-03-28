@@ -30,21 +30,19 @@
       [_ (error 'benchmark/guarded-compile
                 "invalid specialization: ~a"
                 specialize)]))
-  (define exe
-    (path-replace-extension
-     src
-     (string-append ".o" (number->string i))))
+  (define ext (string-append ".o" (number->string i)))
+  (define exe (path-replace-extension src ext))
   (parameterize ([specialize-cast-code-generation? specialize-casts?]
                  [hybrid-cast/coercion-runtime? hybrid-runtime?])
     (unless (file-exists? exe)
       (printf "~a\n" exe)
-      (compile src #:output exe #:cast cast #:ref ref)))
+      (if (cast-profiler?)
+          (let ([exe.prof (path-replace-extension src (string-append ext ".prof.o"))])
+            (compile src #:output exe.prof #:cast cast #:ref ref)
+            (parameterize ([cast-profiler? #f])
+              (compile src #:output exe #:cast cast #:ref ref)))
+          (compile src #:output exe #:cast cast #:ref ref))))
   exe)
-
-#;
-(define configs
-  (call-with-input-file "benchmark/configs.dat"
-    (lambda (in) (read in))))
 
 (define (compile-file f cs)
   (for ([i (in-list cs)]) 
@@ -54,13 +52,6 @@
   ;; The directory should exist if we are going to compile it
   (unless (directory-exists? compile-dir)
     (error 'compile-directory-all-configs "no such directory ~a" compile-dir))
-
-  ;; ;; if the output path exists make sure it is a directory
-  ;; ;; otherwise make the output directory.
-  ;; (cond
-  ;;   [(file-exists? c-dir)
-  ;;    (error 'compiler-directory "not a directory ~a" compile-dir)]
-  ;;   [(not (directory-exists? c-dir)) (make-directory c-dir)])
 
   ;; We are currently only supporting .grift files
   (define (grift-file? path-searched)
@@ -94,6 +85,9 @@
     (define n? (string->number i))
     ;; compile-file checks for valid indices
     (config-indices (list n?))]
+   [("--cast-profiler")
+    "Compile benchmarks with the cast-profiler enabled and then with the cast profiler disabled"
+    (cast-profiler? #t)]
    #:args (path)
    (cond
      [(string->path path)

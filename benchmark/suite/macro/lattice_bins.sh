@@ -28,6 +28,7 @@ run_config()
     local name=$(basename "$path")
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${i}.log"
     local logfile2="${DATA_DIR}/${name}${disk_aux_name}${i}.csv"
+    local logfile3="${DATA_DIR}/${name}${disk_aux_name}${i}_profiles.csv"
     local cache_file="${TMP_DIR}/static/${name}${disk_aux_name}${i}.cache"
     local bs=$(find "$path" -name "*.o$i")
     if [ -f $cache_file ]; then
@@ -36,20 +37,21 @@ run_config()
         local n=0 b
         $baseline_system "$name" "$input_file" "$disk_aux_name"
         local baseline="$RETURN"
-        echo "name,precision,time,slowdown,speedup" > "$logfile1"
+        if [ "$CAST_PROFILER" = true ]; then
+            echo "name,precision,time,slowdown,speedup,total values allocated,"\
+                 "total casts,longest proxy chain,total proxies accessed,total uses"\
+                 > "$logfile1"
+        else
+            echo "name,precision,time,slowdown,speedup" > "$logfile1"
+        fi
         for b in $(find "$path" -name "*.o$i"); do
             let n=n+1
             local binpath="${b%.*}"
             local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' \
                           < "${binpath}.grift")
             local bname="$(basename $b)"
-            echo $b
             local input="${INPUT_DIR}/${name}/${input_file}"
             
-            if [ "$CAST_PROFILER" = true ] ; then
-                # run the cast profiler
-                eval "cat ${input} | ${b}.prof"
-            fi
             avg "$b" "$input"\
                 "static" "${OUTPUT_DIR}/static/${name}/${input_file}"\
                 "${b}.runtimes"
@@ -61,8 +63,24 @@ run_config()
                                  bc -l | \
                                  awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
             echo $n $b $speedup
-            printf "%s,%.2f,%.${PRECISION}f,%.${PRECISION}f,%.${PRECISION}f\n" \
-                   $bname $p $t $slowdown $speedup >> $logfile1
+            printf "%s,%.2f,%.${PRECISION}f,%.${PRECISION}f,%.${PRECISION}f" \
+                   $bname $p $t $slowdown $speedup >> "$logfile1"
+
+            if [ "$CAST_PROFILER" = true ] ; then
+                # run the cast profiler
+                eval "cat ${input} | ${b}.prof.o" > /dev/null 2>&1
+                mv "$bname.prof.o.prof" "${b}.prof"
+                printf "," >> "$logfile1"
+                # ignore first and last rows and sum the values across all
+                # columns in the profile into one column and transpose it into
+                # a row
+                sed '1d;$d' "${b}.prof" | awk -F, '{print $2+$3+$4+$5}'\
+                    | paste -sd "," - >> "$logfile1"
+                # ignore the first row and the first column and stitsh together
+                # all rows into one row
+                cat "${b}.prof" | sed -n '1!p' | awk -F, '{print $2","$3","$4","$5}'\
+                    | paste -sd "," - >> "$logfile3"
+            fi
         done
         cut -d, -f4 "$logfile1" | \
             sed -n '1!p' | \
@@ -143,6 +161,7 @@ gen_output()
     perf_lattice_speedup_fig="${OUT_DIR}/perflattice/speedup/${disk_name}.png"
     perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}_log.png"
     perf_lattice_lin_fig="${OUT_DIR}/perflattice/linear/${disk_name}_lin.png"
+    rt_vs_proxy_accesses_fig="${OUT_DIR}/casts/plot/${disk_name}.png"
     
 
     rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_slowdown_fig"
@@ -315,6 +334,21 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
                 `"${g2} lw 4 dt 4 lc rgb '$color2'  title '${c2t} mean',"`
                 `"1 lw 2 dt 4 lc rgb \"black\" title 'Racket',"` 
                 `"${static_speed_up} lw 2 dt 2 lc \"black\" title 'Static Grift';"
+
+    if [ "$CAST_PROFILER" = true ]; then
+        gnuplot -e "set datafile separator \",\";"`
+                `"set terminal pngcairo size 1280,960"`
+                `"   noenhanced color font 'Verdana,26' ;"`
+                `"set output '${rt_vs_proxy_accesses_fig}';"`
+                `"set key left font 'Verdana,20';"`
+                `"set title \"${printname}\";"`
+                `"set xlabel \"Number of proxy accesses\";"`
+                `"set ylabel \"Speedup over Racket\";"`
+                `"plot '${logfile1}' using 5:9 with points"` 
+                `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
+                `"'${logfile3}' using 5:9 with points"`
+                `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"
+    fi         
 }
 
 # $1 - baseline system
@@ -372,13 +406,13 @@ run_benchmark()
     if [ -f "$lattice_file" ]; then
         dynamizer_out=$(cat "$lattice_file")
     else
-	rm -rf "$lattice_path"
-	rm -f "${lattice_path}.grift"
-	cp "$static_source_file" "${lattice_path}.grift"
+        rm -rf "$lattice_path"
+        rm -f "${lattice_path}.grift"
+        cp "$static_source_file" "${lattice_path}.grift"
 
         dynamizer_out=$(dynamizer "${lattice_path}.grift"\
-                                        --samples "$nsamples" --bins "$nbins" | \
-                                  sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+                                  --samples "$nsamples" --bins "$nbins" | \
+                            sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
         echo "$dynamizer_out" > "$lattice_file"
     fi
 
@@ -563,14 +597,15 @@ run_experiment()
 
 main()
 {
-    USAGE="Usage: $0 nsamples nbins loops [fresh|date] n_1,n_2 ... n_n"
+    USAGE="Usage: $0 nsamples nbins loops cast_profiler? [fresh|date] n_1,n_2 ... n_n"
     if [ "$#" == "0" ]; then
         echo "$USAGE"
         exit 1
     fi
     local nsamples="$1"; shift
-    local nbins="$1"; shift
+    local nbins="$1";    shift
     LOOPS="$1";          shift
+    CAST_PROFILER="$1";  shift
     local date="$1";     shift
     
     GRIFT_DIR=${GRIFT_DIR:=`pwd`/../../..}
@@ -632,6 +667,7 @@ main()
     mkdir -p "$OUT_DIR/perflattice/speedup"
     mkdir -p "$OUT_DIR/perflattice/log"
     mkdir -p "$OUT_DIR/perflattice/linear"
+    mkdir -p "$OUT_DIR/casts/plot"
     rm -f $GMEANS 
     touch $GMEANS
 
@@ -646,8 +682,8 @@ main()
     if [ ! -d $TMP_DIR ]; then
         # copying the benchmarks to a temporary directory
         cp -r ${SRC_DIR} $TMP_DIR
-	mkdir -p "$TMP_DIR/partial"
-	
+        mkdir -p "$TMP_DIR/partial"
+        
         # logging
         printf "Date\t\t:%s\n" "$DATE" >> "$PARAMS_LOG"
         MYEMAIL="`id -un`@`hostname -f`"
