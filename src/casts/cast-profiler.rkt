@@ -15,14 +15,16 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
 (define-syntax (define-counters stx)
   (syntax-case stx ()
     [(_ name ...)
-     (let* ([ids (box '())]
-            [single-ids (box '())]
+     (let* ([single-ids (box '())]
             [max-ids (box '())]
             [total-ids (box '())]
             [uncasted-ids (box '())]
             [casts-ids (box '())]
             [uses-ids (box '())]
             [ls (syntax->list #'(name ...))]
+            [projects-casts-str "projects_casts"]
+            [injects-casts-str "injects_casts"]
+            [ids (box `(,projects-casts-str ,injects-casts-str))]
             [fmt
             (lambda (f b)
               (lambda (x)
@@ -43,42 +45,89 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
                      [((uses-name . uses-val) ...)
                       (map (fmt "~a-uses" uses-ids) ls)]
                      [external-c-decl*
-                      (format-id stx "~a" "cast-profiler/external-c-decl*")])
+                      (format-id stx "~a" "cast-profiler/external-c-decl*")]
+                     [projects-casts-id (format-id stx "~a" "projects-casts")]
+                     [injects-casts-id (format-id stx "~a" "injects-casts")])
          (define decl*
            (string-append "int64_t " (string-join (unbox ids) ", ") ";\n"))
          (define r-total-ids (reverse (unbox total-ids)))
          (define r-uses-ids (reverse (unbox uses-ids)))
 
          (define (build-results-str call width sep)
+           (define dw "30")
            (define w (number->string width))
+           (define (build-printf-str desc-str expr*)
+             (define printf-format-str (box '()))
+             (define printf-args (box (list (string-append "\"" desc-str "\""))))
+             (define (format-expr x)
+               (define (arg-formatter x) (string-append "%" w x))
+               (let ([expr (car x)] [t (cdr x)])
+                 (match t
+                   ;; a 64-bit integer expression 
+                   ['int64
+                    (begin
+                      (set-box!
+                       printf-format-str (cons (arg-formatter "\"PRId64\"")
+                                               (unbox printf-format-str)))
+                      (set-box! printf-args (cons expr (unbox printf-args))))]
+                   ;; a string literal
+                   ['string
+                    (begin
+                      (set-box!
+                       printf-format-str (cons (arg-formatter "s")
+                                               (unbox printf-format-str)))
+                      (set-box! printf-args
+                                (cons (string-append "\"" expr "\"")
+                                      (unbox printf-args))))]
+                   ;; a float expression
+                   ['float
+                    (begin
+                      (set-box!
+                       printf-format-str (cons (arg-formatter ".5f")
+                                               (unbox printf-format-str)))
+                      (set-box! printf-args (cons expr (unbox printf-args))))])))
+             
+             (for-each format-expr expr*)
+             (string-append
+              call "\"%" dw "s " sep
+              (string-join (reverse (unbox printf-format-str)) sep) "\\n\", "
+              (string-join (reverse (unbox printf-args)) ", ") ");\n"))
+           (define na (cons "N/A" 'string))
+           (define (tag-int64 l)
+             (map (lambda (x) (cons x 'int64)) l))
            (string-append
-            "  " call "\"                               %" w "s" sep
-            "%" w "s" sep "%" w "s" sep "%" w "s\\n\","
-            (string-join (map (lambda (x)
-                                (string-append "\"" (symbol->string x) "\""))
-                              (map syntax-e ls)) ", ") ");\n"
-            "  " call "\"total values allocated:        " sep "%" w "\"PRId64\""
-            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
-            "\\n\"," (string-join (reverse (unbox uncasted-ids)) ", ") ");\n"
-            "  " call "\"total casts:                   " sep "%" w "\"PRId64\""
-            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
-            "\\n\"," (string-join (reverse (unbox casts-ids)) ", ") ");\n"
-            "  " call "\"longest proxy chain:           " sep "%" w "\"PRId64\""
-            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
-            "\\n\"," (string-join (reverse (unbox max-ids)) ", ") ");\n"
-            "  " call "\"total proxies accessed:        " sep "%" w "\"PRId64\""
-            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
-            "\\n\"," (string-join r-total-ids ", ") ");\n"
-            "  " call "\"total uses:                    " sep "%" w "\"PRId64\""
-            sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\"" sep "%" w "\"PRId64\""
-            "\\n\"," (string-join r-uses-ids ", ") ");\n"
-            "  " call "\"proxies accesses / value uses: " sep "%" w ".2f" sep
-            "%" w ".2f" sep "%" w ".2f" sep "%" w ".2f\\n\","
-            (string-join (map (lambda (x y)
-                                (string-append
-                                 y " == 0 ? 0 : (float)" x "/(float)" y))
-                              r-total-ids r-uses-ids) ", ") ");\n"))
-         
+            "  "
+            (string-join
+             (list
+              (build-printf-str "types"
+                                (map (lambda (x) (cons x 'string))
+                                     (append (map symbol->string
+                                                  (map syntax-e ls))
+                                             (list "injects" "projects"))))
+              (build-printf-str "total values allocated:"
+                                (append (tag-int64 (reverse (unbox uncasted-ids)))
+                                        (list na na)))
+              (build-printf-str "total casts:"
+                                (tag-int64 (append (reverse (unbox casts-ids))
+                                                   (list injects-casts-str
+                                                         projects-casts-str))))
+              (build-printf-str "longest proxy chain:"
+                                (append (tag-int64 (reverse (unbox max-ids)))
+                                        (list na na)))
+              (build-printf-str "total proxies accessed:"
+                                (append (tag-int64 r-total-ids) (list na na)))
+              (build-printf-str "total uses:"
+                                (append (tag-int64 r-uses-ids) (list na na)))
+              (build-printf-str "proxies accesses / value uses:"
+                                (append (map (lambda (x) (cons x 'float))
+                                             (map (lambda (x y)
+                                                    (string-append
+                                                     y " == 0 ? 0 : (float)" x
+                                                     "/(float)" y))
+                                                  r-total-ids r-uses-ids))
+                                        (list na na))))
+             "  ")))
+
          (create-cast-profiler.h
           (lambda (in)
             (displayln
@@ -113,8 +162,8 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
               "int64_t " (string-join (unbox ids) " = 0;\nint64_t ") " = 0;\n\n"
 
               "void print_cast_profiler_results() {\n"
-              "  printf(\"------------------------------Cast Profiler----------"
-              "--------------------\\n\");\n"
+              "  printf(\"-------------------------------------------"
+              "Cast Profiler-------------------------------------------\\n\");\n"
               (build-results-str "printf(" -12 "")
               "}\n\n"
 
@@ -136,7 +185,7 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
               "  if (h == NULL) {\n    printf(\"Error writing cast profiler "
               "results to disk!\\n\");\n    exit(1);\n  }\n"
               (build-results-str "fprintf(h, " 1 ",")
-              "  fclose(h);\n}"
+              "  fclose(h);\nfree(file_name);\n}"
               )
              in)))
          #`(begin
@@ -146,6 +195,8 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
              (define value-use-name value-use-val) ...
              (define casts-name casts-val) ...
              (define uses-name uses-val) ...
+             (define projects-casts-id #,projects-casts-str)
+             (define injects-casts-id #,injects-casts-str)
              (define external-c-decl* (string-append "extern " #,decl*))
              )))]))
 
@@ -190,6 +241,12 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
                (Assign v (op$ + (Global v) (Quote 1))) ...
                e)
              e))]))
+
+(define-syntax-rule (cast-profile/inc-injects-casts$ e)
+  (cast-profile/inc-counter$ injects-casts e))
+
+(define-syntax-rule (cast-profile/inc-projects-casts$ e)
+  (cast-profile/inc-counter$ projects-casts e))
 
 (define-syntax-rule (cast-profile/inc-function-casts$ e)
   (cast-profile/inc-counter$ function-casts e))
