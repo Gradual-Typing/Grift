@@ -1308,23 +1308,24 @@ TODO write unit tests
   (: compile-project Project-Type)
   (define (compile-project e t2 l mt)
     (let*$ ([v e] [l l] [mt mt])
-      (match t2
-        [(Type (Dyn))
-         (error 'grift/make-code-gen-project "Called with t2 = Dyn")]
-        [(Type (or (Int) (Character) (Unit) (Bool)))
-         (If (dyn-immediate-tag=?$ v t2)
-             (dyn-immediate-value$ v)
-             (interp-project v t2 l mt))]
-        [(Type _) 
-         (If (dyn-immediate-tag=?$ v t2)
-             (let*$ ([u  (dyn-box-value$ v)]
-                     [t1 (dyn-box-type$ v)])
-               (compile-med-cast u t1 t2 l mt))
-             (interp-project v t2 l mt))]
-        [_
-         (if (project-inline-without-types?)
-             (code-gen-full-project v t2 l mt)
-             (interp-project v t2 l mt))])))
+      (cast-profile/inc-projects-casts$
+       (match t2
+         [(Type (Dyn))
+          (error 'grift/make-code-gen-project "Called with t2 = Dyn")]
+         [(Type (or (Int) (Character) (Unit) (Bool)))
+          (If (dyn-immediate-tag=?$ v t2)
+              (dyn-immediate-value$ v)
+              (interp-project v t2 l mt))]
+         [(Type _) 
+          (If (dyn-immediate-tag=?$ v t2)
+              (let*$ ([u  (dyn-box-value$ v)]
+                      [t1 (dyn-box-type$ v)])
+                (compile-med-cast u t1 t2 l mt))
+              (interp-project v t2 l mt))]
+         [_
+          (if (project-inline-without-types?)
+              (code-gen-full-project v t2 l mt)
+              (interp-project v t2 l mt))]))))
   compile-project)
 
 (: make-compile-inject : -> (CoC3-Expr CoC3-Expr -> CoC3-Expr))
@@ -1336,11 +1337,12 @@ TODO write unit tests
     (make-lazy-add-cast-runtime-binding! "inject" inject-code))
   (: compile-inject Inject-Type)
   (define (compile-inject e t)
-    (cond
-      ;; make-dyn$ does specialization if the type is a type literal
-      [(or (Type? t) (inject-inline-without-types?))
-       (dyn-make$ e t)]
-      [else (apply-code (get-uid!) e t)]))
+    (cast-profile/inc-injects-casts$
+     (cond
+       ;; make-dyn$ does specialization if the type is a type literal
+       [(or (Type? t) (inject-inline-without-types?))
+        (dyn-make$ e t)]
+       [else (apply-code (get-uid!) e t)])))
 
   compile-inject)
 
