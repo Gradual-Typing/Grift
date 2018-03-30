@@ -38,8 +38,9 @@ run_config()
         $baseline_system "$name" "$input_file" "$disk_aux_name"
         local baseline="$RETURN"
         if [ "$CAST_PROFILER" = true ]; then
-            echo "name,precision,time,slowdown,speedup,total values allocated,"\
-                 "total casts,longest proxy chain,total proxies accessed,total uses"\
+            echo "name,precision,time,slowdown,speedup,total values allocated"\
+                 ",total casts,longest proxy chain,total proxies accessed"\
+		 ",total uses,injects,projects"\
                  > "$logfile1"
         else
             echo "name,precision,time,slowdown,speedup" > "$logfile1"
@@ -74,11 +75,11 @@ run_config()
                 # ignore first and last rows and sum the values across all
                 # columns in the profile into one column and transpose it into
                 # a row
-                sed '1d;$d' "${b}.prof" | awk -F, '{print $2+$3+$4+$5}'\
+                sed '1d;$d' "${b}.prof" | awk -F, '{print $2+$3+$4+$5+$6+$7}'\
                     | paste -sd "," - >> "$logfile1"
                 # ignore the first row and the first column and stitsh together
                 # all rows into one row
-                cat "${b}.prof" | sed -n '1!p' | awk -F, '{print $2","$3","$4","$5}'\
+                cat "${b}.prof" | sed -n '1!p' | awk -F, '{print $2","$3","$4","$5","$6","$7}'\
                     | paste -sd "," - >> "$logfile3"
             fi
         done
