@@ -2010,5 +2010,6 @@ TODO write unit tests
                [m  (compose-tup-coercions c1 c2 new-i a is-id)])
          (cond$
           [(id-coercion? m) m]
-          [else (Tuple-Coercion-Item-Set! m i ce)]))])))
+          [else (Tuple-Coercion-Item-Set! m i ce)
+                m]))])))
   compose-tup-coercions)
