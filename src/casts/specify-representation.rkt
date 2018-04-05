@@ -597,17 +597,15 @@ but a static single assignment is implicitly maintained.
         [(Id-Tuple-Coercion (app recur a))
          (begin$
            (assign$ size a)
-           (assign$ tup-c (ann (op$ Alloc (sr-plus size (Quote 1))) D0-Expr))
+           (assign$ tup-c
+             (op$ Alloc (sr-plus size COERCION-TUPLE-ELEMENTS-OFFSET)))
            (assign$ info
-             (ann (op$ + (op$ %<< size COERCION-SECOND-TAG-SHIFT)
-                       COERCION-TUPLE-SECOND-TAG)
-                  D0-Expr))
+             (op$ + (op$ %<< size COERCION-SECOND-TAG-SHIFT)
+                       COERCION-TUPLE-SECOND-TAG))
            (sr-array-set! tup-c COERCION-TUPLE-COUNT-INDEX info)
-           (repeat$ (i (Quote 0) size) (_ (Quote 0))
-             (sr-array-set!
-              tup-c
-              (op$ + i COERCION-TUPLE-ELEMENTS-OFFSET)
-              COERCION-IDENTITY-IMDT))
+           (repeat$ (i COERCION-TUPLE-ELEMENTS-OFFSET
+                       (op$ + size COERCION-TUPLE-ELEMENTS-OFFSET)) (_ (Quote 0))
+             (sr-array-set! tup-c i COERCION-IDENTITY-IMDT))
            (sr-tag-value tup-c COERCION-MEDIATING-TAG))]
         [(Fn-Coercion-Arg-Set! (app recur f) (app recur i) (app recur a))
          (sr-tagged-array-set!
