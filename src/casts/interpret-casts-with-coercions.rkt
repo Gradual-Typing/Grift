@@ -522,12 +522,11 @@ form, to the shortest branch of the cast tree that is relevant.
   (: compile-lambda Lambda-Type)
   (define (compile-lambda fml* e)
     (define ctr (get-fn-cast! (length fml*)))
-    (Lambda fml* (Castable ctr e)))
+    (Lambda fml* (Castable ctr (cast-profile/max-function-chain$ e))))
   
   (: compile-app App-Type)
   (define (compile-app e e*)
-    (cast-profile/max-function-chain$
-     (App-Fn-or-Proxy apply-coercion-uid e e*)))
+    (App-Fn-or-Proxy apply-coercion-uid e e*))
   
   (define compile-fn-cast/coercions
     (make-compile-fn-cast/coercions

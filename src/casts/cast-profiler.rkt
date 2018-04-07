@@ -220,9 +220,20 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
                v)
              e))]))
 
-(define-syntax-rule (cast-profile/max-function-chain$ e)
-  (cast-profile/max-chain$
-   single-function-proxies-accessed max-function-proxies-accessed e))
+(define-syntax (cast-profile/max-function-chain$ stx)
+  (syntax-case stx ()
+    [(_ exp)
+     #'(let ([e exp])
+         (if (cast-profiler?)
+             (begin$
+               (If (op$ > (Global single-function-proxies-accessed)
+                        (Global max-function-proxies-accessed))
+                   (Assign max-function-proxies-accessed
+                     (Global single-function-proxies-accessed))
+                   NO-OP)
+               (Assign single-function-proxies-accessed (Quote 0))
+               e)
+             e))]))
 
 (define-syntax-rule (cast-profile/max-vector-chain$ e)
   (cast-profile/max-chain$
