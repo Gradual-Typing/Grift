@@ -28,7 +28,6 @@ run_config()
     local name=$(basename "$path")
     local logfile1="${DATA_DIR}/${name}${disk_aux_name}${i}.log"
     local logfile2="${DATA_DIR}/${name}${disk_aux_name}${i}.csv"
-    local logfile3="${DATA_DIR}/${name}${disk_aux_name}${i}_profiles.csv"
     local cache_file="${TMP_DIR}/static/${name}${disk_aux_name}${i}.cache"
     local bs=$(find "$path" -name "*.o$i")
     if [ -f $cache_file ]; then
@@ -38,9 +37,7 @@ run_config()
         $baseline_system "$name" "$input_file" "$disk_aux_name"
         local baseline="$RETURN"
         if [ "$CAST_PROFILER" = true ]; then
-            echo "name,precision,time,slowdown,speedup,total values allocated"\
-                 ",total casts,longest proxy chain,total proxies accessed"\
-		 ",total uses,injects,projects"\
+            echo "name,precision,time,slowdown,speedup,total values allocated,total casts,longest proxy chain,total proxies accessed,total uses,function total values allocated,vector total values allocated,ref total values allocated,tuple total values allocated,function total casts,vector total casts, ref total casts,tuple total casts,function longest proxy chain,vector longest proxy chain,ref longest proxy chain,tuple longest proxy chain,function total proxies accessed,vector total proxies accessed,ref total proxies accessed,tuple total proxies accessed,function total uses,vector total uses,ref total uses,tuple total uses,injects casts,projects casts"\
                  > "$logfile1"
         else
             echo "name,precision,time,slowdown,speedup" > "$logfile1"
@@ -76,11 +73,23 @@ run_config()
                 # columns in the profile into one column and transpose it into
                 # a row
                 sed '1d;$d' "${b}.prof" | awk -F, '{print $2+$3+$4+$5+$6+$7}'\
-                    | paste -sd "," - >> "$logfile1"
+                    | paste -sd "," - | xargs echo -n >> "$logfile1"
+                echo -n "," >> "$logfile1"
                 # ignore the first row and the first column and stitsh together
                 # all rows into one row
-                cat "${b}.prof" | sed -n '1!p' | awk -F, '{print $2","$3","$4","$5","$6","$7}'\
-                    | paste -sd "," - >> "$logfile3"
+                sed '1d;$d' "${b}.prof" | cut -f1 -d"," --complement\
+                    | awk -F, '{print $1","$2","$3","$4}' | paste -sd "," -\
+                    | xargs echo -n >> "$logfile1"
+                echo -n "," >> "$logfile1"
+                # writing injections
+                sed '1d;$d' "${b}.prof" | cut -f1 -d"," --complement\
+                    | awk -F, 'FNR == 2 {print $5}' | xargs echo -n >> "$logfile1"
+                echo -n "," >> "$logfile1"
+                # writing projections
+                sed '1d;$d' "${b}.prof" | cut -f1 -d"," --complement\
+                    | awk -F, 'FNR == 2 {print $6}' >> "$logfile1"
+            else
+                printf "\n" >> "$logfile1"
             fi
         done
         cut -d, -f4 "$logfile1" | \
@@ -162,7 +171,7 @@ gen_output()
     perf_lattice_speedup_fig="${OUT_DIR}/perflattice/speedup/${disk_name}.png"
     perf_lattice_log_fig="${OUT_DIR}/perflattice/log/${disk_name}_log.png"
     perf_lattice_lin_fig="${OUT_DIR}/perflattice/linear/${disk_name}_lin.png"
-    rt_vs_proxy_accesses_fig="${OUT_DIR}/casts/plot/${disk_name}.png"
+    casts_fig="${OUT_DIR}/casts/plot/${disk_name}.png"
     
 
     rm -f "$cum_perf_lattice_fig" "$cum_perf_lattice_tbl" "$perf_lattice_slowdown_fig"
@@ -185,8 +194,13 @@ gen_output()
 
     speedup_geometric_mean "$logfile1"
     g1="$RETURN"
+    runtime_mean "$logfile1"
+    rt1="$RETURN"
+    
     speedup_geometric_mean "$logfile3"
     g2="$RETURN"
+    runtime_mean "$logfile3"
+    rt2="$RETURN"
     
     $baseline_system "$name" "$input_file" "$disk_aux_name"
     local baseline_mean="$RETURN"
@@ -338,18 +352,54 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
 
     if [ "$CAST_PROFILER" = true ]; then
         gnuplot -e "set datafile separator \",\";"`
-                `"set terminal pngcairo size 1280,960"`
-                `"   noenhanced color font 'Verdana,26' ;"`
-                `"set output '${rt_vs_proxy_accesses_fig}';"`
-                `"set key left font 'Verdana,20';"`
-                `"set title \"${printname}\";"`
-                `"set xlabel \"Number of proxy accesses\";"`
-                `"set ylabel \"Speedup over Racket\";"`
-                `"plot '${logfile1}' using 5:9 with points"` 
-                `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-                `"'${logfile3}' using 5:9 with points"`
-                `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"
-    fi         
+            `"set terminal pngcairo size 1280,1900"`
+            `"   enhanced color font 'Verdana,26' ;"`
+            `"set output '${casts_fig}';"`
+            `"set lmargin at screen 0.15;"`
+            `"set rmargin at screen 0.95;"`
+            `"TOP=0.95;"`
+            `"DY = 0.29;"`
+            `"set multiplot;"`
+            `"set yrange [0:*];"`
+            `"set xlabel \"How much of the code is typed\";"`
+            `"set ylabel \"Longest proxy chain\";"`
+            `"set tmargin at screen TOP-2*DY;"`
+            `"set bmargin at screen TOP-3*DY;"`
+            `"unset key;"`
+            `"set xtics nomirror;"`
+            `"plot '${logfile1}' using 2:8 with points"` 
+            `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
+            `"'${logfile3}' using 2:8 with points"`
+            `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
+            `"unset xlabel;"`
+            `"set format x '';"`
+            `"set ylabel \"Runtime casts count\" offset -3;"`
+            `"set tmargin at screen TOP-DY;"`
+            `"set bmargin at screen TOP+0.02-2*DY;"`
+            `"unset key;"`
+            `"set yrange [1:*];"`
+            `"set format y \"10^{%T}\";"`
+            `"set logscale y;"`
+            `"plot '${logfile1}' using 2:7 with points"` 
+            `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
+            `"'${logfile3}' using 2:7 with points"`
+            `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
+            `"set key bottom left font 'Verdana,20';"`
+            `"set tmargin at screen TOP;"`
+            `"set bmargin at screen TOP+0.02-DY;"`
+            `"set title \"${printname}\";"`
+            `"set yrange [*:*];"`
+            `"set ylabel \"Runtime in seconds\" offset 0;"`
+            `"unset format y;"`
+            `"plot '${logfile1}' using 2:3 with points"` 
+            `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
+            `"${rt1} lw 2 dt 3 lc rgb '$color2' notitle '${c1t} mean',"`
+            `"'${logfile3}' using 2:3 with points"`
+            `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"`
+            `"${rt2} lw 2 dt 3 lc rgb '$color2' notitle '${c2t} mean',"`
+            `"${baseline_mean} lw 2 dt 2 lc rgb \"black\" title 'Racket',"`
+            `"${static_mean} lw 2 dt 2 lc \"blue\" title 'Static Grift';"
+    fi
 }
 
 # $1 - baseline system

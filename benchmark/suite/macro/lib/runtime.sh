@@ -454,9 +454,36 @@ avg()
 }
 
 # $1 - logfile
+# $2 - column index
 # $RETURN - geometric mean of the fifth column in the logfile
+geometric_mean()
+{
+    local logfile="$1"; shift
+    local indx="$1";    shift
+    RETURN=$(cat "$logfile" | sed 1d | cut -d, -f$indx | "${TEST_DIR}/lib/geo")
+}
+
+mean()
+{
+    local logfile="$1"; shift
+    local indx="$1";    shift
+    RETURN=$(cat "$logfile1" | sed 1d | awk -F',' -v indx=$indx '{sum+=$indx; ++n} END { print sum/n }')
+}
+
+runtime_mean()
+{
+    local logfile="$1"; shift
+    mean "$logfile" 3
+}
+
 speedup_geometric_mean()
 {
     local logfile="$1"; shift
-    RETURN=$(cat "$logfile" | sed 1d | cut -d, -f5 | "${TEST_DIR}/lib/geo")
+    geometric_mean "$logfile" 5
+}
+
+runtime_geometric_mean()
+{
+    local logfile="$1"; shift
+    geometric_mean "$logfile" 5
 }
