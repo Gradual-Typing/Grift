@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "constants.h"
 
 int64_t read_int(){
   int64_t i;
@@ -16,6 +17,22 @@ double read_float(){
     exit(-1);
   }
   return d;
+}
+
+int64_t read_bool(){
+  char c;
+  if (1 != scanf(" #%c", &c)) {
+    fputs("Error in read_bool\n", stderr);
+    exit(-1);
+  } else if ( c == 't') {
+    return TRUE_IMDT;
+  } else if ( c == 'f') {
+    return FALSE_IMDT;
+  }
+
+  fputs("Error in read_bool: didn't get #t or #f\n", stderr);
+  exit(-1);
+  
 }
 
 // Based on rackets version of print_char

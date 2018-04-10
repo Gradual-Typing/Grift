@@ -14,6 +14,8 @@
      IntxInt->Int-Primitive
      IntxInt->Bool-Primitive
      ->Int-Primitive
+     ->Bool-Primitive
+     Bool->Unit-Primitive
      FloatxFloat->Float-Primitive
      FloatxFloat->Int-Primitive
      Float->Float-Primitive
@@ -67,6 +69,10 @@
 (define-predicate BoolxBool->Bool-primitive? BoolxBool->Bool-Primitive)
 (define-predicate Bool->Bool-Primitive? Bool->Bool-Primitive)
 
+(define-type Bool->Unit-Primitive 'print-bool)
+(define-predicate Bool->Unit-Primitive? Bool->Unit-Primitive)
+(define-type ->Bool-Primitive 'read-bool)
+(define-predicate ->Bool-Primitive? ->Bool-Primitive)
 
 (define-type FloatxFloat->Float-Primitive
   (U 'fl+ 'fl- 'fl* 'fl/ 'flmodulo 'flexpt 'flmin 'flmax))
@@ -116,7 +122,8 @@
 (define INTxINT->BOOL-TYPE (Fn 2 INTxINT-TYPE BOOL-TYPE))
 (define BOOL->BOOL-TYPE (Fn 1 (list BOOL-TYPE) BOOL-TYPE))
 (define BOOLxBOOL->BOOL-TYPE (Fn 2 BOOLxBOOL-TYPE BOOL-TYPE))
-
+(define BOOL->UNIT-TYPE (Fn 1 (list BOOL-TYPE) UNIT-TYPE))
+(define ->BOOL-TYPE (Fn 0 '() BOOL-TYPE))
 
 (define FLOATxFLOAT-TYPE (list FLOAT-TYPE FLOAT-TYPE))
 (define FLOATxFLOAT->BOOL-TYPE (Fn 2 FLOATxFLOAT-TYPE BOOL-TYPE))
@@ -147,6 +154,8 @@
   (make-immutable-hash
    `((char->int  . ,CHAR->INT-TYPE)
      (int->char  . ,INT->CHAR-TYPE)
+     (print-bool . ,BOOL->UNIT-TYPE)
+     (read-bool  . ,->BOOL-TYPE)
      (print-char . ,CHAR->UNIT-TYPE)
      (display-char . ,CHAR->UNIT-TYPE)
      (read-char  . ,->CHAR-TYPE)
@@ -291,6 +300,8 @@ We are going to UIL
      FloatxFloat->Float-Primitive
      FloatxFloat->Int-Primitive
      BoolxBool->Bool-Primitive
+     ->Bool-Primitive
+     Bool->Unit-Primitive
      Bool->Bool-Primitive
      Int->Int-Primitive
      Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim

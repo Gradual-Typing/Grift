@@ -26,6 +26,13 @@ reads a floating point number from the stdin port.
 */
 double read_float();
 
+/* 
+read_bool
+runtime function for read-bool primitive : (-> Bool)
+reads a #t or #f from the stdin port.
+*/
+int64_t read_bool();
+
 typedef union {
   int64_t *p;
   int64_t i;
