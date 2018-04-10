@@ -19,6 +19,7 @@
    ;; Bools
    (test-file "static" "const-false.grift" (bool #f))
    (test-file "static" "const-true.grift"  (bool #t))
+   (test-file "static" "read-bool1.grift" (int 42))
    ;; Ints
    (test-file "static" "const-one.grift"   (int 1))
    (test-file "static" "const-negative.grift" (int -5))

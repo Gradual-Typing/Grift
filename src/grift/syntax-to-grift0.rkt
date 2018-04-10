@@ -595,6 +595,8 @@ represents types in the grift abstract syntax tree.
      (and . ,core-parse-prim)
      (or  . ,core-parse-prim)
      (quotient . ,core-parse-prim)
+     (print-bool . ,core-parse-prim)
+     (read-bool . ,core-parse-prim)
      ;; Float operations
      (flnegate . ,core-parse-prim)
      (fl+   . ,core-parse-prim)

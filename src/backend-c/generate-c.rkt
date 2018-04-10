@@ -513,6 +513,7 @@
      (Exit       function  "exit"  (,no-cast) ())
      (int->float identity  "none"  (,imdt->int->float) ())
      (float->int identity  "none"  (,imdt->float->int) ())
+     (read-bool  function  "read_bool"  () (,int->imdt))
      (read-int   function  "read_int"   () (,int->imdt))
      (read-float function  "read_float" () (,float->imdt))
      (read-char  function  "read_ascii_char" () (,char->imdt))
@@ -555,6 +556,9 @@
     [('print-int (list d))
      (display "printf")
      (emit-wrap (display "\"%ld\",") (emit-value d))]
+    [('print-bool (list b))
+     (display "puts")
+     (emit-wrap (emit-value b) (display " ? \"#t\" : \"#f\""))]
     [('Printf (cons fmt exp*))
      (begin (display "printf")
             (emit-wrap

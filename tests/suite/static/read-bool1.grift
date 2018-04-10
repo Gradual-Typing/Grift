@@ -1,0 +1,6 @@
+;; Success if it reads false then true
+(if (read-bool) 
+    1
+    (if (read-bool)
+        42
+        2))
