@@ -13,12 +13,7 @@
 (provide (all-defined-out))
 
 (define (find-unused-path [suffix : String]) : Path
-  (let loop ([i 0])
-    (define tmp-path
-      (build-path (string-append "tmp" (number->string i) suffix)))
-    (cond
-      [(not (file-exists? tmp-path)) tmp-path]
-      [else (loop (add1 i))])))
+  (make-temporary-file (format "tmp~~a~a" suffix)))
 
 ;; Basic driver for the entire backend
 (: c-backend-generate-code (Data5-Lang . -> . Path))
