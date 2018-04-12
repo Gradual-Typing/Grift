@@ -591,20 +591,20 @@ run_experiment()
     g+=($RETURN)
     
     # Scheme Array Benchmark
-    local arr_yminf="${DATA_DIR}/arr_ymin_${c1}_${c2}.txt"
-    local arr_ymin=""
-    if [ -f $arr_yminf ]; then
-        arr_ymin="$(cat $arr_yminf)"
-    fi
-    local arr_ymaxf="${DATA_DIR}/arr_ymax_${c1}_${c2}.txt"
-    local arr_ymax=""
-    if [ -f $arr_ymaxf ]; then
-        arr_ymax="$(cat $arr_ymaxf)";
-    fi
-    run_benchmark $baseline_system $c1 $c2 "array" \
-                  "slow.txt" "$nsamples" "$nbins" ""\
-                  "$arr_ymin" "$arr_ymin"
-    g+=($RETURN)
+    # local arr_yminf="${DATA_DIR}/arr_ymin_${c1}_${c2}.txt"
+    # local arr_ymin=""
+    # if [ -f $arr_yminf ]; then
+    #     arr_ymin="$(cat $arr_yminf)"
+    # fi
+    # local arr_ymaxf="${DATA_DIR}/arr_ymax_${c1}_${c2}.txt"
+    # local arr_ymax=""
+    # if [ -f $arr_ymaxf ]; then
+    #     arr_ymax="$(cat $arr_ymaxf)";
+    # fi
+    # run_benchmark $baseline_system $c1 $c2 "array" \
+    #               "slow.txt" "$nsamples" "$nbins" ""\
+    #               "$arr_ymin" "$arr_ymin"
+    # g+=($RETURN)
     
     # Tak
     local tak_yminf="${DATA_DIR}/tak_ymin_${c1}_${c2}.txt"
