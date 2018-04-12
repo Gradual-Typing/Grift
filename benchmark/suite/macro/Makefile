@@ -3,9 +3,9 @@ GRIFT=racket ../../../main.rkt -O 3
 GAMBIT=gsc -exe -cc-options "-O3"
 GCC=gcc -O3
 
-BIN_SAMPLES ?= 3
+BIN_SAMPLES ?= 30
 NUM_BINS ?= 30
-TIMING_SAMPLES ?= 30
+TIMING_SAMPLES ?= 10
 TEST_DIR=test
 BENCHMARK_DIR ?=fresh
 
