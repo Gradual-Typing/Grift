@@ -53,7 +53,7 @@
   (for ([i (in-list cs)]) 
     (apply guarded-compile (cons f (cons i (hash-ref configs i))))))
 
-(define (place-main id my-chan)
+(define (place-main id my-chan cp? cflags dyn-ops?)
   (printf "~a: init\n" id)
   (define send-ready (lambda a (error 'unitialized)))
   (define compile    (lambda a (error 'unitialized)))
@@ -61,7 +61,11 @@
     [`(setup ,ready-chan ,my-chan-in ,cs)
      (printf "~a: setup\n" cs)
      (set! send-ready (lambda () (place-channel-put ready-chan `(ready ,my-chan-in))))
-     (set! compile (lambda (fs) (for ([f fs]) (compile-file f cs))))])
+     (set! compile (lambda (fs) (parameterize ([cast-profiler? cp?]
+                                               [c-flags cflags]
+                                               [dynamic-operations? dyn-ops?])
+                                  (for ([f fs])
+                                    (compile-file f cs)))))])
   (send-ready)
   (let loop ()
     (match (place-channel-get my-chan)
@@ -96,8 +100,11 @@
     [(<= threads 1) (for ((fl files)) (compile-file fl cs))]
     [else
      (define-values (work-q-out work-q-in) (place-channel))
+     (define cp? (cast-profiler?))
+     (define cf  (c-flags))
+     (define dos (dynamic-operations?))
      (define pls (for/list ([i (in-range threads)])
-                   (place/context chan (place-main i chan))))
+                   (place/context chan (place-main i chan cp? cf dos))))
      (for ([pl pls]) (place-channel-put pl `(setup ,work-q-in ,pl ,cs)))
      (let loop ([files files])
        (cond
