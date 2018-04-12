@@ -484,7 +484,7 @@ run_benchmark()
     
     if [ "$CAST_PROFILER" = true ] ; then
         racket "${GRIFT_DIR}/benchmark/benchmark.rkt" --cast-profiler \
-               -s "$c1 $c2" "${lattice_path}/"
+               -j 4 -s "$c1 $c2" "${lattice_path}/"
     else
         racket "${GRIFT_DIR}/benchmark/benchmark.rkt"\
                -s "$c1 $c2" "${lattice_path}/"
