@@ -37,12 +37,13 @@
                 specialize)]))
   (define ext (string-append ".o" (number->string i)))
   (define exe (path-replace-extension src ext))
+  (define exe.prof (path-replace-extension src (string-append ext ".prof.o")))
   (parameterize ([specialize-cast-code-generation? specialize-casts?]
                  [hybrid-cast/coercion-runtime? hybrid-runtime?])
-    (unless (file-exists? exe)
+    (unless (and (file-exists? exe) (if (cast-profiler?) (file-exists? exe.prof) #t))
       (printf "~a\n" exe)
       (if (cast-profiler?)
-          (let ([exe.prof (path-replace-extension src (string-append ext ".prof.o"))])
+          (begin
             (compile src #:output exe.prof #:cast cast #:ref ref)
             (parameterize ([cast-profiler? #f])
               (compile src #:output exe #:cast cast #:ref ref)))
