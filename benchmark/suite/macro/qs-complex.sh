@@ -1,27 +1,33 @@
 #!/bin/sh
 set -euo pipefail
 
-loops=5
-precision=5
-grift_mem_limit=9999999999
+. lib/runtime.sh
+
+c1=17
+c2=7
+
+LOOPS=1
+PRECISION=5
 
 griftdir=$GRIFT_DIR
 ranges=(10 100 1000 2000 3000 4000 5000 6000 7000 8000 9000 10000)
-file=quicksort_worstcase
+file=quicksort
 # --------------------------------------------------------------------
 date=`date +%Y_%m_%d_%H_%M_%S`
 
-testdir=$griftdir/benchmark/suite/macro
-qscomplexdir=$testdir/quicksort-complex/$date
+TEST_DIR=$griftdir/benchmark/suite/macro
+LIB_DIR="$TEST_DIR/lib"
+qscomplexdir=$TEST_DIR/quicksort-complex/$date
 datadir=$qscomplexdir/data
 outdir=$qscomplexdir/output
 tmpdir=$qscomplexdir/tmp
-miscdir=$testdir/misc
-srcdir=$testdir/src
+miscdir=$TEST_DIR/misc
+srcdir=$TEST_DIR/src
 paramfile=$qscomplexdir/params.txt
 TIMEFORMAT=%R
 
-logfile=$datadir/log.csv
+logfile1="$datadir/$c1.csv"
+logfile2="$datadir/$c2.csv"
 
 grift_regex="sed -n 's/.*): \\([0-9]\\+\\)/\\1/p'"
 
@@ -32,37 +38,72 @@ mkdir -p $datadir
 mkdir -p $tmpdir
 mkdir -p $outdir
 
-avg()
-{
-    local avg_sum=0
-    local avg_i
-    for avg_i in `seq $loops`; do
-	avg_t=$(eval $1)
-	avg_sum=$(echo "scale=$precision;$avg_sum+$avg_t" | bc)
-    done
-    RETURN=$(echo "scale=$precision;$avg_sum/$loops" | bc)
-}
-
 cp src/partial/$file.grift $tmpdir
 cd $griftdir
-racket $griftdir/benchmark/benchmark.rkt $tmpdir $grift_mem_limit
+
+racket "$griftdir/benchmark/benchmark.rkt" --cast-profiler -s "$c1 $c2" "$tmpdir"
 
 cd $tmpdir
-for n in ${ranges[*]}; do
-    echo $n >> log1
-    cd $tmpdir
-    c="echo $n | ./$file.o1 | $grift_regex"
-    avg "$c"
-    echo $RETURN >> log2
+echo "iterations,runtime,total values allocated,total casts,longest proxy chain,total proxies accessed,total uses,function total values allocated,vector total values allocated,ref total values allocated,tuple total values allocated,function total casts,vector total casts, ref total casts,tuple total casts,function longest proxy chain,vector longest proxy chain,ref longest proxy chain,tuple longest proxy chain,function total proxies accessed,vector total proxies accessed,ref total proxies accessed,tuple total proxies accessed,function total uses,vector total uses,ref total uses,tuple total uses,injects casts,projects casts"\
+     > "$logfile1"
+echo "iterations,runtime,total values allocated,total casts,longest proxy chain,total proxies accessed,total uses,function total values allocated,vector total values allocated,ref total values allocated,tuple total values allocated,function total casts,vector total casts, ref total casts,tuple total casts,function longest proxy chain,vector longest proxy chain,ref longest proxy chain,tuple longest proxy chain,function total proxies accessed,vector total proxies accessed,ref total proxies accessed,tuple total proxies accessed,function total uses,vector total uses,ref total uses,tuple total uses,injects casts,projects casts"\
+     > "$logfile2"
 
-    c="echo $n | ./$file.o2 | $grift_regex"
-    avg "$c"
-    echo $RETURN >> log3
+function run()
+{
+    # the configuration index
+    local c="$1";       shift
+    local input="$1";   shift
+    local output="$1";  shift
+    local logfile="$1"; shift
+    
+    local b="${tmpdir}/${file}.o${c}"
+    local bname="$(basename $b)"
+    avg "$b" "$input" "static" "$output" "${b}.runtimes"
+    printf "${RETURN}" >> "$logfile"
+    rm "${b}.runtimes"
+
+    eval "cat ${input} | ${b}.prof.o" > /dev/null 2>&1
+    mv "$bname.prof.o.prof" "${b}.prof"
+    printf "," >> "$logfile"
+    # ignore first and last rows and sum the values across all
+    # columns in the profile into one column and transpose it into
+    # a row
+    sed '1d;$d' "${b}.prof" | awk -F, '{print $2+$3+$4+$5+$6+$7}'\
+        | paste -sd "," - | xargs echo -n >> "$logfile"
+    echo -n "," >> "$logfile"
+    # ignore the first row and the first column and stitsh together
+    # all rows into one row
+    sed '1d;$d' "${b}.prof" | cut -f1 -d"," --complement\
+        | awk -F, '{print $1","$2","$3","$4}' | paste -sd "," -\
+        | xargs echo -n >> "$logfile"
+    echo -n "," >> "$logfile"
+    # writing injections
+    sed '1d;$d' "${b}.prof" | cut -f1 -d"," --complement\
+        | awk -F, 'FNR == 2 {print $5}' | xargs echo -n >> "$logfile"
+    echo -n "," >> "$logfile"
+    # writing projections
+    sed '1d;$d' "${b}.prof" | cut -f1 -d"," --complement\
+        | awk -F, 'FNR == 2 {print $6}' >> "$logfile"
+}
+
+for n in ${ranges[*]}; do
+    input=$n;
+    for ((i=$n-1;i>=0;i--)); do
+	input="$input $i";
+    done
+    echo $input > "${tmpdir}/input"
+    input="${tmpdir}/input"
+    echo $(($n-1)) > "${tmpdir}/output"
+    
+    printf "${n}," >> "$logfile1"
+    printf "${n}," >> "$logfile2"
+
+    run "$c1" "$input" "${tmpdir}/output" "$logfile1"
+    run "$c2" "$input" "${tmpdir}/output" "$logfile2"
+    
     echo "finished" $n
 done
-
-echo "iterations,time coercions, time twosomes" > $logfile
-paste -d"," log1 log2 log3 >> $logfile
 
 gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 'Verdana,10'; "`
 	   `"set output '$outdir/${name}.png'; "`
@@ -74,8 +115,8 @@ gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 
 	   `"set ytics nomirror; "`
 	   `"set logscale y;"`
 	   `"set format y \"%.4f\";"`
-	   `"plot '$logfile' using 1:2 with lp lw 3 title 'Coercions', "`
-	   `"'$logfile' using 1:3 with lp lw 3 title 'Type-based casts'"
+	   `"plot '$logfile1' using 1:2 with lp lw 3 title 'Coercions', "`
+	   `"'$logfile2' using 1:2 with lp lw 3 title 'Type-based casts'"
 
 gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 'Verdana,10'; "`
 	   `"set output '$outdir/${name}_coercions_fitting.png'; "`
@@ -86,8 +127,8 @@ gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 
 	   `"set ylabel \"time in seconds\"; "`
 	   `"set xtics nomirror; "`
 	   `"set ytics nomirror; "`
-	   `"fit f(x) '$logfile' using 1:2 via a, b, c;"`
-	   `"plot '$logfile' using 1:2 with lp lw 3 title 'Coercions', "`
+	   `"fit f(x) '$logfile1' using 1:2 via a, b, c;"`
+	   `"plot '$logfile1' using 1:2 with lp lw 3 title 'Coercions', "`
 	   `"f(x) ls 4 title '2nd-degree polynomial'"
 
 gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 'Verdana,10'; "`
@@ -99,7 +140,7 @@ gnuplot -e "set datafile separator \",\"; set term pngcairo enhanced color font 
 	   `"set ylabel \"time in seconds\"; "`
 	   `"set xtics nomirror; "`
 	   `"set ytics nomirror; "`
-	   `"fit f(x) '$logfile' using 1:3 via a, b, c, d;"`
+	   `"fit f(x) '$logfile2' using 1:2 via a, b, c, d;"`
 	   `"set style line 2 lw 3 lt 2;"`
-	   `"plot '$logfile' using 1:3 with lp ls 2 title 'Type-based casts', "`
+	   `"plot '$logfile2' using 1:2 with lp ls 2 title 'Type-based casts', "`
 	   `"f(x) ls 4 title  '3rd-degree polynomial'"
