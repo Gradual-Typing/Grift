@@ -71,67 +71,59 @@
 
 (define number-of-runs 100)
 
-(define number-of-options (read))
-
 (define fake-data '#(#i0 #i0 #i0 #i0 #i0 #i0 #\P #i0 #i0))
 
-(define data
-  (let ([v (make-vector number-of-options fake-data)])
-    (let loop ([i 0])
-      (when (fx< i number-of-options)
-            (vector-set! v i (read-option))
-            (loop (fx+ i 1))))
-    v))
-  
-
-;; This seems really dumb but I am doing it because
-;; this is the way the original benchmark did it.
-(define spots (make-vector number-of-options #i0))
-(define strikes (make-vector number-of-options #i0))
-(define rates  (make-vector number-of-options #i0))
-(define volatilities (make-vector number-of-options #i0))
-(define otypes (make-vector number-of-options 0))
-(define otimes 
+(define (run-benchmark)
+  (define number-of-options (read))
+  (define data (make-vector number-of-options fake-data))
+  ;; This seems really dumb but I am doing it because
+  ;; this is the way the original benchmark did it.
+  (define spots (make-vector number-of-options #i0))
+  (define strikes (make-vector number-of-options #i0))
+  (define rates  (make-vector number-of-options #i0))
+  (define volatilities (make-vector number-of-options #i0))
+  (define otypes (make-vector number-of-options 0))
+  (define otimes (make-vector number-of-options #i0))
+  (define prices (make-vector number-of-options #i0))
+  (let loop ([i 0])
+    (when (fx< i number-of-options)
+          (vector-set! data i (read-option))
+          (loop (fx+ i 1))))
   ;; This is done this way to prevent the unit value
   ;; from printing out at the top level.
-  (let ([otimes (make-vector number-of-options #i0)])
-    (let loop ([i 0])
-      (when (fx< i number-of-options)
-       (let ([od (vector-ref data i)])
-         (vector-set! otypes i
-                      (if (fx= (char->integer (vector-ref od 6))
+  (let loop ([i 0])
+    (when (fx< i number-of-options)
+     (let ([od (vector-ref data i)])
+       (vector-set! otypes i
+                    (if (fx= (char->integer (vector-ref od 6))
                              (char->integer #\P))
-                          1
-                          0))
-         (vector-set! spots i (vector-ref od 0))
-         (vector-set! strikes i (vector-ref od 1))
-         (vector-set! rates i (vector-ref od 2))
-         (vector-set! volatilities i (vector-ref od 4))
-         (vector-set! otimes i (vector-ref od 5))
-         (loop (fx+ i 1)))))
-    otimes))
+                        1
+                        0))
+       (vector-set! spots i (vector-ref od 0))
+       (vector-set! strikes i (vector-ref od 1))
+       (vector-set! rates i (vector-ref od 2))
+       (vector-set! volatilities i (vector-ref od 4))
+       (vector-set! otimes i (vector-ref od 5))
+       (loop (fx+ i 1)))))
+  (let loop ([j 0][i 0])
+    (when (fx< j number-of-runs)
+     (if (fx< i number-of-options)
+         (begin
+           (vector-set! prices i
+                        (black-scholes
+                         (vector-ref spots i)
+                         (vector-ref strikes i)
+                         (vector-ref rates i)
+                         (vector-ref volatilities i)
+                         (vector-ref otimes i)
+                         (vector-ref otypes i)
+                         #i0))
+           (loop j (fx+ i 1)))
+         (loop (fx+ j 1) 0))))
+  (let loop ([i 0])
+    (when (fx< i number-of-options)
+     (display (vector-ref prices i))
+     (newline)
+     (loop (fx+ i 1)))))
 
-(define prices 
-  (let ([prices (make-vector number-of-options #i0)])
-    (let loop ([j 0][i 0])
-      (when (fx< j number-of-runs)
-       (if (fx< i number-of-options)
-           (begin
-             (vector-set! prices i
-                          (black-scholes (vector-ref spots i)
-                                         (vector-ref strikes i)
-                                         (vector-ref rates i)
-                                         (vector-ref volatilities i)
-                                         (vector-ref otimes i)
-                                         (vector-ref otypes i)
-                                         #i0))
-             (loop j (fx+ i 1)))
-           (loop (fx+ j 1) 0))))
-    prices))
-
-(let loop ([i 0])
-  (when (fx< i number-of-options)
-   (display (vector-ref prices i))
-   (newline)
-   (loop (fx+ i 1))))
-
+(time (run-benchmark))

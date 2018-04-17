@@ -1,4 +1,5 @@
-#!gsi-script -:d0
+#!gsi-script
+(declare (standard-bindings) (extended-bindings) (block))
 
 (define (create l1 l2)
   (let ([x (make-vector (fx* l1 l2) 0)])
@@ -31,14 +32,15 @@
 		(loop1 (fx+ i 1))))
 	  r))))
 
-(define (main . args)
+(define (run-benchmark)
   (let ([size (read)])
     (let ([ar size]
-	  [ac size]
-	  [br size]
-	  [bc size])
-      (if (fx= ac br)
-	  (let ([a (create ar ac)]
-		[b (create br bc)])
-	    (time (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1))))
-	  0))))
+          [ac size]
+          [br size]
+          [bc size])
+      (let ([a (create ar ac)]
+            [b (create br bc)])
+        (print (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1)))
+        (newline)))))
+
+(time (run-benchmark) (current-output-port))

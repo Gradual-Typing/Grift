@@ -7,7 +7,11 @@
            (tak (- y 1) z x)
            (tak (- z 1) x y))))
 
-(let ([x : Int (read-int)])
-  (let ([y : Int (read-int)])
-    (let ([z : Int (read-int)])
-      (tak x y z))))
+(define (run-benchmark) : Unit
+  (let ([x : Int (read-int)])
+    (let ([y : Int (read-int)])
+      (let ([z : Int (read-int)])
+        (begin (print-int (tak x y z))
+               (display-char #\newline))))))
+
+(time (run-benchmark))

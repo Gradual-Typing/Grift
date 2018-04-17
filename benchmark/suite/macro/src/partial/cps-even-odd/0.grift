@@ -1,0 +1,20 @@
+(letrec ([even?
+          : (Dyn (Dyn -> Bool) -> Bool)
+          (lambda ([n : Dyn] [k : (Dyn -> Bool)])
+            (if (= n 0)
+                (k #true)
+                (odd? (- n 1) k)))]
+         [odd?
+          : (Int (Bool -> Bool) -> Bool)
+          (lambda ([n : Int] [k : (Bool -> Bool)]) : Bool
+                  (if (= n 0)
+                      (k #f)
+                      (even? (- n 1) k)))]
+         [empty-k
+          : (Bool -> Bool)
+          (lambda ([k : Bool]) : Bool k)]
+         [run-benchmark
+          : (-> ())
+          (lambda () : ()
+            (print-bool (even? (read-int) empty-k)))])
+  (time (run-benchmark)))

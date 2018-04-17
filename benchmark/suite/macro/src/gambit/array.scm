@@ -1,4 +1,5 @@
 #!gsi-script
+(declare (standard-bindings) (extended-bindings) (block))
 ;;; ARRAY1 -- One of the Kernighan and Van Wyk benchmarks.
 
 (define (create-x n)
@@ -22,7 +23,10 @@
       (go (fx- m 1) n (my-try n))
       r))
 
-(define (main)
+(define (run-benchmark)
   (let* ((input1 (read))
-	 (input2 (read)))
-    (pretty-print (go input1 input2 0))))
+         (input2 (read)))
+    (pretty-print (go input1 input2 0))
+    (newline)))
+
+(time (run-benchmark) (current-output-port))

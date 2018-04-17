@@ -35,14 +35,19 @@
 	  (vector-set! a j t)
 	  0))))
 
-(let ([size (read)])
-  (let ([a (make-vector size 1)])
-    (begin
-      (let loop ([i 0])
-        (if (fx< i size)
-            (begin
-              (vector-set! a i (read))
-              (loop (fx+ i 1)))
-            0))
-      (quicksort a 0 (fx- size 1))
-      (pretty-print (vector-ref a (fx- size 1))))))
+(define (run-benchmark)
+  (let ([size (read)])
+    (let ([a (make-vector size 1)])
+      (begin
+        (let loop ([i 0])
+          (if (fx< i size)
+              (begin
+                (vector-set! a i (read))
+                (loop (fx+ i 1)))
+              0))
+        (quicksort a 0 (fx- size 1))
+        (display (vector-ref a (fx- size 1)))
+        (newline)))))
+
+(time (run-benchmark))
+  

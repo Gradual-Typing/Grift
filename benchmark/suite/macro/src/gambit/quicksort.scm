@@ -1,4 +1,5 @@
-#!gsi-script -:d0
+#!gsi-script
+(declare (standard-bindings) (extended-bindings) (block))
 
 (define (sort a p r)
   (if (fx< p r)
@@ -34,15 +35,18 @@
 	  (vector-set! a j t)
 	  0))))
 
-(define (main)
+(define (run-benchmark)
   (let ([size (read)])
     (let ([a (make-vector size 1)])
       (begin
-	(let loop ([i 0])
-	  (if (< i size)
-	      (begin
-		(vector-set! a i (read))
-		(loop (fx+ i 1)))
-	      0))
-	(sort a 0 (fx- size 1))
-	(pretty-print (vector-ref a (fx- size 1)))))))
+        (let loop ([i 0])
+          (if (< i size)
+              (begin
+                (vector-set! a i (read))
+                (loop (fx+ i 1)))
+              0))
+        (sort a 0 (fx- size 1))
+        (pretty-print (vector-ref a (fx- size 1)))
+        (newline)))))
+
+(time (run-benchmark) (current-output-port))

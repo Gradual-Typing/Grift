@@ -9,7 +9,11 @@
            (tak (fx- y 1) z x)
            (tak (fx- z 1) x y))))
 
-(let* ([x (read)]
-       [y (read)]
-       [z (read)])
-  (pretty-print (tak x y z)))
+(define (run-benchmark)
+  (let* ([x (read)]
+         [y (read)]
+         [z (read)])
+    (display (tak x y z))
+    (newline)))
+
+(time (run-benchmark))

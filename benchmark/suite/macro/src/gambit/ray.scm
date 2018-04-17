@@ -1,3 +1,5 @@
+#!gsi-script
+(declare (standard-bindings) (extended-bindings) (block))
 ;;; RAY -- Ray-trace a simple scene with spheres.
 ;;; Translated to Scheme from Paul Graham's book ANSI Common Lisp, Example 9.8
 
@@ -137,25 +139,23 @@
                  (fl- (point-y c) (point-y pt))
                  (fl- (point-z c) (point-z pt)))))
 
-(define (main)
-  (begin
-    (let ([counter (box 29)])
-      (begin
-        (defsphere 32 0.0 -300.0 -1200.0 200.0 0.8)
-        (defsphere 31 -80.0 -150.0 -1200.0 200.0 0.7)
-        (defsphere 30 70.0 -100.0 -1200.0 200.0 0.9)
-        (do ((x -2 (fx+ x 1)))
-            ((fx> x 2))
-          (do ((z 2 (fx+ z 1)))
-              ((fx> z 7))
-            (defsphere
-              (unbox counter)
-              (fl* (exact->inexact x) 200.0)
-              300.0
-              (fl* (exact->inexact z) -400.0)
-              40.0
-              0.75)
-            (set-box! counter (- (unbox counter) 1))))))
+(define (run-benchmark)
+  (let ([counter (box 29)])
+    (defsphere 32 0.0 -300.0 -1200.0 200.0 0.8)
+    (defsphere 31 -80.0 -150.0 -1200.0 200.0 0.7)
+    (defsphere 30 70.0 -100.0 -1200.0 200.0 0.9)
+    (do ((x -2 (fx+ x 1)))
+        ((fx> x 2))
+      (do ((z 2 (fx+ z 1)))
+          ((fx> z 7))
+        (defsphere
+          (unbox counter)
+          (fl* (exact->inexact x) 200.0)
+          300.0
+          (fl* (exact->inexact z) -400.0)
+          40.0
+          0.75)
+        (set-box! counter (- (unbox counter) 1))))
     (tracer 1)))
 
-(main)
+(time (run-benchmark) (current-output-port))

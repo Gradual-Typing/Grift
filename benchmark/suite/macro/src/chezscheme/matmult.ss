@@ -32,13 +32,15 @@
 		(loop1 (fx+ i 1))))
 	  r))))
 
-(let ([size (read)])
-  (let ([ar size]
-	[ac size]
-	[br size]
-	[bc size])
-    (if (fx= ac br)
-	(let ([a (create ar ac)]
-              [b (create br bc)])
-          (time (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1))))
-	0)))
+(define (run-benchmark)
+  (let ([size (read)])
+    (let ([ar size]
+          [ac size]
+          [br size]
+          [bc size])
+      (let ([a (create ar ac)]
+            [b (create br bc)])
+        (display (vector-ref (mult a ar ac b br bc) (fx- (fx* ar bc) 1)))
+        (newline)))))
+
+(time (run-benchmark))

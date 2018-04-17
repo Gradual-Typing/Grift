@@ -22,14 +22,17 @@
                                            (vector-ref y (+ (* k y2) j))))))))
                   r)))
 
-(let ([size : Dyn (read-int)])
-  (let ([ar : Dyn size]
-	[ac : Dyn size]
-	[br : Dyn size]
-	[bc : Dyn size])
-    (if (= ac br)
-	(let ([a : Dyn (create ar ac)]
-              [b : Dyn (create br bc)]
-              [bx : (Ref Dyn) (box 0)])
-          (time (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1))))
-	0)))
+(define (run-benchmark)
+  (let ([size : Dyn (read-int)])
+    (let ([ar : Dyn size]
+          [ac : Dyn size]
+          [br : Dyn size]
+          [bc : Dyn size])
+      (let ([a : Dyn (create ar ac)]
+            [b : Dyn (create br bc)]
+            [bx : (Ref Dyn) (box 0)])
+        (begin
+          (print-int (vector-ref (mult a ar ac b br bc) (- (* ar bc) 1)))
+          (display-char #\newline))))))
+
+(time (run-benchmark))
