@@ -1,6 +1,9 @@
 #!/bin/sh
 set -euo pipefail
 
+# Script to plot figures for the benchmarks with space issues when the input is
+# varied.
+
 function main()
 {
     . lib/runtime.sh
@@ -129,7 +132,7 @@ function plot_benchmark()
 	    `"max(x,y) = (x > y) ? x : y;"`
 	    `"set yrange [0:*];"`
       	    `"set style line 1 lc rgb '$color1' lt 1 lw 2 pt 7 pi -1 ps 1.5;"`
-	    `"set style line 2 lc rgb '$color2' lt 1 lw 2 pt 5 pi -1 ps 1.5;"`
+	    `"set style line 2 lc rgb '$color2' lt 1 dt 2 lw 2 pt 5 pi -1 ps 1.5;"`
 	    `"set pointintervalbox 3;"`
             `"plot '${logfile1}' using 1:(max(\$16, (max(\$17, \$18)))) with lp ls 1 title '${c1t}',"`
             `"'${logfile2}' using 1:(max(\$16, (max(\$17, \$18)))) with lp ls 2 title '${c2t}';"`

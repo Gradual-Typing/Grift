@@ -190,6 +190,31 @@ get_grift_runtime()
     fi
 }
 
+get_dyn_grift_17_runtime()
+{
+    local benchmark="$1";      shift
+    local input="$1"; shift
+    local disk_aux_name="$1";  shift
+    
+    local benchmark_path="${TMP_DIR}/dyn/${benchmark}"
+    local runtimes_file="${benchmark_path}${disk_aux_name}.runtimes"
+    local config_index=17
+    
+    local runtimes_file="${benchmark_path}${disk_aux_name}${config_index}.runtimes"
+    local cache_file="${benchmark_path}${disk_aux_name}${config_index}.runtime"
+    if [ -f $cache_file ]; then
+        RETURN=$(cat "$cache_file")
+    else
+        racket "${GRIFT_DIR}/benchmark/benchmark.rkt"\
+               --config $config_index "${benchmark_path}.grift"
+        avg "${benchmark_path}.o${config_index}"\
+            "${INPUT_DIR}/${benchmark}/${input}"\
+            "static" "${OUTPUT_DIR}/static/${benchmark}/${input}"\
+            "$runtimes_file"
+        echo "$RETURN" > "$cache_file"
+    fi
+}
+
 # $1 - benchmark filename without extension
 # $2 - space-separated benchmark arguments
 # $3 - disk aux name

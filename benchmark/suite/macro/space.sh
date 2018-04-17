@@ -2,6 +2,8 @@
 # needs bash >= 4.3
 set -euo pipefail
 
+# Runs the expirement for benchmarks with space issues when the input is varied
+
 
 function run_config()
 {

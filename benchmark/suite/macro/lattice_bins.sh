@@ -205,6 +205,9 @@ gen_output()
     $baseline_system "$name" "$input_file" "$disk_aux_name"
     local baseline_mean="$RETURN"
 
+    get_dyn_grift_17_runtime "$name" "$input_file" "$disk_aux_name"
+    local dyn_mean="$RETURN"
+    
     get_static_grift_runtime "$name" "$input_file" "$disk_aux_name"
     local static_mean="$RETURN"
     local static_speed_up=$(echo "${baseline_mean} ${static_mean}" | \
@@ -351,54 +354,57 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
                 `"${static_speed_up} lw 2 dt 2 lc \"black\" title 'Static Grift';"
 
     if [ "$CAST_PROFILER" = true ]; then
-        gnuplot -e "set datafile separator \",\";"`
+    gnuplot -e "set datafile separator \",\";"`
             `"set terminal pngcairo size 1280,1900"`
             `"   enhanced color font 'Verdana,26' ;"`
             `"set output '${casts_fig}';"`
             `"set lmargin at screen 0.15;"`
-            `"set rmargin at screen 0.95;"`
-            `"TOP=0.95;"`
-            `"DY = 0.29;"`
-            `"set multiplot;"`
-            `"set yrange [0:*];"`
+	    `"set rmargin at screen 0.95;"`
+	    `"TOP=0.95;"`
+	    `"DY = 0.29;"`
+	    `"set multiplot;"`
             `"set xlabel \"How much of the code is typed\";"`
-            `"set ylabel \"Longest proxy chain\";"`
-            `"set tmargin at screen TOP-2*DY;"`
-            `"set bmargin at screen TOP-3*DY;"`
-            `"unset key;"`
-            `"set xtics nomirror;"`
-            `"plot '${logfile1}' using 2:8 with points"` 
+	    `"unset ylabel;"`
+            `"set label 1 \"Longest proxy chain\" at screen 0.02,0.15 rotate by 90;"`
+	    `"set tmargin at screen TOP-2*DY;"`
+	    `"set bmargin at screen TOP-3*DY;"`
+	    `"unset key;"`
+	    `"stats '${logfile1}' nooutput;"`
+	    `"set xrange [0:STATS_records+10];"`
+	    `"divby=STATS_records/4;"`
+	    `"set xtics ('0%%' 0, '%%25' divby, '%%50' divby*2, '%%75' divby*3, '%%100' divby*4) nomirror;"`
+	    `"max(x,y) = (x > y) ? x : y;"`
+	    `"set yrange [0:*];"`
+            `"plot '${logfile1}' using 0:(max(\$19, (max(\$20, \$21)))) with points"` 
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-            `"'${logfile3}' using 2:8 with points"`
+	    `"'${logfile3}' using 0:(max(\$19, (max(\$20, \$21)))) with points"`
             `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
-            `"unset xlabel;"`
-            `"set format x '';"`
-            `"set ylabel \"Runtime casts count\" offset -3;"`
-            `"set tmargin at screen TOP-DY;"`
-            `"set bmargin at screen TOP+0.02-2*DY;"`
-            `"unset key;"`
-            `"set yrange [1:*];"`
-            `"set format y \"10^{%T}\";"`
-            `"set logscale y;"`
-            `"plot '${logfile1}' using 2:7 with points"` 
+	    `"unset xtics;"`
+	    `"unset xlabel;"`
+	    `"set format x '';"`
+	    `"set yrange [0:*];"`
+            `"set label 2 \"Runtime casts count\" at screen 0.02,0.45 rotate by 90;"`
+	    `"set tmargin at screen TOP-DY;"`
+	    `"set bmargin at screen TOP+0.02-2*DY;"`
+	    `"unset key;"`
+            `"plot '${logfile1}' using 0:7 with points"` 
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-            `"'${logfile3}' using 2:7 with points"`
+            `"'${logfile3}' using 0:7 with points"`
             `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
-            `"set key bottom left font 'Verdana,20';"`
-            `"set tmargin at screen TOP;"`
-            `"set bmargin at screen TOP+0.02-DY;"`
+            `"set key opaque bottom left box vertical width 1 height 1 maxcols 1 spacing 1 font 'Verdana,20';"`
+	    `"set tmargin at screen TOP;"`
+	    `"set bmargin at screen TOP+0.02-DY;"`
             `"set title \"${printname}\";"`
-            `"set yrange [*:*];"`
-            `"set ylabel \"Runtime in seconds\" offset 0;"`
-            `"unset format y;"`
-            `"plot '${logfile1}' using 2:3 with points"` 
+            `"set label 3 \"Runtime in seconds\" at screen 0.02,0.75 rotate by 90;"`
+	    `"set palette maxcolors 2;"`
+	    `"set palette model RGB defined ( 0 'red', 1 '$color2' );"`
+	    `"unset colorbox;"`
+            `"plot '${logfile1}' using 0:3 with points"` 
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-            `"${rt1} lw 2 dt 3 lc rgb '$color2' notitle '${c1t} mean',"`
-            `"'${logfile3}' using 2:3 with points"`
-            `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}',"`
-            `"${rt2} lw 2 dt 3 lc rgb '$color2' notitle '${c2t} mean',"`
-            `"${baseline_mean} lw 2 dt 2 lc rgb \"black\" title 'Racket',"`
-            `"${static_mean} lw 2 dt 2 lc \"blue\" title 'Static Grift';"
+            `"'${logfile3}' using 0:3:( \$8 > 50 ? 0 : 1 ) with points"`
+            `"   pt 6 ps 3 palette title '${c2t}',"`
+            `"${static_mean} lw 2 dt 2 lc \"blue\" title 'Static Grift',"`
+            `"${dyn_mean} lw 2 lt 1 lc \"red\" title 'Dynamic Grift';"
     fi
 }
 

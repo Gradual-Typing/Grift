@@ -169,7 +169,7 @@ function plot_benchmark()
             `"'${logfile3}' using 0:7 with points"`
             `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
 	    `"unset xtics; unset xlabel;"`
-            `"set key top right box vertical width 1 height 1 maxcols 1 spacing 1 font 'Verdana,20';"`
+            `"set key opaque bottom left box vertical width 1 height 1 maxcols 1 spacing 1 font 'Verdana,20';"`
 	    `"set tmargin at screen TOP;"`
 	    `"set bmargin at screen TOP+0.02-DY;"`
             `"set title \"${printname}\";"`
@@ -182,7 +182,7 @@ function plot_benchmark()
             `"'${logfile3}' using 0:3:( \$8 > 50 ? 0 : 1 ) with points"`
             `"   pt 6 ps 3 palette title '${c2t}',"`
             `"${static_mean} lw 2 dt 2 lc \"blue\" title 'Static Grift',"`
-            `"${dyn_mean} lw 2 dt 2 lc \"red\" title 'Dynamic Grift';"
+            `"${dyn_mean} lw 2 lt 1 lc \"red\" title 'Dynamic Grift';"
 
     gnuplot -e "set datafile separator \",\";"`
             `"set terminal pngcairo size 1280,1900"`
@@ -221,7 +221,7 @@ function plot_benchmark()
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
             `"'${logfile3}' using 0:7 with points"`
             `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
-            `"set key top right box vertical width 1 height 1 maxcols 1 spacing 1 font 'Verdana,20';"`
+            `"set key opaque bottom left box vertical width 1 height 1 maxcols 1 spacing 1 font 'Verdana,20';"`
 	    `"set tmargin at screen TOP;"`
 	    `"set bmargin at screen TOP+0.02-DY;"`
             `"set title \"${printname}\";"`
@@ -234,7 +234,7 @@ function plot_benchmark()
             `"'${logfile3}' using 0:3:( \$8 > 50 ? 0 : 1 ) with points"`
             `"   pt 6 ps 3 palette title '${c2t}',"`
             `"${static_mean} lw 2 dt 2 lc \"blue\" title 'Static Grift',"`
-            `"${dyn_mean} lw 2 dt 2 lc \"red\" title 'Dynamic Grift';"
+            `"${dyn_mean} lw 2 lt 1 lc \"red\" title 'Dynamic Grift';"
 
     cp "${all_fig}" "${alls_dir}/${name}.png"
     cp "${mono_fig}" "${rt_casts_dir}/${name}.png"
