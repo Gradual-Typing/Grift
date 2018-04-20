@@ -47,6 +47,7 @@ run_config()
             local binpath="${b%.*}"
             local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' \
                           < "${binpath}.grift")
+	    local sample_index="$(basename $binpath)"
             local bname="$(basename $b)"
             local input="${INPUT_DIR}/${name}/${input_file}"
             
@@ -62,7 +63,7 @@ run_config()
                                  awk -v p="$PRECISION" '{printf "%.*f\n", p,$0}')
             echo $n $b $speedup
             printf "%s,%.2f,%.${PRECISION}f,%.${PRECISION}f,%.${PRECISION}f" \
-                   $bname $p $t $slowdown $speedup >> "$logfile1"
+                   $sample_index $p $t $slowdown $speedup >> "$logfile1"
 
             if [ "$CAST_PROFILER" = true ] ; then
                 # run the cast profiler
