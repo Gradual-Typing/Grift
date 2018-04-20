@@ -3,11 +3,13 @@
 function main()
 {
     TEST_DIR=${GRIFT_DIR}/benchmark/suite/macro
-    LIB_DIR="$TEST_DIR/lib"
-    LATTICE_DIR=$TEST_DIR/lattice_bins/temp
-    DATA_DIR=$LATTICE_DIR/data
-    OUT_DIR=$LATTICE_DIR/output
-    SRC_DIR=$TEST_DIR/src/partial
+    declare -r LIB_DIR="$TEST_DIR/lib"
+    declare -r LB_DIR="$TEST_DIR/lattice_bins"
+    declare -r EXP_DIR="$LB_DIR/temp"
+    declare -r DATA_DIR="$EXP_DIR/data"
+    declare -r OUT_DIR="$EXP_DIR/output"
+    declare -r SRC_DIR="$EXP_DIR/src/partial"
+    declare -r TMP_DIR="$EXP_DIR/tmp"
 
     . ${TEST_DIR}/lib/runtime.sh
 
@@ -18,25 +20,30 @@ function main()
     color1="$DGREEN"
     color2="$DPURPLE"
 
-    plot 19 17 "Monotonic" "Proxied"
-    plot 17 7 "Coercions" "Type-Based casts"
+    plot 19 17
+    plot 17 7
+    plot 17 13
+    plot 17 8
 }
 
 function plot()
 {
     local c1="$1"; shift
     local c2="$1"; shift
-    local c1t="$1"; shift
-    local c2t="$1"; shift
+
+    local config_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
+    local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
+    local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
+    local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
     
-    plot_benchmark "quicksort" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "fft" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "blackscholes" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "matmult" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "n_body" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "tak" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "array" $c1 $c2 "$c1t" "$c2t"
-    plot_benchmark "ray" $c1 $c2 "$c1t" "$c2t"
+    plot_benchmark "quicksort" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "fft" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "blackscholes" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "matmult" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "n_body" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "tak" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "array" $c1 $c2 "$c1t" "$c2t" "$ct"
+    plot_benchmark "ray" $c1 $c2 "$c1t" "$c2t" "$ct"
 }
 
 function plot_benchmark()
@@ -46,10 +53,11 @@ function plot_benchmark()
     local c2="$1"; shift
     local c1t="$1"; shift
     local c2t="$1"; shift
+    local ct="$1"; shift
 
-    local plot_dir="${OUT_DIR}/${c1}_${c2}/${name}"
-    local alls_dir="${OUT_DIR}/${c1}_${c2}/alls"
-    local rt_casts_dir="${OUT_DIR}/${c1}_${c2}/rt_casts"
+    local plot_dir="${OUT_DIR}/${ct}/${name}"
+    local alls_dir="${OUT_DIR}/${ct}/alls"
+    local rt_casts_dir="${OUT_DIR}/${ct}/rt_casts"
 
     mkdir -p "$plot_dir"
     mkdir -p "$alls_dir"
@@ -72,8 +80,8 @@ function plot_benchmark()
 	return
     fi
     
-    sort -k2 -n -t, "${DATA_DIR}/${name}${c1}.log" > "${logfile1}"
-    sort -k2 -n -t, "${DATA_DIR}/${name}${c2}.log" > "${logfile3}"
+    tail -n +2 "${DATA_DIR}/${name}${c1}.log" | sort -k2 -n -t, > "${logfile1}"
+    tail -n +2 "${DATA_DIR}/${name}${c2}.log" | sort -k2 -n -t, > "${logfile3}"
 
     print_aux_name=""
     printname="$(echo "$name" | tr _ "-")${print_aux_name}"
@@ -88,8 +96,8 @@ function plot_benchmark()
     runtime_mean "$logfile3"
     rt2="$RETURN"
 
-    dyn_mean=$(cat "${LATTICE_DIR}/dyn/${name}${disk_aux_name}17.runtime")
-    static_mean=$(cat "${LATTICE_DIR}/static/${name}${disk_aux_name}.static.runtime")
+    dyn_mean=$(cat "${TMP_DIR}/dyn/${name}${disk_aux_name}17.runtime")
+    static_mean=$(cat "${TMP_DIR}/static/${name}${disk_aux_name}.static.runtime")
 
     gnuplot -e "set datafile separator \",\";"`
             `"set terminal pngcairo size 1280,960"`
