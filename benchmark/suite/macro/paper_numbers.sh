@@ -28,6 +28,8 @@ function main()
 
     run_double 19 17
     run_double 17 7
+    run_double 17 13
+    run_double 17 8
     
     run_single $baseline_system 19
     run_single $baseline_system 17
@@ -49,29 +51,29 @@ function run_double()
     local ct=$(echo $config_str | sed -n 's/.*,.*,\(.*\)/\1/p;q')
 
     # Blackscholes
-    run_two_benchmarks $c1 $c2 "$ct" "blackscholes" "in_4K.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "blackscholes" "in_4K.txt"
     
     # Quicksort
-    run_two_benchmarks $c1 $c2 "$ct" "quicksort" "in_descend1000.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "quicksort" "in_descend1000.txt"
     
     # Matrix Multiplication
-    run_two_benchmarks $c1 $c2 "$ct" "matmult" "400.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "matmult" "400.txt"
     
     # N Body Simulation
-    run_two_benchmarks $c1 $c2 "$ct" "n_body" "slow.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "n_body" "slow.txt"
     
     # Fast Fourier Transform
-    run_two_benchmarks $c1 $c2 "$ct" "fft" "slow.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "fft" "slow.txt"
     
     # Scheme Array Benchmark
-    run_two_benchmarks $c1 $c2 "$ct" "array" "slow.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "array" "slow.txt"
     
     # Tak
-    run_two_benchmarks $c1 $c2 "$ct" "tak" "slow.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "tak" "slow.txt"
 
-    run_two_benchmarks $c1 $c2 "$ct" "ray" "empty.txt"
+    run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "ray" "empty.txt"
 
-    echo "finished comparing" $c1 " to " $c2 ", where speedups range from "\
+    echo "finished comparing $c1t to $c2t with $ct, where speedups range from "\
 	 $MIN_SPEEDUP " to " $MAX_SPEEDUP ", with a mean of" $MEAN_SPEEDUP
 }
 
@@ -91,35 +93,23 @@ function run_single()
     
     # Quicksort
     run_benchmark $baseline_system $c "$ct" "quicksort" "in_descend1000.txt"
-    g+=($RETURN)
     
     # Matrix Multiplication
     run_benchmark $baseline_system $c "$ct" "matmult" "400.txt"
-    g+=($RETURN)
     
     # N Body Simulation
     run_benchmark $baseline_system $c "$ct" "n_body" "slow.txt"
-
-    g+=($RETURN)
     
     # Fast Fourier Transform
     run_benchmark $baseline_system $c "$ct" "fft" "slow.txt"
-    g+=($RETURN)
     
     # Scheme Array Benchmark
     run_benchmark $baseline_system $c "$ct" "array" "slow.txt"
-    g+=($RETURN)
     
     # Tak
     run_benchmark $baseline_system $c "$ct" "tak" "slow.txt"
-    g+=($RETURN)
 
     run_benchmark $baseline_system $c "$ct" "ray" "empty.txt"
-    g+=($RETURN)
-
-    # IFS=$'\n'
-    # max=$(echo "${g[*]}" | sort -nr | head -n1)
-    # min=$(echo "${g[*]}" | sort -n | head -n1)
 
     echo "finished running" $c ", where speedups range from " $MIN_SPEEDUP " to " $MAX_SPEEDUP
 }
@@ -162,12 +152,15 @@ function run_two_benchmarks()
     local c1="$1"; shift
     local c2="$1"; shift
     local ct="$1"; shift
+    local c1t="$1"; shift
+    local c2t="$1"; shift
     local name="$1"; shift
     local input_file="$1";  shift
 
     local disk_aux_name=""
     local logfile1="${DATA_DIR}/${name}${c1}.log"
     local logfile2="${DATA_DIR}/${name}${c2}.log"
+    local analysis_dir="${OUT_DIR}/analysis/${ct}"
 
     if [ ! -f "$logfile1" ]; then
 	return
@@ -177,19 +170,39 @@ function run_two_benchmarks()
 	return
     fi
 
+    mkdir -p "$analysis_dir"
+
     local tmp1_logfile="tmp1"
     local tmp2_logfile="tmp2"
     local tmp3_logfile="tmp3"
     local tmp4_logfile="tmp4"
+    local tmp5_logfile="tmp5"
+    local tmp6_logfile="tmp6"
+    local tmp7_logfile="tmp7"
+    local speedup_logfile="${analysis_dir}/${name}.log"
+
+    local logfile3="${logfile1}.sorted1"
+    local logfile4="${logfile2}.sorted1"
+
+    # delete the extension from file names in the logfile so that we can sort them
+    #tail -n +2 "$logfile1" | sed "s/.o${c1}//1" | sort -k1 -n -t, > "${logfile3}"
+    tail -n +2 "$logfile1" | sort -k1 -n -t, > "${logfile3}"
+    tail -n +2 "$logfile2" | sort -k1 -n -t, > "${logfile4}"
 
     # extract the runtime columns (3rd) from each logfile and put them together
     # in a temporary file
-    awk -F"," 'BEGIN { OFS = "," } {print $3}' "$logfile1" > "$tmp1_logfile"
-    awk -F"," 'BEGIN { OFS = "," } {print $3}' "$logfile2" > "$tmp2_logfile"
+    awk -F"," 'BEGIN { OFS = "," } {print $3}' "$logfile3" > "$tmp1_logfile"
+    awk -F"," 'BEGIN { OFS = "," } {print $3}' "$logfile4" > "$tmp2_logfile"
     paste -d , "$tmp1_logfile" "$tmp2_logfile" > "$tmp3_logfile"
 
     # compute speedup of the first config over the second
-    tail -n +2 "$tmp3_logfile" | awk  -F "," '{printf "%4.2f\n", $2/$1 }' > "$tmp4_logfile"
+    awk  -F "," '{printf "%4.2f\n", $2/$1 }' "$tmp3_logfile" > "$tmp4_logfile"
+
+    # extract file names
+    awk -F"," 'BEGIN { OFS = "," } {print $1}' "$logfile3" > "$tmp5_logfile"
+
+    echo "filename,${c1t} runtime,${c2t} runtime,speedup of ${c1t} over ${c2t}" > "$speedup_logfile"
+    paste -d , "$tmp5_logfile" "$tmp3_logfile" "$tmp4_logfile" >> "$speedup_logfile"
     
     local max_speedup=$(sort -n "$tmp4_logfile" | tail -1)
     local min_speedup=$(sort -n "$tmp4_logfile" | head -1)
