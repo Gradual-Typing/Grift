@@ -1,12 +1,16 @@
 #lang typed/racket/base
 
-(require "../helpers.rkt"
-         "../unique-identifiers.rkt"
+(require "../unique-identifiers.rkt"
          "../errors.rkt"
+         (submod "../logging.rkt" typed)
          (for-syntax racket/base)
-         racket/match)
+         racket/match
+         racket/set)
 
-(provide (all-defined-out)
+(module+ test
+  (require typed/rackunit))
+
+(provide (except-out (all-defined-out) Scope-open)
          (all-from-out "../unique-identifiers.rkt"))
 
 #|
@@ -28,32 +32,49 @@ And a type constructor "name" expecting the types of field1 and field2
 
 (define-syntax (define-forms stx)
   (syntax-case stx ()
-    [(_ (name* field** ...) ...)
+    [(_ super (name* field** ...) ...)
      (let ([f** (syntax->list #'((field** ...) ...))])
        (with-syntax ([((type** ...) ...) (map generate-temporaries f**)])
          #'(begin
              (struct (type** ...) name* ([field** : type**] ...) #:transparent)
              ...)))]))
 
-(define-forms
-  ;; Top level wrapper for combining compiler
+;; These struct types describe how AST are mapped
+;; and form a unsafe description of how to map an AST
+(struct form () #:transparent)
+;; Leaf Nodes Contain No other AST Nodes only data
+;; maping them is always the identity.
+(struct form:leaf form () #:transparent)
+;; Simple branchest just apply the function being maped to each sub-field
+;; if the subfield contains a proper list then it is maped with map
+;; any non-form subfields are left alone.
+(struct form:simple-branch form () #:transparent)
+;; Custom-branches have custom defined mapping behavior in form-map.rkt
+(struct form:custom-branch form () #:transparent)
+
+(define-forms form:leaf
+  ;; Top Level expression marker
+  (Expression e)
+  ;; Variable node
+  (Var id)
+  ;; Global is for referencing global variables by their names as strings
+  (Global id))
+
+(define-forms form:simple-branch
+  ;; Conditionals
+  (If test then else)
+    ;; Top level wrapper for combining compiler
   ;; state, meta-information, and the program AST
   (Prog annotation expression)
+  ;; Top level define marker
   (Define rec? id type expression)
-  ;; Top Level Forms
-  (Expression e)
   ;; Annotations that may be added to other AST nodes
   (Ann value data)
+  (Ann2 value data) ;; This is a hack to work around a bug
   ;; Function abstraction
   (Lambda formals body)
   ;; Function application 
   (App operator operands)
-  ;; Variable node
-  (Var id)
-  ;; Global is for referencing global variables by their names as strings
-  (Global id)
-  ;; Conditionals
-  (If test then else)
   ;; Type ascription
   (Ascribe expression type label)
   ;; Primitive operators application 
@@ -156,13 +177,19 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-Tuple-Huh type)
   (Type-Tuple-num type)
   (Type-Tuple-item type index)
+  (Type-Mu-Huh type)
+  (Type-Mu-Body type)
   ;; closure Representation
   (App-Closure code data exprs)
   (Closure-Data code caster variables)
   (Closure-code var)
   (Closure-ref this var)
   (Closure-caster this)
-  (Let-Static* type-bindings crcn-bindings body)
+  (Let-Static* mu-type-bindings
+               type-bindings
+               mu-crcn-bindings
+               crcn-bindings
+               body)
   (Static-Id id)
   (LetP bindings body)
   (LetC bindings body);; Can create cyclic immutable data
@@ -226,10 +253,12 @@ And a type constructor "name" expecting the types of field1 and field2
   (Guarded-Proxy-Target guarded)
   (Guarded-Proxy-Blames guarded)
   (Guarded-Proxy-Coercion guarded)
-  (Guarded-Proxy-Huh expression))
+  (Guarded-Proxy-Huh expression)
+  )
 
 (define-type (Switch-Case  e) (Pair (Listof Integer) e))
 (define-type (Switch-Case* e) (Listof (Switch-Case e)))
+
 
 (: map-switch-case :
    (All (A B) (A -> B) -> ((Switch-Case A) -> (Switch-Case B))))
@@ -243,8 +272,6 @@ And a type constructor "name" expecting the types of field1 and field2
 
 (define NO-OP (No-Op))
 
-
-
 (define-type Blame-Label String)
 (define blame-label? string?)
 
@@ -252,19 +279,136 @@ And a type constructor "name" expecting the types of field1 and field2
 #| Types throughout the languages |#
 
 ;; Grift types
-(define-forms
-  (Unit)
-  (Int)
-  (Float)
-  (Bool)
-  (Character)
-  (Dyn)
-  (Fn arity fmls ret)
-  (MRef  arg)
-  (MVect arg)
-  (GRef  arg)
-  (GVect arg)
-  (STuple num items))
+(struct type ()
+  #:transparent)
+(struct structural-type type ()
+  #:transparent)
+(struct base-type structural-type ()
+  #:transparent
+)
+(define-type Base-Type base-type)
+(struct logical-type type ()
+  #:transparent)
+(struct Unit base-type ()
+  #:transparent)
+(struct Int base-type ()
+  #:transparent)
+(struct Float base-type ()
+  #:transparent)
+(struct Bool base-type ()
+  #:transparent)
+(struct Character base-type ()
+  #:transparent)
+(struct Dyn structural-type ()
+  #:transparent)
+(struct (Arity Fmls Ret)
+  Fn structural-type
+  ([arity : Arity][fmls : Fmls] [ret : Ret])
+  #:transparent)
+(struct (Arg) MRef structural-type ([arg : Arg])
+  #:transparent)
+(struct (Arg) MVect structural-type ([arg : Arg])
+  #:transparent)
+(struct (Arg) GRef structural-type ([arg : Arg])
+  #:transparent)
+(struct (Arg) GVect structural-type ([arg : Arg])
+  #:transparent)
+(struct (Num Items) STuple structural-type ([num : Num] [items : Items])
+  #:transparent)
+;; Not a type but abstraction enforcement
+(struct (A) Scope ([open : A])
+  #:transparent)
+(struct (A) Mu logical-type ([body : A])
+  #:transparent)
+(struct TVar ([index : Nat])
+  #:transparent)
+(struct FVar ([name : Uid])
+  #:transparent)
+
+(: grift-type-map : Grift-Type (Grift-Type -> Grift-Type) -> Grift-Type)
+(define (grift-type-map t f)
+  (match t
+    [(Fn n a* r)
+     (Fn n (map f a*) (f r))]
+    [(STuple n a*)
+     (STuple n (map f a*))]
+    [(GVect a)
+     (GVect (f a))]
+    [(GRef a)
+     (GRef (f a))]
+    [(MVect a)
+     (MVect (f a))]
+    [(MRef a)
+     (MRef (f a))]
+    [(Mu (Scope t))
+     (Mu (Scope (f t)))]
+    [t t]))
+
+(: grift-type-instantiate/used? : (Scope Grift-Type) Grift-Type -> (Values Grift-Type Boolean))
+(define (grift-type-instantiate/used? s t1)
+  (define used? : (Boxof Boolean) (box #f))
+  (: subst : Natural -> (Grift-Type -> Grift-Type))
+  (define (subst i)
+    (: rec : Grift-Type -> Grift-Type)
+    (define (rec t0)
+      (define who 'grift-type-instantiate:subst:rec)
+      (debug off who s t1 i t0)
+      (cond
+        [(and (TVar? t0) (= i (TVar-index t0)))
+         (set-box! used? #t)
+         t1]
+        [(Mu? t0) (Mu (Scope ((subst (+ 1 i)) (Scope-open (Mu-body t0)))))]
+        [else (grift-type-map t0 rec)]))
+    rec)
+  (define t2 ((subst 0) (Scope-open s)))
+  (values t2 (unbox used?)))
+
+(: grift-type-instantiate : (Scope Grift-Type) Grift-Type -> Grift-Type)
+(define (grift-type-instantiate s t)
+  (define-values (t0 _) (grift-type-instantiate/used? s t))
+  t0)
+
+(module+ test
+  (define u1 (Uid "foo" 0))
+  (define u2 (Uid "bar" 1))
+
+  (define ln1 (Mu (Scope (STuple 2 (list (FVar u1) (TVar 0))))))
+
+  (check-equal? (grift-type-instantiate (Mu-body ln1) (FVar u2))
+                (STuple 2 (list (FVar u1) (FVar u2))))
+  (check-equal? (grift-type-instantiate (Mu-body ln1) ln1)
+                (STuple 2 (list (FVar u1)
+                                (Mu (Scope (STuple 2 (list (FVar u1) (TVar 0))))))))
+  (check-equal? (grift-type-abstract u1 ln1)
+                (Scope (Mu (Scope (STuple 2 (list (TVar 1) (TVar 0)))))))
+
+  )
+
+
+;; Close over a free variable in a type
+;; Uid Grift-Type -> Grift-Type
+(: grift-type-abstract/used? : Uid Grift-Type -> (Values (Scope Grift-Type) Boolean))
+(define (grift-type-abstract/used? x t)
+  (define used? : (Boxof Boolean) (box #f))
+  (: subst : Natural -> (Grift-Type -> Grift-Type))
+  (define (subst i)
+    (: rec : Grift-Type -> Grift-Type)
+    (define (rec t)
+      (cond
+        [(and (FVar? t) (equal? x (FVar-name t)))
+         (set-box! used? #t)
+         (TVar i)]
+        [(Mu? t) (Mu (Scope ((subst (+ 1 i)) (Scope-open (Mu-body t)))))]
+        [else (grift-type-map t rec)]))
+    rec)
+  (define s (Scope ((subst 0) t)))
+  (values s (unbox used?)))
+
+(: grift-type-abstract : Uid Grift-Type -> (Scope Grift-Type))
+(define (grift-type-abstract x t)
+  (define-values (s _) (grift-type-abstract/used? x t))
+  s)
+
 
 ;;Constants for the types
 (define UNIT-TYPE (Unit))
@@ -339,33 +483,50 @@ And a type constructor "name" expecting the types of field1 and field2
       (ref-shallow-consistent? t g)))
 
 
-(: completely-static-type? (-> Grift-Type Boolean))
 ;; Is the type t devoid of dyn?
+(: completely-static-type? : Grift-Type -> Boolean)
 (define (completely-static-type? t)
   ;; Typed Racket made me do it
   ;; This uber modular structure speeds up type checking
-  (define (fn-completely-static? [t : Grift-Type]): Boolean
+  (define-type CST-Type
+    (Grift-Type (Setof (Mu (Scope Grift-Type))) -> Boolean))
+  ;; Is it a completely static function type?
+  (: fn-completely-static? CST-Type)
+  (define (fn-completely-static? t ms)
     (and (Fn? t)
-         (andmap completely-static-type? (Fn-fmls t))
-         (completely-static-type? (Fn-ret t))))
-  (define (tuple-completely-static? [t : Grift-Type]): Boolean
-    (and (STuple? t)
-         (andmap completely-static-type? (STuple-items t))))
-  (define (ref-completely-static? [t : Grift-Type])
-    (or (and (GRef? t) (completely-static-type? (GRef-arg t)))
-        (and (MRef? t) (completely-static-type? (MRef-arg t)))
-        (and (GVect? t) (completely-static-type? (GVect-arg t)))
-        (and (MVect? t) (completely-static-type? (MVect-arg t)))))
-  (or (Int? t)
-      (Bool? t)
-      (Character? t)
-      (Float? t)
-      (Unit? t)
-      (fn-completely-static? t)
-      (tuple-completely-static? t)
-      (ref-completely-static? t)))
-
-
+         (andmap (cst/ms? ms) (Fn-fmls t))
+         (cst? (Fn-ret t) ms)))
+  ;; Is it a completely static tuple type?
+  (: tuple-completely-static? CST-Type)
+  (define (tuple-completely-static? t ms)
+    (and (STuple? t) (andmap (cst/ms? ms) (STuple-items t))))
+  ;; Is it a completely static reference type?
+  (: ref-completely-static? CST-Type)
+  (define (ref-completely-static? t ms)
+    (or (and (GRef? t) (cst? (GRef-arg t) ms))
+        (and (MRef? t) (cst? (MRef-arg t) ms))
+        (and (GVect? t) (cst? (GVect-arg t) ms))
+        (and (MVect? t) (cst? (MVect-arg t) ms))))
+  ;; Is it a completely static recursive type?
+  (: mu-completely-static? CST-Type)
+  (define (mu-completely-static? t ms)
+    (and (Mu? t)
+         (or (set-member? ms t)
+             (cst? (grift-type-instantiate (Mu-body t) t) (set-add ms t)))))
+  (: cst/ms? : (Setof (Mu (Scope Grift-Type))) -> (Grift-Type -> Boolean))
+  (define ((cst/ms? ms) t) (cst? t ms))
+  (: cst? CST-Type)
+  (define (cst? t ms)
+    (or (Int? t)
+        (Bool? t)
+        (Character? t)
+        (Float? t)
+        (Unit? t)
+        (fn-completely-static? t ms)
+        (tuple-completely-static? t ms)
+        (ref-completely-static? t ms)
+        (mu-completely-static? t ms)))
+  (cst? t (set)))
 
 
 #|-----------------------------------------------------------------------------+
@@ -403,24 +564,16 @@ class literal constants
     [(null? x)    UNIT-TYPE]
     [else (error 'language/grift-literal->type "~a" x)]))
 
-;; Types in the grift languages
-(define-type  Base-Type (U Int Bool Unit Character Float))
-
-(: base-type? (Any -> Boolean : Base-Type))
-(define (base-type? x)
-  (or (Int? x)
-      (Bool? x)
-      (Character? x)
-      (Unit? x)
-      (Float? x)))
-
 (define-type+ Grift-Type ([Grift-Type* Listof]
-			  [Grift-Type? Option])
+                          [Grift-Type? Option])
   (U Dyn
      Base-Type
      Grift-Fn-Type
      Grift-Ref-Type
-     Grift-Tuple-Type))
+     Grift-Tuple-Type
+     Grift-Mu-Type
+     FVar
+     TVar))
 
 ;; type known at runtime only for monotonic references, the uid is for
 ;; the entire reference cell, you have to access the second component
@@ -438,6 +591,9 @@ class literal constants
      (MRef  Grift-Type)
      (MVect Grift-Type)))
 
+(define-type Grift-Mu-Type
+  (Mu (Scope Grift-Type)))
+
 (define-type Atomic-Type (U Base-Type Dyn))
 
 (: atomic-type? : Any -> Boolean : Atomic-Type)
@@ -449,73 +605,83 @@ class literal constants
   (or (atomic-type? x)
       (grift-fn? x)
       (grift-ref? x)
-      (grift-tuple? x)))
+      (grift-tuple? x)
+      (grift-mu? x)
+      (TVar? x)
+      (FVar? x)))
+
 
 (define-predicate grift-type*? Grift-Type*)
-
 (define-predicate grift-fn? Grift-Fn-Type)
 (define-predicate grift-tuple? Grift-Tuple-Type)
 (define-predicate grift-ref? Grift-Ref-Type)
+(define-predicate grift-mu? Grift-Mu-Type)
+
+
 
 (define-type+ Grift-Fml ([Grift-Fml* Listof])
   (Fml Uid Grift-Type))
 
-
-
-(define-type ConsistentT (Grift-Type Grift-Type -> Boolean))
-(: consistent? ConsistentT)
+(: consistent? (Grift-Type Grift-Type -> Boolean))
 (define (consistent? t g)
-  ;; Typed racket made me structure the code this way.
-  (: both-unit? ConsistentT)
-  (define (both-unit? t g) (and (Unit? t) (Unit? g)))
-  (: both-bool? ConsistentT)
-  (define (both-bool? t g) (and (Bool? t) (Bool? g)))
-  (: both-int? ConsistentT)
-  (define (both-int? t g) (and (Int? t) (Int? g)))
-  (: both-char? ConsistentT)
-  (define (both-char? t g) (and (Character? t) (Character? g)))
-  (: both-float? ConsistentT)
-  (define (both-float? t g) (and (Float? t) (Float? g)))
-  (: consistent-fns? ConsistentT)
-  (define (consistent-fns? t g)
-    (and (Fn? t) (Fn? g)
-         (= (Fn-arity t) (Fn-arity g))
-         (andmap consistent? (Fn-fmls t) (Fn-fmls g))
-         (consistent? (Fn-ret t) (Fn-ret g))))
-  (: consistent-tuples? ConsistentT)
-  (define (consistent-tuples? t g)
-    (and (STuple? t) (STuple? g)
-         (= (STuple-num t) (STuple-num g))
-         (andmap consistent? (STuple-items t) (STuple-items g))))
-  (: consistent-grefs? ConsistentT)
-  (define (consistent-grefs? t g)
-    (and (GRef? t) (GRef? g)
-         (consistent? (GRef-arg t) (GRef-arg g))))
-  (: consistent-gvects? ConsistentT)
-  (define (consistent-gvects? t g)
-    (and (GVect? t) (GVect? g)
-         (consistent? (GVect-arg t) (GVect-arg g))))
-  (: consistent-mrefs? ConsistentT)
-  (define (consistent-mrefs? t g)
-    (and (MRef? t) (MRef? g)
-         (consistent? (MRef-arg t) (MRef-arg g))))
-  (: consistent-mvects? ConsistentT)
-  (define (consistent-mvects? t g)
-    (and (MVect? t) (MVect? g)
-         (consistent? (MVect-arg t) (MVect-arg g))))
-  (or (Dyn? t)
-      (Dyn? g)
-      (both-unit? t g)
-      (both-bool? t g)
-      (both-int? t g)
-      (both-char? t g)
-      (both-float? t g)
-      (consistent-fns? t g)
-      (consistent-tuples? t g)
-      (consistent-grefs? t g)
-      (consistent-gvects? t g)
-      (consistent-mrefs? t g)
-      (consistent-mvects? t g)))
+  (: set-memp : (All (A) (Setof A) A -> (Option (Setof A))))
+  (define (set-memp st x)
+    (and (set-member? st x) st))
+  (: andfold
+     (All (A B)
+          (A B -> (Option B)) (Option B) (Listof A)
+          -> (Option B)))
+  (define (andfold f a ls)
+    (cond
+      [(not a) #f]
+      [(null? ls) a]
+      [else (andfold f (f (car ls) a) (cdr ls))]))  
+  (: consist-pair? :
+     (Pairof Grift-Type Grift-Type)
+     (Setof (Pairof Grift-Type Grift-Type)) ->
+     (Option (Setof (Pairof Grift-Type Grift-Type))))
+  (define (consist-pair? p ms)
+    (consist? (car p) (cdr p) ms))
+  (: consist?-fold :
+     (Option (Setof (Pairof Grift-Type Grift-Type)))
+     (Listof Grift-Type) (Listof Grift-Type) ->
+     (Option (Setof (Pairof Grift-Type Grift-Type))))
+  (define (consist?-fold ms l1 l2)
+    (let ([cons (inst cons Grift-Type Grift-Type)])
+      (andfold consist-pair? ms (map cons l1 l2))))
+  (: consist? :
+     Grift-Type Grift-Type (Setof (Pairof Grift-Type Grift-Type))
+     -> (Option (Setof (Pairof Grift-Type Grift-Type))))
+  (define (consist? t g ms)
+    (match* (t g)
+      [(_ _) #:when (or (Dyn? t) (Dyn? g) (equal? t g))
+       ms]
+      [((Mu s) _)
+       (define p (cons t g))
+       (or (set-memp ms p)
+           (consist? (grift-type-instantiate s t) g (set-add ms p)))]
+      [(_ (Mu s))
+       (define p (cons t g))
+       (or (set-memp ms p)
+           (consist? t (grift-type-instantiate s g) (set-add ms p)))]
+      [((Fn n ta tr) (Fn n ga gr))
+       (consist?-fold (consist? tr gr ms) ta ga)]
+      [((STuple n ta) (STuple n ga))
+       (consist?-fold ms ta ga)]
+      [((GRef t0) (GRef g0)) (consist? t0 g0 ms)]
+      [((GVect t0) (GVect g0)) (consist? t0 g0 ms)]
+      [((MRef t0) (MRef g0)) (consist? t0 g0 ms)]
+         [((MVect t0) (MVect g0)) (consist? t0 g0 ms)]
+      [(_ _) #f]))
+  ;; map truthy values to true
+  (not (not (consist? t g (set)))))
+
+(module+ test
+  (define mu-dyn : Grift-Type
+    (Mu (Scope (STuple 2 (list DYN-TYPE (TVar 0))))))
+  (define mu-int : Grift-Type
+    (Mu (Scope (STuple 2 (list INT-TYPE (TVar 0))))))
+  (test-equal? "Mu type" (consistent? mu-dyn mu-int) #t))
 
 (struct Bottom ([t1 : Grift-Type] [t2 : Grift-Type]) #:transparent)
 (define-type Grift-Type?! (U Bottom Grift-Type))
@@ -536,23 +702,60 @@ class literal constants
     [(t t) t]
     [(t g) (exit (Bottom t g))]))
 
+(define-type Grift-Mu-Map
+  (HashTable (Pairof Grift-Type Grift-Type) FVar))
+
 (: move :
    (Grift-Type Grift-Type -> Grift-Type)
    -> (Grift-Type Grift-Type -> Grift-Type))
-(define ((move u/d/fail) t g)
-  (let m : Grift-Type ([t : Grift-Type t] [g : Grift-Type g])
-       (match* (t g)
-         [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
-          (Fn ta (map m ta* ga*) (m tr gr))]
-         [((STuple ta t*) (STuple ga g*)) #:when (= ta ga)
-          (STuple ta (map m t* g*))]
+(define (move u/d/fail)
+  (: mv/e : Grift-Mu-Map -> (Grift-Type Grift-Type -> Grift-Type))
+  (define (mv/e e)
+    (: mv : Grift-Type Grift-Type -> Grift-Type)
+    (define (mv t g)
+      (match* (t g) 
+        [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
+         (Fn ta (map mv ta* ga*) (mv tr gr))]
+        [((STuple ta t*) (STuple ga g*)) #:when (= ta ga)
+         (STuple ta (map mv t* g*))]
          [((GRef t) (GRef g))
-          (GRef (m t g))]
+          (GRef (mv t g))]
          [((GVect t) (GVect g))
-          (GVect (m t g))]
+          (GVect (mv t g))]
          [((MRef t) (MRef g))
-          (MRef (m t g))]
-         [(t g) (u/d/fail t g)])))
+          (MRef (mv t g))]
+         [(t g) #:when (or (Mu? t) (Mu? g))
+          (define p (cons t g))
+          (define x? (hash-ref e p #f))
+          (cond
+            [x? x?]
+            [else
+             (: move-mu :
+                Grift-Mu-Type (Grift-Mu-Map Grift-Type -> Grift-Type) ->
+                Grift-Type)
+             (define (move-mu t mv)
+               (match-define (Mu s) t)
+               (define u  (next-uid! 'r))
+               (define t0 (grift-type-instantiate s t))
+               (define t1  (mv (hash-set e p (FVar u)) t0))
+               (define-values (s0 used?) (grift-type-abstract/used? u t1))
+               (cond
+                 [(not used?) t1]
+                 [else (Mu s0)]))
+             (match* (t g) 
+               [((Mu _) g)
+                (: mv/other : Grift-Mu-Map Grift-Type -> Grift-Type)
+                (define (mv/other e t0) ((mv/e e) t0 g))
+                (move-mu t mv/other)]
+               [(t (Mu _))
+                (: mv/other : Grift-Mu-Map Grift-Type -> Grift-Type)
+                (define (mv/other e g0) ((mv/e e) t g0))
+                (move-mu g mv/other)])])]
+         [(t g) (u/d/fail t g)]))
+    mv)
+  (mv/e (hash)))
+
+
 
 (: move?! : ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type))
    -> (Grift-Type Grift-Type -> Grift-Type?!))
@@ -584,18 +787,14 @@ class literal constants
 (: meet+ : Grift-Type* -> Grift-Type?!)
 (define meet+ (move+ down))
 
-(define-forms
+(define-forms form:simple-branch
   (Coercion coercion)
   (Twosome type1 type2 lbl)
   ;; TODO Come up with a better name for this
   (Quote-Coercion const)
   (Compose-Coercions fst snd)
   (Make-Coercion t1 t2)
-  ;; Identity Cast
-  ;; "Calculated No Op Cast"
-  (Identity)
   (Id-Coercion-Huh expression)
-  (Id-Coercion)
   ;; Projection Coercion
   ;; "Project from dynamic at type blaming label if it fails"
   ;; G?ˡ in most papers
@@ -681,6 +880,12 @@ class literal constants
   (HC-T1 hc)
   (HC-T2 hc))
 
+(define-forms form:leaf
+  ;; Identity Cast
+  ;; "Calculated No Op Cast"
+  (Identity)
+  (Id-Coercion))
+
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Grift-Type))
 
@@ -719,6 +924,7 @@ class literal constants
      Hyper-Coercion
      (Mediating-Coercion Hyper-Coercion)))
 
+(define-type Mixed-Coercion* (Listof Mixed-Coercion))
 
 (define IDENTITY : Identity (Identity))
 (define ID-EXPR (Quote-Coercion IDENTITY))
@@ -749,6 +955,7 @@ class literal constants
      (GRef Immediate-Type) (MRef Immediate-Type)
      (GVect Immediate-Type) (MVect Immediate-Type)))
 
+(define-type Mu-Compact-Type (Mu Immediate-Type))
 ;; Represent the shallow tree structure of coercions where all
 ;; subtrees of the type are either atomic types, the identity coercion
 ;; or coercion identifiers.
@@ -765,6 +972,8 @@ class literal constants
      (MonoVect Immediate-Type)
      (CTuple Index (Listof Immediate-Coercion))
      (Ref Immediate-Coercion Immediate-Coercion Proxied-Symbol)))
+
+(define-type Mu-Compact-Coercion (Mu Immediate-Coercion))
 
 (define-type Immediate-Type (U Atomic-Type (Static-Id Uid)))
 

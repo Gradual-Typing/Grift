@@ -88,6 +88,9 @@
           [((Tuple-proj x xi) (Tuple-proj y yi))
            (and (equal? xi yi)
                 (recur/env x y))] 
+          [((list xs ...) (list ys ...))
+           (and (= (length xs) (length ys))
+                (andmap recur/env xs ys))]
           [(x y) (equal? x y)])))
   (when #f (debug x y res))
   res)

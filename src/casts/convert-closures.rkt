@@ -34,15 +34,22 @@
   (define cr  (cast-representation))
   (define fr 'Hybrid)
   (match-let ([(Prog (list name count type)
-                     (Let-Static* tbnd* cbnd* exp)) prgm])
+                 (Let-Static* mu-tbnd*
+                              tbnd*
+                              mu-cbnd*
+                              cbnd*
+                              exp)) prgm])
     (let* ([next : (Boxof Nat) (box count)]
            [bndp : (HashTable Integer BP) (make-hash)]
            [exp ;; This is an abusively long function call
             (cc-expr cr fr next bndp empty-env empty-env no-selfp exp)]
            [next : Nat (unbox next)])
       (Prog (list name count type)
-       (Let-Static* tbnd* cbnd*
-        (LetP (hash-values bndp) exp))))))
+        (Let-Static* mu-tbnd*
+                     tbnd*
+                     mu-cbnd*
+                     cbnd*
+                     (LetP (hash-values bndp) exp))))))
 
 (define-type BP  CoC6-Bnd-Procedure)
 (define-type BC  CoC6-Bnd-Closure)

@@ -8,8 +8,11 @@
 
 (define-type Lambda1-Lang
   (Prog (List String Natural Grift-Type)
-        (Let-Static* Bnd-Type* Bnd-Crcn*
-                     L1-Expr)))
+    (Let-Static* Bnd-Mu-Type*
+                 Bnd-Type*
+                 Bnd-Mu-Crcn*
+                 Bnd-Crcn*
+                 L1-Expr)))
 
 (define-type L1-Lambda (Lambda Uid* (Castable (Option Uid) L1-Expr)))
 

@@ -1,7 +1,7 @@
 (define ones : (Rec X (-> (Tuple Int X)))
   (lambda () (tuple 1 ones)))
 
-(define (stream-ref [s : (Rec (-> (Tuple Int X)))]
+(define (stream-ref [s : (Rec X (-> (Tuple Int X)))]
                     [i : Int])
   (if (< i 1)
       (tuple-proj (s) 0)

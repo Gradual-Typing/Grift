@@ -31,7 +31,11 @@
 (: purify-letrec (Lambda0-Lang -> Lambda1-Lang))
 (define (purify-letrec prgm)
   (match-define (Prog (list prgm-name prgm-next prgm-type)
-                  (Let-Static* prgm-type-bnd* prgm-crcn-bnd* prgm-expr))
+                  (Let-Static* mu-type-bnd*
+                               prgm-type-bnd*
+                               mu-crcn-bnd*
+                               prgm-crcn-bnd*
+                               prgm-expr))
     prgm)
 
   (define unique (make-unique-counter prgm-next))
@@ -41,7 +45,11 @@
       (pl-expr prgm-expr)))
   
   (Prog (list prgm-name (unique-counter-next! unique) prgm-type)
-    (Let-Static* prgm-type-bnd* prgm-crcn-bnd* expr/pure-letrec)))
+    (Let-Static* mu-type-bnd*
+                 prgm-type-bnd*
+                 mu-crcn-bnd*
+                 prgm-crcn-bnd*
+                 expr/pure-letrec)))
 
 ;; TODO: is it possible to merge simple? and pl-expr to make only one
 ;; pass over the AST?
@@ -146,6 +154,8 @@
     [(Type-GVect-Of e) (recur e)]
     [(Type-GRef-Huh e) (recur e)]
     [(Type-GVect-Huh e) (recur e)]
+    [(Type-Mu-Huh e) (recur e)]
+    [(Type-Mu-Body e) (recur e)]
     [(Type-Tag e) (recur e)]
     [(Blame e) (recur e)]
     [(Observe e t) (recur e)]
@@ -398,6 +408,10 @@
      (Type-GRef-Huh e)]
     [(Type-GVect-Huh (app recur e))
      (Type-GVect-Huh e)]
+    [(Type-Mu-Huh (app recur e))
+     (Type-Mu-Huh e)]
+    [(Type-Mu-Body (app recur e))
+     (Type-Mu-Body e)]
     [(Type-Tag (app recur e))
      (Type-Tag e)]
     [(Construct t v (app recur* e*))

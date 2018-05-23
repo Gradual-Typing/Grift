@@ -248,21 +248,51 @@
        (define (gen-access-func-name field-string)
          (format-id stx "~a-~a-~a-access"
                     namespace-string name-string field-string))
+       (define (gen-assign-func-name field-string)
+         (format-id stx "~a-~a-~a-assign"
+                    namespace-string name-string field-string))
        (define (gen-index-func-access field-string index-def)
-         (define/with-syntax func-name (gen-access-func-name field-string))
-         (define/with-syntax access-arg (generate-temporary))
-         #`(define (func-name [access-arg : D0-Expr]) : D0-Expr
-             (sr-tagged-array-ref access-arg tag-def #,index-def)))
+         (define/with-syntax access-name (gen-access-func-name field-string))
+         (define/with-syntax assign-name (gen-assign-func-name field-string))
+         (define/with-syntax lvalue-arg (generate-temporary))
+         (define/with-syntax rvalue-arg (generate-temporary))
+         #`(begin
+             (define (access-name [lvalue-arg : D0-Expr])
+               : D0-Expr
+               (sr-tagged-array-ref lvalue-arg tag-def #,index-def))
+             (define (assign-name [lvalue-arg : D0-Expr]
+                                  [rvalue-arg : D0-Expr])
+               : D0-Expr
+               (sr-tagged-array-set! lvalue-arg tag-def #,index-def rvalue-arg))))
        (define (gen-offset-func-access)
-         (define/with-syntax func-name (gen-access-func-name many-field-dtm))
-         (define/with-syntax access-arg (generate-temporary))
+         (define/with-syntax access-name (gen-access-func-name many-field-dtm))
+         (define/with-syntax assign-name (gen-assign-func-name many-field-dtm))
+         (define/with-syntax lvalue-arg (generate-temporary))
          (define/with-syntax ind-arg (generate-temporary))
-         #`(define (func-name [access-arg : D0-Expr] [ind-arg : D0-Expr]) : D0-Expr
-             (sr-tagged-array-ref
-              access-arg tag-def
-              (match ind-arg
-                [(Quote (? fixnum? k)) (Quote (+ #,offset-data-def k))]
-                [otherwise (Op '+ (list #,offset-def ind-arg))]))))
+         (define/with-syntax rvalue-arg (generate-temporary))
+         #`(begin
+             (define (access-name [lvalue-arg : D0-Expr]
+                                  [ind-arg : D0-Expr])
+               : D0-Expr
+               (sr-tagged-array-ref
+                lvalue-arg tag-def
+                (match ind-arg
+                  [(Quote (? fixnum? k))
+                   (Quote (+ #,offset-data-def k))]
+                  [otherwise
+                   (Op '+ (list #,offset-def ind-arg))])))
+             (define (assign-name [lvalue-arg : D0-Expr]
+                                  [ind-arg : D0-Expr]
+                                  [rvalue-arg : D0-Expr])
+               : D0-Expr
+               (sr-tagged-array-set!
+                lvalue-arg tag-def
+                (match ind-arg
+                  [(Quote (? fixnum? k))
+                   (Quote (+ #,offset-data-def k))]
+                  [otherwise
+                   (Op '+ (list #,offset-def ind-arg))])
+                rvalue-arg))))
        (let ([l (map gen-index-func-access field-string* index-def*)])
          (if many-field-dtm (append l (list (gen-offset-func-access))) l)))
      #`(begin
@@ -276,14 +306,16 @@
            (sr-check-tag=? equal-arg namespace-mask-def tag-def))
          #,@(gen-func-access*))]))
 
+(define-types-memory-layout-helpers "type" "fn" #b000
+  ("arity" single) ("return" single) ("fmls" many))
 (define-types-memory-layout-helpers "type" "gref" #b001 ("type" single))
 (define-types-memory-layout-helpers "type" "gvect" #b010 ("type" single))
 (define-types-memory-layout-helpers "type" "mref" #b011 ("type" single))
 (define-types-memory-layout-helpers "type" "mvect" #b100 ("type" single))
-(define-types-memory-layout-helpers "type" "fn" #b000
-  ("arity" single) ("return" single) ("fmls" many))
 (define-types-memory-layout-helpers "type" "tuple" #b101
   ("count" single) ("elements" many))
+(define-types-memory-layout-helpers "type" "mu" #b110 ("body" single))
+
 
 (: sr-hashcons-types (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
 (define (sr-hashcons-types name tag? slots)

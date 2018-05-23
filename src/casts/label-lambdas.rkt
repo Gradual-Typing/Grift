@@ -31,13 +31,15 @@
 
 (: label-lambdas (Cast-or-Coerce3.1-Lang  -> Cast-or-Coerce4-Lang))
 (define (label-lambdas prgm)
-  (match-define (Prog (list n c t) (Let-Static* tb* cb* e)) prgm)
+  (match-define (Prog (list n c t)
+                  (Let-Static* mtb* tb* mcb* cb* e))
+    prgm)
   (define uc (make-unique-counter c))
   (define new-exp
     (parameterize ([current-unique-counter uc])
       (ll-expr e)))
   (Prog (list n (unique-counter-next! uc) t)
-    (Let-Static* tb* cb* new-exp)))
+    (Let-Static* mtb* tb* mcb* cb* new-exp)))
 
 ;; ll-let takes the fields of from let and letrecs and pulls all
 ;; bound procedures out into a letrec form. Placing

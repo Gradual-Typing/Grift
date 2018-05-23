@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require "forms.rkt" "primitives.rkt")
+(require "forms.rkt" "primitives.rkt" "lambda0.rkt")
 
 (provide (all-defined-out)
          (all-from-out "forms.rkt" "primitives.rkt"))
@@ -9,9 +9,11 @@
 
 (define-type Cast-or-Coerce5-Lang
   (Prog (List String Natural Grift-Type)
-        (Let-Static* CoC5-Bnd-Type*
-                     CoC5-Bnd-Crcn*
-                     CoC5-Expr)))
+    (Let-Static* Bnd-Mu-Type*
+                 Bnd-Type*
+                 Bnd-Mu-Crcn*
+                 Bnd-Crcn* 
+                 CoC5-Expr)))
 
 (define-type CoC5-Expr
   (Rec E (U
@@ -89,8 +91,8 @@
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
           ;; Binding Forms - Lambda
-	  (Letrec CoC5-Bnd-Lambda* E)
-	  (Let CoC5-Bnd-Data* E)
+          (Letrec CoC5-Bnd-Lambda* E)
+          (Let CoC5-Bnd-Data* E)
           (Var Uid)
           (Global String)
           (Assign Id E)
@@ -181,11 +183,6 @@
 (define-type CoC5-Bnd-Lambda* (Listof CoC5-Bnd-Lambda))
 (define-type CoC5-Bnd-Data  (Pairof Uid CoC5-Expr))
 (define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
-(define-type CoC5-Bnd-Type  (Pairof Uid Compact-Type))
-(define-type CoC5-Bnd-Type* (Listof CoC5-Bnd-Type))
-(define-type CoC5-Bnd-Crcn  (Pairof Uid Compact-Coercion))
-(define-type CoC5-Bnd-Crcn* (Listof CoC5-Bnd-Crcn))
-
 
 (define-type CoC5-Gen-Data
   (U Dyn))

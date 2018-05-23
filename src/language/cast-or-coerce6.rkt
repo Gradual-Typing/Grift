@@ -1,8 +1,8 @@
 #lang typed/racket/base
-(require "forms.rkt" "primitives.rkt")
+(require "forms.rkt" "primitives.rkt" "lambda0.rkt")
 
 (provide (all-defined-out)
-         (all-from-out "forms.rkt" "primitives.rkt"))
+         (all-from-out "forms.rkt" "primitives.rkt" "lambda0.rkt"))
 #|-----------------------------------------------------------------------------+
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
@@ -11,7 +11,11 @@
 
 (define-type Cast-or-Coerce6-Lang
   (Prog (List String Natural Grift-Type)
-        (Let-Static* CoC6-Bnd-Type* CoC6-Bnd-Crcn* CoC6-Expr)))
+        (Let-Static*  Bnd-Mu-Type*
+                      Bnd-Type*
+                      Bnd-Mu-Crcn*
+                      Bnd-Crcn*
+                      CoC6-Expr)))
 
 (define-type CoC6-Expr
   (Rec E (U

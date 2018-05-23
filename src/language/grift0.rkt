@@ -5,6 +5,9 @@
 (provide (all-defined-out)
          (all-from-out "forms.rkt"
                        "primitives.rkt"))
+(module+ test
+  (require typed/rackunit)
+  (provide (all-defined-out)))
 
 #|-----------------------------------------------------------------------------+
 | Language/Grift-Syntax this is a program returned from grift/read
@@ -17,50 +20,76 @@
 | Language/Grift0 this is the language returned by grift/syntax->grift0
 +-----------------------------------------------------------------------------|#
 (define-type Grift0-Lang
-  (Prog (List String Natural) (Listof S0-Top)))
+  (Prog (List String Natural) (Listof G0-Top)))
 
-(define-type S0-Top
-  (U (Observe S0-Form (Option Grift-Type))
-     (Define Boolean Uid (Option Grift-Type) S0-Form)))
+(define-type G0-Top
+  ;; Using Ann2 here instead of Ann keeps a bug in typed racket
+  ;; from getting Ann at different places in the type signature
+  ;; confused.
+  (Ann2 (U (Observe G0-Ann-Expr (Option Grift-Type))
+           (Define Boolean Uid (Option Grift-Type) G0-Ann-Expr))
+        srcloc))
+(define-type G0-Top* (Listof G0-Top))
 
-(define-type (S0-Form E)
-  (U (Lambda Grift-Fml* (Ann E (Option Grift-Type)))
-     (Letrec S0-Bnd* E)
-     (Let S0-Bnd* E)
-     (App E (Listof E))
-     (Op Grift-Primitive (Listof E))
-     (If E E E)
-     (Switch E (Listof (Pair (Listof Integer) E)) E)
-     (Ascribe E Grift-Type (Option Blame-Label))
+(define-type G0-Ann-Expr (Ann G0-Expr Src))
+(define-type G0-Ann-Expr* (Listof G0-Ann-Expr))
+
+(define-type G0-Expr
+  (U (Lambda Grift-Fml* (List G0-Ann-Expr (Option Grift-Type)))
+     (Letrec G0-Bnd* G0-Ann-Expr)
+     (Let G0-Bnd* G0-Ann-Expr)
+     (App G0-Ann-Expr G0-Ann-Expr*)
+     (Op Grift-Primitive G0-Ann-Expr*)
+     (If G0-Ann-Expr G0-Ann-Expr G0-Ann-Expr)
+     (Switch G0-Ann-Expr (Switch-Case* G0-Ann-Expr) G0-Ann-Expr)
+     (Ascribe G0-Ann-Expr Grift-Type (Option Blame-Label))
      (Var Uid)
      (Quote Grift-Literal)
-     (Begin (Listof E) E)
-     (Repeat Uid E E (Ann Uid (Option Grift-Type)) E E)
+     (Begin G0-Ann-Expr* G0-Ann-Expr)
+     (Repeat Uid G0-Ann-Expr G0-Ann-Expr (List Uid (Option Grift-Type)) G0-Ann-Expr G0-Ann-Expr)
      ;; Monotonic effects
-     (MboxS E)
-     (Munbox E)
-     (Mbox-set! E E)
-     (MvectorS E E)
-     (Mvector-set! E E E)
-     (Mvector-ref E E)
-     (Mvector-length E)
+     (MboxS G0-Ann-Expr)
+     (Munbox G0-Ann-Expr)
+     (Mbox-set! G0-Ann-Expr G0-Ann-Expr)
+     (MvectorS G0-Ann-Expr G0-Ann-Expr)
+     (Mvector-set! G0-Ann-Expr G0-Ann-Expr G0-Ann-Expr)
+     (Mvector-ref G0-Ann-Expr G0-Ann-Expr)
+     (Mvector-length G0-Ann-Expr)
      ;; Guarded effects
-     (Gbox E)
-     (Gunbox E)
-     (Gbox-set! E E)
-     (Gvector E E)
-     (Gvector-set! E E E)
-     (Gvector-ref E E)
-     (Gvector-length E)
+     (Gbox G0-Ann-Expr)
+     (Gunbox G0-Ann-Expr)
+     (Gbox-set! G0-Ann-Expr G0-Ann-Expr)
+     (Gvector G0-Ann-Expr G0-Ann-Expr)
+     (Gvector-set! G0-Ann-Expr G0-Ann-Expr G0-Ann-Expr)
+     (Gvector-ref G0-Ann-Expr G0-Ann-Expr)
+     (Gvector-length G0-Ann-Expr)
      ;;
-     (Create-tuple (Listof E))
-     (Tuple-proj E Index)))
+     (Create-tuple G0-Ann-Expr*)
+     (Tuple-proj G0-Ann-Expr Index)))
+(define-type G0-Expr* (Listof G0-Expr))
 
-(define-type S0-Expr
-  (Rec E (Ann (S0-Form E) Src)))
-
-(define-type S0-Expr* (Listof S0-Expr))
-(define-type S0-Bnd (Bnd Uid Grift-Type? S0-Expr))
-(define-type S0-Bnd* (Listof S0-Bnd))
+(define-type G0-Bnd (Bnd Uid Grift-Type? G0-Ann-Expr))
+(define-type G0-Bnd* (Listof G0-Bnd))
 
 
+(module+ test
+  (define P0
+    (Prog '("0.grift" 0)
+      (list
+       (Ann2
+        (Observe
+         (Ann
+          (Ascribe
+           (Ann (Quote '()) (srcloc "0.grift" 1 5 6 2))
+           (Mu (Scope (TVar 0)))
+           #f)
+          (srcloc "0.grift" 1 0 1 18))
+         #f)
+        (srcloc "0.grift" 1 0 1 18)))))
+  
+  (cast P0 Grift0-Lang)
+  
+  (define-syntax-rule (test-g0 id)
+    (test-not-exn "Grift 0 Language" (lambda () (cast id Grift0-Lang))))
+
+  (test-g0 P0))

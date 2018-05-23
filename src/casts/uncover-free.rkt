@@ -21,11 +21,11 @@
 (: uncover-free (Cast-or-Coerce4-Lang . -> . Cast-or-Coerce5-Lang))
 (define (uncover-free prgm)
   (debug 'cast/uncover-free prgm)
-  (match-define (Prog m (Let-Static* tb* cb* e)) prgm)
+  (match-define (Prog m (Let-Static* mtb* tb* mcb* cb* e)) prgm)
   (define-values (new-exp free*) (uf-expr e))
   (unless (set-empty? free*)
     (raise-pass-exn 'uncover-free "Free variables detect ~a" free*))
-  (Prog m (Let-Static* tb* cb* new-exp)))
+  (Prog m (Let-Static* mtb* tb* mcb* cb* new-exp)))
 
 (define mt-set : (Setof Uid) (set))
 

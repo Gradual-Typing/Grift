@@ -16,6 +16,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                      syntax/parse)
          racket/match
          racket/list
+         racket/set
          syntax/parse 
          syntax/location
          "../unique-counter.rkt"
@@ -55,8 +56,11 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
   (match stx*
     [(list s* ...)
      (define/match (observe/ann e)
-       [((Ann (Define _ _ _ _) s)) e]
-       [((Ann _ s)) (Ann (Observe e #f) s)]
+       ;; Replacing Ann with Ann2 is a hack that prevent
+       ;; the contract generator from getting different Ann
+       ;; types confused.
+       [((Ann (and d (Define _ _ _ _)) s)) (Ann2 d s)]
+       [((Ann _ s)) (Ann2 (Observe e #f) s)]
        [(other) (error 'parse-top-level/insert-observe
                        "unmatched: ~a" other)])
      (define rec-env (scan/check-define-scope name s*))
@@ -124,12 +128,6 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
            (Quote dat))]))
   (Ann cf src))
 
-#;(define (datum? x)
-  (or (exact-integer? x)
-      (boolean? x)
-      (null? x)
-      (real? x)))
-
 (define-syntax syntax-error
   (syntax-rules ()
     [(_ name message) (error name message)]
@@ -140,17 +138,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (let ([msg (format "~a\n\tin:~a\n\tin particular: ~a" message expr sub)])
        (error name msg))])) 
 
-#;(define (grift-core-form? x)
-  (or (Lambda? x) (Letrec? x) (Let? x) (Var? x) (App? x)
-      (Op? x) (Quote? x) (Ascribe? x)
-      (Begin? x) (If? x) (Repeat? x)
-      ;; Constructor, Destructor, Mutator should be factored out
-      ;; (Ctr 'Gbox (list arg)) (Ctr 'Gvector (list arg1 arg2))
-      (Gbox? x) (Gunbox? x) (Gbox-set!? x)
-      (Gvector? x) (Gvector-ref? x) (Gvector-set!? x)
-      (MboxS? x) (Munbox? x) (Mbox-set!? x)
-      (MvectorS? x) (Mvector-ref? x) (Mvector-set!? x)))
-
+;; This is a little ugly but I am using lexical vars for Recursive types
 (struct lexical-var  (symbol))
 (struct core (parser))
 (struct core-atomic (atom))
@@ -214,7 +202,8 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 
 (module+ test
-  (require "../language/forms-equal.rkt")
+  (require racket
+           "../language/forms-equal.rkt")
   (current-unique-counter (make-unique-counter 0))
   (check-forms=?
    ((parse-form (make-top-level-env)) #'(let ([x 1]) x))
@@ -253,9 +242,6 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
          (help #t #'f #f (syntax/loc stx (lambda (f* ...) : r.ty e)))
          (help #t #'f #f (syntax/loc stx (lambda (f* ...) e))))]))
 
-(module+ test
-  (parse-define-form '(define x : Float #i9.8) (hash-set (make-top-level-env) 'x (lexical-var (Uid "x" 0)))))
-
 (define (parse-lambda-expression stx env)
   (syntax-parse stx
     [(_ (fml:formal-parameter ...) r:optional-colon-type body:expr)
@@ -264,25 +250,25 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (define (pt s) (parse-type s env))
      (define tys  (map pt (syntax->list #'(fml.ty  ...))))
      (Lambda (map Fml uids tys)
-       (Ann ((parse-form new-env) #'body)
-            ((parse-optional-type new-env) #'r.ty)))]
+       (list ((parse-form new-env) #'body)
+             ((parse-optional-type new-env) #'r.ty)))]
     [other (error 'parse-lambda "unmatched ~a" (syntax->datum stx))]))
 
 (module+ test
   (check-forms=?
    ((parse-form (make-top-level-env)) #'(lambda (x y) x))
    (Ann (Lambda (list (Fml 'x (Dyn)) (Fml 'y (Dyn)))
-          (Ann (Ann (Var 'x) (quote-srcloc)) #f))
+          (list (Ann (Var 'x) (quote-srcloc)) #f))
         (quote-srcloc)))
   (check-forms=?
    ((parse-form (make-top-level-env)) #'(lambda ([x : Int]) x))
    (Ann (Lambda (list (Fml 'x (Int)))
-          (Ann (Ann (Var 'x) (quote-srcloc)) #f))
+          (list (Ann (Var 'x) (quote-srcloc)) #f))
         (quote-srcloc)))
   (check-forms=?
    ((parse-form (make-top-level-env)) #'(lambda ([x : Int]) : Int x))
    (Ann (Lambda (list (Fml 'x (Int)))
-          (Ann (Ann (Var 'x) (quote-srcloc)) (Int)))
+          (list (Ann (Var 'x) (quote-srcloc)) (Int)))
         (quote-srcloc))))
 
 (define (parse-op stx env)
@@ -340,12 +326,9 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (define new-env (env-extend* env #'i.id i #'a.id a))
      (define recur (parse-form env))
      (Repeat i (recur #'i.start) (recur #'i.stop)
-       (Ann a ((parse-optional-type env) #'a.type))
+       (list a ((parse-optional-type env) #'a.type))
        ((parse-form env) #'a.init)
        ((parse-form new-env) #'M))]))
-
-(module+ test
-  (parse-repeat #'(repeat (foo 0 10) (bar : Int 0) foo) (make-top-level-env)))
 
 (define (parse-switch stx env)
   (define-syntax-class switch-clause
@@ -405,21 +388,42 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                            (op 'timer-report)
                            (Var tmp)))))]))
 
+(define mu-lexical-scope (make-parameter '()))
+
+(struct type-env (top lexical))
+
+(define (type-env-extend e s)
+  (define d (syntax->datum s))
+  (match e
+    [(type-env t l) (type-env t (cons d  l ))]
+    [(hash-table)   (type-env e (cons d '()))]))
+
+(define (type-env-lookup e s)
+  (match e
+    [(hash-table) (env-lookup e s)]
+    [(type-env t l)
+     (define i? (index-of l (syntax->datum s)))
+     (cond
+       [i? (TVar i?)]
+       [else (env-lookup t s)])]))
+
+(define (parse-mu-type stx env)
+  (syntax-parse stx
+    [(_ x:id ty) 
+     (Mu (Scope (parse-type #'ty (type-env-extend env #'x))))]))
 
 #|
 Parse Type converts syntax objects to the core forms that
 represents types in the grift abstract syntax tree.
 |#
-;|#
-
 (define (parse-type stx [env (make-top-level-env)])
   (define (recur s) (parse-type s env))
   (syntax-parse stx
     #:datum-literals (-> Ref Vect GRef GVect MRef MVect Tuple)
     [atm:id
-     (match (env-lookup env #'atm)
-       ;;[(lexical-var id) id]
+     (match (type-env-lookup env #'atm)
        [(core-atomic cf) cf]
+       [(and v (TVar i)) v]
        [other
         (error 'parse-type
                "unmatched atom ~a resolved to ~a"
@@ -431,7 +435,7 @@ represents types in the grift abstract syntax tree.
      (define a* (syntax->list #'(t* ...)))
      (Fn (length a*) (map recur a*) (recur #'t))]
     [(atm:id stx* ...)
-     (match (env-lookup env #'atm)
+     (match (type-env-lookup env #'atm)
        [(core t) (t stx env)]
        [other
         (error 'parse-type
@@ -475,7 +479,28 @@ represents types in the grift abstract syntax tree.
   (check-equal? (parse-type #'(Tuple))
                 UNIT-TYPE)
   (check-equal? (parse-type #'(Tuple Int Bool))
-                (STuple 2 `(,INT-TYPE ,BOOL-TYPE))))
+                (STuple 2 `(,INT-TYPE ,BOOL-TYPE)))
+
+  (check-equal? (parse-type #'(Rec X X)) (Mu (Scope (TVar 0))))
+  
+  (check-equal? (parse-type #'(Rec X (Tuple X)))
+                (Mu (Scope (STuple 1 `(,(TVar 0))))))
+  
+  (check-equal? (parse-type #'(Rec X (-> (Tuple Int X))))
+                (Mu (Scope (Fn 0 `() (STuple 2 `(,INT-TYPE ,(TVar 0)))))))
+
+  (check-equal? (parse-type #'(Rec X (Rec Y (Tuple X Y (Rec X (Tuple X Y))))))
+                (Mu (Scope
+                     (Mu (Scope
+                          (STuple
+                           3
+                           (list
+                            (TVar 1)
+                            (TVar 0)
+                            (Mu (Scope 
+                                 (STuple
+                                  2
+                                  (list (TVar 0) (TVar 1)))))))))))))
 
 (define core-parse-prim (core parse-op))
 
@@ -498,6 +523,8 @@ represents types in the grift abstract syntax tree.
      (Dyn        . ,(core-atomic DYN-TYPE))
      (Float      . ,(core-atomic FLOAT-TYPE))
      (Tuple      . ,(core parse-tuple-type))
+     (Rec        . ,(core parse-mu-type))
+     (μ          . ,(core parse-mu-type))
      (GRef       . ,(core (make-parse-type-w/ctr 'GRef  GRef)))
      (GVect      . ,(core (make-parse-type-w/ctr 'GVect GVect)))
      (MVect      . ,(core (make-parse-type-w/ctr 'MVect MVect)))

@@ -1,4 +1,4 @@
-#lang racket/base
+#lang typed/racket/base/no-check
 #|------------------------------------------------------------------------------+
 |Pass: src/insert-casts                                                         |
 +-------------------------------------------------------------------------------+
@@ -17,13 +17,20 @@
          "../errors.rkt"
          "../logging.rkt"
          "../configuration.rkt"
-         "../language/forms.rkt")
+         "../language/forms.rkt"
+         "../language/grift1.rkt"
+         "../language/cast0.rkt")
 
+(require/typed racket/base
+  (srcloc->string (srcloc -> String)))
 
 ;; Only the pass is provided by this module
-(provide insert-casts)
+(provide insert-casts
+         (all-from-out
+          "../language/grift1.rkt"
+          "../language/cast0.rkt"))
 
-(module* typed typed/racket/base
+#;(module* typed typed/racket/base
   (require "../language/grift1.rkt"
            "../language/cast0.rkt")
   (provide (all-from-out
@@ -32,9 +39,11 @@
   (require/typed/provide (submod "..")
     [insert-casts (Grift1-Lang -> Cast0-Lang)]))
 
-(define-syntax-rule (: stx ...) (void))
-(define-syntax-rule (ann e t ...) e)
-(define-syntax-rule (inst e t ...) e)
+#;(define-syntax-rule (: stx ...) (void))
+#;(define-syntax-rule (ann e t ...) e)
+#;(define-syntax-rule (inst e t ...) e)
+
+
 
 ;; A list of casts that are inserted and there source location
 (: casts-inserted (Boxof (Listof (cons srcloc C0-Expr))))
@@ -52,7 +61,7 @@
   (match-define (Prog (list name unique type) tl*) prgm)
   (define uc (make-unique-counter unique))
   (no-casts!)
-  (define new-tl*
+  (define new-tl* : C0-Top*
     (parameterize ([current-unique-counter uc])
       (for/list ([tl (in-list tl*)])
         (match tl
@@ -74,17 +83,54 @@
   
   (debug (Prog (list name (unique-counter-next! uc) type) new-tl*)))
 
-(: mk-cast ((-> Blame-Label) C0-Expr Grift-Type Grift-Type -> C0-Expr))
+(define (subtype-of? t1 t2)
+  (define (unfold t)
+    (match t
+      [(Mu s) (grift-type-instantiate s t)]
+      [_ (error 'unfold)]))
+  (define (rec/a-fold a t1 t2)
+    (match* (t1 t2)
+      [('() '()) a]
+      [((cons a1 d1) (cons a2 d2))
+       (rec/a-fold (rec/a a1 a2 a) d1 d2)]
+      [(_ _) (error 'rec/a-fold)]))
+  (define (rec/a t1 t2 a)
+    (define (rec t1 t2)
+      (cond
+        [(eq? t1 t2) a]
+        [(not (or (Mu? t1) (Mu? t2)))
+         (match* (t1 t2)
+           [((Fn n a1* r1) (Fn n a2* r2))
+            (rec/a-fold (rec r1 r2) a1* a2*)]
+           [((STuple n a1*) (STuple n a2*))
+            (rec/a-fold a a1* a2*)]
+           [((GVect a1) (GVect a2)) (rec a1 a2)]
+           [((GRef a1) (GRef a2)) (rec a1 a2)]
+           [((MVect a1) (MVect a2)) (rec a1 a2)]
+           [((MRef a1) (MRef a2)) (rec a1 a2)]
+           [(_ _) #f])]
+        [else
+         (define p (cons t1 t2))
+         (cond
+           [(set-member? a p) a]
+           [(Mu? t1) (rec/a (unfold t1) t2 (set-add a (cons t1 t2)))]
+           [(Mu? t2) (rec/a t1 t2 (set-add a p))]
+           [else (error 'subtype-of?)])]))
+    (rec t1 t2))
+  (rec/a t1 t2 (set)))
+         
+
+(: mk-cast (srcloc (-> Blame-Label) C0-Expr Grift-Type Grift-Type -> C0-Expr))
 (define (mk-cast src l-th e t1 t2)
   (cond
-    [(equal? t1 t2) e]
+    [(subtype-of? t1 t2) e]
     [else
      (define c (debug (Cast e (Twosome t1 t2 (l-th)))))
      (add-cast! src c)
      c]))
 
 
-(: ic-expr (S1-Expr . -> . C0-Expr))
+(: ic-expr (G1-Ann-Expr . -> . C0-Expr))
 (define (ic-expr exp^)
   (match-define (Ann exp (cons src type)) exp^)
   (match exp
@@ -105,7 +151,7 @@
        (mk-cast src (mk-label "letrec" src) (ic-expr body) type^ type))]
     [(App rator rand*)
      (ic-application rator rand* src type)]
-    [(Op (Ann prim rand-ty*) rand*)
+    [(Op (list prim rand-ty*) rand*)
      (Op prim (map (ic-operand/cast src) rand* rand-ty*))]
     [(Ascribe exp t1 lbl?)
      (let ([lbl (if lbl? (th lbl?) (mk-label "ascription" src))])
@@ -120,7 +166,7 @@
        c*
        (and (Ann _ (cons ds dt)) (app ic-expr d)))
      (Switch (mk-cast es (mk-label "switch" es) e et INT-TYPE)
-       (for/list #;#;: (Switch-Case* C0-Expr) ([c c*])
+       (for/list : (Switch-Case* C0-Expr) ([c c*])
          (match-let ([(cons cl (and (Ann _ (cons cs ct))
                                     (app ic-expr cr))) c])
            (cons cl (mk-cast cs (mk-label "switch" cs) cr ct type))))
@@ -363,12 +409,14 @@
      (define l-th (mk-label "tuple-proj" e-src))
      (cond
        [(dynamic-operations?)
-        (define dop (Dyn-Tuple-Proj e (Quote i) (Quote (l-th))))
+        (define dop : C0-Expr
+          (Dyn-Tuple-Proj e (Quote i) (Quote (l-th))))
         (add-cast! e-src dop)
         dop]
        [else
-        (define n (+ n 1))
-        (define tgt-ty (STuple n (make-list n DYN-TYPE)))
+        (define n : Index (cast (+ n 1) Index))
+        (define tgt-ty : Grift-Type
+          (STuple n (make-list n DYN-TYPE)))
         (Tuple-proj (mk-cast e-src l-th e DYN-TYPE tgt-ty) i)])]
     [(Tuple-proj (and (Ann _ (cons e-src (STuple _ _))) (app ic-expr e)) i)
      (Tuple-proj e i)]
@@ -380,7 +428,7 @@
       '()
       (cons t (make-list (- n 1) t))))
 
-(: ic-bnd (S1-Bnd -> C0-Bnd))
+(: ic-bnd (G1-Bnd -> C0-Bnd))
 (define (ic-bnd b)
   (match-define (Bnd i t (and rhs (Ann _ (cons rhs-src rhs-type)))) b) 
   (define lbl (mk-label "binding" rhs-src))
@@ -390,7 +438,7 @@
 
 ;; An Application of dynamic casts the arguments to dyn and the operand to
 ;; a function that takes dynamic values and returns a dynamic value
-(: ic-application (S1-Expr (Listof S1-Expr) Src Grift-Type . -> . C0-Expr))
+(: ic-application (G1-Ann-Expr (Listof G1-Ann-Expr) Src Grift-Type . -> . C0-Expr))
 (define (ic-application rator rand* src type)
   (match-define (Ann _ (cons rator-src rator-type)) rator)
   (match rator-type
@@ -419,14 +467,15 @@
   (Fn n (build-list n (lambda (_) #;#;: Grift-Type DYN-TYPE)) DYN-TYPE))
 
 (: ic-operands
-   (-> (Listof S1-Expr)
+   (-> (Listof G1-Ann-Expr)
        (values (Listof C0-Expr) (Listof Grift-Type))))
 (define (ic-operands rand*)
-  (for/lists (cf* ty*) ([rand rand*])
+  (for/lists ([cf* : (Listof C0-Expr)] [ty* : (Listof Grift-Type)])
+             ([rand rand*])
     (match-let ([(Ann _ (cons _ type)) rand])
       (values (ic-expr rand) type))))
 
-(: ic-operand/cast (-> Src (-> S1-Expr Grift-Type C0-Expr)))
+(: ic-operand/cast (-> Src (-> G1-Ann-Expr Grift-Type C0-Expr)))
 (define (ic-operand/cast app-src)
   (lambda (rand arg-type)
     (match-let ([(Ann _ (cons rand-src rand-type)) rand])

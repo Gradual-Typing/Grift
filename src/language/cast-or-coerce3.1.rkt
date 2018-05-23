@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require "forms.rkt" "primitives.rkt")
+(require "forms.rkt" "primitives.rkt" "lambda0.rkt")
 
 (provide (all-defined-out)
          (all-from-out "forms.rkt" "primitives.rkt"))
@@ -10,9 +10,11 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 
 (define-type Cast-or-Coerce3.1-Lang
   (Prog (List String Natural Grift-Type)
-        (Let-Static* CoC3.1-Bnd-Type*
-                     CoC3.1-Bnd-Crcn* 
-                     CoC3.1-Expr)))
+    (Let-Static* Bnd-Mu-Type*
+                 Bnd-Type*
+                 Bnd-Mu-Crcn*
+                 Bnd-Crcn* 
+                 CoC3.1-Expr)))
 
 (define-type CoC3.1-Expr
   (Rec E (U

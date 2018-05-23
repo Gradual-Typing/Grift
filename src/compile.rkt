@@ -3,7 +3,7 @@
 (require "./configuration.rkt"
          ;; "./helpers.rkt"
          (submod "./logging.rkt" typed)
-         (submod "./grift/reduce-to-cast-calculus.rkt" typed)
+         "./grift/reduce-to-cast-calculus.rkt"
          "./casts/impose-cast-semantics.rkt"
          "./data/convert-representation.rkt"
          "./backend-c/code-generator.rkt"

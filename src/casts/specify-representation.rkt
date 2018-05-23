@@ -35,7 +35,12 @@ but a static single assignment is implicitly maintained.
 (: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))
 (define (specify-representation prgm)
   (match-define
-    (Prog (list name next type) (Let-Static* type-bnd* crcn-bnd* exp))
+    (Prog (list name next type)
+      (Let-Static* mu-type-bnd*
+                   type-bnd*
+                   mu-crcn-bnd*
+                   crcn-bnd*
+                   exp))
     prgm)
   (define unique (make-unique-counter next))
   (parameterize ([current-unique-counter unique])
@@ -50,18 +55,40 @@ but a static single assignment is implicitly maintained.
         (set-box! cast-tuple-in-place-code-label? #f)
         (set-box! hashcons-types-code-label? #f)
         (sr-expr (hash) empty-index-map exp)))
-    (define init-type* : D0-Expr* (map allocate-bound-type type-bnd*))
-    (define type-id*   : Uid*     (map (inst car Uid Any) type-bnd*))
-    (define init-crcn* : D0-Expr* (map allocate-bound-coercion crcn-bnd*))
-    (define crcn-id*   : Uid*     (map (inst car Uid Any) crcn-bnd*))
-    (define new-next (unique-counter-next! unique))
-    (define bnd-code*  : D0-Bnd-Code* (unbox boxed-bnd-code*))
+    (: allocate-bound-mu-type : Any -> (Values D0-Expr D0-Expr))
+    (define (allocate-bound-mu-type bnd-mu-type)
+      (error 'todo))
+    (: allocate-bound-mu-crcn : Any -> (Values D0-Expr D0-Expr))
+    (define (allocate-bound-mu-crcn bnd-mu-crcn)
+      (error 'todo))
+    (define-values (alloc-mu-type* init-mu-type*)
+      (for/lists ([alloc-mu-type* : D0-Expr*] [init-mu-type* : D0-Expr*])
+                 ([mu-type-bnd mu-type-bnd*])
+        (allocate-bound-mu-type mu-type-bnd)))
+    (define-values (alloc-mu-crcn* init-mu-crcn*)
+      (for/lists ([alloc-mu-crcn* : D0-Expr*] [init-mu-crcn* : D0-Expr*])
+                 ([mu-crcn-bnd mu-crcn-bnd*])
+        (allocate-bound-mu-crcn mu-crcn-bnd)))
+    (define init-type*  : D0-Expr* (map allocate-bound-type type-bnd*))
+    (define init-crcn*  : D0-Expr* (map allocate-bound-coercion crcn-bnd*))
+    (define mu-type-id* : Uid*     (map (inst car Uid Any) mu-type-bnd*))
+    (define type-id*    : Uid*     (map (inst car Uid Any) type-bnd*))
+    (define mu-crcn-id* : Uid*     (map (inst car Uid Any) mu-crcn-bnd*))
+    (define crcn-id*    : Uid*     (map (inst car Uid Any) crcn-bnd*))
+    (define new-next    : Nat      (unique-counter-next! unique))
+    (define bnd-code*   : D0-Bnd-Code* (unbox boxed-bnd-code*))
     (debug
-     (Prog
-         (list name new-next type)
-       (GlobDecs (append type-id* crcn-id*)
+     (Prog (list name new-next type)
+       (GlobDecs (append mu-type-id* type-id*
+                         mu-crcn-id* crcn-id*)
          (Labels bnd-code*
-           (Begin (append init-type* init-crcn*) new-exp)))))))
+           (Begin (append alloc-mu-type*
+                          init-type*
+                          init-mu-type*
+                          alloc-mu-crcn*
+                          init-crcn*
+                          init-mu-crcn*)
+                  new-exp)))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
@@ -504,6 +531,8 @@ but a static single assignment is implicitly maintained.
         [(Type-Fn-arity (app recur e)) (type-fn-arity-access e)]
         [(Type-Fn-return (app recur e)) (type-fn-return-access e)]
         [(Type-Fn-arg (app recur e1) (app recur e2)) (type-fn-fmls-access e1 e2)]
+        [(Type-Mu-Huh (app recur e)) (type-mu? e)]
+        [(Type-Mu-Body (app recur e)) (type-mu-body-access e)]
         [(Type-GRef-Huh (app recur e)) (type-gref? e)]
         [(Type-GRef-Of (app recur e)) (type-gref-type-access e)]
         [(Type-GVect-Huh (app recur e)) (type-gvect? e)]
@@ -1055,6 +1084,16 @@ but a static single assignment is implicitly maintained.
     [(Static-Id u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
+;; The first expression returned allocates the mu
+;; The second value returned initializes the mu
+;; This allows Mu types to "tie the recursive knot" by initializing
+;; after all other types have been allocated, but allows
+(: allocate-bound-mu-type (Bnd-Mu-Type -> (Values D0-Expr D0-Expr)))
+(define (allocate-bound-mu-type bnd)
+  (match-define (cons u (Mu it)) bnd)
+  (values (Assign u (sr-type-mu (Quote 0)))
+          (type-mu-body-assign (Var u) (sr-prim-type it))))
+
 (: allocate-bound-type (CoC6-Bnd-Type -> D0-Expr))
 (define (allocate-bound-type bnd)
   (: sr-type (Compact-Type -> D0-Expr))
@@ -1077,6 +1116,17 @@ but a static single assignment is implicitly maintained.
     [(Identity) COERCION-IDENTITY-IMDT]
     [(Static-Id id) (Var id)]
     [else (error 'sr-immediate-coercion "unhandled case in match")]))
+
+;; The first expression returned allocates the mu
+;; The second value returned initializes the mu
+;; This allows Mu types to "tie the recursive knot" by initializing
+;; after all other types have been allocated, but allows
+(: allocate-bound-mu-crcn (Bnd-Mu-Crcn -> (Values D0-Expr D0-Expr)))
+(define (allocate-bound-mu-crcn bnd)
+  (match-define (cons u (Mu c)) bnd)
+  (error 'todo))
+
+
 
 (: sr-coercion (Compact-Coercion -> D0-Expr))
 (define (sr-coercion t)
