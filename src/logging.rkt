@@ -10,7 +10,9 @@
 
 (define-logger grift)
 
-
+(define-syntax (current-srcloc-as-string stx)
+  (syntax-case stx ()
+    [(_) #`(srcloc->string (quote-srcloc #,stx))]))
 
 (define-syntax logging
   (syntax-rules ()
