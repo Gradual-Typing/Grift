@@ -180,15 +180,15 @@
 (define-syntax (precondition$ stx)
   (syntax-case stx ()
     [(_ c b* ... b)
-     #'(let ([e (begin$ b* ... b)])
-         (if (check-asserts?)
-             (Begin
-               (list
-                (If c
-                    (Quote 0)
-                    (Blame (Quote (format "runtime precondition failed: ~a" (srcloc->string (quote-srcloc #,stx)))))))
-               e)
-             e))]))
+     #`(let ([e (begin$ b* ... b)])
+         (cond
+           [(check-asserts?)
+            (define src (srcloc->string (quote-srcloc #,stx)))
+            (define msg (format "runtime precondition failed: ~a" src))
+            (Begin
+              (list (If c (Quote 0) (Blame (Quote msg))))
+              e)]
+           [else e]))]))
 
 
 ;; Type-Repr syntax
