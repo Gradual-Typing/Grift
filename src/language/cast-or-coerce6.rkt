@@ -98,6 +98,8 @@
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
+          (Type-Mu-Body E)
+          (Type-Mu-Huh E)
           ;; Tags are exposed before specify This is bad
           ;; TODO fix this after the deadline
           (Type-Tag E)

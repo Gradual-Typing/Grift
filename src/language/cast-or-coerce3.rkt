@@ -1,5 +1,6 @@
 #lang typed/racket/base
-(require "forms.rkt" "primitives.rkt")
+(require "forms.rkt" "primitives.rkt"
+         "cast-or-coerce3.1.rkt")
 
 (provide (all-defined-out)
          (all-from-out "forms.rkt" "primitives.rkt"))
@@ -11,6 +12,35 @@
   (Prog (List String Natural Grift-Type) CoC3-Expr))
 
 
+(define-type CoC3-Expr
+  (Rec E (U (Castable-Lambda-Forms E)
+            (Fn-Proxy-Forms E)
+            (Letrec (Bnd* E) E)
+            (Let (Bnd* E) E)
+            (Var Uid) 
+            (Global String)
+            (Assign Id E)
+            (Gen-Data-Forms E)
+            (Code-Forms E)
+            (Quote-Coercion Grift-Coercion)
+            (Coercion-Operation-Forms E)
+            (Quote-HCoercion Mixed-Coercion) 
+            (Hyper-Coercion-Operation-Forms E)
+            (Type Grift-Type)
+            (Type-Operation-Forms E)
+            (Control-Flow-Forms E)
+            (Op Grift-Primitive (Listof E))
+            (Quote Cast-Literal)
+            No-Op
+            (Blame E)
+            (Observe E Grift-Type)
+            (Unguarded-Forms E)
+            (Guarded-Proxy-Forms E)
+            (Monotonic-Forms E Grift-Type)
+            (Error E)
+            (Tuple-Operation-Forms E))))
+
+#;
 (define-type CoC3-Expr
   (Rec E (U
           (Construct CoC3-Gen-Data CoC3-Gen-Ctor (Listof E))
@@ -91,8 +121,8 @@
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;; Binding Forms - Lambda
-	  (Letrec CoC3-Bnd* E)
-	  (Let CoC3-Bnd* E)
+          (Letrec CoC3-Bnd* E)
+          (Let CoC3-Bnd* E)
           (Var Uid)
           (Global String)
           (Assign Id E)

@@ -4,6 +4,8 @@
          racket/struct
          racket/match)
 
+(provide form-map)
+
 (define (form-map-field x f)
   (cond
     [(form? x) (f x)]
@@ -30,3 +32,19 @@
         (apply ctr f-fields)])]
     [else
      (match x)]))
+
+
+(module+ test
+  (require rackunit)
+  (define f1 (Quote 1))
+  (define (id x) x)
+  (define f2 (App f1 f1))
+  (check-eq? (form-map f1 error) f1)
+  (check-eq? (form-map f2 id) f2)
+  (define f3 (Lambda '(1 2 3) (Castable #f f2)))
+  (define (fadd1 x)
+    (match x
+      [(Quote (? integer? n)) (Quote (add1 n))]
+      [other (form-map other fadd1)]))
+  (define f5 (Lambda '(1 2 3) (Castable #f (App (Quote 2) (Quote 2)))))
+  (check-equal? (fadd1 f3) f5))
