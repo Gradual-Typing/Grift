@@ -4,6 +4,6 @@
 (define (ones) : (Rec X (Tuple Int (-> X)))
   (tuple 1 ones))
 
-(ann (tuple-proj ((ann ones (Rec X (-> (Tuple Dyn X))))) 0) Int)
+((ann ones (Rec X (-> (Tuple Dyn X)))))
 
 

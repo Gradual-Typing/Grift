@@ -1,5 +1,5 @@
-(define ones : (Rec X (-> (Tuple Int X)))
-  (lambda () (tuple 1 ones)))
+(define (ones)  : (Rec X (Tuple Int (-> X)))
+  (tuple 1 ones))
 
-(tuple-proj ones 0)
+(tuple-proj (ones) 0)
 
