@@ -9,8 +9,7 @@
 | non lexical lambdas
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require #;"../helpers.rkt"
-         (submod "../logging.rkt" typed)
+(require (submod "../logging.rkt" typed)
          "../errors.rkt"
          "../language/cast-or-coerce4.rkt"
          "../language/cast-or-coerce5.rkt")
@@ -314,6 +313,10 @@
          (values (Access t f e #f) e-fv))]
     [(Check t p (app uf-expr e e-fv) (app uf-expr* e* e*-fv))
      (values (Check t p e e*) (set-union e-fv e*-fv))]
+    [(Type-Mu-Huh (app uf-expr e e-fv))
+     (values (Type-Mu-Huh e) e-fv)]
+    [(Type-Mu-Body (app uf-expr e e-fv))
+     (values (Type-Mu-Body e) e-fv)]
     [other (error 'uncover-free "unmatched ~a" other)]))
   (debug 'cast/uncover-free/uf-expr/e e ret-e ret-fv)
   (values ret-e ret-fv))

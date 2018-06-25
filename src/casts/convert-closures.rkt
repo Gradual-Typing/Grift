@@ -473,6 +473,8 @@
          (Access t f e (if i? (recur i?) #f))]
         [(Check t p (app recur e) (app recur* e*))
          (Check t p e e*)]
+        [(Type-Mu-Huh (app recur e)) (Type-Mu-Huh e)]
+        [(Type-Mu-Body (app recur e)) (Type-Mu-Body e)]
         [other (error 'Convert-Closures "unmatched ~a" other)]))
 
     ;; recur through a list of expressions
