@@ -9,29 +9,82 @@
 |Description: Hoist the allocation of all types and static coercions to the 
 | initialization of the program. Unify there allocations so that any two
 | structurally similar structures are the same runtime object. Coercions may
-| still allocate new coercions that are equivalent to the hoisted so pointer
-| equality is less meaninfull in this case. But it should limit greatly the
-| amount of allocation occuring at runtime for coercions. 
+| still allocate new coercions that are equivalent to the hoisted, so runtime
+| hashconsing of types is still needed to ensure pointer
+| equality is the same as type equality. This pass greatly reduces the amount
+| of runtime type allocation. 
 +------------------------------------------------------------------------------+
-|Input Grammar Cast or Coercion Language 3
-|Output Grammar Cast or Coercion Language 3.1
+| Input Grammar Cast or Coercion Language 3
+| Output Grammar Cast or Coercion Language 3.1
 +-----------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../helpers.rkt"
-         "../growable-vector.rkt"
-         "../unique-counter.rkt"
-         "../errors.rkt"
-         "../language/cast-or-coerce3.rkt"
-         "../language/lambda0.rkt"
-         racket/match
-         racket/list)
+(require
+ (submod  "../logging.rkt" typed)
+ "../growable-vector.rkt"
+ "../unique-counter.rkt"
+ "../errors.rkt"
+ "../type-equality.rkt"
+ "../language/cast-or-coerce3.rkt"
+ "../language/cast-or-coerce3.1.rkt"
+ racket/match
+ racket/list)
+
+(define-type (HT&C+ E)
+  (U (Type Immediate-Type)
+     (Quote-Coercion Immediate-Coercion)
+     (Mvector E E Immediate-Type)
+     (Mbox E Immediate-Type)))
+
+(define-type (HT&C- E)
+  (U (Type Grift-Type)
+     (Quote-Coercion Grift-Coercion)
+     (Quote-HCoercion Mixed-Coercion)
+     (Mvector E E Grift-Type)
+     (Mbox E Grift-Type)))
+
+(define-type (HT&C= E)
+  (U (Monotonic-Forms-w/o-Constructors E)
+     (Castable-Lambda-Forms E)
+     (Fn-Proxy-Forms E) 
+     (Letrec (Bnd* E) E)
+     (Let (Bnd* E) E)
+     (Var Uid) 
+     (Gen-Data-Forms E)
+     (Code-Forms E)
+     (Coercion-Operation-Forms E)
+     (Hyper-Coercion-Operation-Forms E)
+     (Type-Operation-Forms E)
+     (Control-Flow-Forms E)
+     (Op Grift-Primitive (Listof E))
+     (Quote Cast-Literal)
+     No-Op
+     (Blame E)
+     (Observe E Grift-Type)
+     (Unguarded-Forms E)
+     (Guarded-Proxy-Forms E)
+     (Error E)
+     (Tuple-Operation-Forms E)))
+
+(assert-subtype? (HT&C+ CoC3.1-Expr) CoC3.1-Expr)
+(assert-subtype? (HT&C= CoC3.1-Expr) CoC3.1-Expr)
+(assert-subtype? (U (HT&C= CoC3.1-Expr) (HT&C+ CoC3.1-Expr))
+                 CoC3.1-Expr)
+(assert-subtype? CoC3.1-Expr
+                 (U (HT&C= CoC3.1-Expr) (HT&C+ CoC3.1-Expr)))
+(assert-subtype? (HT&C- CoC3-Expr) CoC3-Expr)
+(assert-subtype? (HT&C= CoC3-Expr) CoC3-Expr)
+(assert-subtype? (U (HT&C- CoC3-Expr) (HT&C= CoC3-Expr))
+                 CoC3-Expr)
+(assert-subtype? CoC3-Expr
+                 (U (HT&C- CoC3-Expr) (HT&C= CoC3-Expr)))
+
 
 (define-type Immediate-Coercion* (Listof Immediate-Coercion))
 
 ;; Only the pass is provided by this module
 (provide hoist-types-and-coercions)
 
-(: hoist-types-and-coercions : Cast-or-Coerce3-Lang -> Lambda0-Lang)
+(: hoist-types-and-coercions : Cast-or-Coerce3-Lang -> Cast-or-Coerce3.1-Lang)
 (define (hoist-types-and-coercions prgm)
   (match-define (Prog (list prgm-name next-unique-number prgm-type) exp)
     prgm)
@@ -45,19 +98,22 @@
   (define coercion->immediate
     (make-identify-coercion! type->immediate crcn-table))
 
-  (define new-exp : L0-Expr
+  (define new-exp : CoC3.1-Expr
     ;; Map through the expression mutating the above state to collect
     ;; all type and coercions.
     (parameterize ([current-unique-counter unique-state])
       (map-hoisting-thru-Expr type->immediate coercion->immediate exp)))
 
+  (define bnd-mu-type* (table-mus type-table))
+  (define bnd-type* (table->list type-table))
+  (define bnd-mu-crcn* (table-mus crcn-table))
+  (define bnd-crcn* (table->list crcn-table))
+  #;(debug std bnd-mu-type* bnd-type* bnd-mu-crcn* bnd-crcn*)
   ;; Compose the mapping with extracting the state of the computation
   ;; to build a new program.  
   (Prog (list prgm-name (unique-counter-next! unique-state) prgm-type)
-    (Let-Static* (table-mus type-table)
-                 (table->list type-table)
-                 (table-mus crcn-table)
-                 (table->list crcn-table)
+    (Let-Static* bnd-mu-type* bnd-type*
+                 bnd-mu-crcn* bnd-crcn*
                  new-exp)))
 
 ;; Type Cache maps grift types to an immediate-type that is the
@@ -148,7 +204,7 @@
 (define (name! sb* name type rank)
   (define uid (next-uid! name))
   (sorted-bnd*-add! sb* rank (cons uid type))
-  (values (Static-Id uid) rank))
+  (values (Static-Id uid) (+ 1 rank)))
 
 (: make-recur*
    (All (Src Imm)
@@ -159,7 +215,7 @@
     (for/lists ([i* : (Listof Imm)] [r : (Listof Nat)])
                ([t t*])
       (recur t)))
-  (values i* (apply max r*)))
+  (values i* (apply max (cons 0 r*))))
 
 ;; This function memoizes the fixpoint of the compile type
 ;; hash consing which ensures that calls containing the
@@ -221,8 +277,10 @@
         [(Bool) (values BOOL-TYPE 0)]
         [(Float) (values FLOAT-TYPE 0)]
         [(Character) (values CHAR-TYPE 0)]
-        [(Fn ar (app recur* t* m) (app recur t n))
-         (name! sb* "static_fn_type" (Fn ar t* t) (max m n))]
+        [(Fn ar (app recur* t* m) (app recur t0 n))
+         (define rank (max m n))
+         (define ty (Fn ar t* t0))
+         (name! sb* "static_fn_type" ty rank)]
         [(GRef (app recur t n))
          (name! sb* "static_gref_type" (GRef t) n)]
         [(MRef (app recur t n))
@@ -234,8 +292,6 @@
         [(STuple arity (app recur* t* n))
          (name! sb* "static_tuple_type" (STuple arity t*) n)])))
   (make-identify! tt make-id-type!))
-
-
 
 (: make-identify-coercion! :
    (Grift-Type -> Immediate-Type) Crcn-Table
@@ -280,13 +336,13 @@
    (Grift-Type     -> Immediate-Type)
    (Mixed-Coercion -> Immediate-Coercion)
    CoC3-Expr
-   -> L0-Expr)
+   -> CoC3.1-Expr)
 ;; Recur through all valid language forms collecting the types
 ;; in the type table and replacing them with references to the
 ;; global identifiers
 (define (map-hoisting-thru-Expr type->imdt crcn->imdt exp)
   ;; Recur through expression replacing types with their primitive counterparts
-  (: recur (CoC3-Expr -> L0-Expr))
+  (: recur (CoC3-Expr -> CoC3.1-Expr))
   (define (recur exp)
     ;;(printf "ht: ~a\n" exp) (flush-output (current-output-port))
     (match exp
@@ -326,8 +382,10 @@
        (Fn-Proxy-Closure e)]
       [(Fn-Proxy-Coercion (app recur e))
        (Fn-Proxy-Coercion e)]
+      #|
       [(Compose-Coercions (app recur e1) (app recur e2))
        (Compose-Coercions e1 e2)]
+      |#
       [(HC (app recur p?) (app recur t1) (app recur lbl)
            (app recur i?) (app recur t2)
            (app recur m))
@@ -422,10 +480,12 @@
        (Type-Mu-Huh e)]
       [(Type-Mu-Body (app recur e))
        (Type-Mu-Body e)]
+      #| 
       [(Type-Tag (app recur e))
-       (Type-Tag e)]
+      (Type-Tag e)]
       [(Tag s)
-       (Tag s)]
+      (Tag s)] 
+      |#
       [(Letrec (app recur-bnd* b*) (app recur e))
        (Letrec b* e)]
       [(Let (app recur-bnd* b*) (app recur e))
@@ -439,7 +499,7 @@
       [(If (app recur t) (app recur c) (app recur a))
        (If t c a)]
       [(Switch e c* d)
-       (: recur-case : (Switch-Case CoC3-Expr) -> (Switch-Case L0-Expr))
+       (: recur-case : (Switch-Case CoC3-Expr) -> (Switch-Case CoC3.1-Expr))
        (define/match (recur-case c)
          [((cons l r)) (cons l (recur r))])
        (Switch (recur e) (map recur-case c*) (recur d))]
@@ -542,16 +602,16 @@
       [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
       [(? string? x) (error 'hoist-types/string)]))
   ;; Recur through other type containing ast forms
-  (: recur* (CoC3-Expr* -> L0-Expr*))
+  (: recur* (CoC3-Expr* -> CoC3.1-Expr*))
   (define (recur* e*) (map recur e*))
   
-  (: recur-bnd* (CoC3-Bnd* -> L0-Bnd*))
+  (: recur-bnd* (CoC3-Bnd* -> CoC3.1-Bnd*))
   (define (recur-bnd* b*)
     (map (lambda ([b : CoC3-Bnd])
            (cons (car b) (recur (cdr b))))
          b*))
 
-  (: recur-bnd-code* (CoC3-Bnd-Code* -> L0-Bnd-Code*))
+  (: recur-bnd-code* (CoC3-Bnd-Code* -> CoC3.1-Bnd-Code*))
   (define (recur-bnd-code* b*)
     (map (lambda ([b : CoC3-Bnd-Code])
            (match-let ([(cons a (Code u* e)) b])
@@ -561,6 +621,18 @@
   ;; Body of ht-expr just start the expression traversal
   (recur exp))
 
-
-;; A few simple tests to make sure the pass isn't completely broken
-(module+ test)
+(module+ test
+  (require typed/rackunit)
+  (define f1 (Fn 0 '() DYN-TYPE))
+  (define f2 (Fn 0 '() f1))
+  (define tt : Type-Table (make-type-table))
+  (define t->i (make-identify-type! tt))
+  (current-unique-counter (make-unique-counter 0))
+  (void (t->i f2)) 
+  (check-equal? (table->list tt)
+                (list
+                 (cons (Uid "static_fn_type" 0) (Fn 0 '() (Dyn)))
+                 (cons
+                  (Uid "static_fn_type" 1)
+                  (Fn 0 '() (Static-Id (Uid "static_fn_type" 0))))))
+  )
