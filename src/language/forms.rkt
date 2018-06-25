@@ -381,10 +381,12 @@ And a type constructor "name" expecting the types of field1 and field2
                 (STuple 2 (list (FVar u1)
                                 (Mu (Scope (STuple 2 (list (FVar u1) (TVar 0))))))))
   (check-equal? (grift-type-abstract u1 ln1)
-                (Scope (Mu (Scope (STuple 2 (list (TVar 1) (TVar 0)))))))
+                (Scope (Mu (Scope (STuple 2 (list (TVar 1) (TVar 0))))))))
 
-  )
-
+(: unfold-mu : (Mu (Scope Grift-Type)) -> Grift-Type)
+(define (unfold-mu t)
+  (match-define (Mu s) t)
+  (grift-type-instantiate s t))
 
 ;; Close over a free variable in a type
 ;; Uid Grift-Type -> Grift-Type

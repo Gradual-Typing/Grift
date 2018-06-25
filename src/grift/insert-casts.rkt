@@ -1,28 +1,25 @@
+;; There is a reported bug with contract generation
+;; The current workaround is to use the nocheck language and avoid types.
 #lang typed/racket/base/no-check
 #|------------------------------------------------------------------------------+
-|Pass: src/insert-casts                                                         |
+|Pass: src/insert-casts                                                         
 +-------------------------------------------------------------------------------+
-|Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
+|Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              
 +-------------------------------------------------------------------------------+
-|Description: This pass converts differences in type equality via a inserted    |
-|cast. After this pass all types should be explicit and the program should be   |
-|roughly equivalent to the cast-calculus mentioned in papers on the gradually   |
-|typed lambda calculus.                                                         |
-+-------------------------------------------------------------------------------+
-|Input Grammar                                                                  |
+|Description: This pass implicit cast explicit via a inserted casts where types
+| the value provided is not a subtype of the expected type, but is a 
+| consistent-subtype of the expected type.
 +------------------------------------------------------------------------------|#
-(require (for-syntax racket/base)
-         racket/match
-         racket/port
-         "../errors.rkt"
-         "../logging.rkt"
-         "../configuration.rkt"
-         "../language/forms.rkt"
-         "../language/grift1.rkt"
-         "../language/cast0.rkt")
-
-(require/typed racket/base
-  (srcloc->string (srcloc -> String)))
+(require
+ (for-syntax racket/base)
+ racket/match
+ racket/port
+ "../configuration.rkt"
+ "../errors.rkt"
+ "../language/cast0.rkt"
+ "../language/forms.rkt"
+ "../language/grift1.rkt"
+ "../logging.rkt")
 
 ;; Only the pass is provided by this module
 (provide insert-casts
@@ -30,34 +27,9 @@
           "../language/grift1.rkt"
           "../language/cast0.rkt"))
 
-#;(module* typed typed/racket/base
-  (require "../language/grift1.rkt"
-           "../language/cast0.rkt")
-  (provide (all-from-out
-            "../language/grift1.rkt"
-            "../language/cast0.rkt"))
-  (require/typed/provide (submod "..")
-    [insert-casts (Grift1-Lang -> Cast0-Lang)]))
-
-#;(define-syntax-rule (: stx ...) (void))
-#;(define-syntax-rule (ann e t ...) e)
-#;(define-syntax-rule (inst e t ...) e)
-
-
-
-;; A list of casts that are inserted and there source location
-(: casts-inserted (Boxof (Listof (cons srcloc C0-Expr))))
-(define casts-inserted (box '()))
-(: add-cast! : srcloc C0-Expr -> Void)
-(define (add-cast! s e)
-  (set-box! casts-inserted (cons (cons s e) (unbox casts-inserted))))
-(: no-casts! : -> Void)
-(define (no-casts!)
-  (set-box! casts-inserted '()))
-
-
 (: insert-casts (Grift1-Lang -> Cast0-Lang))
 (define (insert-casts prgm)
+  (define who 'insert-casts)
   (match-define (Prog (list name unique type) tl*) prgm)
   (define uc (make-unique-counter unique))
   (no-casts!)
@@ -80,20 +52,34 @@
             (match-define (cons loc exp) loc.exp)
             (printf "\t\t~a\n" (srcloc->string loc))))))
     (error 'Type-Error err-str))
-  
-  (debug (Prog (list name (unique-counter-next! uc) type) new-tl*)))
 
+  (debug who (Prog (list name (unique-counter-next! uc) type) new-tl*)))
+
+
+;; A list of casts that are inserted and their source location
+(: casts-inserted (Boxof (Listof (cons srcloc C0-Expr))))
+(define casts-inserted (box '()))
+(: add-cast! : srcloc C0-Expr -> Void)
+(define (add-cast! s e)
+  (set-box! casts-inserted (cons (cons s e) (unbox casts-inserted))))
+(: no-casts! : -> Void)
+(define (no-casts!)
+  (set-box! casts-inserted '()))
+
+
+;; is `t1` a subtype of `t2`?
 (define (subtype-of? t1 t2)
-  (define (unfold t)
-    (match t
-      [(Mu s) (grift-type-instantiate s t)]
-      [_ (error 'unfold)]))
+  ;; substitute `t` for variables bound to this Mu to get
+  ;; rid of this Mu scope.
   (define (rec/a-fold a t1 t2)
-    (match* (t1 t2)
-      [('() '()) a]
-      [((cons a1 d1) (cons a2 d2))
-       (rec/a-fold (rec/a a1 a2 a) d1 d2)]
-      [(_ _) (error 'rec/a-fold)]))
+    (cond
+      [(not a) #f]
+      [else
+       (match* (t1 t2)
+        [('() '()) a]
+        [((cons a1 d1) (cons a2 d2))
+         (rec/a-fold (rec/a a1 a2 a) d1 d2)]
+        [(_ _) (error 'rec/a-fold)])]))
   (define (rec/a t1 t2 a)
     (define (rec t1 t2)
       (cond
@@ -113,34 +99,49 @@
          (define p (cons t1 t2))
          (cond
            [(set-member? a p) a]
-           [(Mu? t1) (rec/a (unfold t1) t2 (set-add a (cons t1 t2)))]
-           [(Mu? t2) (rec/a t1 t2 (set-add a p))]
+           [(Mu? t1) (rec/a (unfold-mu t1) t2 (set-add a p))]
+           [(Mu? t2) (rec/a t1 (unfold-mu t2) (set-add a p))]
            [else (error 'subtype-of?)])]))
     (rec t1 t2))
-  (rec/a t1 t2 (set)))
-         
+  (debug 'subtype-of? t1 t2 (rec/a t1 t2 (set))))
 
+(module+ test
+  (require rackunit)
+  (define inf-mt-stream (Mu (Scope (Fn 0 '() (TVar 0)))))
+  (check-false
+   (not (subtype-of? inf-mt-stream (Fn 0 '() inf-mt-stream))))
+
+  (check-false
+   (subtype-of? (Dyn) (Fn 0 '() (Fn 0 '() inf-mt-stream))))
+  (check-false (subtype-of? (Dyn) inf-mt-stream))
+  )
+
+;; Make a cast from `t1` to `t2` of the value returned by `e`.
 (: mk-cast (srcloc (-> Blame-Label) C0-Expr Grift-Type Grift-Type -> C0-Expr))
 (define (mk-cast src l-th e t1 t2)
+  (define who 'insert-casts/mk-cast)
   (cond
-    [(subtype-of? t1 t2) e]
+    [(subtype-of? t1 t2) (debug who t1 t2 e)]
     [else
      (define c (debug (Cast e (Twosome t1 t2 (l-th)))))
      (add-cast! src c)
-     c]))
+     (debug who t1 t2 c)]))
 
-
-(: ic-expr (G1-Ann-Expr . -> . C0-Expr))
+(: ic-expr : G1-Ann-Expr -> C0-Expr)
 (define (ic-expr exp^)
   (match-define (Ann exp (cons src type)) exp^)
   (match exp
     [(Lambda fml* (and (Ann _ (cons body-src body-type))
                        (app ic-expr body)))
-     (unless (Fn? type)
-       (error 'insert-casts "function type recieve non-function type"))
+     (define fn-range
+       (let rec ([type type])
+         (cond
+           [(Fn? type) (Fn-ret type)]
+           [(Mu? type) (rec (unfold-mu type))]
+           [else (error 'insert-casts "function type recieve non-function type")])))
      (let* ([lbl-th (mk-label "lambda" body-src)]
             [body (mk-cast body-src lbl-th body
-                           body-type (ann (Fn-ret type) Grift-Type))]
+                           body-type (ann fn-range Grift-Type))]
             [fml* (map (inst Fml-identifier Uid Grift-Type) fml*)])
        (Lambda fml* body))]
     [(Let bnd* (and (Ann _ (cons src type^)) body))
@@ -193,7 +194,6 @@
     [(Gbox e) (Gbox (ic-expr e))]
     [(Gunbox (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
      (cond
-       [(GRef? e-ty) (Gunbox e)]
        [(Dyn? e-ty)
         (define lbl (mk-label "guarded unbox" e-src))
         (cond
@@ -203,16 +203,12 @@
            dop]
           [else             
            (Gunbox (mk-cast e-src lbl e e-ty PBOX-DYN-TYPE))])]
-       [else
-        (error 'insert-casts/gunbox
-               "unexexpected value for e-ty: ~a" e-ty)])]
+       [else (Gunbox e)])]
     [(Gbox-set! (and (Ann _ (cons e1-src e1-ty)) (app ic-expr e1))
                 (and (Ann _ (cons e2-src e2-ty)) (app ic-expr e2)))
      (define lbl1 (mk-label "guarded box-set!" e1-src))
      (define lbl2 (mk-label "guarded box-set!" e2-src))
      (cond
-       [(GRef? e1-ty)
-        (Gbox-set! e1 (mk-cast e2-src lbl2 e2 e2-ty (GRef-arg e1-ty)))]
        [(Dyn? e1-ty)
         (cond
           [(dynamic-operations?)
@@ -223,9 +219,7 @@
            (Gbox-set! (mk-cast e1-src lbl1 e1 DYN-TYPE PBOX-DYN-TYPE)
                       (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE))])]
        [else
-        (error 'insert-casts/gbox-set!
-               "unexpected value for e1-ty: ~a"
-               e1-ty)])]
+        (Gbox-set! e1 (mk-cast e2-src lbl2 e2 e2-ty (GRef-arg e1-ty)))])]
     [(Gvector (and (Ann _ (cons size-src size-ty))
                    (app ic-expr size))
               (app ic-expr e))
@@ -263,9 +257,7 @@
           (define lbl (mk-label "gvector-ref index" i-src))
           (mk-cast i-src lbl i i-ty INT-TYPE)]
          [else i]))
-     (cond
-       [(GVect? e1-ty)
-        (Gvector-set! e1 i-exp (mk-cast e2-src lbl2 e2 e2-ty (GVect-arg e1-ty)))]
+     (cond 
        [(Dyn? e1-ty)
         (cond
           [(dynamic-operations?)
@@ -276,9 +268,8 @@
            (Gvector-set! (mk-cast e1-src lbl1 e1 DYN-TYPE (GVect DYN-TYPE))
                          i-exp
                          (mk-cast e2-src lbl2 e2 e2-ty DYN-TYPE))])]
-       [else (error 'insert-casts/gvector-set!
-                    "unexpected value for e1 type: ~a"
-                    e1-ty)])]
+       [else
+        (Gvector-set! e1 i-exp (mk-cast e2-src lbl2 e2 e2-ty (GVect-arg e1-ty)))])]
     [(Mbox (app ic-expr e) t) (Mbox e t)]
     [(Munbox (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
      ;; It would be nice if I can insert the cast from the runtime
@@ -298,7 +289,7 @@
             [else
              (define cst (mk-cast e-src lbl e DYN-TYPE (MRef DYN-TYPE)))
              (MBoxCastedRef cst DYN-TYPE)]))]
-       [(MRef t)
+       [(or (MRef t) (and (Mu _) (app unfold-mu (MRef t))))
         (if (completely-static-type? t)
             (Munbox e)
             (MBoxCastedRef e t))]
@@ -321,7 +312,7 @@
               (mk-cast e1-src lbl e1 DYN-TYPE (MRef DYN-TYPE))
               (mk-cast e2-src e2-lbl e2 e2-ty DYN-TYPE)
               DYN-TYPE)]))]
-       [(MRef t)
+       [(or (MRef t) (and (Mu _) (app unfold-mu (MRef t))))
         (if (completely-static-type? t)
             (Mbox-set! e1 (mk-cast e2-src e2-lbl e2 e2-ty t))
             ;; OPTIMIZATION: instead of casting e2 from
@@ -359,7 +350,7 @@
           [else
            (define cst (mk-cast e-src lbl e DYN-TYPE (MVect DYN-TYPE)))
            (MVectCastedRef cst i^ DYN-TYPE)])]
-       [(MVect t)
+       [(or (MVect t) (and (Mu _) (app unfold-mu (MVect t))))
         (cond
           [(completely-static-type? t) (Mvector-ref e i^)]
           [else (MVectCastedRef e i^ t)])])]
@@ -385,14 +376,14 @@
            (define e1^ (mk-cast e1-src lbl e1 DYN-TYPE (MVect DYN-TYPE)))
            (define e2^ (mk-cast e2-src e2-lbl e2 e2-ty DYN-TYPE)) 
            (MVectCastedSet! e1^ i e2^ DYN-TYPE)])]
-       [(MVect t)
+       [(or (MVect t) (and (Mu _) (app unfold-mu (MVect t))))
         (if (completely-static-type? t)
             (Mvector-set! e1 i^ (mk-cast e2-src e2-lbl e2 e2-ty t))
             (MVectCastedSet! e1 i^ e2 e2-ty))])]
     [(Mvector-length (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)))
      (define l-th (mk-label "mvector-length" e-src))
      (Mvector-length (mk-cast e-src l-th e DYN-TYPE MVEC-DYN-TYPE))]
-    [(Mvector-length (and (Ann _ (cons _ (MVect _))) (app ic-expr e)))
+    [(Mvector-length (app ic-expr e))
      (Mvector-length e)]
     [(Gvector-length (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)))
      (define l-th (mk-label "gvector-length" e-src))
@@ -402,7 +393,7 @@
         (add-cast! e-src dop)
         dop]
        [else (Gvector-length (mk-cast e-src l-th e DYN-TYPE PVEC-DYN-TYPE))])]
-    [(Gvector-length (and (Ann _ (cons _ (GVect _))) (app ic-expr e)))
+    [(Gvector-length (app ic-expr e))
      (Gvector-length e)]
     [(Create-tuple e*) (Create-tuple (map ic-expr e*))]
     [(Tuple-proj (and (Ann _ (cons e-src (Dyn))) (app ic-expr e)) i)
@@ -418,7 +409,7 @@
         (define tgt-ty : Grift-Type
           (STuple n (make-list n DYN-TYPE)))
         (Tuple-proj (mk-cast e-src l-th e DYN-TYPE tgt-ty) i)])]
-    [(Tuple-proj (and (Ann _ (cons e-src (STuple _ _))) (app ic-expr e)) i)
+    [(Tuple-proj (app ic-expr e) i)
      (Tuple-proj e i)]
     [other (error 'insert-casts/expression "unmatched ~a" other)]))
 
@@ -458,9 +449,10 @@
         (define lbl (mk-label "Application" src rator-src))
         (define exp^ (mk-cast rator-src lbl exp DYN-TYPE needed-rator-type))
         (App exp^ exp*)])]
-    [(Fn _ dom _)
+    [(or (Fn _ dom _) (and (Mu _) (app unfold-mu (Fn _ dom _))))
      (define exp* (map (ic-operand/cast src) rand* dom))
      (App (ic-expr rator) exp*)]))
+    
 
 (: make-dyn-fn-type (-> Index (Fn Index (Listof Grift-Type) Grift-Type)))
 (define (make-dyn-fn-type n)
@@ -495,5 +487,6 @@
     [(_ pos sup-src sub-src)
      (mk-label (format "~a at ~a\n" pos (srcloc->string sup-src))
                sub-src)]))
+
 
 

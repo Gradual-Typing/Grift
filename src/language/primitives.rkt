@@ -234,6 +234,7 @@
 
 (define-type Dyn-Repr-Ctor
   (U 'make))
+
 (define-type Dyn-Repr-Access
   (U 'value
      'type
@@ -241,8 +242,21 @@
      'immediate-tag
      'box-value
      'box-type))
+
 (define-type Dyn-Repr-Pred
   (U 'immediate-tag=?))
+
+(define-type Gen-Data
+  (U Dyn))
+
+(define-type Gen-Ctor
+  (U Dyn-Repr-Ctor))
+
+(define-type Gen-Access
+  (U Dyn-Repr-Access))
+
+(define-type Gen-Pred
+  (U Dyn-Repr-Pred))
 
 (define-syntax-rule (dyn-make$ value type)
   (Construct DYN-TYPE 'make (list value type)))

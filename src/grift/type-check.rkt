@@ -37,6 +37,12 @@ Provide comments about where to find definitions of types and data
          "../language/grift1.rkt"
          "../language/primitives.rkt"
          "../logging.rkt")
+(module+ test
+  (require rackunit)
+  (define (fresh-uids!)
+    (current-unique-counter (make-unique-counter 0)))
+  (define s (srcloc #f #f #f #f #f)))
+
 
 (require/typed racket/base
   [srcloc->string (srcloc -> String)])
@@ -48,6 +54,7 @@ Provide comments about where to find definitions of types and data
 
 (: type-check (Grift0-Lang -> Grift1-Lang))
 (define (type-check prgm)
+  (define who 'type-check)
   (match-define (Prog (list n c) top-level*) prgm)
 
   (define uc (make-unique-counter c))
@@ -55,8 +62,8 @@ Provide comments about where to find definitions of types and data
   (define g1-top-level*
     (parameterize ([current-unique-counter uc])
       (tc-top* top-level* (hash))))
-  
-  (Prog (list n (unique-counter-next! uc) INT-TYPE) g1-top-level*))
+  (debug who
+         (Prog (list n (unique-counter-next! uc) INT-TYPE) g1-top-level*)))
 
 (: tc-top* : G0-Top* Env -> G1-Top*)
 (define (tc-top* t* env)
@@ -127,7 +134,7 @@ Provide comments about where to find definitions of types and data
 
 ;; Checks to make sure Mu types obey the productivity check
 ;; Return the a version of type where superflouos mu are droped
-;; and unrolled Mus are rerolded.
+;; and unrolled Mus are rerolled.
 (: validate-type : srcloc Grift-Type -> Grift-Type)
 (define (validate-type src t)
   (define who 'validate-type)
@@ -141,15 +148,26 @@ Provide comments about where to find definitions of types and data
       (cond
         [(Mu? t)
          (match-define (Mu s0) t)
-         (define rec-fvar (next-uid! 'rec-fvar))
-         (define t0 (grift-type-instantiate s0 (FVar rec-fvar)))
-         (define t1 ((vt (set-add pending rec-fvar)) t0))
+         (define rec-uvar (next-uid! 'rec-fvar))
+         (define rec-fvar (FVar rec-uvar))
+         (define t0 (grift-type-instantiate s0 rec-fvar))
+         (define t1 ((vt (set-add pending rec-uvar)) t0))
+         ;; If the inner type is a Mu then we merge the
+         ;; Mu we are creating with the inner one.
+         ;; This is because both Mu's variables point to
+         ;; the same location in the type.
+         (define t2
+           (cond
+             [(Mu? t1)
+              (match-define (Mu s1) t1)
+              (grift-type-instantiate s1 rec-fvar)]
+             [else t1]))
          (define-values (s1 used?)
-           (grift-type-abstract/used? rec-fvar t1))
-         ;; if rec-fvar isn't abstracted then t1 doesn't contain
+           (grift-type-abstract/used? rec-uvar t2))
+         ;; if rec-uvar isn't abstracted then t1 doesn't contain
          ;; any occurences of it and we don't have to bind it.
-         (define ret (if used? (Mu s1) t1))
-         (hash-set! eqs (grift-type-instantiate s1 t) ret)
+         (define ret (if used? (Mu s1) t2))
+         (hash-set! eqs (grift-type-instantiate s1 ret) ret)
          ret]
         [(FVar? t)
          (match-define (FVar u) t)
@@ -220,7 +238,26 @@ The type rules for core forms that have interesting type rules
   (cond
     [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
     [(consistent? t-body return-ann) (Fn (length ty-param*) ty-param* return-ann)]
-    [else (error 'lambda-inconsistent "~a ~a ~a" src t-body return-ann)]))
+    [else
+     (error
+      '|static type error|
+      (string-append
+       "Function return annotation inconsistent with the infered "
+       "return type of the function.\n"
+       "    location: " (or (srcloc->string src) "unkown location") "\n"
+       "    annotated type: " (type->string return-ann) "\n"
+       "    inferred type: " (type->string t-body) "\n"))]))
+
+(module+ test
+  (check-equal? (lambda-type-rule s '() (Dyn) (Int))
+                (Fn 0 '() (Int)))
+  (check-equal? (lambda-type-rule s '() (Dyn) #f)
+                (Fn 0 '() (Dyn)))
+  (check-equal? (lambda-type-rule s '() (Int) (Dyn))
+                (Fn 0 '() (Dyn)))
+  (check-exn
+   #rx"static type error:"
+   (lambda () (lambda-type-rule s '() (Int) (Bool)))))
 
 (: tuple-type-rule (Grift-Type* -> Grift-Type))
 (define (tuple-type-rule t*)
@@ -238,34 +275,42 @@ The type rules for core forms that have interesting type rules
   ;; p = pair representing the current unfold operation
   ;; t = the mu type that is being unfolded
   ;; rec/other = a procedure that take the unfolded type and recurs
-  (define (unfold u p t rec/other)
-    (define x? (hash-ref u p #f))
+  (define (unfold a p t rec/other)
+    (define x? (hash-ref a p #f))
     (cond
       [x? x?]
       [else
        (define u (next-uid! 'r))
        (match-define (Mu s) t)
        (define t0 (grift-type-instantiate s t))
-       (define t1 (rec/other t0 (hash-set u p (FVar u))))
+       (define t1 (rec/other t0 (hash-set a p (FVar u))))
        (define-values (s0 used?) (grift-type-abstract/used? u t1))
        (if used? (Mu s0) t1)]))
-  (let rec/u ([t t] [g g] [u (hash)])
+  (with-handlers ([Bottom? values])
+    (let rec/u ([t t] [g g] [a (hash)])
     (let rec ([t t] [g g])
       (match* (t g)
-         [((Dyn) g) g]
-         [(t (Dyn)) t]
-         [((STuple ta t*) (STuple ga g*)) 
-          ;; for/list semantics on mismatched lists is important here
-          ;; this truncates the result to match the shortest list
-          (STuple ta (for/list ([t t*] [g g*]) (rec t g)))]
-         [((Fn ta ta* tr) (Fn ta ga* gr))
-          (Fn ta (map rec ta* ga*) (rec tr gr))] 
-         [((GRef t) (GRef g)) (GRef (rec t g))]
-         [((GVect t) (GVect g)) (GVect (rec t g))]
-         [((MRef t) (MRef g)) (MRef (rec t g))]
-         [((Mu s) g) (unfold (cons t g) t s (λ (t u) (rec/u t g u)))]
-         [(t (Mu s)) (unfold (cons t g) g s (λ (g u) (rec/u t g u)))]
-         [(t g) (Bottom t g)]))))
+        [(t t)     t]
+        [((Dyn) g) g]
+        [(t (Dyn)) t]
+        [((STuple ta t*) (STuple ga g*)) 
+         ;; for/list semantics on mismatched lists is important here
+         ;; this truncates the result to match the shortest list
+         (STuple ta (for/list ([t t*] [g g*]) (rec t g)))]
+        [((Fn ta ta* tr) (Fn ta ga* gr))
+         (Fn ta (map rec ta* ga*) (rec tr gr))] 
+        [((GRef t) (GRef g)) (GRef (rec t g))]
+        [((GVect t) (GVect g)) (GVect (rec t g))]
+        [((MRef t) (MRef g)) (MRef (rec t g))]
+        [((Mu s) g) (unfold a (cons t g) t (λ (t a) (rec/u t g a)))]
+        [(t (Mu s)) (unfold a (cons t g) g (λ (g a) (rec/u t g a)))]
+        [(t g) (raise (Bottom t g))])))))
+
+(module+ test
+  (fresh-uids!)
+  (check-equal? (intersect (Mu (Scope (STuple 2 (list (Int) (TVar 0)))))
+                           (STuple 2 (list (Int) (Dyn))))
+                (STuple 2 (list (Int) (Mu (Scope (STuple 2 (list (Int) (TVar 0)))))))))
 
 (: tuple-proj-type-rule (Grift-Type Integer -> Grift-Type))
 (define (tuple-proj-type-rule ty i)
@@ -277,6 +322,15 @@ The type rules for core forms that have interesting type rules
        [(< -1 i l) (list-ref t* i)]
        [else (error 'grift "type error: tuple index out of bounds")])]
     [(Bottom _ _) (error 'grift "type error: not a tuple")]))
+
+(module+ test
+  (check-equal? (tuple-proj-type-rule (STuple 1 (list (Int))) 0)
+                (Int))
+  (fresh-uids!)
+  (check-equal? (tuple-proj-type-rule (Mu (Scope (STuple 2 (list (Int) (TVar 0))))) 0)
+                (Int)))
+
+
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
@@ -340,15 +394,65 @@ The type rules for core forms that have interesting type rules
 ;; arguments types of the proceedure.
 (: application-type-rule (-> Grift-Type Grift-Type* Src Grift-Type))
 (define (application-type-rule t-rator t-rand* src)
-  (define app-arity (length t-rand*))
-  (define app-template (Fn app-arity (make-list app-arity DYN-TYPE) DYN-TYPE))
-  ;; Join here is expected to unfold any mu types that are present
-  (match (intersect t-rator app-template)
-    [(Fn arr t-fml* t-ret)
-     (unless (andmap consistent? t-fml* t-rand*)
-       (error 'app-inconsistent "~a ~a ~a" src t-rator t-rand*))
+  (match (resolve t-rator)
+    [(Dyn) (Dyn)]
+    [(Fn arity t-fml* t-ret)
+     (unless (= arity (length t-rand*))
+       (error
+         '|static type error|
+        (string-append
+         "Trying to apply function type of arity " (number->string arity)
+         " to " (number->string (length t-rand*)) " arguments.\n"
+         "   location: " (or (srcloc->string src) "unkown location") "\n")))
+     (for ([t-fml t-fml*] [t-rand t-rand*] [n (in-naturals 1)])
+       (unless (consistent? t-fml t-rand)
+         (error
+          '|static type error|
+          (string-append
+           "Function argument type inconsistent with applied argument type.\n"
+           "   location: " (or (srcloc->string src) "unkown location") "\n"
+           "   argument number: " (number->string n) "\n"
+           "   specifically: " (type->string t-fml)
+           " is inconsistent with " (type->string t-rand) "\n"))
+         (error 'app-inconsistent "~a ~a ~a" src t-rator t-rand*)))
      t-ret]
-    [(Bottom _ _) (error 'app-not-function "~a ~a" src t-rator)]))
+    [other
+     (error
+      '|static type error|
+      (string-append
+      "Trying to apply non-function type: " (type->string other) "\n"
+       "   location: " (or (srcloc->string src) "unkown location") "\n"))]))
+
+(module+ test
+
+  (check-equal?
+   (application-type-rule (Dyn) (list (Int)) s)
+   (Dyn))
+  (check-equal?
+   (application-type-rule
+    (Mu (Scope (Fn 1 (list (Int)) (TVar 0))))
+    (list (Int))
+    s)
+   (Mu (Scope (Fn 1 (list (Int)) (TVar 0)))))
+  (check-equal?
+   (application-type-rule (Fn 0 '() (Bool)) '() s)
+   (Bool))
+  (check-exn
+   #rx"static type error:"
+   (lambda ()
+     (application-type-rule (Fn 1 (list (Int)) (Int)) (list (Bool)) s)))
+  (check-exn
+   #rx"static type error:"
+   (lambda ()
+     (application-type-rule (Fn 0 '() (Unit)) (list (Unit))  s))) 
+  (check-exn
+   #rx"static type error:"
+   (lambda ()
+     (application-type-rule
+      (Mu (Scope (STuple 1 (list (TVar 0)))))
+      (list (Int))
+      s))))
+
 
 ;; I am really just defining this in order to maintain
 ;; the abstraction but the type of a begin is the type
@@ -616,7 +720,7 @@ The type rules for core forms that have interesting type rules
         [(Repeat index
              (app recur start ty-start)
              (app recur stop ty-stop)
-             (Ann acc ty-acc?)
+             (list acc ty-acc?)
              (app recur acc-init ty-acc-init)
            exp) 
          (define ty-acc (let-binding-type-rule (and ty-acc? (validate ty-acc?))
@@ -707,3 +811,39 @@ The type rules for core forms that have interesting type rules
               [c* : (Listof C)])
              ([a a*])
     (map-switch-case2 f a)))
+
+
+;; resolve :: takes a type and converts it to a equivalent type
+;; where the outermost type is a concrete type constructor (like ->, Tuple, etc.) as
+;; opposed to logical (like Rec).
+;; NOTE: this should only be called on types that have been converted to normal form. 
+(define (resolve t)
+  (let rec ([t t])
+    (match t
+      [(Mu s) (resolve (grift-type-instantiate s t))]
+      [t t])))
+
+(define (type->sexp t [e : (hash)])
+  (let rec ([t t])
+    (match t 
+      [(FVar id) (hash-ref e id)]
+      [(Fn n a* r) `(,@(map rec a*) -> ,(rec r))]
+      [(Mu s)
+       (define u (next-uid! ""))
+       (define X (gensym "X"))
+       (define t0 (grift-type-instantiate s (FVar u)))
+       `(Rec ,X ,(type->sexp t0 (hash-set e u X)))]
+      [(STuple n a*) `(Tuple ,@(map rec a*))]
+      [(GVect a) `(GVect ,(rec a))]
+      [(GRef a) `(GRef ,(rec a))]
+      [(MVect a) `(MVect ,(rec a))]
+      [(MRef a)  `(MRef ,(rec a))]
+      [(Unit) '()]
+      [other
+       (define-values (nfo _0) (struct-info other))
+       (define-values (sym _1 _2 _3 _4 _5 _6 _7) (struct-type-info nfo))
+       sym])))
+
+(define (type->string t)
+  (with-output-to-string
+    (lambda () (display (type->sexp t (hash))))))
