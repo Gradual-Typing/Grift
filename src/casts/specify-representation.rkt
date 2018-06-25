@@ -13,17 +13,21 @@ but a static single assignment is implicitly maintained.
 | Target Grammar : Data0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require (for-syntax racket/syntax syntax/parse racket/list
-                     "../language/forms.rkt")
-         "../errors.rkt"
-         (submod "../logging.rkt" typed)
-         "../configuration.rkt"
-         "../language/cast-or-coerce6.rkt"
-         "../language/data0.rkt"
-         "../language/syntax.rkt"
-         "memory-layout-helpers.rkt"
-         "constants-and-codes.rkt"
-         "../unique-counter.rkt")
+(require
+ (for-syntax
+  racket/syntax
+  syntax/parse
+  racket/list
+  "../language/forms.rkt")
+ "../errors.rkt"
+ (submod "../logging.rkt" typed)
+ "../configuration.rkt"
+ "../language/cast-or-coerce6.rkt"
+ "../language/data0.rkt"
+ "../language/syntax.rkt"
+ "memory-layout-helpers.rkt"
+ "constants-and-codes.rkt"
+ "../unique-counter.rkt")
 
 ;; Only the pass is provided by this module
 (provide
@@ -42,6 +46,9 @@ but a static single assignment is implicitly maintained.
                    crcn-bnd*
                    exp))
     prgm)
+  (debug off mu-type-bnd* type-bnd* mu-crcn-bnd* crcn-bnd*)
+  (define who 'specify-representation)
+  (debug off who name type)
   (define unique (make-unique-counter next))
   (parameterize ([current-unique-counter unique])
     (define new-exp    : D0-Expr
@@ -53,14 +60,10 @@ but a static single assignment is implicitly maintained.
         (set-box! coerce-tuple-in-place-code-label? #f)
         (set-box! cast-tuple-code-label? #f)
         (set-box! cast-tuple-in-place-code-label? #f)
-        (set-box! hashcons-types-code-label? #f)
+        (set-box! hashcons-type-code-label? #f)
+        (set-box! access-type-hashcode-label? #f)
+        (set-box! calculate-type-hashcode-label? #f)
         (sr-expr (hash) empty-index-map exp)))
-    (: allocate-bound-mu-type : Any -> (Values D0-Expr D0-Expr))
-    (define (allocate-bound-mu-type bnd-mu-type)
-      (error 'todo))
-    (: allocate-bound-mu-crcn : Any -> (Values D0-Expr D0-Expr))
-    (define (allocate-bound-mu-crcn bnd-mu-crcn)
-      (error 'todo))
     (define-values (alloc-mu-type* init-mu-type*)
       (for/lists ([alloc-mu-type* : D0-Expr*] [init-mu-type* : D0-Expr*])
                  ([mu-type-bnd mu-type-bnd*])
@@ -78,6 +81,8 @@ but a static single assignment is implicitly maintained.
     (define new-next    : Nat      (unique-counter-next! unique))
     (define bnd-code*   : D0-Bnd-Code* (unbox boxed-bnd-code*))
     (debug
+     off
+     who
      (Prog (list name new-next type)
        (GlobDecs (append mu-type-id* type-id*
                          mu-crcn-id* crcn-id*)
@@ -181,7 +186,7 @@ but a static single assignment is implicitly maintained.
         (sr-array-set! rt i t2a))]
      [else UNIT-IMDT])
     (sr-array-set! rt TYPE-TUPLE-COUNT-INDEX bigger-count)
-    (Assign hrt (app-code$ (get-hashcons-types!) tagged-rt))
+    (Assign hrt (hashcons-type tagged-rt))
     (Var hrt)))
 
 (: fn-type-glb ((Code-Label Uid) -> ((Var Uid) (Var Uid) -> D0-Expr)))
@@ -202,7 +207,7 @@ but a static single assignment is implicitly maintained.
       (sr-array-set! rt i t-glb))
     (sr-array-set! rt TYPE-FN-ARITY-INDEX arity)
     (sr-array-set! rt TYPE-FN-RETURN-INDEX t-rt)
-    (Assign hrt (app-code$ (get-hashcons-types!) tagged-rt))
+    (Assign hrt (hashcons-type tagged-rt))
     (Var hrt)))
 
 (: get-mk-fn-crcn! (Uid -> (Code-Label Uid)))
@@ -527,7 +532,7 @@ but a static single assignment is implicitly maintained.
         [(Code-Label u) (Code-Label u)]
         ;; Type Representation
         [(Type t) (sr-prim-type t)]
-        [(Type-Fn-Huh (app recur e)) (type-fn? e)]
+        [(Type-Fn-Huh (app recur e)) (type-fn? e)] 
         [(Type-Fn-arity (app recur e)) (type-fn-arity-access e)]
         [(Type-Fn-return (app recur e)) (type-fn-return-access e)]
         [(Type-Fn-arg (app recur e1) (app recur e2)) (type-fn-fmls-access e1 e2)]
@@ -1030,48 +1035,6 @@ but a static single assignment is implicitly maintained.
 (define (build-hc-med [e : D0-Expr]) : D0-Expr
   (tagged-array-ref e HC-TAG-MASK HC-MED-INDEX))
 
-;; Allocate without forgetting to lift evaluating subterms first
-;; this prevents evaluating terms which may cause more allocation
-;; will initializing the values of an allocation
-;; it essentially produces expression of the form:
-;; (let ((t* e*) ...) (let ((tmp (alloc ...))) (begin (set tmp i t*) ... (binary-or tmp tag))))
-;; though it does eliminate any form that it can based on it's input
-(: sr-alloc (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
-(define (sr-alloc name tag? slots)
-  ;; As long as this is used to initialize all the data I have
-  ;; a faily stong guarentee that no other allocation could possibly occur.
-  (: sr-alloc-init ((Var Uid) -> (Index (Var Uid) -> D0-Expr)))
-  (define ((sr-alloc-init mem) offset value)
-    (op$ Array-set! mem (Quote offset) value))
-  ;; Take a list of variables and expressions paired with their names
-  ;; make variables that are bound to the expressions and the bindings
-  (: get-assignments/vars ((Listof (Pair String D0-Expr)) -> (Values D0-Expr* (Listof (Var Uid)))))
-  (define (get-assignments/vars b*)
-    (cond
-      [(null? b*) (values '() '())]
-      [else
-       (match-define (cons (cons n e) d) b*)
-       (define-values (a* v*) (get-assignments/vars d))
-       (cond
-         [(Var? e) (values a* (cons e v*))]
-         [else
-          (define u (track-next-uid!$ n))
-          (values (cons (Assign u e) a*) (cons (Var u) v*))])]))
-  (define size (length slots))
-  (when (= size 0)
-    (error 'specify-representation "Empty objects can not be allocated"))
-  (define-values (ass* var*) (get-assignments/vars slots))
-  (define ind* (range 0 size))
-  (define-track-next-uid!$ alloc-id)
-  (define alloc-var (Var alloc-id))
-  (define alloc-ass (Assign alloc-id (op$ Alloc (Quote size))))
-  (define set* (map (sr-alloc-init alloc-var) ind* var*)) 
-  (define tag-return : D0-Expr
-    (cond
-      [(not tag?) alloc-var]
-      [else (sr-tag-value alloc-var tag?)]))
-  (Begin (append ass* (cons alloc-ass set*)) tag-return))
-
 (: sr-prim-type (Immediate-Type -> D0-Expr))
 (define (sr-prim-type t)
   (match t
@@ -1092,7 +1055,9 @@ but a static single assignment is implicitly maintained.
 (define (allocate-bound-mu-type bnd)
   (match-define (cons u (Mu it)) bnd)
   (values (Assign u (sr-type-mu (Quote 0)))
-          (type-mu-body-assign (Var u) (sr-prim-type it))))
+          (begin$
+            (type-mu-body-assign (Var u) (sr-prim-type it))
+            (hashcons-type (Var u)))))
 
 (: allocate-bound-type (CoC6-Bnd-Type -> D0-Expr))
 (define (allocate-bound-type bnd)
@@ -1243,7 +1208,9 @@ but a static single assignment is implicitly maintained.
 (: sr-observe ((String -> Uid) D0-Expr Grift-Type -> D0-Expr))
 (define (sr-observe next-uid! e t)
   (: generate-print ((Var Uid) Grift-Type -> D0-Expr))
-  (define (generate-print id ty)
+  (define (generate-print id t)
+    (define who 'sr-observe)
+    (debug off who id t)
     (cond
       [(Int? t) (op$ Printf (Quote "Int : %ld\n") id)]
       ;; This is a fragile hack
@@ -1267,6 +1234,9 @@ but a static single assignment is implicitly maintained.
       [(MVect? t) (op$ Print (Quote "MVector : ?\n"))]
       [(STuple? t) (op$ Print (Quote "Tuple : ?\n"))]
       [(Dyn? t) (op$ Print (Quote "Dynamic : ?\n"))]
+      [(Mu? t)
+       (match-define (Mu s) t)
+       (generate-print id (grift-type-instantiate s t))]
       [else (error 'sr-observe "printing other things")]))
   (begin$ (assign$ res e) (generate-print res t)))
 

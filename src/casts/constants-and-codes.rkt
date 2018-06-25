@@ -1,11 +1,17 @@
 #lang typed/racket
 
-(require (for-syntax racket/syntax syntax/parse racket/list
-                     "../language/forms.rkt" "../language/c-helpers.rkt")
-         "memory-layout-helpers.rkt"
-         "../language/forms.rkt"
-         "../language/data0.rkt"
-         "../language/syntax.rkt")
+(require
+ (for-syntax
+  racket/list
+  racket/syntax
+  syntax/parse
+  "../language/forms.rkt"
+  "../language/c-helpers.rkt")
+ "../language/data0.rkt"
+ "../language/forms.rkt"
+ "../language/syntax.rkt"
+ "../logging.rkt"
+ "memory-layout-helpers.rkt")
 
 (provide (all-defined-out))
 
@@ -185,7 +191,7 @@
 (define-syntax (define-types-memory-layout-helpers stx)
   (syntax-parse stx
     #:datum-literals (single many)
-    [(_ namespace:str name:str tag:exact-integer
+    [(_ namespace:str name:str tag:exact-integer hashcons?:boolean
         (field*:str (~optional cval* #:defaults ([cval* #'#f])) (~literal single)) ...
         (~optional (many-field:str many) #:defaults ([many-field #'#f])))
      (define namespace-string (syntax->datum #'namespace))
@@ -235,14 +241,23 @@
                         [alloc-arg* : D0-Expr] ...
                         [last-alloc-arg : (Listof D0-Expr)])
                  : D0-Expr
-                 (sr-hashcons-types
+                 (sr-hashcons-type
                   #,name-string tag-def
                   `((field*
                      . ,alloc-val*) ... .
                     ,(map (lambda ([arg : D0-Expr]) (cons many-field arg))
                           last-alloc-arg)))))
            #`(define (func-alloc-name [alloc-arg* : D0-Expr] ...) : D0-Expr
-               (sr-hashcons-types #,name-string tag-def `((field* . ,alloc-val*) ...)))))
+               #,(cond
+                   [(syntax->datum #'hashcons?)
+                    #`(sr-hashcons-type
+                       #,name-string tag-def `((field* . ,alloc-val*) ...))]
+                   [else
+                    #`(sr-alloc
+                       #,name-string tag-def
+                      `(("index"    . ,(Quote 0))
+                        ("hashcode" . ,(Quote 0))
+                        (field* . ,alloc-val*) ...))]))))
      (define/with-syntax equal-arg (generate-temporary))
      (define (gen-func-access*)
        (define (gen-access-func-name field-string)
@@ -306,19 +321,19 @@
            (sr-check-tag=? equal-arg namespace-mask-def tag-def))
          #,@(gen-func-access*))]))
 
-(define-types-memory-layout-helpers "type" "fn" #b000
-  ("arity" single) ("return" single) ("fmls" many))
-(define-types-memory-layout-helpers "type" "gref" #b001 ("type" single))
-(define-types-memory-layout-helpers "type" "gvect" #b010 ("type" single))
-(define-types-memory-layout-helpers "type" "mref" #b011 ("type" single))
-(define-types-memory-layout-helpers "type" "mvect" #b100 ("type" single))
-(define-types-memory-layout-helpers "type" "tuple" #b101
+(define-types-memory-layout-helpers "type" "fn" #b000 #t 
+  ("arity" single) ("return" single) ("fmls" many)) 
+(define-types-memory-layout-helpers "type" "gref" #b001 #t ("type" single))
+(define-types-memory-layout-helpers "type" "gvect" #b010 #t ("type" single))
+(define-types-memory-layout-helpers "type" "mref" #b011 #t ("type" single))
+(define-types-memory-layout-helpers "type" "mvect" #b100 #t ("type" single))
+(define-types-memory-layout-helpers "type" "tuple" #b101 #t
   ("count" single) ("elements" many))
-(define-types-memory-layout-helpers "type" "mu" #b110 ("body" single))
+(define-types-memory-layout-helpers "type" "mu" #b110 #f ("body" single))
 
 
-(: sr-hashcons-types (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
-(define (sr-hashcons-types name tag? slots)
+(: sr-hashcons-type (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
+(define (sr-hashcons-type name tag? slots)
   (: sr-alloc-init ((Var Uid) -> (Nonnegative-Fixnum D0-Expr -> D0-Expr)))
   (define ((sr-alloc-init mem) offset value)
     (op$ Array-set! mem (Quote offset) value))
@@ -349,92 +364,7 @@
       [(not tag?) alloc-var]
       [else (sr-tag-value alloc-var tag?)]))
   (Begin `(,alloc-ass ,@ass* ,@init*)
-         (app-code$ (get-hashcons-types!) tagged-ptr)))
-
-(: hash-type ((Var Uid) -> D0-Expr))
-(define (hash-type ty)
-  (define err-msg1
-    (Quote "specify-representation/hash-type: switch failure in access"))
-  (define err-msg2
-    (Quote "specify-representation/hash-type: switch failure in hashing"))
-  (: type-hash-access ((Var Uid) -> D0-Expr))
-  (define (type-hash-access ty)
-    (case$ ty
-      ;; The hash value for primitive types are their runtime values.
-      [(data:TYPE-DYN-RT-VALUE) TYPE-DYN-RT-VALUE]
-      [(data:TYPE-INT-RT-VALUE) TYPE-INT-RT-VALUE]
-      [(data:TYPE-BOOL-RT-VALUE) TYPE-BOOL-RT-VALUE]
-      [(data:TYPE-UNIT-RT-VALUE) TYPE-UNIT-RT-VALUE]
-      [(data:TYPE-FLOAT-RT-VALUE) TYPE-FLOAT-RT-VALUE]
-      [(data:TYPE-CHAR-RT-VALUE) TYPE-CHAR-RT-VALUE]
-      [else
-       (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-       (case$ tag
-         [(data:TYPE-GREF-TAG)
-          (sr-tagged-array-ref ty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX)]
-         [(data:TYPE-GVECT-TAG)
-          (sr-tagged-array-ref ty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX)]
-         [(data:TYPE-MREF-TAG)
-          (sr-tagged-array-ref ty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX)]
-         [(data:TYPE-MVECT-TAG)
-          (sr-tagged-array-ref ty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX)]
-         [(data:TYPE-TUPLE-TAG)
-          (sr-tagged-array-ref ty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX)]
-         [(data:TYPE-FN-TAG)
-          (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-HASH-INDEX)]
-         [else (op$ Print err-msg1) (op$ Exit (Quote 1)) UNDEF-IMDT])]))
-  (begin$
-    (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-    (case$ tag
-      [(data:TYPE-GREF-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-GREF-TAG TYPE-GREF-TYPE-INDEX))
-       (assign$ arg-type-hash (type-hash-access arg-ty))
-       (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 1))]
-      [(data:TYPE-GVECT-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-GVECT-TAG TYPE-GVECT-TYPE-INDEX))
-       (assign$ arg-type-hash (type-hash-access arg-ty))
-       (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 2))]
-      [(data:TYPE-MREF-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-MREF-TAG TYPE-MREF-TYPE-INDEX))
-       (assign$ arg-type-hash (type-hash-access arg-ty))
-       (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 3))]
-      [(data:TYPE-MVECT-TAG)
-       (assign$ arg-ty
-         (sr-tagged-array-ref ty TYPE-MVECT-TAG TYPE-MVECT-TYPE-INDEX))
-       (assign$ arg-type-hash (type-hash-access arg-ty))
-       (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 4))]
-      [(data:TYPE-FN-TAG)
-       (assign$ return-ty
-         (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
-       (assign$ init-hash-code (type-hash-access return-ty))
-       (assign$ args-count
-         (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-ARITY-INDEX))
-       (assign$ iters-count (op$ + TYPE-FN-FMLS-OFFSET args-count))
-       (op$ +
-         (repeat$
-             (i TYPE-FN-FMLS-OFFSET iters-count)
-             (hash-code init-hash-code)
-           (assign$ arg-type (sr-tagged-array-ref ty TYPE-FN-TAG i))
-           (assign$ arg-type-hash (type-hash-access arg-type))
-           (op$ * (Quote 19) (op$ + hash-code arg-type-hash)))
-         (Quote 5))]
-      [(data:TYPE-TUPLE-TAG)
-       (assign$ elms-count
-         (sr-tagged-array-ref ty TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
-       (assign$ iters-count
-         (op$ + TYPE-TUPLE-ELEMENTS-OFFSET elms-count))
-       (op$ +
-         (repeat$
-             (i TYPE-TUPLE-ELEMENTS-OFFSET iters-count)
-             (hash-code (Quote 0))
-           (assign$ elem-type (sr-tagged-array-ref ty TYPE-TUPLE-TAG i))
-           (assign$ elem-type-hash (type-hash-access elem-type))
-           (op$ * (Quote 19) (op$ + hash-code elem-type-hash)))
-         (Quote 6))]
-      [else (op$ Print err-msg2) (op$ Exit EXIT-FAILURE) UNDEF-IMDT])))
+         (hashcons-type tagged-ptr)))
 
 ;; These bindings are C functions that are needed by the compiled code and is
 ;; hoisted by specify-representation
@@ -444,65 +374,216 @@
 (define (add-new-code! b)
   (set-box! boxed-bnd-code* (cons b (unbox boxed-bnd-code*))))
 
-(: hashcons-types-code-label? (Boxof (Option (Code-Label Uid))))
-(define hashcons-types-code-label? (box #f))
+(: hashcons-type-code-label? (Boxof (Option (Code-Label Uid))))
+(define hashcons-type-code-label? (box #f))
 
-(: get-hashcons-types! (-> (Code-Label Uid)))
-(define (get-hashcons-types!)
-  (: make-code! (-> (Code-Label Uid)))
-  (define (make-code!)
-    (define-track-next-uid!$ hashcons-types)
-    (define hashcons-types-label (Code-Label hashcons-types))
-    (define err-msg (Quote "specify-representation/hashcons-types: switch failure"))
-    (define hashcons-types-c : D0-Code
-      (code$ (ty)
-        (cond$
-         [(op$ <= ty TYPE-MAX-ATOMIC-RT-VALUE) ty]
-         [else
-          (begin$
-            (assign$ hcode (hash-type ty))
-            (assign$ hty (op$ Types-hashcons! ty hcode))
-            (cond$
-             [(op$ = ty hty)
-              (begin$
-                (assign$ index (op$ Types-gen-index!))
-                (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-                (case$ tag
-                  [(data:TYPE-GREF-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-GREF-TAG TYPE-GREF-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX hcode)]
-                  [(data:TYPE-GVECT-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-GVECT-TAG TYPE-GVECT-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX hcode)]
-                  [(data:TYPE-MREF-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-MREF-TAG TYPE-MREF-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX hcode)]
-                  [(data:TYPE-MVECT-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-MVECT-TAG TYPE-MVECT-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX hcode)]
-                  [(data:TYPE-TUPLE-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-TUPLE-TAG TYPE-TUPLE-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX hcode)]
-                  [(data:TYPE-FN-TAG)
-                   (sr-tagged-array-set!
-                    hty TYPE-FN-TAG TYPE-FN-INDEX-INDEX index)
-                   (sr-tagged-array-set!
-                    hty TYPE-FN-TAG TYPE-FN-HASH-INDEX hcode)]
-                  [else (op$ Print err-msg) (op$ Exit (Quote 1)) UNDEF-IMDT])
-                hty)]
-             [else hty]))])))
-    (add-new-code! (cons hashcons-types hashcons-types-c))
-    (set-box! hashcons-types-code-label? hashcons-types-label)
-    hashcons-types-label)
-  (let ([cl? (unbox hashcons-types-code-label?)])
-    (or cl? (make-code!))))
+(: hashcons-type (D0-Expr -> D0-Expr))
+(define (hashcons-type ty)
+  (define cl? (unbox hashcons-type-code-label?))
+  (cond
+    [cl? (App-Code cl? (list ty))]
+    [else
+     (define-track-next-uid!$ hashcons-type)
+     (define hashcons-type-code-label (Code-Label hashcons-type))
+     (define err-msg
+       (Quote
+        (string-append
+         "grift internal runtime error:\n"
+         "    location: " (current-srcloc-as-string) "\n"
+         "    invarient: Assumes all type tags are covered by cases\n"
+         "               and that we recieve a valid type.\n")))
+     (define runtime-code : D0-Code
+       (code$ (ty)
+         (cond$
+          [(op$ <= ty TYPE-MAX-ATOMIC-RT-VALUE) ty]
+          [else
+           (begin$
+             (assign$ hcode (calculate-type-hashcode  ty))
+             (assign$ hty (op$ Types-hashcons! ty hcode))
+             (cond$
+              [(op$ = ty hty)
+               (begin$
+                 (assign$ index (op$ Types-gen-index!))
+                 (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
+                 (case$ tag
+                   [(data:TYPE-GREF-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-GREF-TAG TYPE-GREF-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX hcode)]
+                   [(data:TYPE-GVECT-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-GVECT-TAG TYPE-GVECT-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX hcode)]
+                   [(data:TYPE-MREF-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-MREF-TAG TYPE-MREF-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX hcode)]
+                   [(data:TYPE-MVECT-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-MVECT-TAG TYPE-MVECT-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX hcode)]
+                   [(data:TYPE-TUPLE-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-TUPLE-TAG TYPE-TUPLE-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX hcode)]
+                   [(data:TYPE-FN-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-FN-TAG TYPE-FN-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-FN-TAG TYPE-FN-HASH-INDEX hcode)]
+                   [(data:TYPE-MU-TAG)
+                    (sr-tagged-array-set!
+                     hty TYPE-MU-TAG TYPE-MU-INDEX-INDEX index)
+                    (sr-tagged-array-set!
+                     hty TYPE-MU-TAG TYPE-MU-HASH-INDEX hcode)]
+                   [else (op$ Print err-msg) (op$ Exit (Quote 1)) UNDEF-IMDT])
+                 hty)]
+              [else hty]))])))
+     (add-new-code! (cons hashcons-type runtime-code))
+     (set-box! hashcons-type-code-label? hashcons-type-code-label)
+     (App-Code hashcons-type-code-label (list ty))]))
+
+
+
+(: calculate-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
+(define calculate-type-hashcode-label? (box #f))
+
+(: calculate-type-hashcode ((Var Uid) -> D0-Expr))
+(define (calculate-type-hashcode ty)
+  (define cl? (unbox calculate-type-hashcode-label?))
+  (cond
+    [cl? (App-Code cl? (list ty))]
+    [else
+     (define err-msg
+       (Quote
+        (string-append
+         "grift internal runtime error:\n"
+         "    location: " (current-srcloc-as-string) "\n"
+         "    function: calculate-type-hashcode\n"
+         "    immediate cause: recieved a value not covered by case.\n")))
+     (define runtime-code
+       (code$ (ty)
+         (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
+         (case$ tag
+           [(data:TYPE-GREF-TAG)
+            (assign$ arg-ty
+                     (sr-tagged-array-ref ty TYPE-GREF-TAG TYPE-GREF-TYPE-INDEX))
+            (assign$ arg-type-hash (access-type-hashcode arg-ty))
+            (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 1))]
+           [(data:TYPE-GVECT-TAG)
+            (assign$ arg-ty
+                     (sr-tagged-array-ref ty TYPE-GVECT-TAG TYPE-GVECT-TYPE-INDEX))
+            (assign$ arg-type-hash (access-type-hashcode arg-ty))
+            (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 2))]
+           [(data:TYPE-MREF-TAG)
+            (assign$ arg-ty
+                     (sr-tagged-array-ref ty TYPE-MREF-TAG TYPE-MREF-TYPE-INDEX))
+            (assign$ arg-type-hash (access-type-hashcode arg-ty))
+            (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 3))]
+           [(data:TYPE-MVECT-TAG)
+            (assign$ arg-ty
+                     (sr-tagged-array-ref ty TYPE-MVECT-TAG TYPE-MVECT-TYPE-INDEX))
+            (assign$ arg-type-hash (access-type-hashcode arg-ty))
+            (op$ + (op$ * (Quote 19) arg-type-hash) (Quote 4))]
+           [(data:TYPE-FN-TAG)
+            (assign$ return-ty
+                     (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-RETURN-INDEX))
+            (assign$ init-hash-code (access-type-hashcode return-ty))
+            (assign$ args-count
+                     (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-ARITY-INDEX))
+            (assign$ iters-count (op$ + TYPE-FN-FMLS-OFFSET args-count))
+            (op$ +
+                 (repeat$
+                     (i TYPE-FN-FMLS-OFFSET iters-count)
+                     (hash-code init-hash-code)
+                   (assign$ arg-type (sr-tagged-array-ref ty TYPE-FN-TAG i))
+                   (assign$ arg-type-hash (access-type-hashcode arg-type))
+                   (op$ * (Quote 19) (op$ + hash-code arg-type-hash)))
+                 (Quote 5))]
+           [(data:TYPE-TUPLE-TAG)
+            (assign$ elms-count
+                     (sr-tagged-array-ref ty TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+            (assign$ iters-count
+                     (op$ + TYPE-TUPLE-ELEMENTS-OFFSET elms-count))
+            (op$ +
+                 (repeat$
+                     (i TYPE-TUPLE-ELEMENTS-OFFSET iters-count)
+                     (hash-code (Quote 0))
+                   (assign$ elem-type (sr-tagged-array-ref ty TYPE-TUPLE-TAG i))
+                   (assign$ elem-type-hash (access-type-hashcode elem-type))
+                   (op$ * (Quote 19) (op$ + hash-code elem-type-hash)))
+                 (Quote 6))]
+           [(data:TYPE-MU-TAG)
+            (assign$ body (type-mu-body-access ty))
+            (assign$ body-hashcode (access-type-hashcode body))
+            (op$ + (op$ * body-hashcode (Quote 19)) (Quote 7))]
+           [else (op$ Print err-msg) (op$ Exit EXIT-FAILURE) UNDEF-IMDT])))
+     (define uid (next-uid! "calculate-type-hashcode"))
+     (add-new-code! (cons uid runtime-code))
+     (define cl (Code-Label uid))
+     (set-box! calculate-type-hashcode-label? cl)
+     (App-Code cl (list ty))]))
+
+(: access-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
+(define access-type-hashcode-label? (box #f))
+
+(: access-type-hashcode ((Var Uid) -> D0-Expr))
+(define (access-type-hashcode ty)
+  (define cl? (unbox access-type-hashcode-label?))
+  (cond
+    [cl? (App-Code cl? (list ty))]
+    [else
+     (define err-msg
+       (Quote
+        (string-append
+         "grift internal runtime error:\n"
+         "    location: " (current-srcloc-as-string) "\n"
+         "    function: access-type-hashcode\n"
+         "    immediate cause: recieved a value not covered by case.\n")))
+     (define runtime-code
+       (code$ (ty)
+         (case$ ty
+           ;; TODO : Fix type hashconsing so that the following
+           ;; case isn't needed.
+           [(0) (Quote 0)]
+           ;; The hash value for primitive types are their runtime values. 
+           [(data:TYPE-DYN-RT-VALUE) TYPE-DYN-RT-VALUE]
+           [(data:TYPE-INT-RT-VALUE) TYPE-INT-RT-VALUE]
+           [(data:TYPE-BOOL-RT-VALUE) TYPE-BOOL-RT-VALUE]
+           [(data:TYPE-UNIT-RT-VALUE) TYPE-UNIT-RT-VALUE]
+           [(data:TYPE-FLOAT-RT-VALUE) TYPE-FLOAT-RT-VALUE]
+           [(data:TYPE-CHAR-RT-VALUE) TYPE-CHAR-RT-VALUE]
+           [else
+            (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
+            (case$ tag
+              [(data:TYPE-GREF-TAG)
+               (sr-tagged-array-ref ty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX)]
+              [(data:TYPE-GVECT-TAG)
+               (sr-tagged-array-ref ty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX)]
+              [(data:TYPE-MREF-TAG)
+               (sr-tagged-array-ref ty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX)]
+              [(data:TYPE-MVECT-TAG)
+               (sr-tagged-array-ref ty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX)]
+              [(data:TYPE-TUPLE-TAG)
+               (sr-tagged-array-ref ty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX)]
+              [(data:TYPE-FN-TAG)
+               (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-HASH-INDEX)]
+              [(data:TYPE-MU-TAG)
+               ;; This is weird and may be wrong but as a first approximation
+               ;; of hashing on the debrujin index we are just hashing on a
+               ;; constant.
+               (Quote 42)]
+              [else
+               (op$ Print err-msg)
+               (op$ Exit (Quote 1)) UNDEF-IMDT])])))
+     (define uid (next-uid! "access-type-hashcode"))
+     (add-new-code! (cons uid runtime-code))
+     (define cl (Code-Label uid))
+     (set-box! access-type-hashcode-label? cl)
+     (App-Code cl (list ty))]))
+

@@ -30,11 +30,11 @@ int64_t hashcons(table ht, int64_t e, int64_t hcode)
     for (i = 0; i < old_slots; ++i) {
       chain C = old_array[i];
       if (C != NULL) {
-	list p = C->list;
-	while (p != NULL) {
-	  types_reinsert(ht, p->data);
-	  p = p->next;
-	}
+        list p = C->list;
+        while (p != NULL) {
+          types_reinsert(ht, p->data);
+          p = p->next;
+        }
       }
     }
   }
@@ -74,16 +74,23 @@ int types_equal(int64_t t1, int64_t t2)
     untagged_t1 = (t1 ^ tag1);
     untagged_t2 = (t2 ^ tag1);
     switch (tag1) {
+    case TYPE_MU_TAG:
+      return ((int64_t*)untagged_t1)[TYPE_MU_BODY_INDEX] ==
+             ((int64_t*)untagged_t2)[TYPE_MU_BODY_INDEX];
     case TYPE_GREF_TAG ... TYPE_MVECT_TAG:
       // the type index is the same for gref,gvect,mref, and mvect.
-      return ((int64_t*)untagged_t1)[TYPE_GREF_TYPE_INDEX] == ((int64_t*)untagged_t2)[TYPE_GREF_TYPE_INDEX];
+      return ((int64_t*)untagged_t1)[TYPE_GREF_TYPE_INDEX] ==
+             ((int64_t*)untagged_t2)[TYPE_GREF_TYPE_INDEX];
       break;
     case TYPE_TUPLE_TAG:
       count = ((int64_t*)untagged_t1)[TYPE_TUPLE_COUNT_INDEX];
       // the loop checks count along with the elements
-      for (i = TYPE_TUPLE_ELEMENTS_OFFSET-1; i < (count + TYPE_TUPLE_ELEMENTS_OFFSET); ++i) {
-	if (((int64_t*)untagged_t1)[i] != ((int64_t*)untagged_t2)[i])
-	  return false;
+      for (i = TYPE_TUPLE_ELEMENTS_OFFSET-1;
+           i < (count + TYPE_TUPLE_ELEMENTS_OFFSET);
+           ++i) {
+        if (((int64_t*)untagged_t1)[i] != ((int64_t*)untagged_t2)[i]) {
+          return false;
+        }
       }
       return true;
       break;
@@ -91,13 +98,17 @@ int types_equal(int64_t t1, int64_t t2)
       count = ((int64_t*)untagged_t1)[TYPE_FN_ARITY_INDEX];
       // the loop checks the arity and the return type along with the elements
       for (i = TYPE_FN_FMLS_OFFSET-2; i < (count + TYPE_FN_FMLS_OFFSET); ++i) {
-	if (((int64_t*)untagged_t1)[i] != ((int64_t*)untagged_t2)[i])
-	  return false;
+        if (((int64_t*)untagged_t1)[i] != ((int64_t*)untagged_t2)[i]) {
+          return false;
+        }
       }
       return true;
       break;
     default:
-      (printf("hashcons/types-equal: invalid tag: %" PRId64, tag1));
+      printf("grift internal runtime error:\n"
+             "    location: hashcons.c/types-equal\n"
+             "    cause: unrecognized type tag: %" PRId64 "\n",
+             tag1);
       exit(1);
     }
   }
@@ -110,7 +121,7 @@ void types_reinsert(table ht, int64_t ty)
   int64_t untagged_ty = (ty ^ tag);
   int64_t h;
   switch (tag) {
-  case TYPE_FN_TAG ... TYPE_TUPLE_TAG:
+  case TYPE_FN_TAG ... TYPE_MU_TAG:
     // the hash index is the same for all types
     h = ((int64_t*)untagged_ty)[TYPE_FN_HASH_INDEX] % ht->slots;
     h = h < 0 ? h + ht->slots : h;
@@ -126,7 +137,10 @@ void types_reinsert(table ht, int64_t ty)
     C->list = new_item;
     break;
   default:
-    (printf("hashcons/types-reinsert: invalid tag: %" PRId64, tag));
+    printf("grift internal runtime error:\n"
+           "    location: hashcons.c/types-reinsert\n"
+           "    cause: unrecognized type tag: %" PRId64 "\n",
+           tag);
     exit(1);
   }
 }
