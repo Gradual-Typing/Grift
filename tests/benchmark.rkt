@@ -11,8 +11,8 @@ and prints the timing log to the variable named benchmark-log-file.
 (require racket/port)
 (require grift/src/compile
          grift/src/helpers
-         grift/testing/paths
-         grift/testing/values
+         grift/tests/paths
+         grift/tests/values
          grift/src/errors)
 
 ;; This structure is a list representing the arguments to a call to bench

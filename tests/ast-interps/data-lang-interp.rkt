@@ -11,7 +11,7 @@
 
 (require grift/src/helpers
          grift/src/errors
-	 grift/testing/values
+	 grift/tests/values
 	 grift/src/language
          racket/fixnum)
 

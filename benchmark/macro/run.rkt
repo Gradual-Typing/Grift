@@ -1,5 +1,4 @@
-#!racket
-#lang typed/racket
+#!typed/racket
 
 ;; for each benchmark
 ;; shell script that compiles, and runs benchmark n-times adding
