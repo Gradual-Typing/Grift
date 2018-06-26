@@ -2,7 +2,7 @@
 
 (require typed/rackunit
          typed/rackunit/text-ui
-         grift/testing/test-compile)
+         grift/tests/test-compile)
 
 (provide (all-defined-out))
 
