@@ -61,7 +61,10 @@
    (test-file "static" "lambda5.grift" (function))
    (test-file "static" "lambda6.grift" (function))
    (test-file "static" "lambda8.grift" (function))
+   ;; Begin
+   (test-file "static" "begin7.grift" (int 7))
    ;; Let
+   (test-file "static" "letBegin.grift" (int 5))
    (test-file "static" "let0.grift" (bool #t))
    (test-file "static" "let1.grift" (int 2))
    (test-file "static" "let2.grift" (bool #f))

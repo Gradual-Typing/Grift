@@ -1,0 +1,4 @@
+(let ([x1 : Int 5]
+      [y2 : Int 10])
+  (begin (+ x1 y2)
+         x1))
