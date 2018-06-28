@@ -1,4 +1,4 @@
 #lang info
 
 (define compile-omit-paths
-  '("gambit"))
+  '("micro" "macro" "suite"))
