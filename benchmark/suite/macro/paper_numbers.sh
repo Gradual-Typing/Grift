@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# computes speedup ranges for different configurations in the internal comparisons
-# it expects the same directory structure as the one for lattice_bins where
-# the main directory is named temp and it needs temp/data, temp/tmp/dyn, temp/tmp/static,
-# and maybe temp/tmp/racket if you assume racket as the baseline
+# computes speedup ranges for different configurations in the internal
+# comparisons it expects the same directory structure as the one for
+# lattice_bins where the main directory is named temp and it needs temp/data,
+# temp/tmp/dyn, temp/tmp/static, and maybe temp/tmp/racket if you assume racket
+# as the baseline
 
 function main()
 {
@@ -44,7 +45,7 @@ function run_double()
     MIN_SPEEDUP=1000000
     MAX_SPEEDUP=0
     MEAN_SPEEDUP=0
-	
+        
     local config_str=$(racket "${GRIFT_DIR}/benchmark/config_str.rkt" -c $c1 $c2)
     local c1t=$(echo $config_str | sed -n 's/\(.*\),.*,.*/\1/p;q')
     local c2t=$(echo $config_str | sed -n 's/.*,\(.*\),.*/\1/p;q')
@@ -52,29 +53,29 @@ function run_double()
 
     # Blackscholes
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "blackscholes" "in_4K.txt"
-    
+
     # Quicksort
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "quicksort" "in_descend1000.txt"
-    
+
     # Matrix Multiplication
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "matmult" "400.txt"
-    
+
     # N Body Simulation
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "n_body" "slow.txt"
-    
+
     # Fast Fourier Transform
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "fft" "slow.txt"
-    
+
     # Scheme Array Benchmark
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "array" "slow.txt"
-    
+
     # Tak
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "tak" "slow.txt"
 
     run_two_benchmarks $c1 $c2 "$ct" "$c1t" "$c2t" "ray" "empty.txt"
 
     echo "finished comparing $c1t to $c2t with $ct, where speedups range from "\
-	 $MIN_SPEEDUP " to " $MAX_SPEEDUP ", with a mean of" $MEAN_SPEEDUP
+         $MIN_SPEEDUP " to " $MAX_SPEEDUP ", with a mean of" $MEAN_SPEEDUP
 }
 
 function run_single()
@@ -96,7 +97,7 @@ function run_single()
     
     # Matrix Multiplication
     run_benchmark $baseline_system $c "$ct" "matmult" "400.txt"
-    
+
     # N Body Simulation
     run_benchmark $baseline_system $c "$ct" "n_body" "slow.txt"
     
@@ -126,7 +127,7 @@ function run_benchmark()
     local logfile="${DATA_DIR}/${name}${c}.log"
 
     if [ ! -f "$logfile" ]; then
-	return
+        return
     fi
 
     local max_rt=$(tail -n +2 "$logfile" | cut -f3 -d"," | sort -n | tail -1)
@@ -139,11 +140,11 @@ function run_benchmark()
     local max_speedup=$(echo "${baseline} ${min_rt}" | awk '{printf "%.5f\n", $1 / $2}')
 
     if [[ $(echo $min_speedup'<'$MIN_SPEEDUP | bc -l) -eq 1 ]]; then
-	MIN_SPEEDUP=$min_speedup
+        MIN_SPEEDUP=$min_speedup
     fi
 
     if [[ $(echo $max_speedup'>'$MAX_SPEEDUP | bc -l) -eq 1 ]]; then
-	MAX_SPEEDUP=$max_speedup
+        MAX_SPEEDUP=$max_speedup
     fi
 }
 
@@ -163,11 +164,11 @@ function run_two_benchmarks()
     local analysis_dir="${OUT_DIR}/analysis/${ct}"
 
     if [ ! -f "$logfile1" ]; then
-	return
+        return
     fi
 
     if [ ! -f "$logfile2" ]; then
-	return
+        return
     fi
 
     mkdir -p "$analysis_dir"
@@ -203,7 +204,7 @@ function run_two_benchmarks()
 
     echo "filename,${c1t} runtime,${c2t} runtime,speedup of ${c1t} over ${c2t}" > "$speedup_logfile"
     paste -d , "$tmp5_logfile" "$tmp3_logfile" "$tmp4_logfile" >> "$speedup_logfile"
-    
+
     local max_speedup=$(sort -n "$tmp4_logfile" | tail -1)
     local min_speedup=$(sort -n "$tmp4_logfile" | head -1)
 
@@ -213,15 +214,15 @@ function run_two_benchmarks()
     local mean_speedup=$(echo "${mean2} ${mean1}" | awk '{printf "%.5f\n", $1 / $2}')
 
     if [[ $(echo $min_speedup'<'$MIN_SPEEDUP | bc -l) -eq 1 ]]; then
-	MIN_SPEEDUP=$min_speedup
+        MIN_SPEEDUP=$min_speedup
     fi
 
     if [[ $(echo $max_speedup'>'$MAX_SPEEDUP | bc -l) -eq 1 ]]; then
-	MAX_SPEEDUP=$max_speedup
+        MAX_SPEEDUP=$max_speedup
     fi
 
     if [[ $(echo $mean_speedup'>'$MEAN_SPEEDUP | bc -l) -eq 1 ]]; then
-	MEAN_SPEEDUP=$mean_speedup
+        MEAN_SPEEDUP=$mean_speedup
     fi
 
     echo $name $mean_speedup $min_speedup $max_speedup
