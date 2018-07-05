@@ -675,7 +675,8 @@ TODO write unit tests
     (let*$ ([v dyn] [l lbl])
       (If (dyn-immediate-tag=?$ v PBOX-DYN-EXPR)
           (let*$ ([val (dyn-box-value$ v)]
-                  [ty  (dyn-box-type$ v)])
+                  [ty  (dyn-box-type$ v)]
+                  [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
             (If (Type-GRef-Huh ty)
                 (let*$ ([tyof (Type-GRef-Of ty)]
                         [read-val (pbox-ref val)])
@@ -689,8 +690,9 @@ TODO write unit tests
             [t2 t2]
             [lbl lbl])
       (If (ann (dyn-immediate-tag=?$ dyn-gbox PBOX-DYN-EXPR) CoC3-Expr)
-          (let$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
-                 [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)])
+          (let*$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
+                  [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)]
+                  [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
             (If (Type-GRef-Huh ty)
                 (let$ ([tyof (Type-GRef-Of ty)])
                   (cond$
@@ -708,8 +710,9 @@ TODO write unit tests
     (let*$ ([dyn dyn][ind ind][lbl lbl])
       (cond
         [(dyn-immediate-tag=?$ dyn PBOX-DYN-EXPR)
-         (let$ ([maybe-pvec-val (dyn-box-value$ dyn)]
-                [maybe-pvec-ty  (dyn-box-type$ dyn)])
+         (let*$ ([maybe-pvec-val (dyn-box-value$ dyn)]
+                 [ty             (dyn-box-type$ dyn)]
+                 [maybe-pvec-ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
            (cond$
             [(Type-GVect-Huh maybe-pvec-ty)
              (let$ ([elem-ty (Type-GVect-Of maybe-pvec-ty)]
@@ -726,8 +729,9 @@ TODO write unit tests
             [lbl lbl])
       (cond$
        [(dyn-immediate-tag=?$ dyn-gvec PBOX-DYN-EXPR)
-        (let$ ([maybe-vec      (dyn-box-value$ dyn-gvec)]
-               [maybe-vec-type (dyn-box-type$  dyn-gvec)])
+        (let*$ ([maybe-vec      (dyn-box-value$ dyn-gvec)]
+                [ty             (dyn-box-type$  dyn-gvec)]
+                [maybe-vec-type (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
           (cond$ 
            [(Type-GVect-Huh maybe-vec-type)
             (let*$ ([elem-type (Type-GVect-Of maybe-vec-type)]
@@ -741,29 +745,39 @@ TODO write unit tests
   
   (: code-gen-dyn-pvec-len Dyn-PVec-Len-Type)
   (define (code-gen-dyn-pvec-len expr lbl)
-    (let*$ ([v expr] [l lbl])
+    (let*$ ([v expr]
+            [l lbl])
       (cond$
-       [(and$ (dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
-              (Type-GVect-Huh (dyn-box-type$ v)))
-        (pvec-len (dyn-box-value$ v))]
+       [(dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
+        (let*$ ([val (dyn-box-value$ v)]
+                [ty  (dyn-box-type$ v)]
+                [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+          (cond$
+           [(Type-GVect-Huh ty) (pvec-len val)]
+           [else (Blame l)]))]
        [else (Blame l)])))
   
   (: code-gen-dyn-mbox-ref Dyn-MBox-Ref-Type)
   (define (code-gen-dyn-mbox-ref dyn lbl)
     (let$ ([dyn dyn] [lbl lbl])
       (cond$
-       [(and$ (dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
-              (Type-MRef-Huh (dyn-box-type$ dyn)))
-        (mbox-ref (dyn-box-value$ dyn) DYN-EXPR)]
-       [else (Blame lbl)])))
+       [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
+        (let*$ ([val (dyn-box-value$ dyn)]
+                [ty  (dyn-box-type$ dyn)]
+                [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+          (cond$
+           [(Type-MRef-Huh ty) (mbox-ref val DYN-EXPR)]
+           [else (Blame lbl)]))]
+        [else (Blame lbl)])))
   
   (: code-gen-dyn-mbox-set! Dyn-MBox-Set-Type)
   (define (code-gen-dyn-mbox-set! dyn-mbox wrt-val1 t2 lbl)
     (let$ ([dyn dyn-mbox] [val wrt-val1] [t2 t2] [lbl lbl])
       (cond$
        [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
-        (let$ ([mbox (dyn-box-value$ dyn)]
-               [t1 (dyn-box-type$ dyn)])
+        (let*$ ([mbox (dyn-box-value$ dyn)]
+                [t1 (dyn-box-type$ dyn)]
+                [t1 (If (Type-Mu-Huh t1) (Type-Mu-Body t1) t1)])
           (cond$
            [(Type-MRef-Huh t1)
             (let$ ([tyof (Type-MRef-Of t1)])
@@ -777,9 +791,13 @@ TODO write unit tests
   (define (code-gen-dyn-mvec-ref dyn ind lbl)
     (let$ ([dyn dyn] [ind ind] [lbl lbl])
       (cond$
-       [(and$ (dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
-              (Type-MVect-Huh (dyn-box-type$ dyn)))
-        (mvec-ref (dyn-box-value$ dyn) ind DYN-EXPR)]
+       [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
+        (let*$ ([ty (dyn-box-type$ dyn)]
+                [ty (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+          (cond$
+           [(Type-MVect-Huh ty)
+            (mvec-ref (dyn-box-value$ dyn) ind DYN-EXPR)]
+           [else (Blame lbl)]))]
        [else (Blame lbl)])))
   
   (: code-gen-dyn-mvec-set! Dyn-MVec-Set-Type)
@@ -787,8 +805,9 @@ TODO write unit tests
     (let$ ([dyn dyn-mvec] [ind ind] [vale wrt-val1] [t2 t2] [lbl lbl])
       (cond$
        [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
-        (let$ ([val (dyn-box-value$ dyn-mvec)]
-               [ty  (dyn-box-type$ dyn-mvec)])
+        (let*$ ([val (dyn-box-value$ dyn-mvec)]
+                [ty  (dyn-box-type$ dyn-mvec)]
+                [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
           (cond$
            [(Type-MVect-Huh ty)
             (let$ ([tyof (Type-MVect-Of ty)])
@@ -801,72 +820,67 @@ TODO write unit tests
   
   (: code-gen-dyn-fn-app Dyn-Fn-App-Type)
   (define (code-gen-dyn-fn-app e e* t* le)
-    ;; Variable are created here instead of using let$
-    ;; because they appear in sub-expressions that
-    ;; are programmatically generated.
-    (define lu  (next-uid! "dyn-fn-blame-info"))
-    (define l (Var lu))
-    (define tyu (next-uid! "dyn_fn_ty"))
-    (define ty  (Var tyu))
-    (define vu (next-uid! "dyn-fn"))
-    (define v  (Var vu))
-    (define uu (next-uid! "dyn-fn-val"))
-    (define u  (Var uu))
-    (define-values (vu* v*)
-      (for/lists ([vu* : Uid*] [v* : CoC3-Expr*]) ([e : CoC3-Expr e*])
-        (define u (next-uid! "dyn_fn_arg"))
-        (values u (Var u))))
-    (unless (= (length v*) (length t*))
+    (define bnd (inst cons Uid CoC3-Expr))
+    (unless (= (length e*) (length t*))
       (error 'interpret-casts-with-hyper-coercions/make-fn-app
              "expected types to be same length as arguments"))
-    (define arg-casts : CoC3-Expr*
-      (for/list : (Listof CoC3-Expr)
-                ([v : CoC3-Expr v*]
-                 [t : Grift-Type t*]
-                 [i (in-naturals)])
-        (let$ ([dyn-fn-arg-type (Type-Fn-arg ty (Quote i))])
-          (compile-cast v (Type t) dyn-fn-arg-type l))))
-    (define casts-apply : CoC3-Expr (compile-app u arg-casts))
-    (define app-arity (length v*))
+    (define app-arity (length e*))
     (define fn-of-dyns-type
       (Type (Fn app-arity (make-list app-arity DYN-TYPE) DYN-TYPE)))
-    (define ret 
-      (Let `([,lu . ,le]
-             [,vu . ,e]
-             . ,(map (inst cons Uid CoC3-Expr) vu* e*))
-        (cond$
-         ;; This condition asks if this is a boxed dynamic value?
-         [(dyn-immediate-tag=?$ v FN-DYN-DYN-EXPR)
-          (Let `([,uu . ,(dyn-box-value$ v)]
-                 [,tyu . ,(dyn-box-type$ v)])
-            (cond$
-             [(Type-Fn-Huh ty)
-              (let$ ([ret-val casts-apply]
-                     [ret-ty  (Type-Fn-return ty)])
-                (compile-cast ret-val ret-ty DYN-EXPR l))]
-             [else
-              ;; Allthough tyu is not immediately a function type,
-              ;; recursive types need to be converted to function
-              ;; types by the casting machinery.
-              (compile-app
-               (compile-cast (Var uu) (Var tyu) fn-of-dyns-type l) 
-               (for/list ([v v*][t t*])
-                 (compile-cast v (Type t) DYN-EXPR l)))]))]
-         ;; There are currently no unboxed dynamic values
-         ;; that could be used as a function.
-         [else (Blame l)])))
-    (define who 'code-gen-dyn-fn-app)
-    (debug off who e e* t* le ret))
+    (let$ ([dyn-fn-blame-info le] [dyn-v e])
+      (let-values
+          ;; I got tired of trying to make this discriptive name fit
+          ([(l) dyn-fn-blame-info]
+           [(u* v*) (for/lists ([u* : Uid*]
+                                [v* : (Listof (Var Uid))])
+                               ([_ e*])
+                      (define u (next-uid! "dyn_fn_arg"))
+                      (values u (Var u)))])
+        (Let (map bnd u* e*)
+          (cond$
+           ;; This condition asks if this is a boxed dynamic value
+           [(dyn-immediate-tag=?$ dyn-v FN-DYN-DYN-EXPR)
+            (let*$ ([unboxed-value (dyn-box-value$ dyn-v)]
+                    [src-type (dyn-box-type$  dyn-v)]
+                    [src-type (If (Type-Mu-Huh src-type)
+                                         (Type-Mu-Body src-type)
+                                         src-type)])
+              (cond$
+               [(Type-Fn-Huh src-type)
+                (let-values
+                    ;; `cu*` Uids for casted expression bindings
+                    ;; `cv*` Vars for cu*
+                    ;; `ce*` The expressions that cast e*
+                    ([(cu* cv* ce*)
+                      ;; `v*` Vars of the `e*` bindings
+                      ;; `t` The type undyned and unfolded
+                      (for/lists ([cu* : Uid*]
+                                  [cv* : (Listof (Var Uid))]
+                                  [ce* : (Listof CoC3-Expr)])
+                                 ([v v*] [t t*] [i (in-naturals)])
+                        (define u (next-uid! "dyn-fn-casted-argument"))
+                        (values
+                         u (Var u)
+                         (compile-cast
+                          v (Type t) (Type-Fn-arg src-type (Quote i)) l)))])
+                  (Let (map bnd cu* ce*)
+                    (let$ ([ret-val (compile-app unboxed-value cv*)]
+                           [ret-ty  (Type-Fn-return src-type)])
+                      (compile-cast ret-val ret-ty DYN-EXPR l))))]
+               [else (Blame l)]))]
+          [else (Blame l)])))))
   
   (: code-gen-dyn-tup-prj Dyn-Tup-Prj-Type)
   (define (code-gen-dyn-tup-prj e ie le)
     (let$ ([v e] [i ie] [l le])
       (cond$
        [(ann (dyn-immediate-tag=?$ v TUPLE-DYN-EXPR) CoC3-Expr)
-        (let$ ([u  (ann (dyn-box-value$ v) CoC3-Expr)]
-               [ty (ann (dyn-box-type$ v) CoC3-Expr)])
+        (let*$ ([u  (ann (dyn-box-value$ v) CoC3-Expr)]
+                [t0 (ann (dyn-box-type$ v) CoC3-Expr)]
+                [ty (If (Type-Mu-Huh t0) (Type-Mu-Body t0) t0)])
           (cond$
-           [(ann (and$ (Type-Tuple-Huh ty) (Op '> (list (Type-Tuple-num ty) i)))
+           [(ann (and$ (Type-Tuple-Huh ty)
+                       (Op '> (list (Type-Tuple-num ty) i)))
                  CoC3-Expr)
             (let$ ([prj-val (ann (Tuple-proj u i) CoC3-Expr)]
                    [prj-ty  (ann (Type-Tuple-item ty i) CoC3-Expr)])
