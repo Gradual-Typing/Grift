@@ -394,18 +394,23 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 (define (type-env-extend e s)
   (define d (syntax->datum s))
-  (match e
-    [(type-env t l) (type-env t (cons d  l ))]
-    [(hash-table)   (type-env e (cons d '()))]))
+  (cond
+    [(type-env? e)
+     (match-define (type-env t l) e)
+     (type-env t (cons d  l ))]
+    [(hash? e)
+     (type-env e (cons d '()))]))
 
 (define (type-env-lookup e s)
-  (match e
-    [(hash-table) (env-lookup e s)]
-    [(type-env t l)
+  (cond
+    [(hash? e) (env-lookup e s)]
+    [(type-env? e)
+     (match-define (type-env t l) e)
      (define i? (index-of l (syntax->datum s)))
      (cond
        [i? (TVar i?)]
-       [else (env-lookup t s)])]))
+       [else (env-lookup t s)])]
+    [else (error 'type-env-lookup "expected hash? or type-env?: ~a" e)]))
 
 (define (parse-mu-type stx env)
   (syntax-parse stx

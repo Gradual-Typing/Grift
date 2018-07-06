@@ -30,8 +30,7 @@
         (define-values (st skipped?) (struct-info x))
         (define ctr (struct-type-make-constructor st))
         (apply ctr f-fields)])]
-    [else
-     (match x)]))
+    [else (error 'form-map "unmatched ~a" x)]))
 
 
 (module+ test
