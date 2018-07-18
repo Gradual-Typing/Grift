@@ -231,13 +231,4 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 (define-type CoC3.1-Bnd-Type* (Listof CoC3.1-Bnd-Type))
 (define-type CoC3.1-Bnd-Crcn (Pairof Uid Compact-Coercion))
 (define-type CoC3.1-Bnd-Crcn* (Listof CoC3.1-Bnd-Crcn))
-
-
-(define-type Gen-Data
-  (U Dyn))
-(define-type Gen-Ctor
-  (U Dyn-Repr-Ctor))
-(define-type Gen-Access
-  (U Dyn-Repr-Access))
-(define-type Gen-Pred
-  (U Dyn-Repr-Pred))          
+          

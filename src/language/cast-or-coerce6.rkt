@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require "forms.rkt" "primitives.rkt" "lambda0.rkt")
+(require "forms.rkt" "primitives.rkt" "lambda0.rkt" "cast-or-coerce3.1.rkt")
 
 (provide (all-defined-out)
          (all-from-out "forms.rkt" "primitives.rkt" "lambda0.rkt"))
@@ -7,186 +7,165 @@
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
 
+(struct (F E) Closure form:simple-branch
+  ([name : Uid]
+   [well-known? : Boolean]
+   [code-generation : Code-Generation]
+   [code-label : Uid]
+   [self : Uid]
+   [caster : (Option Uid)]
+   [free-vars : (Listof F)]
+   [parameters : Uid*]
+   [code : E]) ;; bogus if `code-generations` = 'closure-only
+  #:transparent)
 
+(define-type (Closure* F E) (Listof (Closure F E)))
+
+(struct (E) Closure-Code form:simple-branch
+  ([arg : E])
+  #:transparent)
+
+(struct (E) Closure-Caster form:simple-branch
+  ([arg : E])
+  #:transparent)
+
+(struct (E) Closure-Ref form:leaf
+  ([arg : E] [key : Integer])
+  #:transparent)
+
+(struct (E) Closure-App form:simple-branch
+  ([code : E]
+   [closure : E]
+   [arguments : (Listof E)])
+  #:transparent)
+
+(define-type (Closure-Ops E)
+  (U (Let-Closures Uid E)
+     (Closure-Code E)
+     (Closure-Caster E)
+     (Closure-App E)))
+
+(define-type (Closure-Ops/Ref E)
+  (U (Let-Closures E E)
+     (Closure-Code E)
+     (Closure-Caster E)
+     (Closure-Ref E) 
+     (Closure-App E)))
+
+(define-type (Hybrid-Fn-Proxy-Forms E)
+  (U Closure-Proxy
+     (Hybrid-Proxy-Huh E)
+     (Hybrid-Proxy-Closure E)
+     (Hybrid-Proxy-Coercion E)))
+
+(define-type (Data-Fn-Proxy-Forms E)
+  (U (Fn-Proxy Index E E)
+     (Fn-Proxy-Huh E)
+     (Fn-Proxy-Closure E)
+     (Fn-Proxy-Coercion E)))
 
 (define-type Cast-or-Coerce6-Lang
   (Prog (List String Natural Grift-Type)
-        (Let-Static*  Bnd-Mu-Type*
-                      Bnd-Type*
-                      Bnd-Mu-Crcn*
-                      Bnd-Crcn*
-                      CoC6-Expr)))
+    (Static-Let*  (List Bnd-Mu-Type*
+                        Bnd-Type*
+                        Bnd-Mu-Crcn*
+                        Bnd-Crcn*
+                        (Bnd* (Fun CoC6-Expr))
+                        (Closure* CoC6-Expr CoC6-Expr))
+                  CoC6-Expr)))
+
+(define-type CoC5-Expr
+  (Rec
+   E
+   (U (Closure-Ops E)
+      (Data-Fn-Proxy-Forms E)
+      (Hybrid-Fn-Proxy-Forms E)
+      (Gen-Data-Forms E)
+      (Code-Forms E)
+      (Quote-Coercion Immediate-Coercion)
+      (Hyper-Coercion-Operation-Forms E)
+      (Coercion-Operation-Forms E)
+      (Type Immediate-Type)
+      (Type-Operation-Forms E)
+      (Let (Bnd* E) E)
+      (Var Uid)
+      (Control-Flow-Forms E)
+      (Op Grift-Primitive (Listof E))
+      No-Op
+      (Quote Cast-Literal)
+      (Blame E)
+      (Observe E Grift-Type)
+      (Unguarded-Forms E)
+      (Guarded-Proxy-Forms E)
+      (Monotonic-Forms E Immediate-Type)
+      (Error E)
+      (Tuple-Operation-Forms E))))
 
 (define-type CoC6-Expr
-  (Rec E (U
+  (Rec
+   E
+   (U (Closure-Ops/Ref E)
+      (Data-Fn-Proxy-Forms E)
+      (Hybrid-Fn-Proxy-Forms E)
+      (Gen-Data-Forms E)
+      (Code-Forms E)
+      (Quote-Coercion Immediate-Coercion)
+      (Hyper-Coercion-Operation-Forms E)
+      (Coercion-Operation-Forms E)
+      (Type Immediate-Type)
+      (Type-Operation-Forms E)
+      (Let (Bnd* E) E)
+      (Var Uid)
+      (Global String)
+      (Assign Id E)
+      (Control-Flow-Forms E)
+      (Op Grift-Primitive (Listof E))
+      No-Op
+      (Quote Cast-Literal)
+      (Blame E)
+      (Observe E Grift-Type)
+      (Unguarded-Forms E)
+      (Guarded-Proxy-Forms E)
+      (Monotonic-Forms E Immediate-Type)
+      (Error E)
+      (Tuple-Operation-Forms E))))
 
-          (Construct CoC6-Gen-Data CoC6-Gen-Ctor (Listof E))
-          (Access CoC6-Gen-Data CoC6-Gen-Access E (Option E))
-          (Check CoC6-Gen-Data CoC6-Gen-Pred E (Listof E))
-          (LetP CoC6-Bnd-Procedure* (LetC CoC6-Bnd-Closure* E))
-          (LetP CoC6-Bnd-Procedure* E)
-          (Closure-code E)
-          (Closure-caster E)
-          (Closure-ref Uid Uid)
-          (App-Closure E E (Listof E))
-          ;; Code Labels
-          (Code-Label Uid)
-          (Labels CoC6-Bnd-Code* E)
-          (App-Code E (Listof E))
-          ;; Functions as an interface
-          (Lambda Uid* (Castable (Option Uid) E))
-          (Fn-Caster E)
-          (App-Fn E (Listof E))
-          ;; Our Lovely Function Proxy Representation
-          (App-Fn-or-Proxy Uid E (Listof E))
-          (Hybrid-Proxy Uid E E)
-          (Hybrid-Proxy-Huh E)
-          (Hybrid-Proxy-Closure E)
-          (Hybrid-Proxy-Coercion E)
-          (Fn-Proxy Index E E)
-          (Fn-Proxy-Huh E)
-          (Fn-Proxy-Closure E)
-          (Fn-Proxy-Coercion E)
-          ;; Coercions
-          (Quote-Coercion Immediate-Coercion)
-          (HC E E E E E E)
-          (HC-Inject-Huh E)
-          (HC-Project-Huh E)
-          (HC-Identity-Huh E)
-          (HC-Label E)
-          (HC-T1 E)
-          (HC-T2 E)
-          (HC-Med E)
-          ;(Compose-Coercions E E)
-          (Id-Coercion-Huh E)
-          (Fn-Coercion-Huh E)
-          (Make-Fn-Coercion Uid E E E)
-          (Fn-Coercion (Listof E) E)
-          (Fn-Coercion-Arity E)
-          (Fn-Coercion-Arg E E)
-          (Fn-Coercion-Return E)
-          (Fn-Coercion-Return-Set! E E)
-          (Fn-Coercion-Arg-Set! E E E)
-          (Id-Fn-Coercion E)
-          (Ref-Coercion E E E)
-          (Ref-Coercion-Huh E)
-          (Ref-Coercion-Read E)
-          (Ref-Coercion-Write E)
-          (Ref-Coercion-Ref-Huh E)
-          (Sequence-Coercion E E)
-          (Sequence-Coercion-Huh E)
-          (Sequence-Coercion-Fst E)
-          (Sequence-Coercion-Snd E)
-          (Project-Coercion E E)
-          (Project-Coercion-Huh E)
-          (Project-Coercion-Type E)
-          (Project-Coercion-Label E)
-          (Inject-Coercion E)
-          (Inject-Coercion-Type E)
-          (Inject-Coercion-Huh E)
-          (Failed-Coercion E)
-          (Failed-Coercion-Huh E)
-          (Failed-Coercion-Label E)
-          ;;Type operations
-          (Type Immediate-Type)
-          (Type-Dyn-Huh E)
-          (Type-Fn-Huh E)
-          (Type-Fn-arity E)
-          (Type-Fn-arg E E)
-          (Type-Fn-return E)
-          (Type-GRef-Huh E)
-          (Type-GRef-Of  E)
-          (Type-GVect-Huh E)
-          (Type-GVect-Of E)
-          (Type-Mu-Body E)
-          (Type-Mu-Huh E)
-          ;; Tags are exposed before specify This is bad
-          ;; TODO fix this after the deadline
-          (Type-Tag E)
-          (Tag Tag-Symbol)
-          ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
-          ;; binding 
-	  (Let CoC6-Bnd-Data* E)
-          (Var Uid)
-          (Global String)
-          (Assign Id E)
-          ;; Controll Flow
-          (If E E E)
-          (Switch E (Switch-Case* E) E)
-          (Begin CoC6-Expr* E)
-          (Repeat Uid E E Uid E E)
-          Break-Repeat
-          ;;Primitives
-          (Op Grift-Primitive (Listof E))
-          No-Op
-          (Quote Cast-Literal)
-          ;; Observations
-          (Blame E)
-          (Observe E Grift-Type)
-          ;; Unguarded-Representation
-          (Unguarded-Box E)
-          (Unguarded-Box-Ref E)
-          (Unguarded-Box-Set! E E)
-          (Unguarded-Vect E E)
-          (Unguarded-Vect-Ref E E)
-          (Unguarded-Vect-Set! E E E)
-          (Guarded-Proxy-Huh E)
-          (Guarded-Proxy E (Twosome E E E))
-          (Guarded-Proxy E (Coercion E))
-          (Guarded-Proxy-Ref E)
-          (Guarded-Proxy-Source E)
-          (Guarded-Proxy-Target E)
-          (Guarded-Proxy-Blames E)
-          (Guarded-Proxy-Coercion E)
-          (Unguarded-Vect-length E)
-          ;; Monotonic references
-          (Mbox E Immediate-Type)
-          (Mbox-val-set! E E)
-          (Mbox-val-ref E)
-          (Mbox-rtti-set! E E)
-          (Mbox-rtti-ref E)
-          (Make-GLB-Two-Fn-Types Uid E E)
-          (Make-GLB-Two-Tuple-Types Uid E E)
-          (MRef-Coercion-Huh E)
-          (MRef-Coercion-Type E)
-          (MRef-Coercion E)
-          (Type-GRef E) ;; glb need to create new types in runtime
-          (Type-GVect E)
-          (Type-MRef E)
-          (Type-MRef-Huh E)
-          (Type-MRef-Of E)
-          (Error E)
-          (Mvector E E Immediate-Type)
-          (Mvector-length E)
-          (Mvector-val-ref E E VectorAccessMode)
-          (Mvector-val-set! E E E VectorAccessMode)
-          (Mvector-rtti-ref E)
-          (Mvector-rtti-set! E E)
-          (Type-MVect E)
-          (Type-MVect-Huh E)
-          (Type-MVect-Of E)
-          (MVect-Coercion-Huh E)
-          (MVect-Coercion-Type E)
-          (MVect-Coercion E)
-          ;;
-          (Create-tuple (Listof E))
-          (Tuple-proj E E)
-          (Tuple-Coercion-Huh E)
-          (Tuple-Coercion-Num E)
-          (Tuple-Coercion-Item E E)
-          (Tuple-Coercion-Item-Set! E E E)
-          (Id-Tuple-Coercion E)
-          (Coerce-Tuple Uid E E)
-          (Coerce-Tuple-In-Place Uid E E E E E)
-          (Cast-Tuple Uid E E E E)
-          (Cast-Tuple-In-Place Uid E E E E E E E)
-          (Type-Tuple-Huh E)
-          (Type-Tuple-num E)
-          (Type-Tuple-item E E)
-          (Make-Tuple-Coercion Uid E E E)
-          (Mediating-Coercion-Huh E))))
+(define-type Code-Generation
+  (U
+   ;; both code and closure
+   'regular
+   ;; Only generate the code, but be compatible with
+   ;; any identical fv-list. This is used for the
+   ;; definition closure-casters, and when a well-known
+   ;; closure shares the closures of closure that isn't
+   ;; well-known.
+   ;; TODO list invarients needed by 'code-only-code
+   'code-only
+   ;; Only allocate the closure, don't generate the
+   ;; code. This is used to share code between function
+   ;; cast, apply-casted closure, of the same arity.
+   'closure-only))
 
+;; TODO This should go in configuration.rkt
+(define-type Fn-Proxy-Representation (U 'Hybrid 'Data))
+(: fn-proxy-representation (Parameterof Fn-Proxy-Representation))
+(define fn-proxy-representation
+  (make-parameter 'Hybrid))
 
+(struct (Bnds Expr) Static-Let* form:simple-branch
+  ([bindings : Bnds]
+   [program : Expr])
+  #:transparent)
+
+(struct Closure-Proxy form:leaf
+  ([closure : (Var Uid)])
+  #:transparent)
+
+;; TODO this should go in 
+(struct (F E) Let-Closures form:simple-branch
+  ([bindings : (Closure* F E)]
+   [body : E])
+  #:transparent)
 
 (define-type CoC6-Expr* (Listof CoC6-Expr))
 (define-type CoC6-Code (Code Uid* CoC6-Expr))
@@ -194,7 +173,6 @@
 (define-type CoC6-Bnd-Code* (Listof CoC6-Bnd-Code))
 (define-type CoC6-Bnd-Data  (Pairof Uid CoC6-Expr))
 (define-type CoC6-Bnd-Data* (Listof CoC6-Bnd-Data))
-
 (define-type CoC6-Procedure
   (Procedure Uid Uid* Uid (Option Uid) Uid* CoC6-Expr))
 (define-type CoC6-Closure
@@ -208,17 +186,3 @@
 (define-type CoC6-Bnd-Crcn  (Pairof Uid Compact-Coercion))
 (define-type CoC6-Bnd-Crcn* (Listof CoC6-Bnd-Crcn))
 
-(define-type CoC6-Gen-Data
-  (U Dyn))
-(define-type CoC6-Gen-Ctor
-  (U Dyn-Repr-Ctor))
-(define-type CoC6-Gen-Access
-  (U Dyn-Repr-Access))
-(define-type CoC6-Gen-Pred
-  (U Dyn-Repr-Pred))
-
-
-
-;; TODO Many of these forms static forms are identical accrose passes
-;; should we lift them into a seperate file so they can be used
-;; over and over.

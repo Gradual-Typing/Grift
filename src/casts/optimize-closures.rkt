@@ -48,9 +48,6 @@ Terminology:
   location. 
 
 +-------------------------------------------------------------------------------+
-TODO rewrite with structure uncover-free > analyze > optimize > expand
-     - Reason easier to remap variable when capturing is all that is needed
-TODO procedures code to handle runtime code in ast
 TODO Change Language Forms Everywhere
 TODO Remove uncover-free vars and add new convert closures
 TODO Make changes to specify for new forms
@@ -104,16 +101,17 @@ Notes to be deleted after implementation
  racket/match
  racket/set
  "../configuration.rkt"
- "../language/cast-or-coerce3.1.rkt"
- "../language/cast-or-coerce4.rkt"
- "../language/lambda0.rkt"
+ (except-in "../language/cast-or-coerce3.1.rkt"
+            Closure-code Closure-caster)
+ (except-in "../language/cast-or-coerce4.rkt"
+            Closure-code Closure-caster)
  "../language/syntax.rkt"
  "../lib/function.rkt"
  "../lib/graph.rkt"
  "../lib/mutable-set.rkt"
  (submod "../logging.rkt" typed)
  #;"../language/cast-or-coerce5.rkt"
- #;"../language/cast-or-coerce6.rkt"
+ "../language/cast-or-coerce6.rkt"
  "../type-equality.rkt")
 
 (module+ test
@@ -125,13 +123,20 @@ Notes to be deleted after implementation
     syntax/location)
    typed/rackunit))
 
-;; TODO move this to 
-(define optimize-closures? : (Parameterof Boolean)
-  (make-parameter #t))
+;; TODO move this to configuration and make these passes optional.
+(define closure-optimizations : (Parameterof (Setof Symbol))
+  (make-parameter
+   (seteq 'self-reference
+          'direct-call
+          'propagate
+          'static-allocation
+          'degenerate-lambda-lifting
+          'tuple-closures
+          'recursive-sharing
+          'lexical-sharing)))
 
 (define currently-testing? : (Parameterof Boolean)
   (make-parameter #t))
-
 
 (: convert-closures-pass (Cast-or-Coerce4-Lang -> Cast-or-Coerce6-Lang))
 (define (convert-closures-pass prgm)
@@ -153,8 +158,7 @@ Notes to be deleted after implementation
      (define-values (bnd-static-code*
                      static-closure*^
                      main-expr^^)
-       (parameterize ([current-unique-counter uc])
-         (optimize-closures static-closure* main-expr^)))
+       (optimize-closures static-closure* main-expr^))
 
      (Prog (list name (unique-counter-next! uc) type)
        (Static-Let* (list bnd-mu-type*
@@ -175,165 +179,6 @@ Notes to be deleted after implementation
   (case->
    [(U= CoC4-Expr) (CoC4-Expr -> CoC5-Expr) -> (U= CoC5-Expr)]
    [CoC5-Expr (CoC5-Expr -> CoC6-Expr) -> CoC6-Expr])])
-
-;; TODO This should go in configuration.rkt
-(define-type Fn-Proxy-Representation (U 'Hybrid 'Data))
-(: fn-proxy-representation (Parameterof Fn-Proxy-Representation))
-(define fn-proxy-representation
-  (make-parameter 'Hybrid))
-
-(struct (Bnds Expr) Static-Let* form:simple-branch
-  ([bindings : Bnds]
-   [program : Expr])
-  #:transparent)
-
-(struct Closure-Proxy form:leaf
-  ([closure : (Var Uid)])
-  #:transparent)
-
-;; TODO this should go in 
-(struct (F E) Let-Closures form:simple-branch
-  ([bindings : (Closure* F E)]
-   [body : E])
-  #:transparent)
-
-(define-type Code-Generation
-  (U
-   ;; both code and closure
-   'regular
-   ;; Only generate the code, but be compatible with
-   ;; any identical fv-list. This is used for the
-   ;; definition closure-casters, and when a well-known
-   ;; closure shares the closures of closure that isn't
-   ;; well-known.
-   ;; TODO list invarients needed by 'code-only-code
-   'code-only
-   ;; Only allocate the closure, don't generate the
-   ;; code. This is used to share code between function
-   ;; cast, apply-casted closure, of the same arity.
-   'closure-only))
-
-(struct (F E) Closure form:simple-branch
-  ([name : Uid]
-   [well-known? : Boolean]
-   [code-generation : Code-Generation]
-   [code-label : Uid]
-   [self : Uid]
-   [caster : (Option Uid)]
-   [free-vars : (Listof F)]
-   [parameters : Uid*]
-   [code : E]) ;; bogus if `code-generations` = 'closure-only
-  #:transparent)
-
-(define-type (Closure* F E) (Listof (Closure F E)))
-
-(struct (E) Closure-Code form:simple-branch
-  ([arg : E])
-  #:transparent)
-
-(struct (E) Closure-Caster form:simple-branch
-  ([arg : E])
-  #:transparent)
-
-(struct (E) Closure-Ref form:leaf
-  ([arg : E] [key : Integer])
-  #:transparent)
-
-(struct (E) Closure-App form:simple-branch
-  ([code : E]
-   [closure : E]
-   [arguments : (Listof E)])
-  #:transparent)
-
-(define-type (Closure-Ops E)
-  (U (Let-Closures Uid E)
-     (Closure-Code E)
-     (Closure-Caster E)
-     (Closure-App E)))
-
-(define-type (Closure-Ops/Ref E)
-  (U (Let-Closures E E)
-     (Closure-Code E)
-     (Closure-Caster E)
-     (Closure-Ref E) 
-     (Closure-App E)))
-
-(define-type (Hybrid-Fn-Proxy-Forms E)
-  (U Closure-Proxy
-     (Hybrid-Proxy-Huh E)
-     (Hybrid-Proxy-Closure E)
-     (Hybrid-Proxy-Coercion E)))
-
-(define-type (Data-Fn-Proxy-Forms E)
-  (U (Fn-Proxy Index E E)
-     (Fn-Proxy-Huh E)
-     (Fn-Proxy-Closure E)
-     (Fn-Proxy-Coercion E)))
-
-(define-type Cast-or-Coerce6-Lang
-  (Prog (List String Natural Grift-Type)
-    (Static-Let*  (List Bnd-Mu-Type*
-                        Bnd-Type*
-                        Bnd-Mu-Crcn*
-                        Bnd-Crcn*
-                        (Bnd* (Fun CoC6-Expr))
-                        (Closure* Uid CoC6-Expr))
-                  CoC6-Expr)))
-
-(define-type CoC5-Expr
-  (Rec
-   E
-   (U (Closure-Ops E)
-      (Data-Fn-Proxy-Forms E)
-      (Hybrid-Fn-Proxy-Forms E)
-      (Gen-Data-Forms E)
-      (Code-Forms E)
-      (Quote-Coercion Immediate-Coercion)
-      (Hyper-Coercion-Operation-Forms E)
-      (Coercion-Operation-Forms E)
-      (Type Immediate-Type)
-      (Type-Operation-Forms E)
-      (Let (Bnd* E) E)
-      (Var Uid)
-      (Control-Flow-Forms E)
-      (Op Grift-Primitive (Listof E))
-      No-Op
-      (Quote Cast-Literal)
-      (Blame E)
-      (Observe E Grift-Type)
-      (Unguarded-Forms E)
-      (Guarded-Proxy-Forms E)
-      (Monotonic-Forms E Immediate-Type)
-      (Error E)
-      (Tuple-Operation-Forms E))))
-
-(define-type CoC6-Expr
-  (Rec
-   E
-   (U (Closure-Ops/Ref E)
-      (Data-Fn-Proxy-Forms E)
-      (Hybrid-Fn-Proxy-Forms E)
-      (Gen-Data-Forms E)
-      (Code-Forms E)
-      (Quote-Coercion Immediate-Coercion)
-      (Hyper-Coercion-Operation-Forms E)
-      (Coercion-Operation-Forms E)
-      (Type Immediate-Type)
-      (Type-Operation-Forms E)
-      (Let (Bnd* E) E)
-      (Var Uid)
-      (Control-Flow-Forms E)
-      (Op Grift-Primitive (Listof E))
-      No-Op
-      (Quote Cast-Literal)
-      (Blame E)
-      (Observe E Grift-Type)
-      (Unguarded-Forms E)
-      (Guarded-Proxy-Forms E)
-      (Monotonic-Forms E Immediate-Type)
-      (Error E)
-      (Tuple-Operation-Forms E))))
-
 
 ;; Uncover Free Eliminates the following forms
 (define-type (U- E)
@@ -404,6 +249,9 @@ Notes to be deleted after implementation
         (Values (Closure* Uid CoC5-Expr) CoC5-Expr)))
 (define (convert-closures
          e
+         #:propagate?      [propogate? (optimize? 'propagate)]
+         #:direct-call?    [direct-call? (optimize? 'direct-call)]
+         #:self-reference? [self-reference? (optimize? 'self-reference)]
          #:cast-rep [cast-rep (cast-representation)]
          #:fn-proxy-rep [fn-proxy-rep (fn-proxy-representation)])
   (define well-known-closures : (MSet Uid)
@@ -542,7 +390,7 @@ Notes to be deleted after implementation
                        ([code-label code-label*]
                         [b b*])
                (match-define (cons x _) b)
-               (define bv (Bound-Var x (Var x) letrec-binding-depth))
+               (define bv (Bound-Var x (Var x) letrec-binding-depth)) 
                (values (hash-set code-env^ x code-label)
                        (hash-set opt-env^  x bv))))
 
@@ -659,6 +507,24 @@ Notes to be deleted after implementation
              (match scc*
                ['() rec-e]
                [(cons scc scc*) (Let-Closures (map u->c scc) (loop scc*))]))]
+          [(Labels? current-e)
+           (match-define (Labels b* b) current-e)
+           (define code-binding-depth (add1 current-binding-depth))
+           (define rec-b* : (Bnd* (Fun CoC5-Expr))
+             (for/list ([b b*])
+               (match-define (cons l (Code p* e)) b)
+               (define opt-env^
+                 (for/fold ([e : (HashTable Uid Propagant) opt-env])
+                           ([u p*])
+                   (hash-set e u (Bound-Var u (Var u) code-binding-depth))))
+               (cons l (Code p*
+                         (rec/env e (hasheq) opt-env^
+                                  code-binding-depth
+                                  current-closure-name
+                                  current-closure-self
+                                  current-closure-depth
+                                  (mset))))))
+           (Labels rec-b* (rec b))]
           [(Let? current-e)
            (match-define (Let b* e) current-e)
            (define let-binding-depth (add1 current-binding-depth))
@@ -727,13 +593,13 @@ Notes to be deleted after implementation
              [(Var u)
               (match (propogate/recognize u #:rator? #t)
                 [(and v (Var u))
-                 (cond
-                   [(hash-ref code-env u #f) =>
-                    (lambda ([u : Uid])
-                      ;; Invariant: The latter closure optimization passes
-                      ;; identify known function application by the presence
-                      ;; of a code-label literal in code position.
-                      (Closure-App (Code-Label u) v e*))]
+                 (define label? (hash-ref code-env u #f))
+                 (cond 
+                   [label?
+                    ;; Invariant: The latter closure optimization passes
+                    ;; identify known function application by the presence
+                    ;; of a code-label literal in code position.
+                    (Closure-App (Code-Label label?) v e*)]
                    [else (clos-app v e*)])]
                 [other
                  ;; There are no propagants except variables who's types
@@ -842,10 +708,7 @@ Notes to be deleted after implementation
                 [(Data)   (Fn-Proxy-Coercion e)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])] 
-          [else
-           ;; The type of current-e and rec 
-           (form-map current-e rec)
-           ]))))
+          [else (form-map current-e rec)]))))
   (define apply-casted-closure* (hash-values arity->apply-casted-closure))
   
   (values apply-casted-closure* rec/env-return))
@@ -856,14 +719,14 @@ Notes to be deleted after implementation
 
 (: optimize-closures :
    (Closure* Uid CoC5-Expr) CoC5-Expr
-   -> (Values (Bnd* (Fun CoC6-Expr)) (Closure* Uid CoC6-Expr) CoC6-Expr))
+   -> (Values (Bnd* (Fun CoC6-Expr)) (Closure* CoC6-Expr CoC6-Expr) CoC6-Expr))
 (define (optimize-closures c* e)
   ;; Closures that are not well-known but contain no free-variables
   ;; can be statically allocated and refered to by there constants name.
   ;; Since they have no free variables, and thus no dependancies, the order of
   ;; these bindings do not matter.
   (define static-code : (Bnd* (Code Uid* CoC6-Expr)) '())
-  (define static-closures : (Closure* Uid CoC6-Expr) '())
+  (define static-closures : (Closure* CoC6-Expr CoC6-Expr) '())
 
   ;; These uids no longer need to be captured because they now refer
   ;; to static bindings or all references to the variable have been
@@ -1138,15 +1001,14 @@ Notes to be deleted after implementation
                            ([c c*]) 
                    (hash-set u->u (Closure-self c) (Closure-name c))))
 
-               
+               (define rec-e (rec/env fst-e uid->uid^ (hasheq) (hash)))
                
                (set!
                 static-closures
                 (cons
                  (Closure
                   fst-name #f 'regular fst-label fst-self fst-ctr?
-                  '() fst-fp-ls
-                  (rec/env fst-e uid->uid^ (hasheq) (hash)))
+                  '() fst-fp-ls rec-e)
                  static-closures))
 
                
@@ -1289,7 +1151,7 @@ Notes to be deleted after implementation
          (hash-set fv-set->clos fv-set sc)))
       (set! static-closures
             (cons (Closure name #t 'code-only label self
-                           #f fv-ls p* rec-e)
+                           #f '() p* rec-e)
                   static-closures))))
   
     (for ([c c*])
@@ -1299,8 +1161,11 @@ Notes to be deleted after implementation
          ;; here, because at this point only the apply casted closure
          ;; code hits this line, and it doesn't allocate closures.         
          (define rec-c
-           (Closure name #f 'code-only label self c? f* p*
-                    (rec/env e (hasheq) (map-fv->closure-ref self f*) (hash))))
+           (Closure
+            ;; code-only suppresses closure creation so empty inits
+            ;; is fine here. 
+            name #f 'code-only label self c? '() p*
+            (rec/env e (hasheq) (map-fv->closure-ref self f*) (hash))))
          (set! static-closures (cons rec-c static-closures))]))      
     
     (define rec-e : CoC6-Expr (rec/env e (hasheq) (hasheq) (hash)))
@@ -1926,6 +1791,58 @@ Notes to be deleted after implementation
     (list
      (Closure u0 #f 'regular code0 self1 #f '() (list p1)
               (App-Code label8 (list (App-Code label6 (list pv1))))))
+    v0))
+
+
+  (refresh!)  
+  #;
+  (define/test-equal? cc-result11
+    "convert closure - non capturing function"
+    (values->list
+     (convert-closures
+      (Labels (list (cons code1 (Code (list p2)
+                                  (Letrec ([u3]))))))))
+    (list
+     '()
+     (Let-Closures
+      (list (Closure u0 #f 'regular code0 self1 #f '() (list p1)
+                     (Let-Closures
+                      (list (Closure u2 #t 'regular code2 self3 #f (list p1) (list p2)
+                                     (Closure-App (Closure-Code pv2) pv2 (list pv1))))
+                      (Let-Closures
+                       (list 
+                        (Closure u3 #t 'regular code4 self5 #f (list p1 u2 u4) '()
+                                 (Closure-App label2 v2 (list (Closure-App label6 v4 (list pv1))))) 
+                        (Closure u4 #t 'regular code6 self7 #f (list u3) (list p3)
+                                 (Closure-App label4  v3 '())))
+                       (Let-Closures
+                        (list
+                         (Closure u5 #t 'regular code8 self9 #f '() (list p4)
+                                  (op$ + (Unguarded-Vect-length pv4) (Quote 1))))
+                        (Closure-App label8 v5 (list (Closure-App label6 v4 '()))))))))
+      v0)))
+  #;
+  (test-equal?
+   "optimize closures - paper complex example"
+   (values->list (apply optimize-closures cc-result10))
+   (list
+    (list
+     (cons
+      code2
+      (Code (list self3 p2)
+        (Closure-App (Closure-Code pv2) pv2 (list selfv3))))
+     (cons
+      code4
+      (Code (list self5)
+        (App-Code label2 (list selfv5 (App-Code label6 (list selfv5 selfv5))))))
+     (cons code6 (Code (list self7 p3) (App-Code label4 (list selfv7))))
+     (cons code8 (Code (list p4) (op$ + (Unguarded-Vect-length pv4) (Quote 1))))) 
+    (list
+     (Closure u0 #f 'regular code0 self1 #f '() (list p1)
+              (App-Code label8 (list (App-Code label6 (list pv1))))))
     v0)))
 
 
+(: optimize? : Symbol -> Boolean)
+(define (optimize? x)
+  (set-member? (closure-optimizations) x))
