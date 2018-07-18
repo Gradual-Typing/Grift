@@ -89,6 +89,8 @@
       (Type-Operation-Forms E)
       (Let (Bnd* E) E)
       (Var Uid)
+      (Global String)
+      (Assign Id E)
       (Control-Flow-Forms E)
       (Op Grift-Primitive (Listof E))
       No-Op
