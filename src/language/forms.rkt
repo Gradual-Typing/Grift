@@ -180,12 +180,6 @@ And a type constructor "name" expecting the types of field1 and field2
   (Type-Tuple-item type index)
   (Type-Mu-Huh type)
   (Type-Mu-Body type)
-  ;; closure Representation
-  (App-Closure code data exprs)
-  (Closure-Data code caster variables)
-  (Closure-code var)
-  (Closure-ref this var)
-  (Closure-caster this)
   (Let-Static* mu-type-bindings
                type-bindings
                mu-crcn-bindings

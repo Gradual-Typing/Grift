@@ -13,13 +13,15 @@
  get-vertices
  in-vertices
  in-edges-from
+ edges-from
  scc)
 
 (module+ test
   (require
    typed/rackunit))
 
-(define-type (G N) (Mutable-HashTable N (G N)))
+(define-type (G N)
+  (Mutable-HashTable N (Mutable-HashTable N True)))
 ;; Graph is a directed eq? graph with explicit
 ;; support for backtracking edges.
 ;; to vertices, and walking the graph.
@@ -38,14 +40,14 @@
     (define e* (cdr row))
     (define e*-from-v (%add-vertex! contents v))
     (for ([w (in-list e*)])
-      (define e*-from-w (%add-vertex! contents w))
-      (hash-set! e*-from-v w e*-from-w)))
+      (%add-vertex! contents w)
+      (hash-set! e*-from-v w #t)))
   (Graph contents))
 
 ;; add a vertice to the graph if it hasn't be done yet
-(: %add-vertex! : (All (N) (G N) N -> (G N)))
+(: %add-vertex! : (All (N) (G N) N -> (Mutable-HashTable N True)))
 (define (%add-vertex! h v)
-  (hash-ref! h v (λ () : (G N) (make-hasheq))))
+  (hash-ref! h v (λ () : (Mutable-HashTable N True)(make-hasheq))))
 
 (define graph? Graph?)
 
@@ -56,7 +58,8 @@
   (test-equal? "graph? false" (graph? als) #f))
 
 (: has-vertex? : (All (N) (Graph N) N -> Boolean))
-(define (has-vertex? g v) (hash-has-key? (Graph-contents g) v))
+(define (has-vertex? g v)
+  (hash-has-key? (Graph-contents g) v))
 
 #;(: in-edges-of-vertex : (All (N) (Graph N) N -> (Sequenceof N (G N))))
 #;
@@ -85,7 +88,7 @@
 (: has-edge? (All (A) (Graph A) A A -> Boolean))
 (define (has-edge? g u v)
   (define e*-from-u? (hash-ref (Graph-contents g) u #f))
-  (and e*-from-u? (hash-ref e*-from-u? v #f) #t))
+  (and e*-from-u? (hash-ref e*-from-u? v #f)))
 
 (module+ test
   (test-equal? "has-edge? true 1" (has-edge? g1 'v 'w) #t)
@@ -97,7 +100,7 @@
 (define (%add-edge! h u v)
   (define e*-from-u (%add-vertex! h u))
   (define e*-from-v (%add-vertex! h v))
-  (hash-set! e*-from-u v e*-from-v))
+  (hash-set! e*-from-u v #t))
 
 (: add-edge! (All (A) (Graph A) A A -> Void))
 (define (add-edge! g u v)
@@ -123,6 +126,10 @@
 (: in-edges-from (All (A) (Graph A) A -> (Sequenceof A)))
 (define (in-edges-from g a)
   (in-mutable-hash-keys (hash-ref (Graph-contents g) a)))
+
+(: edges-from (All (A) (Graph A) A -> (Listof A)))
+(define (edges-from g a)
+  (hash-keys (hash-ref (Graph-contents g) a)))
 
 (struct node
   ([index : Natural]

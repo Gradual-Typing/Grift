@@ -39,4 +39,5 @@
    (test-file "mu" "13.grift" (int 1))
    (test-file "mu" "13.1.grift" (tuple))
    (test-file "mu" "13.2.grift" (tuple))
-   (test-file "mu" "14.grift" (int 1))))
+   (test-file "mu" "14.grift" (int 1))
+   (test-file "mu" "dyn-ops.grift" (int 2))))

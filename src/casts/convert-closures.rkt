@@ -6,7 +6,7 @@
 +-------------------------------------------------------------------------------+
 Description: This pass performs closure conversion and optimization based off
 of the paper Optimizing closures in O(n) time. A cursory analysis shows that
-we don't quite get O(n) time, instead I think we are O(n^2). At this point
+we don't quite get O(n) time, instead I think we are O(n^3). At this point
 I am not really concered about the runtime. 
 
 
@@ -109,13 +109,11 @@ Notes to be deleted after implementation
  racket/set
  "./cast-profiler.rkt"
  "../configuration.rkt"
- (except-in "../language/cast-or-coerce3.1.rkt"
-            Closure-code Closure-caster)
- (except-in "../language/cast-or-coerce4.rkt"
-            Closure-code Closure-caster)
+ "../language/cast-or-coerce3.1.rkt"
+ "../language/cast-or-coerce4.rkt"
  "../language/syntax.rkt"
  "../lib/function.rkt"
- "../lib/graph.rkt"
+ "../lib/dgraph.rkt"
  "../lib/mutable-set.rkt"
  (submod "../logging.rkt" typed)
  #;"../language/cast-or-coerce5.rkt"
@@ -373,6 +371,7 @@ Notes to be deleted after implementation
           ;; Variable found in non-application possition
           [(Var? current-e) (propogate/recognize (Var-id current-e))]
           [(Letrec? current-e)
+           (debug off current-e)
            (match-define (Letrec b* e) current-e)
            (define letrec-binding-depth (add1 current-binding-depth))
            (define closures-in-this-binding : (MSet Uid) (mset))
@@ -472,7 +471,7 @@ Notes to be deleted after implementation
            ;; - Rebuild each closure
            ;; - map each closure name to the closure
            ;; - Build graph, `g`, of capture relationship of these bindings 
-           (define captures : (Graph Uid) (make-graph '()))
+           (define captures : (DGraph Uid) (make-dgraph))
            (define u->c-hash
              (for/hasheq : (HashTable Uid (Closure Uid CoC5-Expr))
                          ([b b*]
@@ -488,7 +487,7 @@ Notes to be deleted after implementation
                       (mset-member? well-known-closures self)))
                (debug off well-known-closures name self wk?)
                (define c (Closure name wk? 'regular label self c? fv* fp* rec-e))
-               (add-vertex! captures name)
+               (dgraph-add-vertex! captures name)
                (for ([fv fv*])
                  ;; we only care about the free variables that are bound
                  ;; in this binding. Filtering these here prevents `scc`
@@ -497,7 +496,7 @@ Notes to be deleted after implementation
                  (when (mset-member? closures-in-this-binding fv)
                    ;; add-edge adds `name` as a vertex if it hasn't be
                    ;; added yet.
-                   (add-edge! captures name fv)))
+                   (dgraph-add-edge! captures name fv)))
                (values name c)))
            
            (: u->c : Uid -> (Closure Uid CoC5-Expr))
@@ -507,11 +506,8 @@ Notes to be deleted after implementation
            ;; i.e. The sets of mutually recusive bindings.
            ;; Tarjans algorithm also topologically sorts the bindings
            (define scc* : (Listof Uid*)
-             (let ([scc* (scc captures)])
-               (cond
-                 ;; making this deterministic is expensive.
-                 [(currently-testing?) (sort-scc* scc* captures)]
-                 [else (reverse scc*)])))
+             (for/list ([scc (reverse (dgraph-scc captures))])
+               (sort scc uid<?)))
 
            (let loop ([scc* scc*])
              (match scc*
@@ -588,6 +584,24 @@ Notes to be deleted after implementation
            (cond
              [(null? b*^) rec-e]
              [else (Let b*^ rec-e)])]
+          [(Repeat? current-e)
+           (match-define (Repeat i e1 e2 a e3 e4) current-e)
+           (define rec-e1 (rec e1))
+           (define rec-e2 (rec e2))
+           (define rec-e3 (rec e3))
+           (define repeat-binding-depth (add1 current-binding-depth))
+           (define opt-env^
+             (hash-set
+              (hash-set opt-env i (Bound-Var i (Var i) repeat-binding-depth))
+              a (Bound-Var a (Var a) repeat-binding-depth)))
+           (define rec-e4
+             (rec/env e4 code-env opt-env^
+                      repeat-binding-depth
+                      current-closure-name
+                      current-closure-self
+                      current-closure-depth
+                      free-variables))
+           (Repeat i rec-e1 rec-e2 a rec-e3 rec-e4)]
           ;; Castable Function Operations
           [(Fn-Caster? current-e)
            (match-define (Fn-Caster e) current-e)
@@ -753,7 +767,7 @@ Notes to be deleted after implementation
 
   (define-type Uid->Set.Clos
     (Mutable-HashTable Uid (Pairof (Setof Uid) Shared-Closure)))
-  (define-type Set->Clos (HashTable (Setof Uid) Shared-Closure))
+  (define-type Set->Clos (Immutable-HashTable (Setof Uid) Shared-Closure))
   (define uid->fv-set.clos : Uid->Set.Clos (make-hash))
   (: filter-shared-closures : (Listof Uid) -> Set->Clos)
   (define (filter-shared-closures fv-ls)
@@ -782,14 +796,14 @@ Notes to be deleted after implementation
            ;; - no need to capture any of variables in this binding
            ;;   because everone will end up passing self to each other.
            ['()
-            (define fv-set/this-binding
+            (define-values (fv-set/this-binding uid->uid^)
               ;; remove any eliminated closures
               ;; and merge any closures that where renamed
-              (for*/fold ([fv-set : (Setof Uid) (seteq)])
-                         ([c wk-c*]
-                          [fv (Closure-free-vars c)]
-                          #:when (not (eliminated? fv)))
-                (set-add fv-set (or (hash-ref uid->uid fv #f) fv))))
+              (for/fold ([fv-set : (Setof Uid) (seteq)]
+                         [u->u : (HashTable Uid Uid) uid->uid])
+                        ([c wk-c*])
+                (resolve-free-variables
+                 eliminated? u->u (Closure-free-vars c) fv-set)))
             
             (define fv-set (set-subtract fv-set/this-binding wk-name-set))
             
@@ -800,25 +814,31 @@ Notes to be deleted after implementation
               ['() 
                (for ([c wk-c*])
                  (mset-add! closures-eliminated (Closure-name c))
+                 (mset-add! closures-eliminated (Closure-self c))
                  (hash-set! label->closure-status
                             (Closure-code-label c)
                             'eliminated))
 
-               ;; There are no fvs in this code to have closures
-               (define fv-set->clos : Set->Clos (hash))
-               ;; These closures will have no free variables to rewrite
-               (define fv->expr : (HashTable Uid CoC6-Expr) (hasheq))
 
+               ;; There are no fvs in this code to have closures
+               (define empty-fv-set->clos : Set->Clos (hash))
+               ;; These closures will have no free variables to rewrite
+               (define empty-fv->expr : (HashTable Uid CoC6-Expr) (hasheq))
+               
                ;; Change each closure to a non-capturing function
                (for ([c wk-c*])
                  (match-define (Closure _ _ _ label _ _ _ p* e) c)
                  ;; We know the caster isn't needed because the closure
                  ;; never got passed as an argument (or else it wouldn't
                  ;; be well-known).
-                 (define rec-e (rec/env e uid->uid fv->expr fv-set->clos))
+                 (define rec-e (rec/env e uid->uid^
+                                        empty-fv->expr
+                                        empty-fv-set->clos))
                  (set! static-code (cons (cons label (Code p* rec-e))
-                                         static-code))) 
-               (rec e)] 
+                                         static-code)))
+               
+               (rec/env e uid->uid^ fv->expr fv-set->shared-closure)] 
+
               ;; Well known closures with only 1 free variable
               [(list fv)
                (for ([c wk-c*])
@@ -834,23 +854,23 @@ Notes to be deleted after implementation
                  ;; Note this is done with uid->uid so that if the
                  ;; fv and self are captured then only a single variable
                  ;; is captured.
-                 (define uid->uid^
-                   (map-uid*-to uid->uid (cons fv wk-name*) self))
+                 (define uid->uid^^
+                   (map-uid*-to uid->uid^ (cons fv wk-name*) self))
                  
-                 (define rec-e (rec/env e uid->uid^ fv->expr fv-set->clos))
+                 (define rec-e (rec/env e uid->uid^^ fv->expr fv-set->clos))
                  (set!
                   static-code
                   `([,label . ,(Code `(,self . ,p*) rec-e)] . ,static-code)))
                
-               (define uid->uid^ (map-uid*-to uid->uid wk-name* fv)) 
+               (define uid->uid^^ (map-uid*-to uid->uid^ wk-name* fv)) 
                
-               (rec/env e uid->uid^ fv->expr fv-set->shared-closure)]
+               (rec/env e uid->uid^^ fv->expr fv-set->shared-closure)]
               ;; All wk w/ 1 < fvs
               [fv-ls
                ;; We need a structure storing the free-variables, so
                ;; check to see if there is a closure with these
                ;; free-variables in scope.
-               (match (hash-ref fv-set->shared-closure fv-ls #f)
+               (match (hash-ref fv-set->shared-closure fv-set #f)
                  ;; There are no closures in scope with these free
                  ;; variables so we allocate a tuple to share amongst
                  ;; all the wk closures.
@@ -866,18 +886,19 @@ Notes to be deleted after implementation
                   
                   (define fv-set->clos (filter-shared-closures fv-ls))
                   
-                  (closures-borrow-tuple wk-c* fv-ls wk-name* uid->uid
+                  (closures-borrow-tuple wk-c* fv-ls wk-name* uid->uid^
                                          fv-set->clos fv-set)
                   ;; The first closure gets bound to a tuple all the
                   ;; rest get renamed to be the first closure.
-                  (define uid->uid^ (map-uid*-to uid->uid rst fst))
+                  (define uid->uid^^ (map-uid*-to uid->uid^ rst fst))
                   ;; Add this closure to the filter set so that it can
                   ;; be used as the scope narrows.
                   (define sc (shared-tuple fst fv-ls))
-                  (hash-set uid->fv-set.clos fst (cons fv-set sc))
+                  ;; TODO write a test for this code path
+                  (hash-set! uid->fv-set.clos fst (cons fv-set sc))
                   ;; Allocate a tuple with the free-variables
                   (Let `([,fst . ,(Create-tuple (fv*->expr* fv->expr fv-ls))])
-                    (rec/env e uid->uid^ fv->expr
+                    (rec/env e uid->uid^^ fv->expr
                              (hash-set fv-set->clos fv-set sc)))]
                  ;; There is another well-known closure that
                  ;; has the same free variable set, we use that
@@ -893,26 +914,26 @@ Notes to be deleted after implementation
                   
                   (define fv-set->clos (filter-shared-closures fv-ls))
 
-                  (closures-borrow-tuple wk-c* fv-ls wk-name* uid->uid
+                  (closures-borrow-tuple wk-c* fv-ls wk-name* uid->uid^
                                          fv-set->clos fv-set)
 
                   ;; The tuple gets passed as the closure for all the
                   ;; closures.
-                  (define uid->uid^ (map-uid*-to uid->uid wk-name* tuple-name))
+                  (define uid->uid^^ (map-uid*-to uid->uid^ wk-name* tuple-name))
 
-                  (rec/env e uid->uid^ fv->expr fv-set->clos)]
+                  (rec/env e uid->uid^^ fv->expr fv-set->clos)]
                  [(shared-closure clos-name fv-ls)
                   (for ([c wk-c*])
                     (hash-set! label->closure-status
                                (Closure-code-label c)
                                'regular))
                   
-                  (closures-borrow-closure wk-c* fv-ls fv-set '() uid->uid
+                  (closures-borrow-closure wk-c* fv-ls fv-set '() uid->uid^
                                            (filter-shared-closures fv-ls))
 
-                  (define uid->uid^ (map-uid*-to uid->uid wk-name* clos-name))
+                  (define uid->uid^^ (map-uid*-to uid->uid^ wk-name* clos-name))
                   
-                  (rec/env e uid->uid^ fv->expr fv-set->shared-closure)])])]
+                  (rec/env e uid->uid^^ fv->expr fv-set->shared-closure)])])]
            ;; At least one not-well-known closure
            ;; -> add the fvs of wk to !wk and share !wk closure with wk
            [not-wk-c*
@@ -923,7 +944,12 @@ Notes to be deleted after implementation
             (hash-set! label->closure-status fst-name 'regular)
             
             (define rst-nwk* (cdr not-wk-c*))
-            
+
+
+            (define-values (fst-fv-set uid->uid^)
+              (resolve-free-variables eliminated? uid->uid fst-fv-ls))
+
+            #;
             (define fst-fv-set
               (for/fold ([fv-set : (Setof Uid) (seteq)])
                         ([fv fst-fv-ls] #:when (not (eliminated? fv)))
@@ -931,13 +957,17 @@ Notes to be deleted after implementation
 
             ;; Add fvs of wk closure to fvs of
             ;; - don't add fst-name if present
+            ;; TODO use best uid->uid here 
+            (define-values (fv-set/wk-names/fst-name _)
+              (for*/fold ([fv-set : (Setof Uid) fst-fv-set]
+                          [u->u : (HashTable Uid Uid) uid->uid])
+                         ([c wk-c*])
+                (resolve-free-variables eliminated? u->u
+                                        (Closure-free-vars c)
+                                        fv-set)))
+
             (define fv-set/wk-names
-              (for*/fold ([fv-set : (Setof Uid) fst-fv-set])
-                         ([c wk-c*]
-                          [fv (Closure-free-vars c)]
-                          #:when (not (eliminated? fv))
-                          #:when (not (eq? fv fst-name))) 
-                (set-add fv-set (or (hash-ref uid->uid fv #f) fv))))
+              (set-remove fv-set/wk-names/fst-name fst-name))
             
             (define fv-set (set-subtract fv-set/wk-names wk-name-set))
             
@@ -951,9 +981,11 @@ Notes to be deleted after implementation
 
             ;; In the other !wk closures and the body the
             ;; well-known closure just use the fst closure
-            (define uid->uid^ (map-uid*-to uid->uid wk-name* fst-name))
+            (define uid->uid^^ (map-uid*-to uid->uid^ wk-name* fst-name))
+
             
             (define-values (rst-fv-ls* rst-fv-set* rst-int-sc* rst-ext-sc*)
+              ;; TODO consider threading the uid map through
               (for/lists ([fv-ls* : (Listof Uid*)]
                           [fv-set* : (Listof (Setof Uid))]
                           [int-sc* : (Listof Shared-Closure)]
@@ -963,7 +995,9 @@ Notes to be deleted after implementation
                                        ctr? f* p* rec-e)
                   c)
                 (hash-set! label->closure-status name 'regular)
-                (define fv-set
+                (define-values (fv-set _) 
+                  (resolve-free-variables eliminated? uid->uid^^ f*)
+                  #;
                   (for*/fold ([fv-set : (Setof Uid) (seteq)])
                              ([fv f*] #:when (not (eliminated? fv)))
                     (set-add fv-set (or (hash-ref uid->uid^ fv #f) fv))))
@@ -1006,12 +1040,12 @@ Notes to be deleted after implementation
                (for ([c rst-nwk*])
                  (hash-set! label->closure-status (Closure-code-label c) 'regular))
                
-               (define uid->uid^ : (HashTable Uid Uid)
-                 (for/fold ([u->u uid->uid])
+               (define uid->uid^^ : (HashTable Uid Uid)
+                 (for/fold ([u->u uid->uid^])
                            ([c c*]) 
                    (hash-set u->u (Closure-self c) (Closure-name c))))
 
-               (define rec-e (rec/env fst-e uid->uid^ (hasheq) (hash)))
+               (define rec-e (rec/env fst-e uid->uid^^ (hasheq) (hash)))
                
                (set!
                 static-closures
@@ -1027,7 +1061,7 @@ Notes to be deleted after implementation
                  ;; We know the caster isn't needed because the closure
                  ;; never got passed as an argument (or else it wouldn't
                  ;; be well-known).
-                 (define rec-e (rec/env e uid->uid fv->expr fv-set->clos))
+                 (define rec-e (rec/env e uid->uid^ fv->expr fv-set->clos))
                  (set! static-code (cons (cons label (Code p* rec-e))
                                          static-code)))
                
@@ -1042,7 +1076,7 @@ Notes to be deleted after implementation
                  (define fv-init* (fv*->expr* fv->expr fv-ls))
                  (Closure
                   name #f 'regular label self ctr? fv-init* p*
-                  (rec/env e uid->uid^
+                  (rec/env e uid->uid^^
                            (map-fv->closure-ref self fv-ls)
                            (filter-shared-closures fv-ls))))
                
@@ -1054,7 +1088,7 @@ Notes to be deleted after implementation
                            ([s rst-fv-set*] [c rst-ext-sc*])
                    (hash-set s->c s c))) 
 
-               (rec/env e uid->uid^ fv->expr fv-set->clos^^)]
+               (rec/env e uid->uid^^ fv->expr fv-set->clos^^)]
               ;; Otherwise we generate code to allocate closures and
               ;; caputure the free-variables of all !wk closures.
               [else 
@@ -1105,7 +1139,7 @@ Notes to be deleted after implementation
                 (cons rec-fst rec-rst)
                 (rec/env e uid->uid^ fv->expr fv-set->clos^^))])])] 
         [(Var u)
-         (define u^ (find-representative uid->uid u))
+         (define-values (u^ _) (find-representative uid->uid u))
          (cond
            [(hash-ref fv->expr u^ #f) => values]
            [else (Var u^)])]
@@ -1270,37 +1304,6 @@ Notes to be deleted after implementation
     [else (uid<? (car (sort x uid<?))
                  (car (sort y uid<?)))]))
 
-;; Reverse scc and sort unrelated components
-(: sort-scc* : (Listof Uid*) (Graph Uid) -> (Listof Uid*)) 
-(define (sort-scc* scc* captures)
-  (let loop ([scc* scc*]
-             [acc  : (Listof Uid*) '()]
-             [unrelated-scc* : (Listof Uid*) '()]
-             [unrelated-set (seteq)])
-    (match scc*
-      ['() (append (sort unrelated-scc* scc<?) acc)]
-      [(cons scc scc*)
-       (define unrelated? : Boolean
-         (for*/fold ([unrelated? : Boolean #t])
-                    ([c1 scc]
-                     [e1 (in-edges-from captures c1)])
-           (and unrelated? (not (set-member? unrelated-set e1)))))
-       (cond
-         [unrelated?
-          (loop
-           scc*
-           acc
-           (cons (sort scc uid<?) unrelated-scc*)
-           (set-union unrelated-set (list->seteq scc*)))]
-         [else 
-          (append
-           (sort unrelated-scc* scc<?)
-           (loop scc*
-                 (append (sort unrelated-scc* scc<?) acc)
-                 (list (sort scc uid<?))
-                 (list->seteq scc*)))])])))
-
-
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
 (define (bnd-code<? x y) (uid<? (car x) (car y)))
 
@@ -1332,16 +1335,37 @@ Notes to be deleted after implementation
             ([from from*])
     (hash-set u->u from to)))
 
+(: find-representative :
+   (HashTable Uid Uid) Uid -> (Values Uid (HashTable Uid Uid)))
+(define (find-representative uid->uid x)
+  (let loop ([x x] [y? (hash-ref uid->uid x #f)])
+    (cond
+      [y?
+       (define-values (rep u->u) (loop y? (hash-ref uid->uid y? #f)))
+       (values rep (hash-set u->u x rep))]
+      [else (values x uid->uid)])))
+
+(: resolve-free-variables :
+   (->* ((Uid -> Boolean) (HashTable Uid Uid) Uid*) ((Setof Uid))
+        (Values (Setof Uid) (HashTable Uid Uid))))
+(define (resolve-free-variables eliminated? uid->uid fv*
+                                [fv-set : (Setof Uid) (seteq)])
+  (for*/fold ([fv-set : (Setof Uid) fv-set]
+              [u->u : (HashTable Uid Uid) uid->uid])
+             ([fv fv*])
+    (define-values (rep u->u^) (find-representative u->u fv))
+    (values
+     (if (eliminated? rep)
+         fv-set
+         (set-add fv-set rep))
+     u->u^)))
+
+
+
 (: fv*->expr* : (HashTable Uid CoC6-Expr) Uid* -> (Listof CoC6-Expr))
 (define (fv*->expr* fv->expr fv*)
   (for/list ([fv fv*])
     (or (hash-ref fv->expr fv #f) (Var fv))))
-
-(: find-representative : (HashTable Uid Uid) Uid -> Uid)
-(define (find-representative uid->uid x)
-  (let ([y? (hash-ref uid->uid x #f)])
-    (if y? (find-representative uid->uid y?) x)))
-
 
 (module+ test
   ;; TODO add `refresh!` and the Uids to a test library file
@@ -1599,17 +1623,12 @@ Notes to be deleted after implementation
       v0)))
 
   (test-equal?
-   "convert closures - nested closures self captured"
+   "optimize closures - nested closures self captured"
    (values->list (apply optimize-closures cc-result5))
    (list
     '()
-    (list (Closure
-           u0 #f 'regular code0 self1 #f '() '()
-           (Let-Closures
-            (list
-             (Closure u1 #f 'regular code2 self3 #f (list v0) '()
-                      (Closure-Ref selfv3 0)))
-             v1)))
+    (list (Closure u0 #f 'regular code0 self1 #f '() '() v1)
+          (Closure u1 #f 'regular code2 self3 #f '() '() v0))
     v0))
   
   ;; Mutually Recusive Closures
@@ -1751,6 +1770,29 @@ Notes to be deleted after implementation
               (App-Code label4 '())))
     v3))
 
+  (refresh!)  
+  (define/test-equal? cc-result-letrec-6
+    "convert closures - tests/suite/static/letrec6.rkt"
+    (values->list
+     (convert-closures
+      (Letrec (list
+               (cons u0 (Lambda '()
+                          (Castable
+                           #f
+                           (op$ + (Quote 1) (App-Fn v2 '())))))
+               (cons u2 (Lambda '() (Castable #f (Quote 0)))))
+        (App-Fn v0 '()))))
+    (list
+     '()
+     (Let-Closures 
+      (list
+       (Closure u2 #t 'regular code2 self3 #f '() '() (Quote 0)))
+      (Let-Closures
+       (list
+        (Closure u0 #t 'regular code0 self1 #f (list u2) '()
+                 (op$ + (Quote 1) (Closure-App label2 v2 '()))))
+       (Closure-App label0 v0 '())))))
+
   ;; This is the example from Optimizing Closures in O(n) time.
   #;
   (lambda (x)
@@ -1801,21 +1843,26 @@ Notes to be deleted after implementation
     (list
      '()
      (Let-Closures
-      (list (Closure u0 #f 'regular code0 self1 #f '() (list p1)
-                     (Let-Closures
-                      (list (Closure u2 #t 'regular code2 self3 #f (list p1) (list p2)
-                                     (Closure-App (Closure-Code pv2) pv2 (list pv1))))
-                      (Let-Closures
-                       (list 
-                        (Closure u3 #t 'regular code4 self5 #f (list p1 u2 u4) '()
-                                 (Closure-App label2 v2 (list (Closure-App label6 v4 (list pv1))))) 
-                        (Closure u4 #t 'regular code6 self7 #f (list u3) (list p3)
-                                 (Closure-App label4  v3 '())))
-                       (Let-Closures
-                        (list
-                         (Closure u5 #t 'regular code8 self9 #f '() (list p4)
-                                  (op$ + (Unguarded-Vect-length pv4) (Quote 1))))
-                        (Closure-App label8 v5 (list (Closure-App label6 v4 '()))))))))
+      (list (Closure
+             u0 #f 'regular code0 self1 #f '() (list p1)
+             (Let-Closures
+              (list (Closure
+                     u5 #t 'regular code8 self9 #f '() (list p4)
+                     (op$ + (Unguarded-Vect-length pv4) (Quote 1))))
+              (Let-Closures 
+               (list (Closure
+                      u2 #t 'regular code2 self3 #f (list p1) (list p2)
+                      (Closure-App (Closure-Code pv2) pv2 (list pv1))))
+               (Let-Closures
+                (list 
+                 (Closure
+                  u3 #t 'regular code4 self5 #f (list p1 u2 u4) '()
+                  (Closure-App label2 v2
+                               (list (Closure-App label6 v4 (list pv1)))))
+                 (Closure
+                  u4 #t 'regular code6 self7 #f (list u3) (list p3)
+                  (Closure-App label4  v3 '())))
+                (Closure-App label8 v5 (list (Closure-App label6 v4 '()))))))))
       v0)))
   (test-equal?
    "optimize closures - paper complex example"
@@ -1837,54 +1884,89 @@ Notes to be deleted after implementation
               (App-Code label8 (list (App-Code label6 (list pv1))))))
     v0))
 
-
   (refresh!)  
-  #;
-  (define/test-equal? cc-result11
-    "convert closure - non capturing function"
+  (define/test-equal? cc-result-count-from
+    "conver-closure - tests/suite/program/sieve.100.grift count-from"
     (values->list
      (convert-closures
-      (Labels (list (cons code1 (Code (list p2)
-                                  (Letrec ([u3]))))))))
+      (Letrec (list
+               (cons
+                u1
+                (Lambda '() 
+                  (Castable
+                   #f
+                   (Letrec (list
+                            (cons
+                             u2
+                             (Lambda '() (Castable #f (App-Fn v1 '())))))
+              v2)))))
+        (No-Op))))
     (list
      '()
      (Let-Closures
-      (list (Closure u0 #f 'regular code0 self1 #f '() (list p1)
-                     (Let-Closures
-                      (list (Closure u2 #t 'regular code2 self3 #f (list p1) (list p2)
-                                     (Closure-App (Closure-Code pv2) pv2 (list pv1))))
-                      (Let-Closures
-                       (list 
-                        (Closure u3 #t 'regular code4 self5 #f (list p1 u2 u4) '()
-                                 (Closure-App label2 v2 (list (Closure-App label6 v4 (list pv1))))) 
-                        (Closure u4 #t 'regular code6 self7 #f (list u3) (list p3)
-                                 (Closure-App label4  v3 '())))
-                       (Let-Closures
-                        (list
-                         (Closure u5 #t 'regular code8 self9 #f '() (list p4)
-                                  (op$ + (Unguarded-Vect-length pv4) (Quote 1))))
-                        (Closure-App label8 v5 (list (Closure-App label6 v4 '()))))))))
-      v0)))
-  #;
-  (test-equal?
-   "optimize closures - paper complex example"
-   (values->list (apply optimize-closures cc-result10))
+      (list
+       (Closure
+        u1 #t 'regular code0 self1 #f '() '()
+        (Let-Closures
+         (list
+          (Closure u2 #f 'regular code2 self3 #f (list self1) '()
+                   (Closure-App label0 selfv1 '())))
+         v2)))
+      (No-Op))))
+
+  (test-equal? 
+    "optimize-closures - tests/suite/program/sieve.100.grift count-from"
+    (values->list (apply optimize-closures cc-result-count-from))
+    (list
+     (list (cons code0 (Code '() v2)))
+     (list (Closure u2 #f 'regular code2 self3 #f '() '()
+                    (App-Code label0 '())))
+     (No-Op)))
+
+
+  (refresh!)  
+  (define/test-equal? cc-result-bug
+    "convert-closure - bug in capture"
+    (values->list
+     (convert-closures
+      (Letrec (list
+               (cons
+                u1
+                (Lambda '() 
+                  (Castable
+                   #f
+                   (Letrec (list
+                            (cons
+                             u2
+                             (Lambda '() (Castable #f (App-Fn v1 '())))))
+              v2)))))
+        v1)))
+    (list
+     '()
+     (Let-Closures
+      (list
+       (Closure
+        u1 #f 'regular code0 self1 #f '() '()
+        (Let-Closures
+         (list
+          (Closure u2 #f 'regular code2 self3 #f (list self1) '()
+                   (Closure-App label0 selfv1 '())))
+         v2)))
+      v1)))
+  
+  (test-equal? 
+   "optimize-closures - bug in capture"
+   (values->list (apply optimize-closures cc-result-bug))
    (list
+    '()
     (list
-     (cons
-      code2
-      (Code (list self3 p2)
-        (Closure-App (Closure-Code pv2) pv2 (list selfv3))))
-     (cons
-      code4
-      (Code (list self5)
-        (App-Code label2 (list selfv5 (App-Code label6 (list selfv5 selfv5))))))
-     (cons code6 (Code (list self7 p3) (App-Code label4 (list selfv7))))
-     (cons code8 (Code (list p4) (op$ + (Unguarded-Vect-length pv4) (Quote 1))))) 
-    (list
-     (Closure u0 #f 'regular code0 self1 #f '() (list p1)
-              (App-Code label8 (list (App-Code label6 (list pv1))))))
-    v0)))
+     (Closure u1 #f 'regular code0 self1 #f '() '() v2)
+     (Closure u2 #f 'regular code2 self3 #f '() '()
+              (Closure-App label0 v1 '())))
+    v1))
+  
+
+  )
 
 (: optimize? : Symbol -> Boolean)
 (define (optimize? x)

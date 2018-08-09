@@ -175,14 +175,6 @@
 (define-type CoC6-Bnd-Code* (Listof CoC6-Bnd-Code))
 (define-type CoC6-Bnd-Data  (Pairof Uid CoC6-Expr))
 (define-type CoC6-Bnd-Data* (Listof CoC6-Bnd-Data))
-(define-type CoC6-Procedure
-  (Procedure Uid Uid* Uid (Option Uid) Uid* CoC6-Expr))
-(define-type CoC6-Closure
-  (Closure-Data CoC6-Expr (Option CoC6-Expr) CoC6-Expr*))
-(define-type CoC6-Bnd-Procedure (Pairof Uid CoC6-Procedure))
-(define-type CoC6-Bnd-Procedure* (Listof CoC6-Bnd-Procedure))
-(define-type CoC6-Bnd-Closure (Pairof Uid CoC6-Closure))
-(define-type CoC6-Bnd-Closure* (Listof CoC6-Bnd-Closure))
 (define-type CoC6-Bnd-Type  (Pairof Uid Compact-Type))
 (define-type CoC6-Bnd-Type* (Listof CoC6-Bnd-Type))
 (define-type CoC6-Bnd-Crcn  (Pairof Uid Compact-Coercion))

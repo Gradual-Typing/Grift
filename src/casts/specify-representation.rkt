@@ -25,7 +25,7 @@ but a static single assignment is implicitly maintained.
  (submod "../logging.rkt" typed)
  "../configuration.rkt"
  "../language/cast-or-coerce6.rkt"
- (except-in "../language/data0.rkt" Closure-code Closure-caster) 
+ "../language/data0.rkt"
  "../language/syntax.rkt"
  "memory-layout-helpers.rkt"
  "constants-and-codes.rkt"
@@ -51,9 +51,6 @@ but a static single assignment is implicitly maintained.
                     closure*)
                    exp))
     prgm)
-  (debug off mu-type-bnd* type-bnd* mu-crcn-bnd* crcn-bnd*)
-  (define who 'specify-representation)
-  (debug off who name type)
   (define unique (make-unique-counter next))
   (parameterize ([current-unique-counter unique])
     (set-box! boxed-bnd-code* '())
@@ -92,25 +89,22 @@ but a static single assignment is implicitly maintained.
     (define crcn-id*    : Uid*     (map (inst car Uid Any) crcn-bnd*))
     (define new-next    : Nat      (unique-counter-next! unique))
     (define bnd-code*   : D0-Bnd-Code* (unbox boxed-bnd-code*))
-    (debug
-     off
-     who
-     (Prog (list name new-next type)
-       (GlobDecs (append mu-type-id* type-id*
-                         mu-crcn-id* crcn-id*
-                         static-closure-id*)
-         (Labels (append bnd-code*
-                         new-code*
-                         static-closure-code*)
-           (Begin (append alloc-mu-type*
-                          init-type*
-                          init-mu-type*
-                          alloc-mu-crcn*
-                          init-crcn*
-                          init-mu-crcn*
-                          static-closure-alloc*
-                          static-closure-init*)
-                  new-exp)))))))
+    (Prog (list name new-next type)
+      (GlobDecs (append mu-type-id* type-id*
+                        mu-crcn-id* crcn-id*
+                        static-closure-id*)
+        (Labels (append bnd-code*
+                        new-code*
+                        static-closure-code*)
+          (Begin (append alloc-mu-type*
+                         init-type*
+                         init-mu-type*
+                         alloc-mu-crcn*
+                         init-crcn*
+                         init-mu-crcn*
+                         static-closure-alloc*
+                         static-closure-init*)
+                 new-exp))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
@@ -518,7 +512,7 @@ but a static single assignment is implicitly maintained.
            [else
             (error 'specify-representation/quote "invalid: ~a" k)])]
         ;; Closure Representation
-        [(App-Closure (app recur e) (app recur e^) (app recur* e*))
+        [(Closure-App (app recur e) (app recur e^) (app recur* e*))
          (App-Code e (cons e^ e*))]
         [(Let-Closures c* e)
          (define-values (code* id* alloc* init*) (sr-closures c*))
@@ -530,36 +524,14 @@ but a static single assignment is implicitly maintained.
          (cond
            [(null? code*) alloc-e]
            [else (Labels code* alloc-e)])]
-        #;
-        [(LetP (app (sr-bndp* recur/env) p*) b)
-         (let* ([l*  : Uid* (map (inst car Uid D0-Code) p*)]
-                [env : Env  (extend* env l* (map label l*))])
-           (if (LetC? b)
-               (match-let ([(LetC c* e) b])
-                 (let* ([u*  : Uid* (map (inst car Uid Any) c*)]
-                        [env : Env  (extend* env u* (map var u*))]
-                        [recur      (recur-curry-env env cenv)])
-                   (let*-values ([(a*) (sr-bndc* recur c*)])                     
-                     (Labels p* (Begin a* (recur e)))))) 
-               (Labels p* (recur/env b env cenv))))]
-        #;
-        [(Closure-caster (app recur e))
-         (op$ Array-ref (op$ binary-and CLOSURE-VALUE-MASK e) CLOS-CSTR-INDEX)]
         [(Closure-Caster (app recur e))
          (op$ Array-ref (op$ binary-and CLOSURE-VALUE-MASK e) CLOS-CSTR-INDEX)]
-        #;
-        [(Closure-code (app recur e))
-         (op$ Array-ref (op$ binary-and CLOSURE-VALUE-MASK e) CLOS-CODE-INDEX)]
         [(Closure-Code (app recur e))
          (op$ Array-ref (op$ binary-and CLOSURE-VALUE-MASK e) CLOS-CODE-INDEX)]
         [(Closure-Ref (app recur e) i)
-         (op$ Array-ref (op$ binary-and e CLOSURE-VALUE-MASK)
-              ;; TODO Don't use a magic number here
-              (Quote (+ 2 i)))]
-        #;
-        [(Closure-ref clos fvar)
-         (op$ Array-ref (op$ binary-and (Var clos) CLOSURE-VALUE-MASK)
-              (Quote (cenv clos fvar)))]
+         (op$ Array-ref
+              (op$ binary-and e CLOSURE-VALUE-MASK)
+              (Quote (+ data:CLOS-FVAR-OFFSET i)))]
         [(and v (Var _)) v]
         [(Global s) (Global s)]
         [(Assign u/s (app recur e)) (Assign u/s e)]
@@ -1300,22 +1272,6 @@ but a static single assignment is implicitly maintained.
     [(STuple) TYPE-TUPLE-TAG]
     [else (error 'sr-tag "invalid: ~a" t)]))
 
-(: sr-bndp* ((CoC6-Expr Env IndexMap -> D0-Expr)
-             -> (CoC6-Bnd-Procedure* -> D0-Bnd-Code*)))
-(define ((sr-bndp* sr-expr) b*)
-  (: sr-bndp (CoC6-Bnd-Procedure -> D0-Bnd-Code))
-  (define (sr-bndp bnd)
-    (match-let ([(cons u (Procedure cp param* code ctr? fvar* exp)) bnd])
-      (let* ([offset (if ctr? 2 1)]
-             [closv  (Var cp)]
-             [env (for/hash : Env ([fvar fvar*]
-                                   [i (in-naturals offset)])
-                    (values fvar (op$ Array-ref closv (Quote i))))]
-             [env (extend* env param* (map var param*))]
-             [cenv (index-closure offset cp fvar*)])
-        (cons u (Code (cons cp param*) (sr-expr exp env cenv))))))
-  (map sr-bndp b*))
-
 (: index-closure (Nat Uid Uid* -> IndexMap))
 (define (index-closure offset clos fvar*)
   (define ((fvar-err f))
@@ -1334,31 +1290,6 @@ but a static single assignment is implicitly maintained.
       (if (uid=? c clos)
           (hash-ref map f (fvar-err f))
           (clos-err c f)))))
-
-(: sr-bndc* ((CoC6-Expr -> D0-Expr) CoC6-Bnd-Closure* -> D0-Expr*))
-(define (sr-bndc* sr-expr b*)
-  (: sr-bndc (CoC6-Bnd-Closure -> (Pair Uid (Pair D0-Expr D0-Expr*))))
-  (define (sr-bndc bnd)
-    (match-let ([(cons uid (Closure-Data lbl ctr? free*)) bnd])
-      (let* ([lbl   (sr-expr lbl)]
-             [free* (map sr-expr free*)]
-             [data  (cons lbl (if ctr? (cons (sr-expr ctr?) free*) free*))]
-             [size  (length data)]
-             [clos  (Var uid)]
-             [rhs  (op$ Alloc (Quote size))]
-             [set*  (for/list : (Listof D0-Expr)
-                        ([d : D0-Expr data]
-                         [i : Integer (in-naturals)])
-                      (op$ Array-set! clos (Quote i) d))])
-        (cons uid (ann (cons rhs set*) (Pair D0-Expr D0-Expr*))))))
-  (let* ([u.r.e*  (map sr-bndc b*)]
-         [u*      (map (inst car Uid Any) u.r.e*)]
-         [r.e*    (map (inst cdr Uid (Pair D0-Expr D0-Expr*)) u.r.e*)]
-         [r*      (map (inst car D0-Expr D0-Expr*) r.e*)]
-         [a*      (map (inst Assign Uid D0-Expr) u* r*)]
-         [e*      (append-map (inst cdr D0-Expr D0-Expr*) r.e*)])
-    ;; This code implies that the tag of a closure is #b000
-    (append a* e*)))
 
 (: sr-clos-ref-code (-> D0-Expr D0-Expr))
 (define (sr-clos-ref-code clos) (op$ Array-ref  clos CLOS-CODE-INDEX))

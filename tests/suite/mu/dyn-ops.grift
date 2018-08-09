@@ -1,0 +1,8 @@
+(define (f) : (Rec X (Tuple Int (-> X)))
+  (tuple 1 f))
+
+(define df : Dyn (ann f (Rec X (-> (Tuple Int X)))))
+(define dt : Dyn (f))
+
+(+ (tuple-proj (df) 0)
+   (tuple-proj dt 0)) 

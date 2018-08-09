@@ -27,8 +27,7 @@ This is a micro compiler that removes the cast language form.
   (define c5   (hoist-types-and-coercions c1))
   (define c5.5 (purify-letrec c5))
   (define c6   (label-lambdas c5.5))
-  (define c7   (uncover-free c6))
-  (define c8   (convert-closures c7))
-  (specify-representation c8))
+  (define c7   (convert-closures c6))
+  (specify-representation c7))
 
 
