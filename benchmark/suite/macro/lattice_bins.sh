@@ -47,7 +47,7 @@ run_config()
             local binpath="${b%.*}"
             local p=$(sed -n 's/;; \([0-9]*.[0-9]*\)%/\1/p;q' \
                           < "${binpath}.grift")
-	    local sample_index="$(basename $binpath)"
+            local sample_index="$(basename $binpath)"
             local bname="$(basename $b)"
             local input="${INPUT_DIR}/${name}/${input_file}"
             
@@ -360,46 +360,46 @@ mean speedup               & ${mean2}x             & ${mean1}x            \\\ \h
             `"   enhanced color font 'Verdana,26' ;"`
             `"set output '${casts_fig}';"`
             `"set lmargin at screen 0.15;"`
-	    `"set rmargin at screen 0.95;"`
-	    `"TOP=0.95;"`
-	    `"DY = 0.29;"`
-	    `"set multiplot;"`
+            `"set rmargin at screen 0.95;"`
+            `"TOP=0.95;"`
+            `"DY = 0.29;"`
+            `"set multiplot;"`
             `"set xlabel \"How much of the code is typed\";"`
-	    `"unset ylabel;"`
+            `"unset ylabel;"`
             `"set label 1 \"Longest proxy chain\" at screen 0.02,0.15 rotate by 90;"`
-	    `"set tmargin at screen TOP-2*DY;"`
-	    `"set bmargin at screen TOP-3*DY;"`
-	    `"unset key;"`
-	    `"stats '${logfile1}' nooutput;"`
-	    `"set xrange [0:STATS_records+10];"`
-	    `"divby=STATS_records/4;"`
-	    `"set xtics ('0%%' 0, '%%25' divby, '%%50' divby*2, '%%75' divby*3, '%%100' divby*4) nomirror;"`
-	    `"max(x,y) = (x > y) ? x : y;"`
-	    `"set yrange [0:*];"`
+            `"set tmargin at screen TOP-2*DY;"`
+            `"set bmargin at screen TOP-3*DY;"`
+            `"unset key;"`
+            `"stats '${logfile1}' nooutput;"`
+            `"set xrange [0:STATS_records+10];"`
+            `"divby=STATS_records/4;"`
+            `"set xtics ('0%%' 0, '%%25' divby, '%%50' divby*2, '%%75' divby*3, '%%100' divby*4) nomirror;"`
+            `"max(x,y) = (x > y) ? x : y;"`
+            `"set yrange [0:*];"`
             `"plot '${logfile1}' using 0:(max(\$19, (max(\$20, \$21)))) with points"` 
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
-	    `"'${logfile3}' using 0:(max(\$19, (max(\$20, \$21)))) with points"`
+            `"'${logfile3}' using 0:(max(\$19, (max(\$20, \$21)))) with points"`
             `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
-	    `"unset xtics;"`
-	    `"unset xlabel;"`
-	    `"set format x '';"`
-	    `"set yrange [0:*];"`
+            `"unset xtics;"`
+            `"unset xlabel;"`
+            `"set format x '';"`
+            `"set yrange [0:*];"`
             `"set label 2 \"Runtime casts count\" at screen 0.02,0.45 rotate by 90;"`
-	    `"set tmargin at screen TOP-DY;"`
-	    `"set bmargin at screen TOP+0.02-2*DY;"`
-	    `"unset key;"`
+            `"set tmargin at screen TOP-DY;"`
+            `"set bmargin at screen TOP+0.02-2*DY;"`
+            `"unset key;"`
             `"plot '${logfile1}' using 0:7 with points"` 
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
             `"'${logfile3}' using 0:7 with points"`
             `"   pt 6 ps 3 lc rgb '$color2' title '${c2t}';"`
             `"set key opaque bottom left box vertical width 1 height 1 maxcols 1 spacing 1 font 'Verdana,20';"`
-	    `"set tmargin at screen TOP;"`
-	    `"set bmargin at screen TOP+0.02-DY;"`
+            `"set tmargin at screen TOP;"`
+            `"set bmargin at screen TOP+0.02-DY;"`
             `"set title \"${printname}\";"`
             `"set label 3 \"Runtime in seconds\" at screen 0.02,0.75 rotate by 90;"`
-	    `"set palette maxcolors 2;"`
-	    `"set palette model RGB defined ( 0 'red', 1 '$color2' );"`
-	    `"unset colorbox;"`
+            `"set palette maxcolors 2;"`
+            `"set palette model RGB defined ( 0 'red', 1 '$color2' );"`
+            `"unset colorbox;"`
             `"plot '${logfile1}' using 0:3 with points"` 
             `"   pt 9 ps 3 lc rgb '$color1' title '${c1t}',"`
             `"'${logfile3}' using 0:3:( \$8 > 50 ? 0 : 1 ) with points"`
@@ -468,13 +468,19 @@ run_benchmark()
         rm -f "${lattice_path}.grift"
         cp "$static_source_file" "${lattice_path}.grift"
 
-        dynamizer_out=$(dynamizer "${lattice_path}.grift"\
-                                  --samples "$nsamples" --bins "$nbins" | \
-                            sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+	dynamizer_out=""
+	if [ "$LEVEL" = "fine" ]; then
+            dynamizer_out=$(dynamizer "${lattice_path}.grift"\
+                                      --samples "$nsamples" --bins "$nbins" | \
+				sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+	else
+	    dynamizer_out=$(dynamizer "${lattice_path}.grift"\
+                                      --coarse | \
+				sed -n 's/.* \([0-9]\+\) .* \([0-9]\+\) .*/\1 \2/p')
+	fi
         echo "$dynamizer_out" > "$lattice_file"
     fi
 
-    
     # check for/create/annotate 100% and 0%
     local benchmark_100_file="${lattice_path}/static.grift"
     if [ ! -f benchmark_100_file ]; then
@@ -655,11 +661,12 @@ run_experiment()
 
 main()
 {
-    USAGE="Usage: $0 nsamples nbins loops cast_profiler? [fresh|date] n_1,n_2 ... n_n"
+    USAGE="Usage: $0 [fine|coarse] nsamples nbins loops cast_profiler? [fresh|date] n_1,n_2 ... n_n"
     if [ "$#" == "0" ]; then
         echo "$USAGE"
         exit 1
     fi
+    local LEVEL="$1";    shift
     local nsamples="$1"; shift
     local nbins="$1";    shift
     LOOPS="$1";          shift
@@ -760,7 +767,6 @@ main()
         printf "nsamples\t:%s\n" "$nsamples" >> "$PARAMS_LOG"
         printf "nbins\t:%s\n" "$nbins" >> "$PARAMS_LOG"
     fi
-    
 
     local i j
     if [ "$#" == "1" ]; then
@@ -789,13 +795,8 @@ main()
     racket ${LIB_DIR}/csv-set.rkt -i $GMEANS --config-names 1 \
            --si 2 --su 1 \
            -o ${OUT_DIR}/gm-config.csv
-    
-    
+
     echo "done."
-
-
 }
 
 main "$@"
-
-# find . -name *quicksort_worstcase* | sed -e "p;s/quicksort_worstcase/quicksort/" | xargs -n2 mv
