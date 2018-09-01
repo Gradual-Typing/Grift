@@ -9,15 +9,19 @@ TIMING_SAMPLES ?= 10
 TEST_DIR=test
 BENCHMARK_DIR ?=fresh
 
-.PHONY: external internal all clean test-clean outputs
+.PHONY: external fine all clean test-clean outputs
 
-all: external internal
+all: external coarse fine
 
 external:
 	./extremes.sh $(TIMING_SAMPLES) $(BENCHMARK_DIR) 17 19
 
-internal: 
-	./lattice_bins.sh $(BIN_SAMPLES) $(NUM_BINS) $(TIMING_SAMPLES) \
+fine: 
+	./lattice_bins.sh fine $(BIN_SAMPLES) $(NUM_BINS) $(TIMING_SAMPLES) \
+		true $(BENCHMARK_DIR) 17 7 19 17 17 13 19 15 17 8 19 11
+
+coarse: 
+	./lattice_bins.sh coarse $(BIN_SAMPLES) $(NUM_BINS) $(TIMING_SAMPLES) \
 		true $(BENCHMARK_DIR) 17 7 19 17 17 13 19 15 17 8 19 11
 
 test:
