@@ -11,7 +11,7 @@
 
 (require "../src/errors.rkt"
          "../src/compile.rkt"
-         "./config_str.rkt"
+         "./configs.rkt"
          "../src/configuration.rkt"
          "../tests/paths.rkt")
 
@@ -25,14 +25,14 @@
     (match hybrid-runtime
       ['Eager   #f]
       ['Lazy     #t]
-      [_ (error 'benchmark/guarded-compile
+      [_ (error 'benchmark/bench/guarded-compile
                 "invalid specialization: ~a"
                 specialize)]))
   (define specialize-casts?
     (match specialize
       ['Unspecialized #f]
       ['Specialized #t]
-      [_ (error 'benchmark/guarded-compile
+      [_ (error 'benchmark/bench/guarded-compile
                 "invalid specialization: ~a"
                 specialize)]))
   (define ext (string-append ".o" (number->string i)))
@@ -137,7 +137,7 @@
       [(list ds ...)
        (config-indices (map string->number ds))]
       [other
-       (error 'benchmark.rkt "invalid configs string: ~v ~v" cs other)])]
+       (error 'benchmark/bench.rkt "invalid configs string: ~v ~v" cs other)])]
    [("--config" "-i") i
     "Compile a path with a single configuration, must be a number > 0"
     (define n? (string->number i))
@@ -150,13 +150,13 @@
     "Compile with multiple threads"
     (define j (string->number jobs))
     (unless (exact-nonnegative-integer? j)
-      (error 'benchmark.rkt "expected exact-nonnegative-integer got: ~a" jobs))
+      (error 'benchmark/bench.rkt "expected exact-nonnegative-integer got: ~a" jobs))
     (threads j)]
    [("--batch-size" "-b") size
     "How many files to hand off to each job"
     (define s (string->number size))
     (unless (exact-nonnegative-integer? s)
-      (error 'benchmark.rkt "expected exact-nonnegative-integer got: ~a" size))
+      (error 'benchmark/bench.rkt "expected exact-nonnegative-integer got: ~a" size))
     (batch-size s)]
    #:args (path)
    (cond
