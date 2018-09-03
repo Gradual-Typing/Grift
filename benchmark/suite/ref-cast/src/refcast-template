@@ -1,8 +1,0 @@
-(let ([f : (Int -> Int) (lambda (x) x)])
-  (let ([r : (GRef (Int -> Int)) (gbox f)])
-    (begin
-      (timer-start)
-      (repeat (u 0 CAST-COUNT)
-              (: r (GRef (Dyn -> Dyn))))
-      (timer-stop)
-      (timer-report))))

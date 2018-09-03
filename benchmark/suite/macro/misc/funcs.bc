@@ -1,8 +1,0 @@
-#!/usr/local/bin/bc -l
-
-# Round up to integer above x
-define ceil(x) {
-  auto os,xx;x=-x;os=scale;scale=0
-  xx=x/1;if(xx>x).=xx--
-  scale=os;return(-xx)
-}
