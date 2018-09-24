@@ -3,5 +3,7 @@
 (provide post-installer)
 
 (define (post-installer collections-top-path this-collection-path)
-  (current-directory (build-path this-collection-path "src/backend-c/runtime"))
-  (system "make" #:set-pwd? #t))
+  (define pwd (build-path this-collection-path "src/backend-c/runtime"))
+  (current-directory pwd)
+  (unless (system "make" #:set-pwd? #t)
+    (error (format "Running make failed in ~a" pwd))))
