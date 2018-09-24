@@ -1,8 +1,8 @@
 #lang info
 (define collection "grift")
 (define version "0.1")
-(define racket-launcher-names '("grift"))
-(define racket-launcher-libraries '("main.rkt"))
+(define racket-launcher-names '("grift" "grift-bench" "grift-configs"))
+(define racket-launcher-libraries '("main.rkt" "benchmark/bench.rkt" "benchmark/configs.rkt"))
 (define post-install-collection "src/backend-c/runtime/make.rkt")
 (define compile-omit-files '("src/backend-c/runtime/make.rkt"))
 (define clean
