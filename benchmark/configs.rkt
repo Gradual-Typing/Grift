@@ -73,7 +73,6 @@ Description: Facilitates a user-friendly interface for Grift
   ;; Given a set of configuration options returns the stylized string
   ;; representation of that name.
   (define (set->name s [sep (name-sep)] [end (name-end)])
-    (define ls (set->list s))
     (list->name (set->list s) sep end))
 
   (define (list->name l [sep (name-sep)] [end (name-end)])
@@ -115,17 +114,22 @@ Description: Facilitates a user-friendly interface for Grift
         (for/list ([i (in-range 1 (+ 1 (hash-count configs)))])
           (set->name (list->set (hash-ref configs i))))
         ","))))]
-   [("--names")
+   [("--names" "-n")
     "Generate configuration names from indicies"
-    (main-fn 
-     (lambda rest
-       (define ns (map string->number rest))
-       (define cs (map (lambda (n) (hash-ref configs n)) ns))
-       (define ss (map list->set cs))
-       (define common (apply set-intersect ss))
-       (define ds (map (lambda (s) (set-subtract s common)) ss))
-       (define names (map set->name ds))
-       (display (string-join names ","))))]
+    (main-fn
+     (case-lambda
+       ;; The singleton case does not work in the general case because
+       ;; subtracting the set representing the configuration from itself yields
+       ;; the empty set.
+       [(x) (display (list->name (hash-ref configs (string->number x)) ","))]
+       [rest
+        (define ns (map string->number rest))
+        (define cs (map (lambda (n) (hash-ref configs n)) ns))
+        (define ss (map list->set cs))
+        (define common (apply set-intersect ss))
+        (define ds (map (lambda (s) (set-subtract s common)) ss))
+        (define names (map set->name ds))
+        (display (string-join names ","))]))]
    [("--common")
     "Generate shared features of a set of configurations"
     (main-fn 
