@@ -121,7 +121,7 @@ Description: Facilitates a user-friendly interface for Grift
        ;; The singleton case does not work in the general case because
        ;; subtracting the set representing the configuration from itself yields
        ;; the empty set.
-       [(x) (display (list->name (hash-ref configs (string->number x)) ","))]
+       [(x) (display (list->name (hash-ref configs (string->number x)) "_"))]
        [rest
         (define ns (map string->number rest))
         (define cs (map (lambda (n) (hash-ref configs n)) ns))
