@@ -195,15 +195,15 @@
     [(MVect-Coercion e) (recur e)]
     [(Error e) (recur e)]
     [(Create-tuple e*) (recur* e*)]
-    [(Copy-Tuple n v) (recur-all n v)]
     [(Tuple-proj e i) (recur-all e i)]
     [(Tuple-Coercion-Huh e) (recur e)]
     [(Tuple-Coercion-Num e) (recur e)]
     [(Tuple-Coercion-Item e i) (recur-all e i)]
     [(Coerce-Tuple uid e1 e2) (recur-all e1 e2)]
-    [(Coerce-Tuple-In-Place uid e1 e2 e3) (recur-all e1 e2 e3)]
+    [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5) (recur-all e1 e2 e3 e4 e5)]
     [(Cast-Tuple uid e1 e2 e3 e4) (recur-all e1 e2 e3 e4)]
-    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5) (recur-all e1 e2 e3 e4 e5)]
+    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+     (recur-all e1 e2 e3 e4 e5 e6 e7)]
     [(Type-Tuple-Huh e) (recur e)]
     [(Type-Tuple-num e) (recur e)]
     [(Type-Tuple-item e i) (recur-all e i)]
@@ -488,8 +488,6 @@
     [(MVect-Coercion e) (MVect-Coercion (recur e))]
     [(Error (app recur e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (recur* e*))]
-    [(Copy-Tuple (app recur n) (app recur v))
-       (Copy-Tuple n v)]
     [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
     [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
@@ -499,10 +497,13 @@
     [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (recur e))]
     [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
     [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
-    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
-     (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
+    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+     (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
+                          (recur e5) (recur e6) (recur e7))]
     [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
-    [(Coerce-Tuple-In-Place uid e1 e2 e3) (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
+    [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+     (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
+                            (recur e5))]
     [other (error 'purify-letrec/replace-ref "unmatched ~a" other)]))
 
 
@@ -841,18 +842,18 @@
     [(MVect-Coercion e) (MVect-Coercion (pl-expr e))]
     [(Error (app pl-expr e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (pl-expr* e*))]
-    [(Copy-Tuple n v)
-     (Copy-Tuple (pl-expr n) (pl-expr v))]
     [(Tuple-proj e i) (Tuple-proj (pl-expr e) (pl-expr i))]
     [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (pl-expr e))]
     [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (pl-expr e))]
     [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (pl-expr e) (pl-expr i))]
     [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (pl-expr e1) (pl-expr e2))]
-    [(Coerce-Tuple-In-Place uid e1 e2 e3)
-     (Coerce-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3))]
+    [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+     (Coerce-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3)
+                            (pl-expr e4) (pl-expr e5))]
     [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (pl-expr e1) (pl-expr e2) (pl-expr e3) (pl-expr e4))]
-    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
-     (Cast-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3) (pl-expr e4) (pl-expr e5))]
+    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+     (Cast-Tuple-In-Place uid (pl-expr e1) (pl-expr e2) (pl-expr e3) (pl-expr e4)
+                          (pl-expr e5) (pl-expr e6) (pl-expr e7))]
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (pl-expr e))]
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
     [(Type-Tuple-item e i) (Type-Tuple-item (pl-expr e) (pl-expr i))]

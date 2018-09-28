@@ -463,18 +463,17 @@
       [(Error (app recur e)) (Error e)]
       [(Create-tuple (app recur* e*))
        (Create-tuple e*)]
-      [(Copy-Tuple (app recur n) (app recur v))
-       (Copy-Tuple n v)]
       [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
       [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) (recur i))]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
-      [(Coerce-Tuple-In-Place uid e1 e2 e3)
-       (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
+      [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+       (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
       [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
-      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
-       (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
+      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+       (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
+                            (recur e5) (recur e6) (recur e7))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
       [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
       [(Type-Tuple-item e i) (Type-Tuple-item (recur e) (recur i))]

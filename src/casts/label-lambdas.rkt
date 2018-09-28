@@ -272,18 +272,18 @@
       [(MVect-Coercion e) (MVect-Coercion (ll-expr e))]
       [(Error (app ll-expr e)) (Error e)]
       [(Create-tuple e*) (Create-tuple (map ll-expr e*))]
-      [(Copy-Tuple n v)
-       (Copy-Tuple (ll-expr n) (ll-expr v))]
       [(Tuple-proj e i) (Tuple-proj (ll-expr e) (ll-expr i))]
       [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (ll-expr e))]
       [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (ll-expr e))]
       [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (ll-expr e) (ll-expr i))]
       [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (ll-expr e1) (ll-expr e2))]
-      [(Coerce-Tuple-In-Place uid e1 e2 e3)
-       (Coerce-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3))]
+      [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+       (Coerce-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3)
+                              (ll-expr e4) (ll-expr e5))]
       [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4))]
-      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
-       (Cast-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3) (ll-expr e4) (ll-expr e5))]
+      [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+       (Cast-Tuple-In-Place uid (ll-expr e1) (ll-expr e2) (ll-expr e3)
+                            (ll-expr e4) (ll-expr e5) (ll-expr e6) (ll-expr e7))]
       [(Type-Tuple-Huh e) (Type-Tuple-Huh (ll-expr e))]
       [(Type-Tuple-num e) (Type-Tuple-num (ll-expr e))]
       [(Type-Tuple-item e i) (Type-Tuple-item (ll-expr e) (ll-expr i))]
