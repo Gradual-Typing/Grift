@@ -117,9 +117,9 @@ And a type constructor "name" expecting the types of field1 and field2
   (Copy-Tuple n v)
   (Tuple-proj tuple index)
   (Coerce-Tuple cast value coercion)
-  (Coerce-Tuple-In-Place cast value coercion address)
+  (Coerce-Tuple-In-Place cast value coercion mono-address base-address index)
   (Cast-Tuple cast value t1 t2 lbl)
-  (Cast-Tuple-In-Place cast value t1 t2 lbl address)
+  (Cast-Tuple-In-Place cast value t1 t2 lbl mono-address base-address index)
   ;; various imediates markers
   (Quote literal)    ;; immediate data in general
   ;; Node that references a piece of code identified by the UID value

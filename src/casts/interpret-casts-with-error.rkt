@@ -64,10 +64,11 @@
     (error 'interpret-casts/error
            "~a: used in supposedly static code"
            sym))
-  (define (compile-cast/error v t1 t2 l [mt : CoC3-Expr ZERO-EXPR]
-                              #:t1-not-dyn [t1-not-dyn #f]
-                              #:t2-not-dyn [t2-not-dyn #f])
+(define (compile-cast/error v t1 t2 l
+                            [mono-address : CoC3-Expr ZERO-EXPR]
+                            [base-address : CoC3-Expr ZERO-EXPR]
+                            [index : CoC3-Expr ZERO-EXPR]
+                            #:t1-not-dyn [t1-not-dyn #f]
+                            #:t2-not-dyn [t2-not-dyn #f])
     (error 'interpret-casts/error
            "compile-cast: used in supposedly static code"))
-
-

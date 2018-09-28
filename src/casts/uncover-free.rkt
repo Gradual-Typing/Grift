@@ -274,8 +274,6 @@
     [(Type-MRef-Of (app uf-expr e fv)) (values (Type-MRef-Of e) fv)]
     [(Error (app uf-expr e fv)) (values (Error e) fv)]
     [(Create-tuple (app uf-expr* e* e*-fvars)) (values (Create-tuple e*) e*-fvars)]
-    [(Copy-Tuple (app uf-expr n fv1) (app uf-expr v fv2))
-     (values (Copy-Tuple n v) (set-union fv1 fv2))]
     [(Tuple-proj (app uf-expr e e-fvars) (app uf-expr i i-fvars))
      (values (Tuple-proj e i) (set-union e-fvars i-fvars))]
     [(Tuple-Coercion-Huh (app uf-expr e e-fvars)) (values (Tuple-Coercion-Huh e) e-fvars)]
@@ -289,12 +287,17 @@
     [(Cast-Tuple-In-Place uid
                  (app uf-expr e1 fv1) (app uf-expr e2 fv2)
                  (app uf-expr e3 fv3) (app uf-expr e4 fv4)
-                 (app uf-expr e5 fv5))
-     (values (Cast-Tuple-In-Place uid e1 e2 e3 e4 e5) (set-union fv1 fv2 fv3 fv4 fv5))]
+                 (app uf-expr e5 fv5) (app uf-expr e6 fv6)
+                 (app uf-expr e7 fv7))
+     (values (Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+             (set-union fv1 fv2 fv3 fv4 fv5 fv6 fv7))]
     [(Coerce-Tuple uid (app uf-expr e1 fv1) (app uf-expr e2 fv2))
      (values (Coerce-Tuple uid e1 e2) (set-union fv1 fv2))]
-    [(Coerce-Tuple-In-Place uid (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
-     (values (Coerce-Tuple-In-Place uid e1 e2 e3) (set-union fv1 fv2 fv3))]
+    [(Coerce-Tuple-In-Place uid (app uf-expr e1 fv1) (app uf-expr e2 fv2)
+                            (app uf-expr e3 fv3) (app uf-expr e4 fv4)
+                            (app uf-expr e5 fv5))
+     (values (Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+             (set-union fv1 fv2 fv3 fv4 fv5))]
     [(Type-Tuple-Huh (app uf-expr e e-fvars)) (values (Type-Tuple-Huh e) e-fvars)]
     [(Type-Tuple-num (app uf-expr e e-fvars)) (values (Type-Tuple-num e) e-fvars)]
     [(Type-Tuple-item (app uf-expr e e-fv) (app uf-expr i i-fv))

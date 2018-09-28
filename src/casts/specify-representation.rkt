@@ -231,7 +231,7 @@ but a static single assignment is implicitly maintained.
           (assign$ val-i (op$ - i COERCION-TUPLE-ELEMENTS-OFFSET))
           (assign$ vala (op$ Array-ref val val-i))
           (assign$ crcna (sr-tagged-array-ref crcn COERCION-MEDIATING-TAG i))
-          (assign$ casted-vala (app-code$ coerce-label vala crcna ZERO-IMDT))
+          (assign$ casted-vala (app-code$ coerce-label vala crcna ZERO-IMDT ZERO-IMDT ZERO-IMDT))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
     (add-new-code! (cons coerce-tuple coerce-tuple-c))
@@ -248,26 +248,32 @@ but a static single assignment is implicitly maintained.
     (define cast-label (Code-Label cast))
     (define coerce-tuple-in-place-label (Code-Label coerce-tuple-in-place))
     (define coerce-tuple-in-place-c : D0-Code
-      (code$ (tpl-val tpl-crcn mono-addr)
+      (code$ (old-tpl-val tpl-crcn mono-addr base-addr index)
         (begin$
           (assign$ tagged-count
             (sr-tagged-array-ref
              tpl-crcn COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
           (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
+          (assign$ new-tpl-val (op$ Alloc count))
           (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-            (assign$ val (op$ Array-ref tpl-val i))
+            (op$ Array-set! new-tpl-val i (op$ Array-ref old-tpl-val i)))
+          ;; writing the address of the new tuple in place of the address of the
+          ;; old one
+          (op$ Array-set! base-addr index new-tpl-val)
+          (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
+            (assign$ val (op$ Array-ref new-tpl-val i))
             (assign$ crcn
               (sr-tagged-array-ref
                tpl-crcn
                COERCION-MEDIATING-TAG
                (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
             (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-            (assign$ new-val (app-code$ cast-label val crcn mono-addr))
+            (assign$ new-val (app-code$ cast-label val crcn mono-addr new-tpl-val i))
             (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
             (If (op$ = rtti1 rtti2)
-                (op$ Array-set! tpl-val i new-val)
+                (op$ Array-set! new-tpl-val i new-val)
                 ZERO-IMDT))
-          tpl-val)))
+          new-tpl-val)))
     (add-new-code! (cons coerce-tuple-in-place coerce-tuple-in-place-c))
     (set-box! coerce-tuple-in-place-code-label? coerce-tuple-in-place-label)
     coerce-tuple-in-place-label)
@@ -282,26 +288,32 @@ but a static single assignment is implicitly maintained.
     (define cast-tuple-in-place-label (Code-Label cast-tuple-in-place))
     (define cast-label (Code-Label cast))
     (define cast-tuple-in-place-c : D0-Code
-      (code$ (tpl-val t1 t2 l mono-addr)
+      (code$ (old-tpl-val t1 t2 l mono-addr base-addr index)
         (begin$
           (assign$ count
             (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
+          (assign$ new-tpl-val (op$ Alloc count))
           (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-            (begin$
-              (assign$ val (op$ Array-ref tpl-val i))
-              (assign$ t1a
-                (sr-tagged-array-ref
-                 t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-              (assign$ t2a
-                (sr-tagged-array-ref
-                 t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-              (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-              (assign$ new-val (app-code$ cast-label val t1a t2a l mono-addr))
-              (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-              (If (op$ = rtti1 rtti2)
-                  (op$ Array-set! tpl-val i new-val)
-                  ZERO-IMDT)))
-          tpl-val)))
+            (op$ Array-set! new-tpl-val i (op$ Array-ref old-tpl-val i)))
+          ;; writing the address of the new tuple in place of the address of the
+          ;; old one
+          (op$ Array-set! base-addr index new-tpl-val)
+          (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
+            (assign$ val (op$ Array-ref new-tpl-val i))
+            (assign$ t1a
+              (sr-tagged-array-ref
+               t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
+            (assign$ t2a
+              (sr-tagged-array-ref
+               t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
+            (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
+            (assign$ new-val
+              (app-code$ cast-label val t1a t2a l mono-addr new-tpl-val i))
+            (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
+            (If (op$ = rtti1 rtti2)
+                (op$ Array-set! new-tpl-val i new-val)
+                ZERO-IMDT))
+          new-tpl-val)))
     (add-new-code! (cons cast-tuple-in-place cast-tuple-in-place-c))
     (set-box! cast-tuple-in-place-code-label? cast-tuple-in-place-label)
     cast-tuple-in-place-label)
@@ -326,7 +338,7 @@ but a static single assignment is implicitly maintained.
           (assign$ vala (op$ Array-ref val val-i))
           (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
           (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
-          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l ZERO-IMDT))
+          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l ZERO-IMDT ZERO-IMDT ZERO-IMDT))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
     (add-new-code! (cons cast-tuple cast-tuple-c))
@@ -919,14 +931,6 @@ but a static single assignment is implicitly maintained.
          (begin$ (op$ Print e) (op$ Exit EXIT-FAILURE) UNDEF-IMDT)]
         [(Create-tuple (app recur* e*))
          (sr-alloc "tuple" #f (map (lambda ([e : D0-Expr]) (cons "element" e)) e*))]
-        [(Copy-Tuple (app recur n) (app recur v))
-         (begin$
-           (assign$ new-tpl (op$ Alloc n))
-           (repeat$ (i ZERO-IMDT n) (_ UNIT-IMDT)
-             (begin$
-               (assign$ val (op$ Array-ref v i))
-               (op$ Array-set! new-tpl i val)))
-           new-tpl)]
         [(Tuple-proj (app recur e) (app recur i)) (op$ Array-ref e i)]
         [(Tuple-Coercion-Huh (app recur e))
          (begin$
@@ -950,12 +954,17 @@ but a static single assignment is implicitly maintained.
          (type-tuple-elements-access e i)]
         [(Coerce-Tuple coerce (app recur v) (app recur c))
          (app-code$ (get-coerce-tuple! coerce) v c)]
-        [(Coerce-Tuple-In-Place coerce (app recur v) (app recur c) (app recur mono-type))
-         (app-code$ (get-coerce-tuple-in-place! coerce) v c mono-type)]
+        [(Coerce-Tuple-In-Place coerce (app recur v) (app recur c)
+                                (app recur mono-address)
+                                (app recur base-address)
+                                (app recur index))
+         (app-code$ (get-coerce-tuple-in-place! coerce) v c
+                    mono-address base-address index)]
         [(Cast-Tuple-In-Place
           cast (app recur v) (app recur t1) (app recur t2) (app recur l)
-          (app recur mono-address))
-         (app-code$ (get-cast-tuple-in-place! cast) v t1 t2 l mono-address)]
+          (app recur mono-address) (app recur base-address) (app recur index))
+         (app-code$ (get-cast-tuple-in-place! cast) v t1 t2 l
+                    mono-address base-address index)]
         [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))

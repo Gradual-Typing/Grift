@@ -153,7 +153,6 @@
           (Error E)
           ;;
           (Create-tuple (Listof E))
-          (Copy-Tuple E E) ;; n v
           (Tuple-proj E E)
           (Tuple-Coercion-Huh E)
           (Tuple-Coercion-Num E)
@@ -161,9 +160,9 @@
           (Id-Tuple-Coercion E)
           (Tuple-Coercion-Item-Set! E E E)
           (Coerce-Tuple Uid E E)
-          (Coerce-Tuple-In-Place Uid E E E)
+          (Coerce-Tuple-In-Place Uid E E E E E)
           (Cast-Tuple Uid E E E E)
-          (Cast-Tuple-In-Place Uid E E E E E)
+          (Cast-Tuple-In-Place Uid E E E E E E E)
           (Type-Tuple-Huh E)
           (Type-Tuple-num E)
           (Type-Tuple-item E E)

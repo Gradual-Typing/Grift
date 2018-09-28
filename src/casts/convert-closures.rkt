@@ -441,18 +441,18 @@
         [(MVect-Coercion e) (MVect-Coercion (recur e))]
         [(Error (app recur e)) (Error e)]
         [(Create-tuple (app recur* e*)) (Create-tuple e*)]
-        [(Copy-Tuple (app recur n) (app recur v))
-         (Copy-Tuple n v)]
         [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
         [(Tuple-Coercion-Huh e) (Tuple-Coercion-Huh (recur e))]
         [(Tuple-Coercion-Num e) (Tuple-Coercion-Num (recur e))]
         [(Tuple-Coercion-Item e i) (Tuple-Coercion-Item (recur e) (recur i))]
         [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
-        [(Coerce-Tuple-In-Place uid e1 e2 e3)
-         (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3))]
+        [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+         (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
+                                (recur e5))]
         [(Cast-Tuple uid e1 e2 e3 e4) (Cast-Tuple uid (recur e1) (recur e2) (recur e3) (recur e4))]
-        [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5)
-         (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4) (recur e5))]
+        [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
+         (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
+                              (recur e5) (recur e6) (recur e7))]
         [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
         [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
         [(Type-Tuple-item e i) (Type-Tuple-item (recur e) (recur i))]
@@ -515,12 +515,16 @@
   (define cast (Code-Label cast-uid))
   (define i*   (build-list (length arg*) (lambda ([i : Index]) i)))
   (: help (CoC6-Expr Integer -> CoC6-Expr))
+  (define mono-address ZERO-EXPR)
+  (define base-address ZERO-EXPR)
+  (define index ZERO-EXPR)
   (define (help e i)
-    (App-Code cast (list e (Fn-Coercion-Arg crcn (Quote i)) (Quote 0))))
+    (App-Code cast (list e (Fn-Coercion-Arg crcn (Quote i))
+                         mono-address base-address index)))
   (cast-profile/inc-function-proxies-accessed$
    (App-Code cast (list (App-Closure (Closure-code fun) fun (map help arg* i*))
                         (Fn-Coercion-Return crcn)
-                        (Quote 0)))))
+                        mono-address base-address index))))
 
 
 ;; Lookup a variables local access instruction
