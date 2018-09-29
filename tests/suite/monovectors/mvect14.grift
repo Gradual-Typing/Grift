@@ -1,0 +1,3 @@
+(define *world* : (Vect (Tuple Dyn Dyn (Tuple Dyn Dyn Dyn)))
+  (vector 33 (: (tuple (: 0 Dyn) (: 1 Dyn) (: (tuple (: 2 Dyn) (: 3 Dyn) (: 4 Dyn)) Dyn)) Dyn)))
+(: (tuple-proj (vector-ref *world* 32) 0) Int)
