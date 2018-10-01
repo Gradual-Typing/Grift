@@ -240,6 +240,14 @@ but a static single assignment is implicitly maintained.
   (let ([cl? (unbox coerce-tuple-code-label?)])
     (or cl? (make-code! coerce))))
 
+(define-syntax-rule (tuple-copy-code-gen old-tpl-val new-tpl-val count base-addr index)
+  (begin$
+     (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
+       (op$ Array-set! new-tpl-val i (op$ Array-ref old-tpl-val i)))
+     ;; writing the address of the new tuple in place of the address of the
+     ;; old one
+     (op$ Array-set! base-addr index new-tpl-val)))
+
 (: get-coerce-tuple-in-place! (Uid -> (Code-Label Uid)))
 (define (get-coerce-tuple-in-place! cast)
   (: make-code! (Uid -> (Code-Label Uid)))
@@ -255,11 +263,7 @@ but a static single assignment is implicitly maintained.
              tpl-crcn COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
           (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
           (assign$ new-tpl-val (op$ Alloc count))
-          (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-            (op$ Array-set! new-tpl-val i (op$ Array-ref old-tpl-val i)))
-          ;; writing the address of the new tuple in place of the address of the
-          ;; old one
-          (op$ Array-set! base-addr index new-tpl-val)
+          (tuple-copy-code-gen old-tpl-val new-tpl-val count base-addr index)
           (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
             (assign$ val (op$ Array-ref new-tpl-val i))
             (assign$ crcn
@@ -293,11 +297,7 @@ but a static single assignment is implicitly maintained.
           (assign$ count
             (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
           (assign$ new-tpl-val (op$ Alloc count))
-          (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-            (op$ Array-set! new-tpl-val i (op$ Array-ref old-tpl-val i)))
-          ;; writing the address of the new tuple in place of the address of the
-          ;; old one
-          (op$ Array-set! base-addr index new-tpl-val)
+          (tuple-copy-code-gen old-tpl-val new-tpl-val count base-addr index)
           (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
             (assign$ val (op$ Array-ref new-tpl-val i))
             (assign$ t1a

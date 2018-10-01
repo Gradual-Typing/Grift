@@ -1704,19 +1704,7 @@ TODO write unit tests
     (let*$ ([address e][t2 t2])
       (cond$
        [(Type-Dyn-Huh t2) address]
-       [else
-        (let*$ ([t1 (Mbox-rtti-ref address)]
-                [t3 (app-code$ greatest-lower-bound t1 t2)])
-          (cond$
-           [(op=? t1 t3) address]
-           [else
-            (Mbox-rtti-set! address t3)
-            (let*$ ([v (Mbox-val-ref address)]
-                    [cv (interp-cast v t1 t3 l address address MBOX-VALUE-INDEX)]
-                    [t4 (Mbox-rtti-ref address)])
-              (cond$
-               [(op=? t3 t4) (Mbox-val-set! address cv) address]
-               [else address]))]))])))
+       [else (code-gen-mbox-cast/no-dyn address t2 l)])))
 
   (: code-gen-mbox-cast/no-dyn : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
   (define (code-gen-mbox-cast/no-dyn e t2 l)
@@ -1781,22 +1769,7 @@ TODO write unit tests
     (let*$ ([address e] [t2 t2] [l l])
       (cond$
        [(type-dyn?$ t2) address]
-       [else
-        (let*$ ([t1 (Mvector-rtti-ref address)]
-                [t3 (app-code$ greatest-lower-bound t1 t2)])
-          (cond$
-           [(op=? t1 t3) address]
-           [else
-            (Mvector-rtti-set! address t3)
-            (let$ ([len (Mvector-length address)])
-              (repeat$ (i ZERO-EXPR len) ()
-                (let*$ ([vi (Mvector-val-ref address i)]
-                        [cvi (interp-cast vi t1 t3 l address address (op$ + MVECT-OFFSET i))]
-                        [t4 (Mvector-rtti-ref address)])
-                  (If (op=? t3 t4)
-                      (Mvector-val-set! address i cvi)
-                      (Break-Repeat)))))
-            address]))])))
+       [else (code-gen-mvec-cast/no-dyn address t2 l)])))
 
   (: code-gen-mvec-cast/no-dyn : CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
   (define (code-gen-mvec-cast/no-dyn e t2 l)
