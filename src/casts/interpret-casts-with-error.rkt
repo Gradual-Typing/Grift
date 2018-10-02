@@ -47,7 +47,7 @@
    #:mvec-len Unguarded-Vect-length 
    #:stc-mvec-ref Unguarded-Vect-Ref
    #:stc-mvec-set Unguarded-Vect-Set!
-   
+
    #:dyn-pbox-ref    (err 'dyn-pbox-ref)
    #:dyn-pbox-set    (err 'dyn-pbox-set!)
    #:dyn-pvec-ref    (err 'dyn-pvec-ref)

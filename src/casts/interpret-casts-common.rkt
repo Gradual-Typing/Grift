@@ -178,6 +178,14 @@ TODO write unit tests
   (let ([cl? (types-greatest-lower-bound-code-label?)])
     (or cl? (make-code!))))
 
+(: mvector-val-ref-with-check-bounds (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define (mvector-val-ref-with-check-bounds mvect i)
+  (Mvector-val-ref mvect i 'check-bounds))
+
+(: mvector-val-set!-with-check-bounds (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define (mvector-val-set!-with-check-bounds mvect i val)
+  (Mvector-val-set! mvect i val 'check-bounds))
+
 (define (make-map-expr
          #:compile-cast    [compile-cast : Compile-Cast-Type]
          #:compile-lambda  [compile-lambda : Lambda-Type]
@@ -207,8 +215,8 @@ TODO write unit tests
          #:stc-mbox-ref [stc-mbox-ref : (CoC3-Expr -> CoC3-Expr) Mbox-val-ref]
          #:stc-mbox-set [stc-mbox-set! : (CoC3-Expr CoC3-Expr -> CoC3-Expr) Mbox-val-set!]
          #:mvec         [mvec : (CoC3-Expr CoC3-Expr Grift-Type -> CoC3-Expr) Mvector]
-         #:stc-mvec-ref [stc-mvec-ref : (CoC3-Expr CoC3-Expr -> CoC3-Expr) Mvector-val-ref]
-         #:stc-mvec-set [stc-mvec-set! : (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) Mvector-val-set!]
+         #:stc-mvec-ref [stc-mvec-ref : (CoC3-Expr CoC3-Expr -> CoC3-Expr) mvector-val-ref-with-check-bounds]
+         #:stc-mvec-set [stc-mvec-set! : (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr) mvector-val-set!-with-check-bounds]
          #:mvec-len     [mvec-len : (CoC3-Expr -> CoC3-Expr) Mvector-length])
   : (C0-Expr -> CoC3-Expr) 
   ;; map the pass through lists of expressions
@@ -597,7 +605,7 @@ TODO write unit tests
   (: code-gen-mvec-ref MVec-Ref-Type)
   (define (code-gen-mvec-ref mvec i t2)
     (let*$ ([v mvec])
-      (cast (Mvector-val-ref v i) (Mvector-rtti-ref mvec) t2 (Quote "Monotonic vect read error"))))
+      (cast (Mvector-val-ref v i 'check-bounds) (Mvector-rtti-ref mvec) t2 (Quote "Monotonic vect read error"))))
   
   (: code-gen-mvec-set! MVec-Set-Type)
   (define (code-gen-mvec-set! mvec i val t1)
@@ -609,7 +617,7 @@ TODO write unit tests
                [t2 (Mvector-rtti-ref address)]
                [cvi (cast val t1 t2 (Quote "Monotonic vect write error") address address (op$ + MVECT-OFFSET i))])
          (If (op=? t2 (Mvector-rtti-ref address))
-             (Mvector-val-set! address i cvi)
+             (Mvector-val-set! address i cvi 'check-bounds)
              (Quote '()))))))
 
   (cond
@@ -1795,7 +1803,7 @@ TODO write unit tests
         (Mvector-rtti-set! address t3)
         (let$ ([len (Mvector-length address)])
           (repeat$ (i ZERO-EXPR len) ()
-            (let*$ ([vi (Mvector-val-ref address i)]
+            (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
                     ;; in the very beginning of casting a monotonic vector, we
                     ;; write casted tuples to the vector address itself at the
                     ;; corresponding index to the element we are currently
@@ -1806,10 +1814,10 @@ TODO write unit tests
                     [cvi (interp-cast vi t1 t3 l address address (op$ + MVECT-OFFSET i))]
                     [t4 (Mvector-rtti-ref address)])
               (If (op=? t3 t4)
-                  (Mvector-val-set! address i cvi)
+                  (Mvector-val-set! address i cvi 'no-check-bounds)
                   (Break-Repeat)))))
         address])))
-  
+
   (define interp-mvec-cast
     (let ([uid! (make-lazy-add-cast-runtime-binding!
                  "mvec-cast"

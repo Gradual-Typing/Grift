@@ -246,10 +246,10 @@
     [(Mvector (app uf-expr e1 fv1) (app uf-expr e2 fv2) t)
      (values (Mvector e1 e2 t) (set-union fv1 fv2))]
     [(Mvector-length (app uf-expr e fv)) (values (Mvector-length e) fv)]
-    [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3))
-     (values (Mvector-val-set! e1 e2 e3) (set-union fv1 fv2 fv3))]
-    [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2))
-     (values (Mvector-val-ref e1 e2) (set-union fv1 fv2))]
+    [(Mvector-val-set! (app uf-expr e1 fv1) (app uf-expr e2 fv2) (app uf-expr e3 fv3) mode)
+     (values (Mvector-val-set! e1 e2 e3 mode) (set-union fv1 fv2 fv3))]
+    [(Mvector-val-ref (app uf-expr e1 fv1) (app uf-expr e2 fv2) mode)
+     (values (Mvector-val-ref e1 e2 mode) (set-union fv1 fv2))]
     [(Mvector-rtti-set! (app uf-expr addr fv1) (app uf-expr e fv2))
      (values (Mvector-rtti-set! addr e) (set-union fv1 fv2))]
     [(Mvector-rtti-ref (app uf-expr addr fv))

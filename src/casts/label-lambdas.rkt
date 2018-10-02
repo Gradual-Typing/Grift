@@ -259,8 +259,10 @@
       [(Mvector (app ll-expr e1) (app ll-expr e2) t) (Mvector e1 e2 t)]
       [(Mvector-length (app ll-expr e)) (Mvector-length e)]
       [(Unguarded-Vect-length e) (Unguarded-Vect-length (ll-expr e))]
-      [(Mvector-val-set! (app ll-expr e1) (app ll-expr e2) (app ll-expr e3)) (Mvector-val-set! e1 e2 e3)]
-      [(Mvector-val-ref (app ll-expr e1) (app ll-expr e2)) (Mvector-val-ref e1 e2)]
+      [(Mvector-val-set! (app ll-expr e1) (app ll-expr e2) (app ll-expr e3) mode)
+       (Mvector-val-set! e1 e2 e3 mode)]
+      [(Mvector-val-ref (app ll-expr e1) (app ll-expr e2) mode)
+       (Mvector-val-ref e1 e2 mode)]
       [(Mvector-rtti-set! (app ll-expr addr) (app ll-expr e))
        (Mvector-rtti-set! addr e)]
       [(Mvector-rtti-ref (app ll-expr addr)) (Mvector-rtti-ref addr)]

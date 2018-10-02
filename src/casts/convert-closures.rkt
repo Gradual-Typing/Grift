@@ -428,8 +428,10 @@
         [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
         [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
         [(Mvector-length (app recur e)) (Mvector-length e)]
-        [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
-        [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+        [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3) mode)
+         (Mvector-val-set! e1 e2 e3 mode)]
+        [(Mvector-val-ref (app recur e1) (app recur e2) mode)
+         (Mvector-val-ref e1 e2 mode)]
         [(Mvector-rtti-set! (app recur addr) (app recur e))
          (Mvector-rtti-set! addr e)]
         [(Mvector-rtti-ref (app recur addr)) (Mvector-rtti-ref addr)]
