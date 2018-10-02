@@ -854,38 +854,38 @@ but a static single assignment is implicitly maintained.
         [(Mvector-rtti-set! (app recur addr) (app recur e))
          (op$ Array-set! addr MONO-RTTI-INDEX e)]
         [(Mvector-rtti-ref (app recur addr)) (op$ Array-ref addr MONO-RTTI-INDEX)]
-        [(Mvector-val-ref (app recur e1) (app recur e2))
+        [(Mvector-val-ref (app recur e1) (app recur e2) mode)
          (begin$
            (assign$ ind e2)
            (assign$ mvect e1)
-           (if (bounds-checks?)
-               (If (op$ >= ind ZERO-IMDT) ;; vectors indices starts from 0
-                   (If (op$ < ind (op$ Array-ref mvect MVECT-SIZE-INDEX))
-                       (op$ Array-ref mvect (op$ + ind MVECT-OFFSET))
-                       (begin$
-                         (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit EXIT-FAILURE)))
-                   (begin$
-                     (op$ Printf (Quote "index out of bound %ld\n") ind)
-                     (op$ Exit EXIT-FAILURE)))
-               (op$ Array-ref mvect (op$ + ind MVECT-OFFSET))))]
-        [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3))
+           (cond
+             [(and (eq? mode 'check-bounds) (bounds-checks?))
+              (If (op$ >= ind ZERO-IMDT) ;; vectors indices starts from 0
+                  (If (op$ < ind (op$ Array-ref mvect MVECT-SIZE-INDEX))
+                      (op$ Array-ref mvect (op$ + ind MVECT-OFFSET))
+                      (begin$
+                        (op$ Printf (Quote "index out of bound %ld\n") ind)
+                        (op$ Exit EXIT-FAILURE)))
+                  (begin$
+                    (op$ Printf (Quote "index out of bound %ld\n") ind)
+                    (op$ Exit EXIT-FAILURE)))]
+             [else (op$ Array-ref mvect (op$ + ind MVECT-OFFSET))]))]
+        [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3) mode)
          (begin$
            (assign$ ind e2)
            (assign$ mvect e1)
-           (if (bounds-checks?)
-               (If (op$ >= ind ZERO-IMDT) ;; vectors indices starts from 0
-                   (If (op$ < ind (op$ Array-ref mvect MVECT-SIZE-INDEX))
-                       (op$ Array-set! mvect (op$ + ind MVECT-OFFSET) e3)
-                       (begin$
-                         (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit EXIT-FAILURE)))
-                   (begin$
-                     (op$ Printf (Quote "index out of bound %ld\n") ind)
-                     (op$ Exit EXIT-FAILURE)))
-               (begin$
-                 (op$ Printf (Quote "index out of bound %ld\n") ind)
-                 (op$ Exit EXIT-FAILURE))))]
+           (cond
+             [(and (eq? mode 'check-bounds) (bounds-checks?))
+              (If (op$ >= ind ZERO-IMDT) ;; vectors indices starts from 0
+                  (If (op$ < ind (op$ Array-ref mvect MVECT-SIZE-INDEX))
+                      (op$ Array-set! mvect (op$ + ind MVECT-OFFSET) e3)
+                      (begin$
+                        (op$ Printf (Quote "index out of bound %ld\n") ind)
+                        (op$ Exit EXIT-FAILURE)))
+                  (begin$
+                    (op$ Printf (Quote "index out of bound %ld\n") ind)
+                    (op$ Exit EXIT-FAILURE)))]
+             [else (op$ Array-set! mvect (op$ + ind MVECT-OFFSET) e3)]))]
         [(Type-MVect (app recur e)) (sr-type-mvect e)]
         [(Type-MVect-Huh (app recur e)) (type-mvect? e)]
         [(Type-MVect-Of (app recur e)) (type-mvect-type-access e)]

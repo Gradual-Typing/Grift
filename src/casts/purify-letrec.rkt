@@ -183,8 +183,8 @@
     [(Type-MRef-Of e) (recur e)]
     [(Mvector e1 e2 t) (recur-all e1 e2)]
     [(Mvector-length e) (recur e)]
-    [(Mvector-val-set! e1 e2 e3) (recur-all e1 e2 e3)]
-    [(Mvector-val-ref e1 e2) (recur-all e1 e2)]
+    [(Mvector-val-set! e1 e2 e3 mode) (recur-all e1 e2 e3)]
+    [(Mvector-val-ref e1 e2 mode) (recur-all e1 e2)]
     [(Mvector-rtti-set! addr e) (recur-all addr e)]
     [(Mvector-rtti-ref addr) (recur addr)]
     [(Type-MVect e) (recur e)]
@@ -475,8 +475,10 @@
     [(Type-MRef-Of (app recur e)) (Type-MRef-Of e)]
     [(Mvector (app recur e1) (app recur e2) t) (Mvector e1 e2 t)]
     [(Mvector-length (app recur e)) (Mvector-length e)]
-    [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3)) (Mvector-val-set! e1 e2 e3)]
-    [(Mvector-val-ref (app recur e1) (app recur e2)) (Mvector-val-ref e1 e2)]
+    [(Mvector-val-set! (app recur e1) (app recur e2) (app recur e3) mode)
+     (Mvector-val-set! e1 e2 e3 mode)]
+    [(Mvector-val-ref (app recur e1) (app recur e2) mode)
+     (Mvector-val-ref e1 e2 mode)]
     [(Mvector-rtti-set! (app recur addr) (app recur e))
      (Mvector-rtti-set! addr e)]
     [(Mvector-rtti-ref (app recur addr)) (Mvector-rtti-ref addr)]
@@ -829,8 +831,10 @@
     [(Type-MRef-Of (app pl-expr e)) (Type-MRef-Of e)]
     [(Mvector (app pl-expr e1) (app pl-expr e2) t) (Mvector e1 e2 t)]
     [(Mvector-length (app pl-expr e)) (Mvector-length e)]
-    [(Mvector-val-set! (app pl-expr e1) (app pl-expr e2) (app pl-expr e3)) (Mvector-val-set! e1 e2 e3)]
-    [(Mvector-val-ref (app pl-expr e1) (app pl-expr e2)) (Mvector-val-ref e1 e2)]
+    [(Mvector-val-set! (app pl-expr e1) (app pl-expr e2) (app pl-expr e3) mode)
+     (Mvector-val-set! e1 e2 e3 mode)]
+    [(Mvector-val-ref (app pl-expr e1) (app pl-expr e2) mode)
+     (Mvector-val-ref e1 e2 mode)]
     [(Mvector-rtti-set! (app pl-expr addr) (app pl-expr e))
      (Mvector-rtti-set! addr e)]
     [(Mvector-rtti-ref (app pl-expr addr)) (Mvector-rtti-ref addr)]

@@ -99,8 +99,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (Mvector-set!T vector index value type)
   (Mvector-ref vector index)
   (Mvector-refT vector index type)
-  (Mvector-val-ref vector index)
-  (Mvector-val-set! vector index value)
+  (Mvector-val-ref vector index guarded?)
+  (Mvector-val-set! vector index value guarded?)
   (Mvector-rtti-ref vector)
   (Mvector-rtti-set! expression1 expression2)
   (MVectCastedRef addr index type)
@@ -807,3 +807,5 @@ class literal constants
     [(cons i e) (cons i (f e))]))
 
 (define-type Id (U Uid String))
+
+(define-type VectorAccessMode (U 'check-bounds 'no-check-bounds))
