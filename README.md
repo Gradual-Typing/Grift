@@ -1,19 +1,27 @@
-# Grift: A GTLC Compiler
+# Grift
 
-Welcome to the home of a compiler for the Gradually Typed Lambda 
-Calculus (GTLC). The compiler is intended to explore how different
-gradual typing semantics may be represented at runtime. It is currently
-a work in progress, but I am at the level where I can start to
-play with the runtime representation of objects freely.
+Grift is a gradually-typed language that was designed and implemented from
+scratch. The runtime system is completely designed with the goal to minimize the
+overhead of runtime checking for the gradually-typed language it implements.
+The compiler implements a variant of space-efficient coercions and
+space-efficient monotonic heap. Space-efficiency requires more work to be done
+when casting an already casted value at runtime which is typically some sort of
+merging between the old and the new casts. On the other hand, it is much cheaper
+to access an already casted value because it is guaranteed to go through a
+single layer of checks instead of a chain of casts that is linear in the number
+of times this value has been casted before. Grift's runtime also represents
+values and types in a way that makes many operations on them that are related to
+runtime checking very efficient. Our self-comparison performance evaluation
+indicates that this approach increased performance substantially in comparison
+to our own implementation of the space-inefficient runtime. It also indicates
+that the overhead of doing merging is not expensive. Furthermore, fully typed
+and fully untyped code is in the ball-park of OCaml, and Typed Racket, and of
+Chez Scheme, Gambit Scheme, and Racket respectively.
 
 ## Getting Started
 
-A simple setup for 
-
 ```bash
-git checkout git@github.com:Gradual-Typing/Grift.git
-cd Grift
-raco pkg install
+raco pkg install grift
 ```
 
 ## Use as a Program
@@ -65,18 +73,6 @@ ops            ::=  + | -  | * | binary-and | binary-or | ...
 Type, T        ::= Dyn | Int | Bool | Unit | (-> Type ...) | (Ref Type)
 ```
 
-In order to support more accurate benchmarking we have added the
-repeat special form which is guaranteed to be the equivalent of a for
-loop in C. The loop ```(repeat (id start stop) exp)``` is the
-equivalent of the for loop ```for(id = start; id < stop; id += 1)
-exp;```. It always results in a unit value.
-
-Further support for benchmarking has been added with the timer
-primitives.  All of which take no arguments and return unit. This is a
-global one shot timer. Calling (timer-report) will print out the time
-in seconds between the calls (timer-start) and (timer-stop). If no
-such calls have occurred there will be a runtime error.
-
 ### Tinkering with the compiler
 - [/src/README.md](/src/README.md) contains an overview of the construction
   of the compiler.
@@ -87,5 +83,3 @@ such calls have occurred there will be a runtime error.
 - Getting the most out of typed racket
    - If typecheck time blows up consider profiling with 
      `export PLTSTDERR="error debug@tr-timing"`
-
-   
