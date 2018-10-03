@@ -1174,6 +1174,14 @@ TODO write unit tests
   (add-cast-runtime-binding!
    interp-cast-uid
    (code$ (v t1 t2 l mono-address base-address index)
+     ;; mono-address: is the address of the monotonic box/vector being
+     ;; casted. It is 0 otherwise. It is used to query the rtti during the cast.
+     ;; base-address: is the address to write a casted tuple value to. This
+     ;; address is either a monotonic box/vector address or an address of a
+     ;; tuple that resides in a monotonic heap either directly or inside another
+     ;; tuple that does. It is an undefined value otherwise.
+     ;; index: is the index used to write into the base address. It is an
+     ;; undefined value otherwise.
      (cond$
       [(op=? t1 t2) v]
       [(Type-Dyn-Huh t1)
@@ -1716,6 +1724,11 @@ TODO write unit tests
        [else
         (Mbox-rtti-set! address t3)
         (let*$ ([v   (Mbox-val-ref address)]
+                ;; in the very beginning of casting a monotonic box, we write
+                ;; casted tuples to the box address itself at the value index.
+                ;; I wish to not expose the internals of the representation of
+                ;; the monotonic heap at this point but this is the most
+                ;; efficient way I can think of to go about it.
                 [cv (interp-cast v t1 t3 l address address MBOX-VALUE-INDEX)]
                 [t4 (Mbox-rtti-ref address)])
           (cond$
@@ -1783,6 +1796,13 @@ TODO write unit tests
         (let$ ([len (Mvector-length address)])
           (repeat$ (i ZERO-EXPR len) ()
             (let*$ ([vi (Mvector-val-ref address i)]
+                    ;; in the very beginning of casting a monotonic vector, we
+                    ;; write casted tuples to the vector address itself at the
+                    ;; corresponding index to the element we are currently
+                    ;; casting. I wish to not expose the internals of the
+                    ;; representation of the monotonic heap at this point but
+                    ;; this is the most efficient way I can think of to go about
+                    ;; it.
                     [cvi (interp-cast vi t1 t3 l address address (op$ + MVECT-OFFSET i))]
                     [t4 (Mvector-rtti-ref address)])
               (If (op=? t3 t4)
