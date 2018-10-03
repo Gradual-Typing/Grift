@@ -240,6 +240,10 @@ but a static single assignment is implicitly maintained.
   (let ([cl? (unbox coerce-tuple-code-label?)])
     (or cl? (make-code! coerce))))
 
+;; all input variables to this macro should have been already defined and
+;; initialized. tuple-copy-code-gen expands into a loop that populates the new
+;; tuples from the old tuples and writes the address of the new tuple into
+;; @base-address at @index.
 (define-syntax-rule (tuple-copy-code-gen old-tpl-val new-tpl-val count base-addr index)
   (begin$
      (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
@@ -256,6 +260,13 @@ but a static single assignment is implicitly maintained.
     (define cast-label (Code-Label cast))
     (define coerce-tuple-in-place-label (Code-Label coerce-tuple-in-place))
     (define coerce-tuple-in-place-c : D0-Code
+      ;; mono-address: is the address of the monotonic box/vector being
+      ;; casted. It is used to query the rtti during the cast.
+      ;; base-address: is the address to write a casted tuple value to. This
+      ;; address is either a monotonic box/vector address or an address of a
+      ;; tuple that resides in a monotonic heap either directly or inside another
+      ;; tuple that does.
+      ;; index: is the index used to write into the base address.
       (code$ (old-tpl-val tpl-crcn mono-addr base-addr index)
         (begin$
           (assign$ tagged-count
@@ -292,6 +303,13 @@ but a static single assignment is implicitly maintained.
     (define cast-tuple-in-place-label (Code-Label cast-tuple-in-place))
     (define cast-label (Code-Label cast))
     (define cast-tuple-in-place-c : D0-Code
+      ;; mono-address: is the address of the monotonic box/vector being
+      ;; casted. It is used to query the rtti during the cast.
+      ;; base-address: is the address to write a casted tuple value to. This
+      ;; address is either a monotonic box/vector address or an address of a
+      ;; tuple that resides in a monotonic heap either directly or inside another
+      ;; tuple that does.
+      ;; index: is the index used to write into the base address.
       (code$ (old-tpl-val t1 t2 l mono-addr base-addr index)
         (begin$
           (assign$ count
