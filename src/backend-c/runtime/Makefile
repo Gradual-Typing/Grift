@@ -1,4 +1,4 @@
-all : boehm-gc-install hashcons.o castprofiler.o runtime.o nonegc.o
+all : boehm-gc-install hashcons.o castprofiler.o runtime.o nonegc.o assoc_stack.o 
 
 boehm-gc-install :
 	PWD=`pwd`; cd boehm-gc; ./configure --prefix=${PWD}/boehm-gc-install
