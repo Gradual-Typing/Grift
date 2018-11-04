@@ -49,8 +49,11 @@
 ;; this prevents evaluating terms which may cause more allocation
 ;; will initializing the values of an allocation
 ;; it essentially produces expression of the form:
-(: sr-alloc (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
-(define (sr-alloc name tag? slots)
+(: sr-alloc-aux :
+   (Nat -> D0-Expr) ->
+   (String (Option D0-Expr) (Listof (Pair String D0-Expr))
+           -> D0-Expr))
+(define ((sr-alloc-aux alloc) name tag? slots)
   ;; As long as this is used to initialize all the data I have
   ;; a faily stong guarentee that no other allocation could possibly occur.
   (: sr-alloc-init ((Var Uid) -> (Index (Var Uid) -> D0-Expr)))
@@ -71,10 +74,17 @@
   (define ind* (range 0 size))
   (define-track-next-uid!$ alloc-id)
   (define alloc-var (Var alloc-id))
-  (define alloc-ass (Assign alloc-id (op$ Alloc (Quote size))))
+  (define alloc-ass (Assign alloc-id (alloc size)))
   (define set* (map (sr-alloc-init alloc-var) ind* var*)) 
   (define tag-return : D0-Expr
     (cond
       [(not tag?) alloc-var]
       [else (sr-tag-value alloc-var tag?)]))
   (Begin (append ass* (cons alloc-ass set*)) tag-return))
+
+(: alloc-op : Nat -> D0-Expr)
+(define (alloc-op s) (op$ Alloc (Quote s)))
+(: stack-alloc-op : Nat -> D0-Expr)
+(define (stack-alloc-op s) (Stack-Alloc s))
+(define sr-alloc (sr-alloc-aux alloc-op))
+(define sr-alloc-on-stack (sr-alloc-aux stack-alloc-op))

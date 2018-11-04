@@ -86,12 +86,16 @@ TODO write unit tests
        (CoC3-Expr #:know-not-eq? Boolean) CoC3-Expr))
 
 (define-type Id-Coercion-Huh-Type (CoC3-Expr -> CoC3-Expr))
+
 (define-type Compile-Make-Coercion-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr)
        (#:top-level? Boolean #:know-not-eq? Boolean)
        CoC3-Expr))
+
 (define-type Make-Med-Coercion-Type
-  (->* (CoC3-Expr CoC3-Expr CoC3-Expr) (#:know-not-eq? Boolean) CoC3-Expr))
+  (->* (CoC3-Expr CoC3-Expr CoC3-Expr)
+       (#:know-not-eq? Boolean)
+       CoC3-Expr))
 
 (define-type Lambda-Type (Uid* CoC3-Expr -> CoC3-Expr)) 
 (define-type App-Type (CoC3-Expr CoC3-Expr* -> CoC3-Expr))
@@ -122,6 +126,7 @@ TODO write unit tests
 
 (define-type Compose-Coercions-Type
   (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
 (define-type Compile-Cast-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
        (CoC3-Expr CoC3-Expr CoC3-Expr #:t1-not-dyn Boolean #:t2-not-dyn Boolean)

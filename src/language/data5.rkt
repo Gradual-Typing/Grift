@@ -14,7 +14,7 @@
                     (Labels D5-Bnd-Code*
                             D5-Body))))
 
-(define-type D5-Body (Locals Uid* D5-Tail))
+(define-type D5-Body (Locals Uid* (Bnd* Nat) D5-Tail))
 (define-type D5-Bnd-Code* (Listof D5-Bnd-Code))
 (define-type D5-Bnd-Code (Pairof Uid D5-Code))
 (define-type D5-Code (Code Uid* D5-Body))

@@ -8,6 +8,7 @@
  list->mset
  mset-add!
  mset-remove!
+ mset-subtract!
  mset-member?
  mset-union!)
 
@@ -36,6 +37,12 @@
 (: mset-remove! (All (T) (MSet T) T -> Void))
 (define (mset-remove! st e)
   (hash-remove! (MSet-contents st) e))
+
+(: mset-subtract! (All (T) (MSet T) (MSet T) -> Void))
+(define (mset-subtract! st1 st2)
+  (define c1 (MSet-contents st1))
+  (for ([k (hash-keys (MSet-contents st2))])
+    (hash-remove! c1 k)))
 
 (: mset-member? (All (T) (MSet T) T -> Boolean))
 (define (mset-member? s e)

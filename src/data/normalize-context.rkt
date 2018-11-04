@@ -63,12 +63,13 @@
        (if (uil-prim-effect? p)
            (Begin (list (Op p v*)) UNIT-IMDT)
            (nc-value-op p v*))]
-      [(Var i)  (Var i)]
-      [(Global s) (Global s)]
-      [(Code-Label i) (Code-Label i)]
-      [(Quote k) (Quote k)]
-      [(Halt) (Halt)]
-      [(Success) (Success)]
+      [(and (Stack-Alloc _) a) a]
+      [(and (Var _) v) v]
+      [(and (Global s) g) g]
+      [(and (Code-Label _) l) l]
+      [(and (Quote _) k) k]
+      [(and (Halt) h) h]
+      [(and (Success) s) s]
       ;; FIXME: Come up with a more compelling intermediate language
       [(No-Op) (Success)]
       ;; forms that don't quite work out because normalize
@@ -104,6 +105,7 @@
        (if (uil-prim-effect? p)
            (Begin (list (Op p v*)) UNIT-IMDT)
            (nc-value-op p v*))]
+      [(and (Stack-Alloc _) a) a]
       [(Var i)  (Var i)]
       [(Global s) (Global s)]
       [(Code-Label i) (Code-Label i)]
@@ -144,6 +146,7 @@
            (Op p (nc-value* exp*))
            ;; evaluate values for their effects
            (make-begin (nc-effect* exp*) NO-OP))]
+      [(Stack-Alloc _) NO-OP]
       [(Var i)  NO-OP]
       [(Global s) NO-OP]
       [(Code-Label i) NO-OP]

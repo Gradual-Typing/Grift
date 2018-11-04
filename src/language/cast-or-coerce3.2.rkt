@@ -14,11 +14,13 @@ Cast-or-Coerce3.2-Lang is the product of purify-letrec
 
 (define-type Cast-or-Coerce3.2-Lang
   (Prog (List String Natural Grift-Type)
-    (Let-Static* Bnd-Mu-Type*
-                 Bnd-Type*
-                 Bnd-Mu-Crcn*
-                 Bnd-Crcn* 
-                 CoC3.2-Expr)))
+    (Static* (List
+              Bnd-Mu-Type*
+              Bnd-Type*
+              Bnd-Mu-Crcn*
+              Bnd-Crcn*
+              CoC3.2-Bnd*) 
+             CoC3.2-Expr)))
 
 (define-type CoC3.2-Expr
   (Rec E

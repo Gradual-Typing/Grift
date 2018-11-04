@@ -28,7 +28,7 @@
 ;; Add new local variables to the declaration to each body
 (: sp-body (D4-Body -> D5-Body))
 (define (sp-body body)
-  (match-define (Locals i* t) body)
+  (match-define (Locals i* s* t) body)
   (define new-locals : Uid* i*)
   (: local-next-uid! : String -> Uid)
   (define (local-next-uid! s)
@@ -116,6 +116,6 @@
   (define (sp-trivial* t*) t*)
   
   (define new-body (sp-tail t))
-  (Locals new-locals new-body))
+  (Locals new-locals s* new-body))
 
 

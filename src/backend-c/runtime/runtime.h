@@ -6,32 +6,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <math.h>
-#include "hashcons.h"
-#include "castprofiler.h"
-
-extern table types_ht;
-extern int64_t types_unique_index_counter;
-
-/* 
-read_int
-runtime function for read-int primitive : (-> Int)
-reads a integer from the stdin port.
-*/
-int64_t read_int();
-
-/* 
-read_float
-runtime function for read-float primitive : (-> Float)
-reads a floating point number from the stdin port.
-*/
-double read_float();
-
-/* 
-read_bool
-runtime function for read-bool primitive : (-> Bool)
-reads a #t or #f from the stdin port.
-*/
-int64_t read_bool();
 
 /* floatptr_t is a floating point number that is the same width as a pointer */
 #if   (__SIZEOF_POINTER__ == __SIZEOF_DOUBLE__)
@@ -52,28 +26,39 @@ typedef union grift_obj {
 
 
 typedef union {
-  int64_t *p;
-  int64_t i;
-  double f;
+  intptr_t *p;
+  intptr_t i;
+  floatptr_t f;
 } imdt;
   
 #define imdt_to_float(x) (((imdt)(x)).f)
 #define float_to_imdt(x) (((imdt)(x)).i)
 
-/*
-print_ascii_char
-prints out the character literal for a character
-*/
-void print_ascii_char(int64_t);
+#include "boehm-gc-install/include/gc/gc.h"
+// TODO these should be moved to runtime.h
+#define NULL_GRIFT_OBJ ((grift_obj)(uintptr_t)0)
+#define GRIFT_MALLOC(size) ((grift_obj)GC_MALLOC(size));
 
-/*
-display_char
-print a character to stdout
-*/
-void display_ascii_char(int64_t);
 
-int64_t read_ascii_char();
+#define GRIFT_ERROR_IN_RUNTIME 1
 
-double neg_float(double n);
+#include "hashcons.h"
+extern table types_ht;
+extern int64_t types_unique_index_counter;
 
-#endif
+#include "io.h"
+
+#include "assoc_stack.h"
+
+#define max(a,b)\
+({ __typeof__ (a) _a = (a);\
+   __typeof__ (b) _b = (b);\
+   _a > _b ? _a : _b; })
+
+#define min(a,b)\
+({ __typeof__ (a) _a = (a);\
+   __typeof__ (b) _b = (b);\
+   _a < _b ? _a : _b; })
+
+
+#endif /* RUNTIME_INCLUDED */

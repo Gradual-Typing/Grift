@@ -186,6 +186,7 @@ And a type constructor "name" expecting the types of field1 and field2
                crcn-bindings
                body)
   (Static-Id id)
+  (Static* bindings body)
   (LetP bindings body)
   (LetC bindings body);; Can create cyclic immutable data
   (Procedure this params code caster bound-vars body)
@@ -226,7 +227,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Success)
   (Assign lhs rhs)
   ;; Declares Local Variables
-  (Locals names body)
+  (Locals names space body)
   (Return value)
   (Relop primitive expression1 expression2)
   ;; Uil Memory Ops
@@ -237,6 +238,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (BinOp primitive expression1 expression2)
   ;; Guarded references IL Representation
   (Unguarded-Box init)
+  (Unguarded-Box-On-Stack init)
   (Unguarded-Box-Ref box)
   (Unguarded-Box-Set! box value)
   (Unguarded-Vect size value)
@@ -869,6 +871,9 @@ class literal constants
   (MVect-Coercion-Huh crcn)
   (Fn-Coercion-Huh crcn)
   (Make-Fn-Coercion make-uid t1 t2 lbl)
+  (Mu-Coercion-Huh crcn)
+  (Mu-Coercion-Body mu)
+  (Mu-Coercion-Body-Set! mu body)
   (HC project? t1 label inject? t2 med)
   (Quote-HCoercion coercion)
   (HC-Project-Huh hc)
@@ -883,10 +888,16 @@ class literal constants
   ;; Identity Cast
   ;; "Calculated No Op Cast"
   (Identity)
+  (Make-Mu-Coercion)
   (Quote-Coercion const)
   ;; FIXME Does this need to exist?
   ;; Can't we just use the (Identity) "litereral" everywhere it is needed?
   (Id-Coercion))
+
+(struct CVar form:leaf ([uid : Uid])
+  #:transparent)
+(struct (C) CRec form:simple-branch ([uid : Uid] [body : C])
+  #:transparent)
 
 (define-type Cast-Fml* (Listof Cast-Fml))
 (define-type Cast-Fml (Fml Uid Grift-Type))
@@ -908,7 +919,9 @@ class literal constants
      (Ref C C Proxied-Symbol)
      (MonoRef Grift-Type)
      (MonoVect Grift-Type)
-     (Failed Blame-Label)))
+     (Failed Blame-Label)
+     (CRec C)
+     CVar))
 
 (define-type Grift-Coercion
   (Rec C (U (Project Grift-Type Blame-Label)

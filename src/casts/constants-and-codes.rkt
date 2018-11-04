@@ -72,6 +72,14 @@
   ;; mediating coercion representation
   (COERCION-SECOND-TAG-SHIFT      3)
   (COERCION-MEDIATING-TAG         #b100)
+  ;; guarded coercion representation
+  (COERCION-REF-SECOND-TAG        #b000)
+  (COERCION-REF-TAG-INDEX         0)
+  (COERCION-REF-READ-INDEX        1)
+  (COERCION-REF-WRITE-INDEX       2)
+  (COERCION-REF-FLAG-INDEX        3)
+  (COERCION-REF-REF-FLAG          0)
+  (COERCION-REF-VEC-FLAG          1)
   ;; function coercion representation
   (COERCION-FN-SECOND-TAG         #b001)
   (COERCION-FN-ARITY-INDEX        0)
@@ -89,14 +97,10 @@
   (COERCION-MVECT-SECOND-TAG      #b100)
   (COERCION-MVECT-TAG-INDEX       0)
   (COERCION-MVECT-TYPE-INDEX      1)
-  ;; guarded coercion representation
-  (COERCION-REF-SECOND-TAG        #b000)
-  (COERCION-REF-TAG-INDEX         0)
-  (COERCION-REF-READ-INDEX        1)
-  (COERCION-REF-WRITE-INDEX       2)
-  (COERCION-REF-FLAG-INDEX        3)
-  (COERCION-REF-REF-FLAG          0)
-  (COERCION-REF-VEC-FLAG          1)
+  ;; mu coercion representation
+  (COERCION-MU-SECOND-TAG         #b101)
+  (COERCION-MU-TAG-INDEX          0)
+  (COERCION-MU-BODY-INDEX         1)
   ;; values
   ;; simple dynamic value representation
   (DYN-TAG-MASK                   #b111)
@@ -156,8 +160,8 @@
   (FN-PROXY-CRCN-INDEX            1)
   (FN-PROXY-CLOS-INDEX            0)
   (HYBRID-PROXY-TAG               #b001)
-  (HYBRID-PROXY-CRCN-INDEX        2)
-  (HYBRID-PROXY-CLOS-INDEX        1)
+  (HYBRID-PROXY-CRCN-INDEX        3)
+  (HYBRID-PROXY-CLOS-INDEX        2)
   (EXIT-FAILURE                   1))
 
 ;; define-types-memory-layout-helpers generates constants and functions for

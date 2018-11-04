@@ -42,14 +42,15 @@ but a static single assignment is implicitly maintained.
 (define (specify-representation prgm)
   (match-define
     (Prog (list name next type)
-      (Static-Let* (list
-                    mu-type-bnd*
-                    type-bnd*
-                    mu-crcn-bnd*
-                    crcn-bnd*
-                    code-bnd*
-                    closure*)
-                   exp))
+      (Static* (list
+                mu-type-bnd*
+                type-bnd*
+                mu-crcn-bnd*
+                crcn-bnd*
+                code-bnd*
+                closure*
+                const-bnd*)
+               exp))
     prgm)
   (define unique (make-unique-counter next))
   (parameterize ([current-unique-counter unique])
@@ -63,6 +64,11 @@ but a static single assignment is implicitly maintained.
     (set-box! hashcons-type-code-label? #f)
     (set-box! access-type-hashcode-label? #f)
     (set-box! calculate-type-hashcode-label? #f)
+
+    (define const-id* : Uid* (map (inst car Uid Any) const-bnd*))
+    (define init-const* : (Listof D0-Expr)
+      (for/list ([b const-bnd*])
+        (Assign (car b) (sr-expr (hash) empty-index-map (cdr b))))) 
     (define new-exp : D0-Expr (sr-expr (hash) empty-index-map exp))
     (define new-code* : (Bnd* (Fun D0-Expr))
       (for/list ([b code-bnd*])
@@ -92,7 +98,8 @@ but a static single assignment is implicitly maintained.
     (Prog (list name new-next type)
       (GlobDecs (append mu-type-id* type-id*
                         mu-crcn-id* crcn-id*
-                        static-closure-id*)
+                        static-closure-id*
+                        const-id*)
         (Labels (append bnd-code*
                         new-code*
                         static-closure-code*)
@@ -103,7 +110,8 @@ but a static single assignment is implicitly maintained.
                          init-crcn*
                          init-mu-crcn*
                          static-closure-alloc*
-                         static-closure-init*)
+                         static-closure-init*
+                         init-const*)
                  new-exp))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
@@ -624,6 +632,20 @@ but a static single assignment is implicitly maintained.
         [(HC-T2 (app recur h))
          (tagged-array-ref h HC-TAG-MASK HC-T2-INDEX)]
         [(HC-Med (app recur h)) (build-hc-med h)]
+        [(Make-Mu-Coercion) (sr-alloc-mu-id-coercion)]
+        [(Mu-Coercion-Huh (app recur e))
+         ;; TODO fix mediating coercions so that it is more obvious
+         ;; that they have a shared layout.
+         (begin$
+           (assign$ crcn-tag-word
+                    (sr-tagged-array-ref
+                     e COERCION-MEDIATING-TAG COERCION-MU-TAG-INDEX))
+           (assign$ crcn-med-tag (sr-get-tag crcn-tag-word COERCION-TAG-MASK))
+           (op$ = crcn-med-tag COERCION-MU-SECOND-TAG))]
+        [(Mu-Coercion-Body (app recur e))
+         (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MU-BODY-INDEX)]
+        [(Mu-Coercion-Body-Set! (app recur m) (app recur b))
+         (sr-mu-coercion-body-set! m b)]
         ;; Function Coercions
         [(Fn-Coercion-Huh (app recur e))
          (begin$
@@ -702,16 +724,13 @@ but a static single assignment is implicitly maintained.
            (assign$ second-tag
                     (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
                          COERCION-REF-SECOND-TAG))
-           (if (cast-profiler?)
-               (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
+           (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
                          `(("tag" . ,second-tag)
                            ("read-coercion" . ,r)
                            ("write-coercion" . ,w)
-                           ("flag" . ,(recur flag))))
-               (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
-                         `(("tag" . ,second-tag)
-                           ("read-coercion" . ,r)
-                           ("write-coercion" . ,w)))))]
+                           . ,(if (cast-profiler?)
+                                  `(("flag" . ,(recur flag)))
+                                  '()))))]
         [(Ref-Coercion-Read (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-READ-INDEX)]
         [(Ref-Coercion-Write (app recur e))
@@ -813,6 +832,11 @@ but a static single assignment is implicitly maintained.
         ;; Guarded
         [(Unguarded-Box (app recur e))
          (sr-alloc "unguarded_box" UGBOX-TAG (list (cons "init_value" e)))]
+        [(Unguarded-Box-On-Stack (app recur e))
+         (sr-alloc-on-stack
+          "unguarded_box_on_stack" UGBOX-TAG
+          (list (cons "init_value" e)))]
+        
         [(Unguarded-Box-Ref (app recur e)) (op$ Array-ref e UGBOX-VALUE-INDEX)]
         [(Unguarded-Box-Set! (app recur e1) (app recur e2))
          (op$ Array-set! e1 UGBOX-VALUE-INDEX e2)]
@@ -1033,6 +1057,7 @@ but a static single assignment is implicitly maintained.
                     mono-address base-address index)]
         [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
+        #;
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]
         [(Mediating-Coercion-Huh (app recur e))
@@ -1103,9 +1128,18 @@ but a static single assignment is implicitly maintained.
 (: allocate-bound-mu-crcn (Bnd-Mu-Crcn -> (Values D0-Expr D0-Expr)))
 (define (allocate-bound-mu-crcn bnd)
   (match-define (cons u (Mu c)) bnd)
-  (error 'todo))
+  (values (Assign u (sr-alloc-mu-id-coercion))
+          (sr-mu-coercion-body-set! (Var u) (sr-immediate-coercion c))))
 
+(: sr-alloc-mu-id-coercion : -> D0-Expr)
+(define (sr-alloc-mu-id-coercion)
+  (sr-alloc "mu-coercion" COERCION-MEDIATING-TAG
+            `(("tag" . ,COERCION-MU-SECOND-TAG)
+              ("body" . ,COERCION-IDENTITY-IMDT))))
 
+(: sr-mu-coercion-body-set! : D0-Expr D0-Expr -> D0-Expr)
+(define (sr-mu-coercion-body-set! m b) 
+  (sr-tagged-array-set! m COERCION-MEDIATING-TAG COERCION-MU-BODY-INDEX b))
 
 (: sr-coercion (Compact-Coercion -> D0-Expr))
 (define (sr-coercion t)

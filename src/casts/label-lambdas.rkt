@@ -89,14 +89,24 @@
 (: label-lambdas (Cast-or-Coerce3.2-Lang  -> Cast-or-Coerce4-Lang))
 (define (label-lambdas prgm)
   (match-define (Prog (list n c t)
-                  (Let-Static* mtb* tb* mcb* cb* e))
+                  (Static*
+                   (list mtb* tb* mcb* cb* constb*)
+                   e))
     prgm)
   (define uc (make-unique-counter c))
-  (define new-exp
+  (: new-exp CoC4-Expr)
+  (: new-constb* CoC4-Bnd-Data*)
+  (define-values (new-exp new-constb*)
     (parameterize ([current-unique-counter uc])
-      (ll-expr e)))
+      (values
+       (ll-expr e)
+       (for/list ([b constb*])
+         (match-define (cons id expr) b)
+         (cons id (ll-expr expr))))))
   (Prog (list n (unique-counter-next! uc) t)
-    (Let-Static* mtb* tb* mcb* cb* new-exp)))
+    (Static*
+     (list mtb* tb* mcb* cb* new-constb*)
+     new-exp)))
 
 (: ll-expr (CoC3.2-Expr -> CoC4-Expr))
 (define (ll-expr expr)

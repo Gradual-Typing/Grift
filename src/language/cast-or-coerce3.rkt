@@ -9,7 +9,9 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Cast-or-Coerce3-Lang
-  (Prog (List String Natural Grift-Type) CoC3-Expr))
+  (Prog (List String Natural Grift-Type)
+    (Static* (List CoC3-Bnd*)
+             CoC3-Expr)))
 
 
 (define-type CoC3-Expr

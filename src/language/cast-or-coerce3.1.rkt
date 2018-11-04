@@ -10,11 +10,13 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 
 (define-type Cast-or-Coerce3.1-Lang
   (Prog (List String Natural Grift-Type)
-    (Let-Static* Bnd-Mu-Type*
-                 Bnd-Type*
-                 Bnd-Mu-Crcn*
-                 Bnd-Crcn* 
-                 CoC3.1-Expr)))
+    (Static* (List
+              Bnd-Mu-Type*
+              Bnd-Type*
+              Bnd-Mu-Crcn*
+              Bnd-Crcn*
+              CoC3.1-Bnd*) 
+             CoC3.1-Expr)))
 
 (define-type (Castable-Lambda E) (CLambda E))
 
@@ -87,7 +89,12 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
    (Tuple-Coercion-Huh E)
    (Tuple-Coercion-Num E)
    (Tuple-Coercion-Item E E)
-   (Tuple-Coercion-Item-Set! E E E)))
+   (Tuple-Coercion-Item-Set! E E E)
+   
+   Make-Mu-Coercion
+   (Mu-Coercion-Huh E)
+   (Mu-Coercion-Body-Set! E E)
+   (Mu-Coercion-Body E)))
 
 (define-type (Type-Operation-Forms E)
   (U (Type-Dyn-Huh E)
@@ -128,6 +135,7 @@ Cast-or-Coerce3.1-Lang is the product of hoist-types
 
 (define-type (Unguarded-Forms E)
   (U (Unguarded-Box E)
+     (Unguarded-Box-On-Stack E)
      (Unguarded-Box-Ref E)
      (Unguarded-Box-Set! E E)
      (Unguarded-Vect E E)

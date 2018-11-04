@@ -14,7 +14,7 @@
                     (Labels D4-Bnd-Code*
                             D4-Body))))
 
-(define-type D4-Body (Locals Uid* D4-Tail))
+(define-type D4-Body (Locals Uid* (Bnd* Nat) D4-Tail))
 (define-type D4-Bnd-Code* (Listof D4-Bnd-Code))
 (define-type D4-Bnd-Code (Pairof Uid D4-Code))
 (define-type D4-Code (Code Uid* D4-Body))

@@ -9,11 +9,12 @@
 
 (define-type Cast-or-Coerce4-Lang
   (Prog (List String Natural Grift-Type)
-    (Let-Static* CoC4-Bnd-Mu-Type*
-                 CoC4-Bnd-Type*
-                 CoC4-Bnd-Mu-Crcn*
-                 CoC4-Bnd-Crcn*
-                 CoC4-Expr)))
+    (Static* (List CoC4-Bnd-Mu-Type*
+                   CoC4-Bnd-Type*
+                   CoC4-Bnd-Mu-Crcn*
+                   CoC4-Bnd-Crcn*
+                   CoC4-Bnd-Data*)
+             CoC4-Expr)))
 
 (require "cast-or-coerce3.1.rkt")
 

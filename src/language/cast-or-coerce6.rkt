@@ -66,13 +66,15 @@
 
 (define-type Cast-or-Coerce6-Lang
   (Prog (List String Natural Grift-Type)
-    (Static-Let*  (List Bnd-Mu-Type*
-                        Bnd-Type*
-                        Bnd-Mu-Crcn*
-                        Bnd-Crcn*
-                        (Bnd* (Fun CoC6-Expr))
-                        (Closure* CoC6-Expr CoC6-Expr))
-                  CoC6-Expr)))
+    (Static*
+     (List Bnd-Mu-Type*
+           Bnd-Type*
+           Bnd-Mu-Crcn*
+           Bnd-Crcn*
+           (Bnd* (Fun CoC6-Expr))
+           (Closure* CoC6-Expr CoC6-Expr)
+           (Bnd* CoC6-Expr))
+     CoC6-Expr)))
 
 (define-type CoC5-Expr
   (Rec
