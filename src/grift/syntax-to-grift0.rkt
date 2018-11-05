@@ -99,33 +99,33 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
   (debug who (foldl env-cons (hash) rec-vars)))
 
 
-
+(define ((parse-form/no-ann env) stx)
+  (syntax-parse stx
+    [var:id (Var ((env-get-lexical 'parse-form) env #'var))]
+    [(var:id rest ...)
+     (match (env-lookup env #'var)
+       [(lexical-var var)
+        (define var-src (quote-srcloc #'var))
+        (define as (map (parse-form env) (syntax->list #'(rest ...))))
+        (App (Ann (Var var) var-src) as)]
+       [(core parse) (parse stx env)]
+       [other (error 'parse-form "unmatched: ~a" other)])]
+    [(fst rest ...)
+     (define p ((parse-form env) #'fst))
+     (define as (map (parse-form env) (syntax->list #'(rest ...))))
+     (App p as)]
+    [other
+     (define dat (syntax->datum #'other))
+     (unless (grift-literal? dat)
+       (syntax-error 'parse-form "expected datum" #'other))
+     (if (and (not (exact-integer? dat)) (real? dat))
+         (Quote (exact->inexact dat))
+         (Quote dat))]))
 
 (define ((parse-form env) stx)
   (debug 'parse-form stx env)
   (define src (syntax->srcloc stx))
-  (define cf
-    (syntax-parse stx
-      [var:id (Var ((env-get-lexical 'parse-form) env #'var))]
-      [(var:id rest ...)
-       (match (env-lookup env #'var)
-         [(lexical-var var)
-          (define var-src (quote-srcloc #'var))
-          (define as (map (parse-form env) (syntax->list #'(rest ...))))
-          (App (Ann (Var var) var-src) as)]
-         [(core parse) (parse stx env)]
-         [other (error 'parse-form "unmatched: ~a" other)])]
-      [(fst rest ...)
-       (define p ((parse-form env) #'fst))
-       (define as (map (parse-form env) (syntax->list #'(rest ...))))
-       (App p as)]
-      [other
-       (define dat (syntax->datum #'other))
-       (unless (grift-literal? dat)
-         (syntax-error 'parse-form "expected datum" #'other))
-       (if (and (not (exact-integer? dat)) (real? dat))
-           (Quote (exact->inexact dat))
-           (Quote dat))]))
+  (define cf ((parse-form/no-ann env) stx))
   (Ann cf src))
 
 (define-syntax syntax-error
@@ -182,23 +182,23 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 (define (parse-let-expression stx env)
   (syntax-parse stx
-    [(_ (bnd:binding ...) body)
+    [(_ (bnd:binding ...) e* ... body)
      (define-values (new-env uids)
        (destruct-and-parse-bnds-lhs (syntax->list #'(bnd.var ...)) env))
      (define tys  (map (parse-optional-type env) (syntax->list #'(bnd.ty  ...))))
      (define rhss (map (parse-form env) (syntax->list #'(bnd.rhs ...))))
      (Let (map Bnd uids tys rhss)
-      ((parse-form new-env) #'body))]))
+      ((parse-form new-env) (syntax/loc stx (begin e* ... body))))]))
 
 (define (parse-letrec-expression stx env)
   (syntax-parse stx
-    [(_ (bnd:binding ...) body)
+    [(_ (bnd:binding ...) e*:expr ... body)
      (define-values (new-env uids)
        (destruct-and-parse-bnds-lhs (syntax->list #'(bnd.var ...)) env))
      (define tys  (map (parse-optional-type env) (syntax->list #'(bnd.ty  ...))))
      (define rhss (map (parse-form new-env) (syntax->list #'(bnd.rhs ...))))
      (Letrec (map Bnd uids tys rhss)
-       ((parse-form new-env) #'body))]))
+       ((parse-form new-env) (syntax/loc stx (begin e* ... body))))]))
 
 
 (module+ test
@@ -237,20 +237,20 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
   (syntax-parse stx
     [(_ v:optionally-annotated-id e:expr)
      (help #f #'v.id #'v.ty #'e)]
-    [(_ (f:id f*:formal-parameter ...) r:optional-colon-type e:expr)
+    [(_ (f:id f*:formal-parameter ...) r:optional-colon-type e*:expr ... e:expr)
      (if (syntax->datum #'r.ty)
-         (help #t #'f #f (syntax/loc stx (lambda (f* ...) : r.ty e)))
-         (help #t #'f #f (syntax/loc stx (lambda (f* ...) e))))]))
+         (help #t #'f #f (syntax/loc stx (lambda (f* ...) : r.ty e* ... e)))
+         (help #t #'f #f (syntax/loc stx (lambda (f* ...) e* ... e))))]))
 
 (define (parse-lambda-expression stx env)
   (syntax-parse stx
-    [(_ (fml:formal-parameter ...) r:optional-colon-type body:expr)
+    [(_ (fml:formal-parameter ...) r:optional-colon-type e*:expr ... body:expr)
      (define-values (new-env uids)
        (destruct-and-parse-bnds-lhs (syntax->list #'(fml.var ...)) env))
      (define (pt s) (parse-type s env))
      (define tys  (map pt (syntax->list #'(fml.ty  ...))))
      (Lambda (map Fml uids tys)
-       (list ((parse-form new-env) #'body)
+       (list ((parse-form new-env) (syntax/loc stx (begin e* ... body)))
              ((parse-optional-type new-env) #'r.ty)))]
     [other (error 'parse-lambda "unmatched ~a" (syntax->datum stx))]))
 
@@ -295,6 +295,7 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
 
 (define (parse-begin stx env)
   (syntax-parse stx
+    [(_ expr) ((parse-form/no-ann env) #'expr)]
     [(_ expr* ... expr)
      (Begin (map (parse-form env) (syntax->list #'(expr* ...)))
             ((parse-form env) #'expr))]))
@@ -342,6 +343,18 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                   (syntax->datum #'((c*.case* ...) ...))
                   (map recur (syntax->list #'(c*.rhs ...))))
              (recur #'default))]))
+
+(define (parse-cond stx env)
+  (syntax-parse stx
+    #:datum-literals (else)
+    [(_ [p e** ...] ... [else e* ...])
+     (syntax-case stx ()
+       [(_ [else e* ...])
+        ((parse-form/no-ann env) (syntax/loc stx (begin e* ...)))]
+       [(cond [p e* ...] c ...)
+        (let* ([recur  (parse-form env)]
+               [conseq (recur (syntax/loc stx (begin e* ...)))])
+          (If (recur #'p) conseq (recur #'(cond c ...))))])]))
 
 (define ((parse-simple-form sym ctr arg-count) stx env)
   (syntax-parse stx
@@ -516,6 +529,7 @@ represents types in the grift abstract syntax tree.
      (letrec     . ,(core parse-letrec-expression))
      (lambda     . ,(core parse-lambda-expression))
      (if         . ,(core (parse-simple-form 'if If 3)))
+     (cond       . ,(core parse-cond))
      (begin      . ,(core parse-begin))     
      (tuple      . ,(core (parse-simple*-form 'tuple Create-tuple)))
      (tuple-proj . ,(core parse-tuple-proj))
