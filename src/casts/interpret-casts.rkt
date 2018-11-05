@@ -7,10 +7,10 @@
  "../language/cast0.rkt"
  "../language/cast-or-coerce3.rkt"
  "interpret-casts-common.rkt"
- ;"interpret-casts-with-type-based-casts.rkt"
+ "interpret-casts-with-type-based-casts.rkt"
  "interpret-casts-with-coercions.rkt"
- ;"interpret-casts-with-hyper-coercions.rkt"
- ;"interpret-casts-with-error.rkt"
+ "interpret-casts-with-hyper-coercions.rkt"
+ "interpret-casts-with-error.rkt"
  )
 
 (provide
@@ -32,10 +32,10 @@
 
     (define ic-expr! : (C0-Expr -> CoC3-Expr)
       (case (cast-representation) 
-        #;[(|Type-Based Casts|) (interpret-casts/type-based-casts)]
+        [(|Type-Based Casts|) (interpret-casts/type-based-casts)]
         [(Coercions) (interpret-casts/coercions)]
-        #;[(Hyper-Coercions) (interpret-casts/hyper-coercions)]
-        #;[(Static) (interpret-casts/error)]
+        [(Hyper-Coercions) (interpret-casts/hyper-coercions)]
+        [(Static) (interpret-casts/error)]
         [else (error 'todo)]))
     
     (define new-e (ic-expr! e))
