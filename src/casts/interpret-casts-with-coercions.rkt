@@ -34,11 +34,14 @@ form, to the shortest branch of the cast tree that is relevant.
 (provide interpret-casts/coercions
          cast-runtime-constant-bindings)
 
-(define-type Compose-Coercions/ID?-Return
+(define-type Compose-Coercions/ID/FVS
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
+(define-type Compose-Coercions/FVS
   (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
-(define-type Make-Coercion/ID?-Return
-  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
+(define-type Make-Coercion/ID/FVS
+  (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 
 
 ;; Given two type literals and Blame-Label generate the equivalent
@@ -296,48 +299,53 @@ form, to the shortest branch of the cast tree that is relevant.
   (define mc-assoc-stack-uid (next-uid! "make-coercion-assoc-stack"))
   (define mc-assoc-stack (Var mc-assoc-stack-uid))
   (add-cast-runtime-constant! mc-assoc-stack-uid (op$ make-assoc-stack))
-  (: interp-make-coercion Make-Coercion/ID?-Return)
-  (define (interp-make-coercion t1 t2 lbl id?-ret-box)
-    (apply-code make-coercion-uid t1 t2 lbl id?-ret-box))
-  (: interp-make-med-coercion Make-Coercion/ID?-Return)
-  (define (interp-make-med-coercion t1 t2 lbl id?-ret-box)
-    (apply-code make-med-coercion-uid t1 t2 lbl id?-ret-box))
-  (: interp-make-coercion/id? Make-Coercion-Type)
-  (define (interp-make-coercion/id? t1 t2 lbl)
-    (let$ ([unused-id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-      (apply-code make-coercion-uid t1 t2 lbl unused-id?-ret-box)))
-  (: interp-make-med-coercion/id? Make-Coercion-Type)
-  (define (interp-make-med-coercion/id? t1 t2 lbl)
-    (let$ ([unused-id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-      (apply-code make-med-coercion-uid t1 t2 lbl unused-id?-ret-box)))
+  (: interp-make-coercion Make-Coercion/ID/FVS)
+  (define (interp-make-coercion t1 t2 lbl ret-id? ret-fvs)
+    (apply-code make-coercion-uid t1 t2 lbl ret-id? ret-fvs))
+  (: interp-make-med-coercion Make-Coercion/ID/FVS)
+  (define (interp-make-med-coercion t1 t2 lbl ret-id? ret-fvs)
+    (apply-code make-med-coercion-uid t1 t2 lbl ret-id? ret-fvs))
+  (: interp-make-coercion/id/fvs Make-Coercion-Type)
+  (define (interp-make-coercion/id/fvs t1 t2 lbl)
+    (let$ ([ret-id? (Unguarded-Box-On-Stack (Quote #t))]
+           [ret-fvs (Unguarded-Box-On-Stack (Quote 0))])
+      (apply-code make-coercion-uid t1 t2 lbl ret-id? ret-fvs)))
+  (: interp-make-med-coercion/id/fvs Make-Coercion-Type)
+  (define (interp-make-med-coercion/id/fvs t1 t2 lbl)
+    (let$ ([ret-id? (Unguarded-Box-On-Stack (Quote #t))]
+           [ret-fvs (Unguarded-Box-On-Stack (Quote 0))])
+      (apply-code make-med-coercion-uid t1 t2 lbl ret-id? ret-fvs)))
 
-  (define make-fn-coercion : Make-Coercion/ID?-Return
+  (define make-fn-coercion : Make-Coercion/ID/FVS
     (make-make-fn-coercion #:id-coercion? Id-Coercion-Huh
                            #:make-coercion interp-make-coercion))
-  (: make-fn-coercion/id? Make-Coercion-Type)
-  (define (make-fn-coercion/id? t1 t2 lbl)
-    (let$ ([unused-id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-      (make-fn-coercion t1 t2 lbl unused-id?-ret-box)))
+  (: make-fn-coercion/id/fvs Make-Coercion-Type)
+  (define (make-fn-coercion/id/fvs t1 t2 lbl)
+    (let$ ([ret-id? (Unguarded-Box-On-Stack (Quote #t))]
+           [ret-fvs (Unguarded-Box-On-Stack (Quote 0))])
+      (make-fn-coercion t1 t2 lbl ret-id? ret-fvs)))
   
-  (define make-tuple-coercion : Make-Coercion/ID?-Return
+  (define make-tuple-coercion : Make-Coercion/ID/FVS
     (make-make-tuple-coercion #:id-coercion? Id-Coercion-Huh
                               #:make-coercion interp-make-coercion))
   
-  (: make-tuple-coercion/id? Make-Coercion-Type)
-  (define (make-tuple-coercion/id? t1 t2 lbl)
-    (let$ ([unused-id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-      (make-tuple-coercion t1 t2 lbl unused-id?-ret-box)))
+  (: make-tuple-coercion/id/fvs Make-Coercion-Type)
+  (define (make-tuple-coercion/id/fvs t1 t2 lbl)
+    (let$ ([ret-id? (Unguarded-Box-On-Stack (Quote #t))]
+           [ret-fvs (Unguarded-Box-On-Stack (Quote 0))])
+      (make-tuple-coercion t1 t2 lbl ret-id? ret-fvs)))
   
-  ;; Invariant: `t1` is not pointer equal to `t2`
-  ;; the `compile-med-coercion` function takes care of this case  
-  ;; But `t1` can be equivalent to `t2` via equirecursive equality.
-  ;; `not-id/fv-count` is a return paramater that indicates if make
-  ;; `id?-box` indicates that the content of a cast is equivalent to
-  ;; identity.
-  ;; This is useful to collapse equations like
-  ;; (μX. (Id × X)) where the cast will map id across a structure.  
-  (: code-gen-make-med-coercion Make-Coercion/ID?-Return)
-  (define (code-gen-make-med-coercion t1 t2 lbl id?-box)
+  ;; Invariant: `t1` is not pointer equal to `t2` the
+  ;; `compile-med-coercion` function takes care of this case But `t1`
+  ;; can be equivalent to `t2` via equirecursive equality.
+
+  
+  ;; This follows the logic in the compile time version of this function
+  ;; except that a set of free variables isn't maintained for efficiency
+  ;; reasons. Instead we use a counter that is only incremented/decremented
+  ;; the first time a mu is allocated/closed. 
+  (: code-gen-make-med-coercion Make-Coercion/ID/FVS)
+  (define (code-gen-make-med-coercion t1 t2 lbl ret-id? ret-fvs)
     (cond$
      ;; Checking for Mu now allows all other cases to ignore
      ;; that they exist. 
@@ -354,58 +362,63 @@ form, to the shortest branch of the cast tree that is relevant.
           (ann
            (let$ ([pm (op$ assoc-stack-ref mc-assoc-stack i)])
             (cond$
-             ;; Check to see if we have allocated the mu yet
-             [(op$ = ZERO-EXPR pm)
-              ;; We haven't allocated the Mu so we need to do that
+             ;; We have already allocated the mu
+             [(op$ not (op$ = ZERO-EXPR pm)) pm]
+             ;; We haven't allocated the Mu so we need to do that
+             [else
               (let$ ([pm (Make-Mu-Coercion)])
                 (op$ assoc-stack-set! mc-assoc-stack i pm)
-                pm)]
-             [else pm]))
+                (Unguarded-Box-Set!
+                 ret-fvs
+                 (op$ + (Unguarded-Box-Ref ret-fvs) (Quote 1)))
+                pm)]))
            CoC3-Expr)] 
          [else
           (op$ assoc-stack-push! mc-assoc-stack t1 t2 ZERO-EXPR)
-          ;; new-id?-box is a out parameter to interp-make-coercion
-          ;; We make a new id?-box because the input id?-box might
+          ;; new-id? is a out parameter to interp-make-coercion
+          ;; We make a new-id? because the input id?-box might
           ;; already be false, and we want a chance to collapse
           ;; this mu.
           (ann
-           (let*$ ([new-id?-box (Unguarded-Box-On-Stack (Quote #t))]
+           (let*$ ([new-id? (Unguarded-Box-On-Stack (Quote #t))]
                    ;; Could we make this `interp-make-med-coercion`
                    [c  (cond$
                         [(Type-Mu-Huh t1)
                          (interp-make-coercion
-                          (Type-Mu-Body t1) t2 lbl new-id?-box)]
+                          (Type-Mu-Body t1) t2 lbl new-id? ret-fvs)]
                         [else
                          (interp-make-coercion
-                          t1 (Type-Mu-Body t2) lbl new-id?-box)])]
+                          t1 (Type-Mu-Body t2) lbl new-id? ret-fvs)])]
                    [mu (op$ assoc-stack-pop! mc-assoc-stack)]
-                   [id? (Unguarded-Box-Ref new-id?-box)])
+                   [fv-count (Unguarded-Box-Ref ret-fvs)]
+                   [id?      (Unguarded-Box-Ref new-id?)])
+             (unless$ id? (Unguarded-Box-Set! ret-id? (Quote #f))) 
              (ann
               (cond$
-              ;; This mu binding was never used in the body
-              [(op$ = ZERO-EXPR mu)
-               (unless$ id? (Unguarded-Box-Set! id?-box (Quote #f))) 
-               c]
-              [else 
-               (cond$
-                [id? ID-EXPR]
-                [else
-                 (Unguarded-Box-Set! id?-box (Quote #f))
-                 (Mu-Coercion-Body-Set! mu c)
-                 mu])])
+               ;; This mu binding was never used in the body
+               [(op$ = ZERO-EXPR mu) c]
+               [else
+                (Unguarded-Box-Set! ret-fvs (op$ - fv-count (Quote 1)))
+                (cond$
+                 ;; if ret-fvs is 0 and id? is still true then we can
+                 ;; conclude this mu is equivalent to identity
+                 [(and$ id? (op=? fv-count (Quote 1))) ID-EXPR]
+                 [else
+                  (Mu-Coercion-Body-Set! mu c)
+                  mu])])
               CoC3-Expr))
            CoC3-Expr)]))]
      [(and$ (type-fn?$ t1) (type-fn?$ t2)
             (op=? (type-fn-arity$ t1) (type-fn-arity$ t2)))
-      (make-fn-coercion t1 t2 lbl id?-box)]
+      (make-fn-coercion t1 t2 lbl ret-id? ret-fvs)]
      [(and$ (type-tup?$ t1) (type-tup?$ t2)
             (op<=? (type-tup-arity$ t2) (type-tup-arity$ t1)))
-      (make-tuple-coercion t1 t2 lbl id?-box)]
+      (make-tuple-coercion t1 t2 lbl ret-id? ret-fvs)]
      [(and$ (type-pvec?$ t1) (type-pvec?$ t2))
       (let*$ ([pvof1 (type-pvec-of$ t1)]
               [pvof2 (type-pvec-of$ t2)]
-              [read_crcn  (interp-make-coercion pvof1 pvof2 lbl id?-box)]
-              [write_crcn (interp-make-coercion pvof2 pvof1 lbl id?-box)])
+              [read_crcn  (interp-make-coercion pvof1 pvof2 lbl ret-id? ret-fvs)]
+              [write_crcn (interp-make-coercion pvof2 pvof1 lbl ret-id? ret-fvs)])
         (cond$
          [(and$ (op=? read_crcn  ID-EXPR)
                 (op=? write_crcn ID-EXPR))
@@ -414,8 +427,10 @@ form, to the shortest branch of the cast tree that is relevant.
      [(and$ (type-pbox?$ t1) (type-pbox?$ t2))
       (ann (let*$ ([pbof1 (type-pbox-of$ t1)]
                    [pbof2 (type-pbox-of$ t2)]
-                   [read_crcn  (interp-make-coercion pbof1 pbof2 lbl id?-box)]
-                   [write_crcn (interp-make-coercion pbof2 pbof1 lbl id?-box)])
+                   [read_crcn  (interp-make-coercion
+                                pbof1 pbof2 lbl ret-id? ret-fvs)]
+                   [write_crcn (interp-make-coercion
+                                pbof2 pbof1 lbl ret-id? ret-fvs)])
              (cond$
               [(and$ (op=? read_crcn  ID-EXPR)
                      (op=? write_crcn ID-EXPR))
@@ -427,7 +442,7 @@ form, to the shortest branch of the cast tree that is relevant.
              (cond$
               [(type-dyn?$ t2) ID-EXPR]
               [else
-               (Unguarded-Box-Set! id?-box (Quote #f))
+               (Unguarded-Box-Set! ret-id? (Quote #f))
                (MVect-Coercion t)]))
            CoC3-Expr)]
      [(and$ (type-mbox?$ t1) (type-mbox?$ t2))
@@ -435,7 +450,7 @@ form, to the shortest branch of the cast tree that is relevant.
              (cond$
               [(type-dyn?$ t2) ID-EXPR]
               [else
-               (Unguarded-Box-Set! id?-box (Quote #f))
+               (Unguarded-Box-Set! ret-id? (Quote #f))
                (MRef-Coercion t)]))
            CoC3-Expr)]
      [else (Failed-Coercion lbl)]))
@@ -456,101 +471,99 @@ form, to the shortest branch of the cast tree that is relevant.
          (match* (t1-t t2-t)
            [(t t) ID-EXPR]
            [((Fn n _ _) (Fn n _ _))
-            (let$ ([id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-              (make-fn-coercion t1 t2 lbl id?-ret-box))]
+            (make-fn-coercion/id/fvs t1 t2 lbl)]
            [((STuple n _) (STuple m _)) #:when (<= n m)
-            (let$ ([id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-              (make-tuple-coercion t1 t2 lbl id?-ret-box))]
+            (make-tuple-coercion/id/fvs t1 t2 lbl)]
            [((GRef t1-t) (GRef t2-t))
             (define t1 (Type t1-t))
             (define t2 (Type t2-t))
-            (let$ ([id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-              (ref-coercion$
-               (interp-make-coercion t1 t2 lbl id?-ret-box)
-               (interp-make-coercion t2 t1 lbl id?-ret-box)))]
+            (ref-coercion$
+             (interp-make-coercion/id/fvs t1 t2 lbl)
+             (interp-make-coercion/id/fvs t2 t1 lbl))]
            [((GVect t1-t) (GVect t2-t))
             (define t1 (Type t1-t))
             (define t2 (Type t2-t))
-            (let$ ([id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-              (vec-coercion$
-               (interp-make-coercion t1 t2 lbl id?-ret-box)
-               (interp-make-coercion t2 t1 lbl id?-ret-box)))]
+            (vec-coercion$
+             (interp-make-coercion/id/fvs t1 t2 lbl)
+             (interp-make-coercion/id/fvs t2 t1 lbl))]
            [((MRef _) (MRef t2))
             (Quote-Coercion (MonoRef t2))]
            [((MVect _) (MVect t2))
             (Quote-Coercion (MonoVect t2))]
            ;; TODO consider doing better
-           [(_ _) (interp-make-med-coercion/id? t1 t2 lbl)])]
+           [(_ _) (interp-make-med-coercion/id/fvs t1 t2 lbl)])]
         [((Type t1-t) t2)
          (match t1-t
            ;; in each of these cases t2 could be a mu
            ;; todo consider doing better
            [(Fn n _ _)
             (If (and$ (type-fn?$ t2) (op=? (type-fn-arity$ t2) (Quote n)))
-                (make-fn-coercion/id? t1 t2 lbl)
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                (make-fn-coercion/id/fvs t1 t2 lbl)
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(STuple n _)
             (If (and$ (type-tup?$ t2) (op=? (type-tup-arity$ t2) (Quote n)))
-                (make-tuple-coercion/id? t1 t2 lbl)
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                (make-tuple-coercion/id/fvs t1 t2 lbl)
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(GRef t1-t)
             (define t1 (Type t1-t))
             (If (type-pbox?$ t2)
                 (let$ ([t2 (type-pbox-of$ t2)])
                   (ref-coercion$
-                   (interp-make-coercion/id? t1 t2 lbl)
-                   (interp-make-coercion/id? t2 t1 lbl)))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                   (interp-make-coercion/id/fvs t1 t2 lbl)
+                   (interp-make-coercion/id/fvs t2 t1 lbl)))
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(GVect t1-t)
             (define t1 (Type t1-t))
             (If (type-pvec?$ t2)
                 (let$ ([t2 (type-pvec-of$ t2)])
-                  (vec-coercion$ (interp-make-coercion/id? t1 t2 lbl)
-                                 (interp-make-coercion/id? t2 t1 lbl)))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                  (vec-coercion$ (interp-make-coercion/id/fvs t1 t2 lbl)
+                                 (interp-make-coercion/id/fvs t2 t1 lbl)))
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(MRef _)
             (If (type-mbox?$ t2)
                 (MRef-Coercion (type-mbox-of$ t2))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(MVect _)
             (If (type-mvec?$ t2)
                 (MVect-Coercion (type-mvec-of$ t2))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
-           [_ (interp-make-med-coercion/id? t1 t2 lbl)])]
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
+           [_ (interp-make-med-coercion/id/fvs t1 t2 lbl)])]
         [(t1 (Type t2-t))
          (match t2-t
            [(Fn n _ _)
             (If (and$ (type-fn?$ t1) (op=? (type-fn-arity$ t1) (Quote n)))
-                (make-fn-coercion/id? t1 t2 lbl)
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                (make-fn-coercion/id/fvs t1 t2 lbl)
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(STuple n _)
             (If (and$ (type-tup?$ t1) (op=? (type-tup-arity$ t1) (Quote n)))
-                (make-tuple-coercion/id? t1 t2 lbl)
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                (make-tuple-coercion/id/fvs t1 t2 lbl)
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(GRef t2-t)
             (define t2 (Type t2-t))
             (If (type-pbox?$ t1)
                 (let$ ([t1 (type-pbox-of$ t1)])
-                  (ref-coercion$ (interp-make-coercion/id? t1 t2 lbl)
-                                 (interp-make-coercion/id? t2 t1 lbl)))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                  (ref-coercion$
+                   (interp-make-coercion/id/fvs t1 t2 lbl)
+                   (interp-make-coercion/id/fvs t2 t1 lbl)))
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(GVect t2-t)
             (define t2 (Type t2-t))
             (If (type-pvec?$ t1)
                 (let$ ([t1 (type-pvec-of$ t1)])
-                  (vec-coercion$ (interp-make-coercion/id? t1 t2 lbl)
-                                 (interp-make-coercion/id? t2 t1 lbl)))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                  (vec-coercion$
+                   (interp-make-coercion/id/fvs t1 t2 lbl)
+                   (interp-make-coercion/id/fvs t2 t1 lbl)))
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(MRef t2-t)
             (If (type-mbox?$ t1)
                 (MRef-Coercion (Type t2-t))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
            [(MVect t2-t)
             (If (type-mvec?$ t1)
                 (MVect-Coercion (Type t2-t))
-                (interp-make-med-coercion/id? t1 t2 lbl))]
-           [_ (interp-make-med-coercion/id? t1 t2 lbl)])]
-        [(t1 t2) (interp-make-med-coercion/id? t1 t2 lbl)]))
+                (interp-make-med-coercion/id/fvs t1 t2 lbl))]
+           [_ (interp-make-med-coercion/id/fvs t1 t2 lbl)])]
+        [(t1 t2) (interp-make-med-coercion/id/fvs t1 t2 lbl)]))
     ;; Bind non-values and decide to be eq? check 
     (bind-value$
      ([t1 t1] [t2 t2] [lbl lbl])
@@ -568,12 +581,12 @@ form, to the shortest branch of the cast tree that is relevant.
   
   (add-cast-runtime-binding!
    make-med-coercion-uid
-   (code$ (t1 t2 lbl id?-ret-box)
-     (code-gen-make-med-coercion t1 t2 lbl id?-ret-box)))
+   (code$ (t1 t2 lbl ret-id? ret-fvs)
+     (code-gen-make-med-coercion t1 t2 lbl ret-id? ret-fvs)))
   
   (add-cast-runtime-binding!
    make-coercion-uid
-   (code$ (t1 t2 lbl id?-ret-box)
+   (code$ (t1 t2 lbl ret-id? ret-fvs)
      (cond$
       [(op=? t1 t2) (Quote-Coercion (Identity))]
       ;; This is absolutly necisarry
@@ -581,19 +594,19 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; source code coercions composition can create new
       ;; projections and injections
       [(type-dyn?$ t1)
-       (Unguarded-Box-Set! id?-ret-box (Quote #f))
+       (Unguarded-Box-Set! ret-id? (Quote #f))
        (Sequence-Coercion (Project-Coercion t2 lbl)
                           (Quote-Coercion (Identity)))]
       [(type-dyn?$ t2)
-       (Unguarded-Box-Set! id?-ret-box (Quote #f))
+       (Unguarded-Box-Set! ret-id? (Quote #f))
        (Sequence-Coercion (Quote-Coercion (Identity))
                           (Inject-Coercion t1))]
       [else
        (cond
          [(monolithic-make-coercion?)
-          (code-gen-make-med-coercion t1 t2 lbl id?-ret-box)]
+          (code-gen-make-med-coercion t1 t2 lbl ret-id? ret-fvs)]
          [else
-          (interp-make-med-coercion t1 t2 lbl id?-ret-box)])])))
+          (interp-make-med-coercion t1 t2 lbl ret-id? ret-fvs)])])))
   
   ;; This is only applied to source level make-coercions at the top level
   ;; ie there are know recursive calls to compile-make-coercion therefore
@@ -637,8 +650,8 @@ form, to the shortest branch of the cast tree that is relevant.
              [(type-dyn?$ t1) (r DYN-EXPR t2 lbl)]
              [(type-dyn?$ t2) (r t1 DYN-EXPR lbl)]
              ;; There is no more information to specialize on
-             [else (interp-make-med-coercion/id? t1 t2 lbl)])]
-           [else (interp-make-coercion/id? t1 t2 lbl)])]))
+             [else (interp-make-med-coercion/id/fvs t1 t2 lbl)])]
+           [else (interp-make-coercion/id/fvs t1 t2 lbl)])]))
     ;; bind all non-literals and decide to check for eq?
     (define ret
       (bind-value$
@@ -653,7 +666,7 @@ form, to the shortest branch of the cast tree that is relevant.
          [((Type _) (Type _)) ;; lbl is an expression
           ;; Two types that are not equal do not need an eq check
           (r t1 t2 lbl)]
-         [((Var _) (Var _)) (interp-make-coercion/id? t1 t2 lbl)]
+         [((Var _) (Var _)) (interp-make-coercion/id/fvs t1 t2 lbl)]
          [(_ _) #:when know-not-eq? (r t1 t2 lbl)]
          [(_ _) (If (op=? t1 t2) ID-EXPR (r t1 t2 lbl))])))
     ret)
@@ -752,18 +765,24 @@ form, to the shortest branch of the cast tree that is relevant.
   (define cc-assoc-stack-uid (next-uid! "compose-coercions-assoc-stack"))
   (define cc-assoc-stack (Var cc-assoc-stack-uid))
   (add-cast-runtime-constant! cc-assoc-stack-uid (op$ make-assoc-stack))
-  (: compose-coercions Compose-Coercions/ID?-Return)
-  (define (compose-coercions c1 c2 id?-ret-box)
-    (apply-code compose-coercions-uid c1 c2 id?-ret-box))
-  (: compose-coercions/id? Compose-Coercions-Type)
-  (define (compose-coercions/id? c1 c2)
+  (: compose-coercions Compose-Coercions/ID/FVS)
+  (define (compose-coercions c1 c2 ret-id? ret-fvs)
+    (apply-code compose-coercions-uid c1 c2 ret-id? ret-fvs))
+  (: compose-coercions/id Compose-Coercions/FVS)
+  (define (compose-coercions/id c1 c2 ret-fvs)
     (let$ ([unused-id?-ret-box (Unguarded-Box-On-Stack (Quote #t))])
-      (apply-code compose-coercions-uid c1 c2 unused-id?-ret-box)))
-  (: compose-fn-coercions Compose-Coercions/ID?-Return)
+      (apply-code compose-coercions-uid c1 c2 unused-id?-ret-box ret-fvs)))
+  (: compose-coercions/id/fvs Compose-Coercions-Type)
+  (define (compose-coercions/id/fvs c1 c2)
+    (let$ ([unused-id?-ret-box (Unguarded-Box-On-Stack (Quote #t))]
+           [fv-count-ret-box   (Unguarded-Box-On-Stack (Quote 0))])
+      (apply-code compose-coercions-uid c1 c2
+                  unused-id?-ret-box fv-count-ret-box)))
+  (: compose-fn-coercions Compose-Coercions/ID/FVS)
   (define compose-fn-coercions
     (make-compose-fn-coercions #:id-coercion? Id-Coercion-Huh
                                #:compose-coercions compose-coercions))
-  (: compose-tup-coercions Compose-Coercions/ID?-Return)
+  (: compose-tup-coercions Compose-Coercions/ID/FVS)
   (define compose-tup-coercions
     (make-compose-tup-coercions #:id-coercion? Id-Coercion-Huh
                                 #:compose-coercions compose-coercions))
@@ -783,14 +802,14 @@ form, to the shortest branch of the cast tree that is relevant.
    ;; TODO break this function up so there is a compose-med-coercions
    ;; Rational: the only meaningfull coercions under a Mu are also
    ;; med-coercions being able to dispatch there quicker makes sense
-   (code$ (c1 c2 id?-ret-box)
+   (code$ (c1 c2 ret-id? ret-fvs)
      (cond$
       ;; Eliminating the Identities cuts down on the number of branches
       ;; and should be fast
       [(id-coercion?$ c1)
        (if (id-coercion?$ c2)
            (Quote '())
-           (Unguarded-Box-Set! id?-ret-box (Quote #f)))         
+           (Unguarded-Box-Set! ret-id? (Quote #f)))         
        c2]
       [(id-coercion?$ c2)
        ;; We know that c1 isn't id because of the test above
@@ -802,12 +821,12 @@ form, to the shortest branch of the cast tree that is relevant.
                [seq_snd (seq-coercion-snd$ c1)])
          (cond$
           [(prj-coercion?$ seq_fst)
-           (let*$ ([comp_seq_snd (compose-coercions seq_snd c2 id?-ret-box)])
-             (Unguarded-Box-Set! id?-ret-box (Quote #f))
+           (let*$ ([comp_seq_snd (compose-coercions seq_snd c2 ret-id? ret-fvs)])
+             (Unguarded-Box-Set! ret-id? (Quote #f))
              (seq-coercion$ seq_fst comp_seq_snd))]
           ;; We have to prioritize failure on the right over injection
           [(failed-coercion?$ c2)
-           (Unguarded-Box-Set! id?-ret-box (Quote #f))
+           (Unguarded-Box-Set! ret-id? (Quote #f))
            c2]
           ;; Because of the typeing rule for coercions we know that
           ;; c2 must be a (I?;i) aka projection sequence because
@@ -819,30 +838,30 @@ form, to the shortest branch of the cast tree that is relevant.
                    [t1    (inj-coercion-type$ seq_snd)]
                    [t2    (prj-coercion-type$ proj)]
                    [lbl   (prj-coercion-label$ proj)]
-                   ;; We can't us id?-ret-box in make-coercion or
-                   ;; the first call to compose-coercions because this
-                   ;; could result in a coercion that gets collapsed
-                   ;; in the subsequent composition(s).
                    [comp_prj_inj (make-coercion t1 t2 lbl)]
                    [comp_fst_pi
-                    (compose-coercions/id? seq_fst comp_prj_inj)]) 
-             (compose-coercions comp_fst_pi final id?-ret-box))]))]
+                    (compose-coercions/id seq_fst comp_prj_inj ret-fvs)])
+             ;; Only the final compose call should factor into the
+             ;; ret-id? .  Coercions created in the call to
+             ;; make-coercion and first compose-coercions calls can be
+             ;; eliminated in subsequent composes.
+             (compose-coercions comp_fst_pi final ret-id? ret-fvs))]))]
       [(seq-coercion?$ c2)
        (cond$
         [(failed-coercion?$ c1)
-         (Unguarded-Box-Set! id?-ret-box (Quote #f))
+         (Unguarded-Box-Set! ret-id? (Quote #f))
          c1]
         [else
          ;; must be c1 & (g;I?)
          (let*$ ([seq_fst (seq-coercion-fst$ c2)]
                  [seq_snd (seq-coercion-snd$ c2)]
-                 [comp_c1_final (compose-coercions c1 seq_fst id?-ret-box)])
-           (Unguarded-Box-Set! id?-ret-box (Quote #f))
+                 [comp_c1_final (compose-coercions c1 seq_fst ret-id? ret-fvs)])
+           (Unguarded-Box-Set! ret-id? (Quote #f))
            (seq-coercion$ comp_c1_final seq_snd))])]
       ;; All Branches from here out will have to check if c2 is failure
       ;; so we do it once to eliminate the possibility
       [(failed-coercion?$ c2)
-       (Unguarded-Box-Set! id?-ret-box (Quote #f))
+       (Unguarded-Box-Set! ret-id? (Quote #f))
        (If (failed-coercion?$ c1)
            c1
            c2)]
@@ -854,31 +873,30 @@ form, to the shortest branch of the cast tree that is relevant.
             ;; We haven't previously composed this pair of coercions
             [(op$ < i ZERO-EXPR)
              (op$ assoc-stack-push! cc-assoc-stack c1 c2 ZERO-EXPR)
-             (let*$ ([new-id?-box (Unguarded-Box-On-Stack (Quote #t))]
+             (let*$ ([new-id? (Unguarded-Box-On-Stack (Quote #t))]
                      [c (cond$
                          [(Mu-Coercion-Huh c1)
                           (compose-coercions
-                           (Mu-Coercion-Body c1) c2 new-id?-box)]
+                           (Mu-Coercion-Body c1) c2 new-id? ret-fvs)]
                          [else
                           (compose-coercions
-                           c1 (Mu-Coercion-Body c2) new-id?-box)])]
+                           c1 (Mu-Coercion-Body c2) new-id? ret-fvs)])]
                      [mu (op$ assoc-stack-pop! cc-assoc-stack)]
-                     [id? (Unguarded-Box-Ref new-id?-box)])
+                     [id? (Unguarded-Box-Ref new-id?)]
+                     [fv-count (Unguarded-Box-Ref ret-fvs)])
+               (unless$ id? (Unguarded-Box-Set! ret-id? (Quote #f))) 
                (cond$
-                ;; This Mu is equivalent to Id?
-                [id? ID-EXPR]
-                [else
-                 (Unguarded-Box-Set! id?-ret-box (Quote #f))
-                 (cond$
-                  ;; The Mu wasn't used, and therefore doesn't need to
-                  ;; exist.
-                  [(op$ = ZERO-EXPR mu) c]
-                  ;; The mu was used and therefore allocated we just
-                  ;; need to initialize it so that all the backedges
-                  ;; point to c.
-                  [else
-                   (Mu-Coercion-Body-Set! mu c)
-                   mu])]))]
+                 ;; This mu binding was never used in the body
+                 [(op$ = ZERO-EXPR mu) c]
+                 [else
+                  (Unguarded-Box-Set! ret-fvs (op$ - fv-count (Quote 1)))
+                  (cond$
+                   ;; if ret-fvs is 0 and id? is still true then we can
+                   ;; conclude this mu is equivalent to identity
+                   [(and$ id? (op=? fv-count (Quote 1))) ID-EXPR]
+                   [else
+                    (Mu-Coercion-Body-Set! mu c)
+                    mu])]))]
             ;; We have previously composed this pair of coercions
             ;; and `i` may point to a recursive coercion that will
             ;; represent the result of composing.
@@ -890,6 +908,9 @@ form, to the shortest branch of the cast tree that is relevant.
                 ;; we need it to point to the coercion we want to
                 ;; exist here too.
                 [(op$ = ZERO-EXPR mu)
+                 (Unguarded-Box-Set!
+                  ret-fvs
+                  (op$ + (Unguarded-Box-Ref ret-fvs) (Quote 1))) 
                  (let$ ([mu (Make-Mu-Coercion)])
                    (op$ assoc-stack-set! cc-assoc-stack i mu)
                    mu)]
@@ -897,20 +918,22 @@ form, to the shortest branch of the cast tree that is relevant.
                 ;; made, it will point to the coercion we need here.
                 [else mu]))]))]               
         [(fn-coercion?$ c1) ;; c2 must be a Function Coercion
-         (compose-fn-coercions c1 c2 id?-ret-box)]
+         (compose-fn-coercions c1 c2 ret-id? ret-fvs)]
         [(ref-coercion?$ c1) ;; c2 must also be a reference coercion
          (let*$ ([ref1_read  (ref-coercion-read$  c1)]
                  [ref1_write (ref-coercion-write$ c1)]
                  [ref2_read  (ref-coercion-read$  c2)]
                  [ref2_write (ref-coercion-write$ c2)]
-                 [read  (compose-coercions ref1_read  ref2_read id?-ret-box)]
-                 [write (compose-coercions ref2_write ref1_write id?-ret-box)])
+                 [read  (compose-coercions ref1_read  ref2_read
+                                           ret-id? ret-fvs)]
+                 [write (compose-coercions ref2_write ref1_write
+                                           ret-id? ret-fvs)])
            (If (and$ (id-coercion?$ read)
                      (id-coercion?$ write))
                ID-EXPR
                (ref-coercion$ read write)))]
         [(tup-coercion?$ c1)
-         (compose-tup-coercions c1 c2 id?-ret-box)]
+         (compose-tup-coercions c1 c2 ret-id? ret-fvs)]
         [(mbox-coercion?$ c1)
          (let*$ ([ref1_type  (mbox-coercion-type$ c1)]
                  [ref2_type  (mbox-coercion-type$ c2)]
@@ -925,12 +948,7 @@ form, to the shortest branch of the cast tree that is relevant.
       ;; C1 must be a failed coercion
       [else (Blame (failed-coercion-label$ c1))])))
   ;; For now we are not even trying to be good at compiling coercion composition
-  (values
-   compose-coercions-uid
-   (λ ([c1 : CoC3-Expr] [c2 : CoC3-Expr])
-     : CoC3-Expr
-     (let$ ([unused-id?-ret (Unguarded-Box-On-Stack (Quote #t))])
-       (apply-code compose-coercions-uid c1 c2 unused-id?-ret)))))
+  (values compose-coercions-uid compose-coercions/id/fvs))
 
 (: interpret-casts/coercions : -> (C0-Expr -> CoC3-Expr))
 (define (interpret-casts/coercions)
@@ -1244,22 +1262,19 @@ form, to the shortest branch of the cast tree that is relevant.
 ;; extend to work with recursive coercions.
 (define (make-compose-fn-coercions
          #:id-coercion? [id-coercion? : Id-Coercion-Huh-Type]
-         #:compose-coercions [compose-coercions : Compose-Coercions/ID?-Return])
-  : Compose-Coercions/ID?-Return
+         #:compose-coercions [compose-coercions : Compose-Coercions/ID/FVS])
+  : Compose-Coercions/ID/FVS
   (define compose-fn-coercions-uid (next-uid! "compose-fn-coercions"))
-  (define (compose-fn-coercions [c1 : CoC3-Expr] [c2 : CoC3-Expr]
-                                [id?-ret-box : CoC3-Expr])
-    (apply-code compose-fn-coercions-uid c1 c2 id?-ret-box))
   (add-cast-runtime-binding!
    compose-fn-coercions-uid
-   (code$ (c1 c2 id?-ret-box)
+   (code$ (c1 c2 ret-id? ret-fvs)
      (let$ ([c3-box  (Unguarded-Box-On-Stack ID-EXPR)]
             [j       (Unguarded-Box-On-Stack ZERO-EXPR)]
             [arity   (fn-coercion-arity$ c1)])
        ;; Compose the return
        (let$ ([c3-ret (compose-coercions (Fn-Coercion-Return c1)
                                          (Fn-Coercion-Return c2)
-                                         id?-ret-box)])
+                                         ret-id? ret-fvs)])
          (cond$
           [(id-coercion? c3-ret) (Quote '())]
           [else
@@ -1271,7 +1286,7 @@ form, to the shortest branch of the cast tree that is relevant.
          (Unguarded-Box-Set! j (op$ + (Quote 1) i))
          (let$ ([c3-arg (compose-coercions (Fn-Coercion-Arg c2 i)
                                            (Fn-Coercion-Arg c1 i)
-                                           id?-ret-box)])
+                                           ret-id? ret-fvs)])
            (cond$
             [(id-coercion? c3-arg) (Quote '())]
             [else
@@ -1283,23 +1298,27 @@ form, to the shortest branch of the cast tree that is relevant.
        (repeat$ (i (Unguarded-Box-Ref j) arity) ()
          (let$ ([c3-arg (compose-coercions (Fn-Coercion-Arg c2 i)
                                            (Fn-Coercion-Arg c1 i)
-                                           id?-ret-box)])
+                                           ret-id? ret-fvs)])
            ;; The function coercion has to exist because we are
            ;; in this loop
            (Fn-Coercion-Arg-Set! (Unguarded-Box-Ref c3-box) i c3-arg)))
        ;; No need to set the id?-ret-box because the sub calls would
        ;; have set it if they resulted in anything besides id. 
        (Unguarded-Box-Ref c3-box))))
-  compose-fn-coercions)
+  (λ ([c1 : CoC3-Expr]
+      [c2 : CoC3-Expr]
+      [ret-id? : CoC3-Expr]
+      [ret-fvs : CoC3-Expr])
+    (apply-code compose-fn-coercions-uid c1 c2 ret-id? ret-fvs)))
 
 (define (make-compose-tup-coercions
          #:id-coercion? [id-coercion? : Id-Coercion-Huh-Type]
-         #:compose-coercions [compose-coercions : Compose-Coercions/ID?-Return])
-  : Compose-Coercions/ID?-Return
+         #:compose-coercions [compose-coercions : Compose-Coercions/ID/FVS])
+  : Compose-Coercions/ID/FVS
   (define compose-tup-coercions-uid (next-uid! "compose-tuple-coercions"))
   (add-cast-runtime-binding!
    compose-tup-coercions-uid
-   (code$ (c1 c2 id?-ret-box)
+   (code$ (c1 c2 ret-id? ret-fvs)
      (let$ ([c3-box  (Unguarded-Box-On-Stack ID-EXPR)]
             [j       (Unguarded-Box-On-Stack ZERO-EXPR)]
             [arity   (Tuple-Coercion-Num c1)])
@@ -1308,7 +1327,7 @@ form, to the shortest branch of the cast tree that is relevant.
          (Unguarded-Box-Set! j (op$ + (Quote 1) i))
          (let$ ([c3-arg (compose-coercions (Tuple-Coercion-Item c1 i)
                                            (Tuple-Coercion-Item c2 i)
-                                           id?-ret-box)])
+                                           ret-id? ret-fvs)])
            (cond$
             [(id-coercion? c3-arg) (Quote '())]
             [else
@@ -1323,23 +1342,24 @@ form, to the shortest branch of the cast tree that is relevant.
           i
           (compose-coercions (Tuple-Coercion-Item c1 i)
                              (Tuple-Coercion-Item c2 i)
-                             id?-ret-box)))
+                             ret-id? ret-fvs)))
        ;; We don't need to set id?-ret-box because any recursive
        ;; calls resulting in non-id coercions would have set it.
        (Unguarded-Box-Ref c3-box))))
   (λ ([c1 : CoC3-Expr]
       [c2 : CoC3-Expr]
-      [id?-ret-box : CoC3-Expr])
-    (apply-code compose-tup-coercions-uid c1 c2 id?-ret-box)))
+      [ret-id? : CoC3-Expr]
+      [ret-fvs : CoC3-Expr])
+    (apply-code compose-tup-coercions-uid c1 c2 ret-id? ret-fvs)))
 
 (define (make-make-fn-coercion
          #:id-coercion? [id-coercion? : Id-Coercion-Huh-Type]
-         #:make-coercion [make-coercion : Make-Coercion/ID?-Return])
-  : Make-Coercion/ID?-Return
+         #:make-coercion [make-coercion : Make-Coercion/ID/FVS])
+  : Make-Coercion/ID/FVS
   (define make-fn-coercion-uid (next-uid! "make-fn-coercions"))
   (add-cast-runtime-binding!
    make-fn-coercion-uid
-   (code$ (t1 t2 lbl id?-ret-box)
+   (code$ (t1 t2 lbl ret-id? ret-fvs)
      ;; This code is slightly more complicated than it should
      ;; be in order to avoid allocating a fn-coercion before
      ;; we know that we need to. If we had a faster GC for
@@ -1350,8 +1370,7 @@ form, to the shortest branch of the cast tree that is relevant.
        ;; make the return
        (let$ ([c-ret (make-coercion (Type-Fn-return t1)
                                     (Type-Fn-return t2)
-                                    lbl
-                                    id?-ret-box)])
+                                    lbl ret-id? ret-fvs)])
          (cond$
           [(id-coercion? c-ret) (Quote '())]
           [else
@@ -1363,8 +1382,7 @@ form, to the shortest branch of the cast tree that is relevant.
          (Unguarded-Box-Set! j (op$ + (Quote 1) i))
          (let$ ([c-arg (make-coercion (Type-Fn-arg t2 i)
                                       (Type-Fn-arg t1 i)
-                                      lbl
-                                      id?-ret-box)])
+                                      lbl ret-id? ret-fvs)])
            (cond$
             [(id-coercion? c-arg) (Quote '())]
             [else
@@ -1376,8 +1394,7 @@ form, to the shortest branch of the cast tree that is relevant.
        (repeat$ (i (Unguarded-Box-Ref j) arity) ()
          (let$ ([c-arg (make-coercion (Type-Fn-arg t2 i)
                                       (Type-Fn-arg t1 i)
-                                      lbl
-                                      id?-ret-box)])
+                                      lbl ret-id? ret-fvs)])
            ;; The function coercion has to exist because we are
            ;; in this loop
            (Fn-Coercion-Arg-Set! (Unguarded-Box-Ref c-box) i c-arg)))
@@ -1387,14 +1404,15 @@ form, to the shortest branch of the cast tree that is relevant.
     (λ ([t1 : CoC3-Expr]
         [t2 : CoC3-Expr]
         [lbl : CoC3-Expr]
-        [id?-ret-box : CoC3-Expr])
+        [ret-id? : CoC3-Expr]
+        [ret-fvs : CoC3-Expr])
       : CoC3-Expr
-      (apply-code make-fn-coercion-uid t1 t2 lbl id?-ret-box)))
+      (apply-code make-fn-coercion-uid t1 t2 lbl ret-id? ret-fvs)))
 
 (define (make-make-tuple-coercion
          #:id-coercion? [id-coercion? : Id-Coercion-Huh-Type]
-         #:make-coercion [make-coercion : Make-Coercion/ID?-Return])
-  : Make-Coercion/ID?-Return
+         #:make-coercion [make-coercion : Make-Coercion/ID/FVS])
+  : Make-Coercion/ID/FVS
   (define make-tuple-coercion-uid (next-uid! "make-tuple-coercion"))
   (add-cast-runtime-binding!
    make-tuple-coercion-uid
@@ -1403,7 +1421,7 @@ form, to the shortest branch of the cast tree that is relevant.
    ;; identity coercion without allocating unnecessary tuple coercion of
    ;; identities. It expects the length of the first tuple to be greater than
    ;; or equal to the length of the second.
-   (code$ (t1 t2 lbl id?-ret-box)
+   (code$ (t1 t2 lbl ret-id? ret-fvs)
      (let$ ([c-box (Unguarded-Box-On-Stack ID-EXPR)]
             [j     (Unguarded-Box-On-Stack ZERO-EXPR)]
             [arity (Type-Tuple-num t2)])
@@ -1412,8 +1430,7 @@ form, to the shortest branch of the cast tree that is relevant.
          (Unguarded-Box-Set! j (op$ + (Quote 1) i))
          (let$ ([c-arg (make-coercion (Type-Tuple-item t1 i)
                                       (Type-Tuple-item t2 i)
-                                      lbl
-                                      id?-ret-box)])
+                                      lbl ret-id? ret-fvs)])
            (cond$
             [(id-coercion? c-arg) (Quote '())]
             [else
@@ -1428,16 +1445,16 @@ form, to the shortest branch of the cast tree that is relevant.
           i
           (make-coercion (Type-Tuple-item t1 i)
                          (Type-Tuple-item t2 i)
-                         lbl
-                         id?-ret-box)))
+                         lbl ret-id? ret-fvs)))
        ;; We don't need to set id?-ret-box because any recursive
        ;; calls resulting in non-id coercions would have set it.
        (Unguarded-Box-Ref c-box))))
   (λ ([t1 : CoC3-Expr]
       [t2 : CoC3-Expr]
       [lbl : CoC3-Expr]
-      [id?-ret-box : CoC3-Expr])
-    (apply-code make-tuple-coercion-uid t1 t2 lbl id?-ret-box)))
+      [ret-id? : CoC3-Expr]
+      [ret-fvs : CoC3-Expr])
+    (apply-code make-tuple-coercion-uid t1 t2 lbl ret-id? ret-fvs)))
 
 
 (define cast-runtime-constant-bindings
