@@ -52,7 +52,7 @@
 ;; The value of the test-cast-representations parameter
 ;; before alterations to the configuration.
 (define default-test-cast-representation
-  '(Static |Type-Based Casts| Coercions Hyper-Coercions))
+  '(Static |Type-Based Casts| Coercions )) #;Hyper-Coercions
 
 ;; Parameter Specifying which cast-representation variables
 ;; get tested when running the test suite
