@@ -36,8 +36,11 @@
          [(DHash K V) K -> V]
          [(DHash K V) K False -> (Option V)]
          [(DHash K V) K (-> V) -> V])))
-(define (dhash-ref dht k [th (missing-key k)])
-  (hash-ref (DHash-content dht) k th))
+(define (dhash-ref dht k [default 'dhash-ref/no-default-passed])
+  (cond
+    [(eq? default 'dhash-ref/no-default-passed)
+     (hash-ref (DHash-content dht) k (missing-key k))]
+    [else (hash-ref (DHash-content dht) k default)]))
 
 (: dhash-ref! (All (K V) (DHash K V) K (-> V) -> V))
 (define (dhash-ref! dht k v)
