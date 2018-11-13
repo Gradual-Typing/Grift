@@ -43,6 +43,8 @@ typedef union {
 #define GRIFT_ERROR_IN_RUNTIME 1
 
 #include "hashcons.h"
+#include "castprofiler.h"
+
 extern table types_ht;
 extern int64_t types_unique_index_counter;
 
