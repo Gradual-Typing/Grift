@@ -340,7 +340,6 @@ Notes to be deleted after implementation
                   ;; Mutable set of free variables in the current closure
                   ;; this is an out parameter.
                   [free-variables : (MSet Uid) (mset)])
-      
       (: propogate/recognize : (->* (Uid) (#:rator? Boolean) CoC5-Expr))
       ;; - propagate representative values and their binding depth
       ;; - recognize free-variable occurences
@@ -994,7 +993,7 @@ Notes to be deleted after implementation
               (unless (null? (cdr not-wk-c*))
                 (error 'todo)))
                         
-            (hash-set! label->closure-status fst-name 'regular)
+            (hash-set! label->closure-status fst-label 'regular)
             
             (define rst-nwk* (cdr not-wk-c*))
 
@@ -1047,7 +1046,7 @@ Notes to be deleted after implementation
                 (match-define (Closure name #f 'regular label self
                                        ctr? f* p* rec-e)
                   c)
-                (hash-set! label->closure-status name 'regular)
+                (hash-set! label->closure-status label 'regular)
                 (define-values (fv-set _) 
                   (resolve-free-variables eliminated? uid->uid^^ f*)
                   #;
@@ -1466,12 +1465,12 @@ Notes to be deleted after implementation
           (app-code$
            (Code-Label cast)
            v1
-           (Fn-Coercion-Arg v2 (Quote 0)) (Quote 0))))
+           (Fn-Coercion-Arg v2 (Quote 0)) (Quote 0) (Quote 0) (Quote 0))))
      (app-code$
       (Code-Label cast) 
       (Closure-App (Closure-Code v0) v0 (list (Var a0)))
       (Fn-Coercion-Return v2)
-      (Quote 0))))
+      (Quote 0) (Quote 0) (Quote 0))))
   
   
   ;; TODO Write tests for most of the features of optimize closures
@@ -2077,7 +2076,228 @@ Notes to be deleted after implementation
        (list
         (Closure
          u1 #f 'closure-only code0 self1 #f (list v0) '() (Quote 0)))
-       v1)))))
+       v1))))
+
+
+  ;; loop5 -> u0
+  ;; 
+  (define loop5 (Uid "loop5" 1))
+  (define loop5-code (Uid "loop5_code" 0))
+  (define loop5-self (Uid "loop5_closure_self" 1))
+  (define loop4 (Uid "loop4" 2))
+  (define fn-cast (Uid "fn-cast-0" 442))
+  (define apply-coercion (Uid "apply-coercion" 158))
+  (define app-crcn-cl (Code-Label apply-coercion))
+  (define tmp (Uid "tmp" 465))
+  (define annon (Uid "annon" 467))
+  (define annon-code (Uid "annon_code" 2))
+  (define annon-self (Uid "annon_closure_self" 3))
+  (define init (Uid "letrec-init" 30))
+  (define tmp-closure2 (Uid "closure" 4))
+  (define tmp-closure3 (Uid "closure" 5))
+  (define tmp-closure1 (Uid "closure" 6))
+  
+  (refresh!)
+  (: fft-bug-result (List Null Null CoC5-Expr))
+  (define/test-equal? fft-bug-result
+    "convert-closure - fft-bug"
+    (values->list
+     (convert-closures
+      '()
+      (Let
+          (list
+           (cons init (Unguarded-Box (Quote #f)))
+           (cons loop4 (Unguarded-Box (Quote 0))))
+        (Letrec
+            (list
+             (cons
+              loop5
+              (Lambda
+                  '()
+                (Castable
+                 fn-cast
+                 (App-Code
+                  app-crcn-cl
+                  (list
+                   (Begin
+                     (list
+                      (App-Fn-or-Proxy apply-coercion (Var loop5) '()))
+                     (App-Fn-or-Proxy
+                      apply-coercion
+                      (Unguarded-Box-Ref (Var loop4)) '()))
+                   (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
+                   (Quote 0) (Quote 0) (Quote 0)))))))
+          (Let
+           (list
+            (cons
+                tmp
+                (App-Code
+                 (Code-Label apply-coercion)
+                 (list
+                  (Letrec
+                      (list
+                       (cons
+                        annon
+                        (Lambda '()
+                          (Castable
+                           fn-cast
+                           (App-Fn-or-Proxy
+                            apply-coercion
+                            (If (Unguarded-Box-Ref (Var init))
+                                (Var loop5)
+                                (Blame (Quote "")))
+                            '())))))
+                    (Var annon))
+                  (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
+                  (Quote 0) (Quote 0) (Quote 0)))))            
+           (Begin
+             (list
+              (Unguarded-Box-Set! (Var loop4) (Var tmp))
+              (Unguarded-Box-Set! (Var init) (Quote #t)))
+             (App-Fn-or-Proxy apply-coercion
+                              (Unguarded-Box-Ref (Var loop4))
+                              '())))))))
+    (list
+     '()
+     '()
+     (Let
+         (list
+          (cons
+           loop4
+           (Unguarded-Box (Quote 0)))
+          (cons
+           init
+           (Unguarded-Box (Quote #f))))
+       (Let-Closures
+        (list
+         (Closure
+          loop5 #f 'regular loop5-code loop5-self
+          fn-cast (list loop4) '()
+          (ann
+           (App-Code
+           app-crcn-cl
+           (list
+            (Begin
+              (list
+                 (Closure-App (Code-Label loop5-code)
+                              (Var loop5-self)
+                              '()))
+                (Let (list (cons tmp-closure1 (Unguarded-Box-Ref (Var loop4))))
+                  (Closure-App (Closure-Code (Var tmp-closure1))
+                               (Var tmp-closure1)
+                               '())))
+            (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
+            (Quote 0) (Quote 0) (Quote 0)))
+           CoC5-Expr)))
+        (ann
+         (Let
+             (list
+              (cons
+               tmp
+               (App-Code
+                (Code-Label apply-coercion)
+                (list
+                 (Let-Closures
+                  (list
+                   (Closure
+                    annon #f 'regular annon-code annon-self fn-cast
+                    (list loop5 init) '()
+                    (ann
+                     (Let
+                         (list
+                          (cons
+                           tmp-closure2
+                           (If (Unguarded-Box-Ref (Var init))
+                               (Var loop5)
+                               (Blame (Quote "")))))
+                       (Closure-App
+                        (Closure-Code (Var tmp-closure2))
+                        (Var tmp-closure2) '()))
+                     CoC5-Expr)))
+                  (Var annon))
+                 (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
+                 (Quote 0) (Quote 0) (Quote 0)))))
+           (ann
+            (Begin
+              (list
+               (Unguarded-Box-Set! (Var loop4) (Var tmp))
+               (Unguarded-Box-Set! (Var init) (Quote #t)))
+              (Let (list (cons tmp-closure3 (Unguarded-Box-Ref (Var loop4))))
+                (Closure-App (Closure-Code (Var tmp-closure3))
+                             (Var tmp-closure3)
+                             '())))
+            CoC5-Expr))
+         CoC5-Expr)))))
+  
+  (test-equal? 
+   "optimize-closures - bug in fft"
+   (values->list (apply optimize-closures fft-bug-result))
+   (list
+    '()
+    '()
+    '()
+    (Let (list (cons loop4 (Unguarded-Box (Quote 0)))
+               (cons init (Unguarded-Box (Quote #f))))
+      (Let-Closures
+       (list
+        (Closure
+         loop5 #f 'regular loop5-code loop5-self fn-cast
+         (list (Var loop4)) '()
+         (App-Code
+           (Code-Label apply-coercion)
+           (list
+            (Begin
+              (list
+               (Closure-App (Code-Label loop5-code) (Var loop5-self) '()))
+              (Let
+                  (list
+                   (cons
+                    tmp-closure1 
+                    (Unguarded-Box-Ref (Closure-Ref (Var loop5-self) 0))))
+                (Closure-App
+                 (Closure-Code (Var tmp-closure1)) (Var tmp-closure1) '())))
+            (Quote-Coercion
+             (Static-Id (Uid "static_project_crcn" 464)))
+            (Quote 0) (Quote 0) (Quote 0)))))
+       (Let
+           (list
+            (cons
+             tmp
+             (App-Code
+              (Code-Label apply-coercion)
+              (list
+               (Let-Closures
+                (list
+                 (Closure
+                  annon #f 'regular annon-code annon-self fn-cast
+                  (list (Var loop5) (Var init)) '()
+                  (Let (list
+                        (cons
+                         tmp-closure2 
+                         ;; Why are these not closure forms
+                         (If (Unguarded-Box-Ref (Closure-Ref (Var annon-self) 1))
+                             (Closure-Ref (Var annon-self) 0)
+                             (Blame (Quote "")))))
+                    (Closure-App (Closure-Code (Var tmp-closure2))
+                                 (Var tmp-closure2)
+                                 '()))))
+                (Var annon))
+               (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
+            (Quote 0) (Quote 0) (Quote 0))))) 
+         (Begin
+           (list
+            (Unguarded-Box-Set! (Var loop4) (Var tmp))
+            (Unguarded-Box-Set! (Var init) (Quote #t)))
+           (Let (list (cons tmp-closure3 (Unguarded-Box-Ref (Var loop4))))
+             (Closure-App (Closure-Code (Var tmp-closure3))
+                          (Var tmp-closure3)
+                          '()))))))))
+
+
+
+
+
+  )
 
 (: optimize? : Symbol -> Boolean)
 (define (optimize? x)
