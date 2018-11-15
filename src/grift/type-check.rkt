@@ -685,107 +685,112 @@ The type rules for core forms that have interesting type rules
     (define (validate t) (validate-type src t))
     (: new-exp G1-Expr)
     (: type Grift-Type)
+    (define (trace-type-error [e : exn])
+      (printf "error while type-checking: ~a\n" (srcloc->string src))
+      (raise e))
     (define-values (new-exp type)
-      (match (Ann-value e)
-        [(Lambda f* (list b t?))
-         (define i* (map (inst Fml-identifier Uid Grift-Type) f*))
-         (define t* (map (inst Fml-type Uid Grift-Type) f*))
-         (define vt* (map validate t*))
-         (define vt? (and t? (validate t?)))
-         (define-values (body type-of-body) (tc-expr b (env-extend* env i* vt*)))
-         (values (Lambda f* body)
-                 (lambda-type-rule src vt* type-of-body vt?))]
-        [(Letrec (app map-letrec-infer-bnd-type bnd*) body)
-         ;; letrce-infer-bnd-type maps validate type
-         (define recursive-env (foldr env-extend/bnd env bnd*))
-         (: rec/env : G0-Ann-Expr -> (Values G1-Ann-Expr Grift-Type))
-         (define (rec/env e) (tc-expr e recursive-env))
-         (define new-bnd (map (tc-binding src rec/env) bnd*))
-         (define-values (new-body type) (rec/env body))
-         (values (Letrec new-bnd new-body) type)]
-        [(Let (app (map-tc-binding src recur) bnd*) body)
-         (define env0 (foldl env-extend/bnd env bnd*))
-         (define-values (new-body type) (tc-expr body env0))
-         (values (Let bnd* new-body) type)]
-        [(App (app recur rator ty-rator) (app map-recur rand* ty-rand*))
-         (values (App rator rand*)
-                 (application-type-rule ty-rator ty-rand* src))]
-        [(Op (and p (app grift-primitive->type ty-p))
-             (app map-recur rand* ty-rand*))
-         (unless (Fn? ty-p)
-           (error 'type-check/Op "assuming operators have function type"))
-         (values (Op (list p (Fn-fmls ty-p)) rand*)
-                 (application-type-rule ty-p ty-rand* src))]
-        [(Ascribe (app recur exp ty-exp) ty-ann label)
-         (values (Ascribe exp ty-exp label)
-                 (ascription-type-rule ty-exp (validate ty-ann) src label))]
-        [(If (app recur tst ty-tst)
-             (app recur csq ty-csq)
-             (app recur alt ty-alt)) 
-         (values (If tst csq alt)
-                 (if-type-rule ty-tst ty-csq ty-alt src))]
-        [(Switch (app recur e et)
-           (app recur-switch-case* c* t*)
-           (app recur d dt))
-         (values (Switch e c* d) (switch-type-rule et t* dt))]
-        [(and e (Var id))
-         (debug e env id src (hash-ref env id #f))
-         (values e (hash-ref env id (lookup-failed src id)))]
-        [(and e (Quote lit)) (values e (const-type-rule lit))]
-        [(Repeat index
-             (app recur start ty-start)
-             (app recur stop ty-stop)
-             (list acc ty-acc?)
-             (app recur acc-init ty-acc-init)
-           exp) 
-         (define ty-acc (let-binding-type-rule (and ty-acc? (validate ty-acc?))
-                                               ty-acc-init acc src))
-         (define repeat-env (hash-set (hash-set env index INT-TYPE) acc ty-acc))
-         (define-values (new-exp ty-exp) (tc-expr exp repeat-env))
-         (values (Repeat index start stop acc acc-init new-exp)
-                 (repeat-type-rule ty-start ty-stop ty-acc ty-exp))]
-        [(Begin (app map-recur e* t*) (app recur e t))
-         (values (Begin e* e) (begin-type-rule t* t))]
-        [(Gbox (app recur e t))
-         (values (Gbox e) (gbox-type-rule t))]
-        [(Gunbox (app recur e t))
-         (values (Gunbox e) (gunbox-type-rule t))]
-        [(Gbox-set! (app recur e1 t1) (app recur e2 t2))
-         (values (Gbox-set! e1 e2) (gbox-set!-type-rule t1 t2))]
-        [(MboxS (app recur e t))
-         (values (Mbox e t) (mbox-type-rule t))]
-        [(Munbox (app recur e t))
-         (let ([ty (munbox-type-rule t)])
-           (values (Munbox e) ty))]
-        ;; move it to insert casts
-        [(Mbox-set! (app recur e1 t1) (app recur e2 t2))
-         (let ([ty (mbox-set!-type-rule t1 t2)])
-           (values (Mbox-set! e1 e2) ty))]
-        [(MvectorS (app recur e1 t1) (app recur e2 t2))
-         (let ([ty (mvector-type-rule t1 t2)])
-           (values (Mvector e1 e2 t2) ty))]
-        [(Mvector-ref (app recur e1 t1) (app recur e2 t2))
-         (let ([ty (mvector-ref-type-rule t1 t2)])
-           (values (Mvector-ref e1 e2) ty))]
-        [(Mvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
-         (let ([ty (mvector-set!-type-rule t1 t2 t3)])
-           (values (Mvector-set! e1 e2 e3) ty))]
-        [(Mvector-length (app recur e t))
-         (values (Mvector-length e) (mvector-length-type-rule t))]
-        [(Gvector (app recur e1 t1) (app recur e2 t2))
-         (values (Gvector e1 e2) (gvector-type-rule t1 t2))]
-        [(Gvector-ref (app recur e1 t1) (app recur e2 t2))
-         (values (Gvector-ref e1 e2) (gvector-ref-type-rule t1 t2))]
-        [(Gvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
-         (values (Gvector-set! e1 e2 e3) (gvector-set!-type-rule t1 t2 t3))]
-        [(Gvector-length (app recur e t))
-         (values (Gvector-length e)
-                 (gvector-length-type-rule t))]
-        [(Create-tuple (app map-recur e* t*))
-         (values (Create-tuple e*) (tuple-type-rule t*))]
-        [(Tuple-proj (app recur e t) i)
-         (values (Tuple-proj e i) (tuple-proj-type-rule t i))]
-        [other (error 'type-check "unmatched ~a" other)]))
+      (with-handlers ([exn? trace-type-error])
+        (match (Ann-value e)
+          [(Lambda f* (list b t?))
+           (define i* (map (inst Fml-identifier Uid Grift-Type) f*))
+           (define t* (map (inst Fml-type Uid Grift-Type) f*))
+           (define vt* (map validate t*))
+           (define vt? (and t? (validate t?)))
+           (define-values (body type-of-body) (tc-expr b (env-extend* env i* vt*)))
+           (values (Lambda f* body)
+                   (lambda-type-rule src vt* type-of-body vt?))]
+          [(Letrec (app map-letrec-infer-bnd-type bnd*) body)
+           ;; letrce-infer-bnd-type maps validate type
+           (define recursive-env (foldr env-extend/bnd env bnd*))
+           (: rec/env : G0-Ann-Expr -> (Values G1-Ann-Expr Grift-Type))
+           (define (rec/env e) (tc-expr e recursive-env))
+           (define new-bnd (map (tc-binding src rec/env) bnd*))
+           (define-values (new-body type) (rec/env body))
+           (values (Letrec new-bnd new-body) type)]
+          [(Let (app (map-tc-binding src recur) bnd*) body)
+           (define env0 (foldl env-extend/bnd env bnd*))
+           (define-values (new-body type) (tc-expr body env0))
+           (values (Let bnd* new-body) type)]
+          [(App (app recur rator ty-rator) (app map-recur rand* ty-rand*))
+           (values (App rator rand*)
+                   (application-type-rule ty-rator ty-rand* src))]
+          [(Op (and p (app grift-primitive->type ty-p))
+               (app map-recur rand* ty-rand*))
+           (unless (Fn? ty-p)
+             (error 'type-check/Op "assuming operators have function type"))
+           (values (Op (list p (Fn-fmls ty-p)) rand*)
+                   (application-type-rule ty-p ty-rand* src))]
+          [(Ascribe (app recur exp ty-exp) ty-ann label)
+           (values (Ascribe exp ty-exp label)
+                   (ascription-type-rule ty-exp (validate ty-ann) src label))]
+          [(If (app recur tst ty-tst)
+               (app recur csq ty-csq)
+               (app recur alt ty-alt)) 
+           (values (If tst csq alt)
+                   (if-type-rule ty-tst ty-csq ty-alt src))]
+          [(Switch (app recur e et)
+             (app recur-switch-case* c* t*)
+             (app recur d dt))
+           (values (Switch e c* d) (switch-type-rule et t* dt))]
+          [(and e (Var id))
+           (debug e env id src (hash-ref env id #f))
+           (values e (hash-ref env id (lookup-failed src id)))]
+          [(and e (Quote lit)) (values e (const-type-rule lit))]
+          [(Repeat index
+               (app recur start ty-start)
+               (app recur stop ty-stop)
+               (list acc ty-acc?)
+               (app recur acc-init ty-acc-init)
+             exp) 
+           (define ty-acc (let-binding-type-rule (and ty-acc? (validate ty-acc?))
+                                                 ty-acc-init acc src))
+           (define repeat-env (hash-set (hash-set env index INT-TYPE) acc ty-acc))
+           (define-values (new-exp ty-exp) (tc-expr exp repeat-env))
+           (values (Repeat index start stop acc acc-init new-exp)
+                   (repeat-type-rule ty-start ty-stop ty-acc ty-exp))]
+          [(Begin (app map-recur e* t*) (app recur e t))
+           (values (Begin e* e) (begin-type-rule t* t))]
+          [(Gbox (app recur e t))
+           (values (Gbox e) (gbox-type-rule t))]
+          [(Gunbox (app recur e t))
+           (values (Gunbox e) (gunbox-type-rule t))]
+          [(Gbox-set! (app recur e1 t1) (app recur e2 t2))
+           (values (Gbox-set! e1 e2) (gbox-set!-type-rule t1 t2))]
+          [(MboxS (app recur e t))
+           (values (Mbox e t) (mbox-type-rule t))]
+          [(Munbox (app recur e t))
+           (let ([ty (munbox-type-rule t)])
+             (values (Munbox e) ty))]
+          ;; move it to insert casts
+          [(Mbox-set! (app recur e1 t1) (app recur e2 t2))
+           (let ([ty (mbox-set!-type-rule t1 t2)])
+             (values (Mbox-set! e1 e2) ty))]
+          [(MvectorS (app recur e1 t1) (app recur e2 t2))
+           (let ([ty (mvector-type-rule t1 t2)])
+             (values (Mvector e1 e2 t2) ty))]
+          [(Mvector-ref (app recur e1 t1) (app recur e2 t2))
+           (let ([ty (mvector-ref-type-rule t1 t2)])
+             (values (Mvector-ref e1 e2) ty))]
+          [(Mvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
+           (let ([ty (mvector-set!-type-rule t1 t2 t3)])
+             (values (Mvector-set! e1 e2 e3) ty))]
+          [(Mvector-length (app recur e t))
+           (values (Mvector-length e) (mvector-length-type-rule t))]
+          [(Gvector (app recur e1 t1) (app recur e2 t2))
+           (values (Gvector e1 e2) (gvector-type-rule t1 t2))]
+          [(Gvector-ref (app recur e1 t1) (app recur e2 t2))
+           (values (Gvector-ref e1 e2) (gvector-ref-type-rule t1 t2))]
+          [(Gvector-set! (app recur e1 t1) (app recur e2 t2) (app recur e3 t3))
+           (values (Gvector-set! e1 e2 e3) (gvector-set!-type-rule t1 t2 t3))]
+          [(Gvector-length (app recur e t))
+           (values (Gvector-length e)
+                   (gvector-length-type-rule t))]
+          [(Create-tuple (app map-recur e* t*))
+           (values (Create-tuple e*) (tuple-type-rule t*))]
+          [(Tuple-proj (app recur e t) i)
+           (values (Tuple-proj e i) (tuple-proj-type-rule t i))]
+          [other (error 'type-check "unmatched ~a" other)]))
+      )
     (values (Ann new-exp (cons src type)) type))
   (recur exp))
 
