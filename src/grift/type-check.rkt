@@ -62,7 +62,7 @@ Provide comments about where to find definitions of types and data
   (define g1-top-level*
     (parameterize ([current-unique-counter uc])
       (tc-top* top-level* (hash))))
-  (debug who
+  (debug off
          (Prog (list n (unique-counter-next! uc) INT-TYPE) g1-top-level*)))
 
 (: tc-top* : G0-Top* Env -> G1-Top*)
@@ -93,13 +93,15 @@ Provide comments about where to find definitions of types and data
 
      (: tc-rec-define : Env -> (G0-IRec-Def -> G1-IRec-Def))
      (define ((tc-rec-define env) d)
-       (match-define (Ann2 (Define #t id id-type expr) src) d)
+       ;; The valid-id-type variable has already been validated in
+       ;; tc-rec-define*
+       (match-define (Ann2 (Define #t id valid-id-type expr) src) d)
        (define-values (new-expr expr-type) (tc-expr expr env))
-       (debug id-type expr-type)
-       (unless (consistent? id-type expr-type)
+       (debug valid-id-type expr-type)
+       (unless (consistent? valid-id-type expr-type)
          (error 'static-type-error "~a: inconsistent typed ~a and ~a"
-                (srcloc->string src) id-type expr-type))
-       (Define #t id id-type new-expr))
+                (srcloc->string src) valid-id-type expr-type))
+       (Define #t id valid-id-type new-expr))
 
      (: tc-rec-define* : G0-Top* Env G0-IRec-Def* -> G1-Top*)
      (define (tc-rec-define* t* env i*)
@@ -107,9 +109,10 @@ Provide comments about where to find definitions of types and data
          ;; Scan through then next consective recusive bindings in t*
          ;; infer their types and accumulate them in reverse.
          [(cons (Ann2 (Define #t id t? e) s) t*-rest)
-          (define-values (ty new-e) (infer-recursive-binding-type t? e)) 
-          (define i (Ann2 (Define #t id (validate-type s ty) new-e) s))
-          (tc-rec-define* t*-rest (hash-set env id ty) (cons i i*))]
+          (define-values (ty new-e) (infer-recursive-binding-type t? e))
+          (define valid-ty (validate-type s ty))
+          (define i (Ann2 (Define #t id valid-ty new-e) s))
+          (tc-rec-define* t*-rest (hash-set env id valid-ty) (cons i i*))]
          ;; Type-check each scanned top level form
          ;; reversing the scanned forms again and typechecking the
          ;; rest with the new environment. 
@@ -185,6 +188,18 @@ Provide comments about where to find definitions of types and data
          (or (hash-ref eqs r #f) r)]))
     rec)
   (debug who src type ((vt (set)) t)))
+
+(module+ test
+  (current-unique-counter (make-unique-counter 0))
+  (test-equal?
+   "validate type Mu without variable"
+   (validate-type s (Mu (Scope (Dyn))))
+   (Dyn))
+
+  (test-equal?
+   "validate type-Nested Mu without variable"
+   (validate-type s (Fn 0 '() (Mu (Scope (Dyn)))))
+   (Fn 0 '() (Dyn))))
 
 ;; Assumed to not validate types
 (: infer-recursive-binding-type :
