@@ -237,6 +237,7 @@ form, to the shortest branch of the cast tree that is relevant.
 (define make-coercion-inline/both-vars? : (Parameterof Boolean)
   (make-parameter #f))
 
+;; TODO this could be factored out of both coercion implementations
 (define (make-compile-make-coercion/make-med-coercion)
   : (Values Compile-Make-Coercion-Type Make-Med-Coercion-Type)
   (define make-coercion-uid (next-uid! "make-coercion"))

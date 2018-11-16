@@ -1035,15 +1035,6 @@ TODO write unit tests
      [(Type-Mu-Huh t1)
       (let$ ([t1-mu-body (Type-Mu-Body t1)])
         (cond$
-         [(Type-Mu-Huh t2)
-          (let$ ([t2-mu-body (Type-Mu-Body t2)])
-            (cond$
-             [(or$ (op=? t1-mu-body t2)
-                   (op=? t2-mu-body t1)
-                   (op=? t1-mu-body t2-mu-body))
-              v]
-             [else (interp-med-cast v t1-mu-body t2-mu-body l
-                                    mono-address base-address index)]))]
          [(op=? t1-mu-body t2) v]
          [else (interp-med-cast v t1-mu-body t2 l
                                 mono-address base-address index)]))]
@@ -1519,36 +1510,41 @@ TODO write unit tests
 
 (: make-compile-fn-cast/coercions
    (->* (#:get-fn-cast! (Nat -> Uid)
-         #:make-fn-coercion Make-Coercion-Type)
+         #:make-fn-coercion Make-Coercion-Type) 
         Fn-Cast-Type))
 (define (make-compile-fn-cast/coercions
          #:get-fn-cast! get-fn-cast! 
          #:make-fn-coercion make-fn-coercion)
+
   (define dfc? (direct-fn-cast-optimization?))
   (: compile-fn-cast Fn-Cast-Type)
   (define (compile-fn-cast v t1 t2 l)
-    (define c (make-fn-coercion t1 t2 l))
-    (match* (t1 t2)
-      [((Type (Fn n _ _)) _) #:when dfc?
-       (apply-code (get-fn-cast! n) v c)]
-      [(_ (Type (Fn n _ _))) #:when dfc?
-       (apply-code (get-fn-cast! n) v c)]
-      [(_ _)
-       (let$ ([v v] [c c])
-         ;; TODO!!! consider
-         ;; (App-Code (Fn-Caster v) (list v m))
-         ;; Benifit: no double-memory indirect
-         ;;          cast code can be specific
-         ;;          two branches eliminated
-         ;; Cost   : Proxies must have a caster slot
-         ;; (App-Code (Global-Cast-Table-Ref (Fn-Coercion-arity m))
-         ;;           (list v m))
-         ;; Benifit: Functions no longer have cast code cell
-         ;; Neg    : Another double memory indirect
-         ;;        : Another branch on the otherside cast code
-         (If (Fn-Proxy-Huh v)
-             (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
-             (App-Code (Fn-Caster v) (list v c))))]))
+    (let$ ([v v] [c (make-fn-coercion t1 t2 l)])
+      (cond$
+       ;; TODO: can this be more specialized to the implementation
+       ;; TODO: mk-fn-crcn is being implemented by make-coercion
+       [(Id-Coercion-Huh c) v]
+       [else
+        (match* (t1 t2)
+          [((Type (Fn n _ _)) _) #:when dfc?
+           (apply-code (get-fn-cast! n) v c)]
+          [(_ (Type (Fn n _ _))) #:when dfc?
+           (apply-code (get-fn-cast! n) v c)]
+          [(_ _)
+           ;; TODO!!! consider
+           ;; (App-Code (Fn-Caster v) (list v m))
+           ;; Benifit: no double-memory indirect
+           ;;          cast code can be specific
+           ;;          two branches eliminated
+           ;; Cost   : Proxies must have a caster slot
+           ;; (App-Code (Global-Cast-Table-Ref (Fn-Coercion-arity m))
+           ;;           (list v m))
+           ;; Benifit: Functions no longer have cast code cell
+           ;; Neg    : Another double memory indirect
+           ;;        : Another branch on the otherside cast code
+           (If (Fn-Proxy-Huh v)
+               (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
+               (App-Code (Fn-Caster v) (list v c)))])])))
   compile-fn-cast)
 
 (: make-compile-fn-cast
