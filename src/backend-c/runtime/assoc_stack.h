@@ -7,7 +7,7 @@ typedef struct {
 
 typedef struct {
   unsigned int size;// The total capacity of triples
-  unsigned int next; // end is the index for the next free slot
+  unsigned int next; // next is the index for the next free slot
   grift_assoc_triple *triples; // Pointer to Array of triples
 } grift_assoc_stack;
 
