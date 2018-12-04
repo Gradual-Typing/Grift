@@ -1,4 +1,4 @@
-;; This function test iso-recusive type equality
+;; This function test equirecusive type equality
 ;; in multiple ways
 (define (step) : (Rec X (-> X)) step)
 
