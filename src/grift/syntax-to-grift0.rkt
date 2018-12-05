@@ -441,7 +441,7 @@ represents types in the grift abstract syntax tree.
     [atm:id
      (match (type-env-lookup env #'atm)
        [(core-atomic cf) cf]
-       [(and v (TVar i)) v]
+       [(and v (TVar _)) v]
        [other
         (error 'parse-type
                "unmatched atom ~a resolved to ~a"
