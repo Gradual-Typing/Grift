@@ -336,12 +336,14 @@
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Global s)          (display s)]
+    ;; bit cast float using macro defined in backend-c/runtime/runtime.h
     [(Quote (? inexact-real? f))  (printf "float_to_imdt(~a)" f)]
     [(Quote (? char? c))
      (if (<= 0 (char->integer c) 255)
          (printf "'\\x~a'" (number->string (char->integer c) 16))
          (error 'generate-c/quote-char "currently only supports ASCII"))]
     [(Quote (? string? s)) (print s)]
+    ;; C doesn't allow implicit conversion of literal numbers to intptr_t
     [(Quote (? exact-integer? i)) (printf "((~a)~a)" IMDT-C-TYPE i)]
     ;; Todo Consider changing how Halt is handled
     [(Halt)           (display "exit(-1),-1")]
