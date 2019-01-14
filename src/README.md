@@ -2,7 +2,7 @@
 
 [grift/reduce-to-cast-calculus.rkt]: grift/reduce-to-cast-calculus.rkt
 [read.rkt]: grift/read.rkt
-[syntax-to-schml0.rkt]: grift/syntax-to-schml0.rkt
+[syntax-to-grift0.rkt]: grift/syntax-to-grift0.rkt
 [type-check.rkt]: grift/type-check.rkt
 [insert-casts.rkt]: grift/insert-casts.rkt
 [casts/impose-cast-semantics.rkt]: casts/impose-cast-semantics.rkt
@@ -36,7 +36,7 @@ of multiple passes.
 
 - [grift/reduce-to-cast-calculus.rkt]:
   - [read.rkt]: reads from file
-  - [syntax-to-schml0.rkt]: turns racket syntax objects into grift AST
+  - [syntax-to-grift0.rkt]: turns racket syntax objects into grift AST
     representation.
   - [type-check.rkt]: rejects ill-typed programs and annotates the AST
     with type information.
