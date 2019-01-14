@@ -15,11 +15,13 @@
 [specify-representation.rkt]: casts/specify-representation.rkt
 [data/convert-representation.rkt]: data/conver-representation.rkt
 [backend-c/code-generator.rkt]: backend-c/code-generator.rkt
-[backend-c/runtime/]: backend-c/runtime/
+[runtime/]: backend-c/runtime/
+[generate-c.rkt]: backend-c/generate-c.rkt
 [language/]: language/
 [language/forms.rkt]: language/forms.rkt
 [compile.rkt]: compile.rkt
 [configuration.rkt]: configuration.rkt
+
 
 ## The compiler
 
