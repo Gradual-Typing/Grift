@@ -26,6 +26,8 @@
    (test-file "program" "odd-20-hybrid5.grift" (bool #f))
    (test-file "program" "odd-20-dynamic.grift" (dyn))
    (test-file "program" "even-odd-cps-herman.grift" (bool #t))
+   ;; array sorting
+   (test-file "program" "insertion-sort-5.grift" (bool #t))
    ;; ackermans these are too long for the test suite
    (test-file "program" "ack-1-2-static.grift" (int 4))
    (test-file "program" "ack-2-3-static.grift" (int 9))

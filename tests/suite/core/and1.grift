@@ -1,0 +1,4 @@
+(define (bad-thing)
+  (vector-ref (vector 0 0) 0))
+
+(and #f (bad-thing))

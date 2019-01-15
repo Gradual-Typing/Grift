@@ -1,0 +1,11 @@
+(define (bad-thing)
+  (vector-ref (vector 0 0) 0))
+
+(define (good-thing)
+  42)
+
+(: (cond
+     [#f (bad-thing)]
+     [#t (good-thing)]
+     [else (bad-thing)])
+   Int)

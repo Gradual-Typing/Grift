@@ -405,6 +405,57 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                            (op 'timer-report)
                            (Var tmp)))))]))
 
+(define (parse-and stx env)
+  ;; this should be implemented as a macro once we have an expander
+  (syntax-parse stx
+    [(_ tests ...)
+     (define src (syntax->srcloc stx))
+     (define (/src e) (Ann e src))
+     (foldr (lambda (t e)
+              (If ((parse-form env) t)
+                  (/src e)
+                  (/src (Quote #f))))
+            (Quote #t)
+            (syntax->list #'(tests ...)))]))
+
+(define (parse-or stx env)
+  ;; this should be implemented as a macro once we have an expander
+  (syntax-parse stx
+    [(_ tests ...)
+     (define src (syntax->srcloc stx))
+     (define (/src e) (Ann e src))
+     (foldr (lambda (t e)
+              (If ((parse-form env) t)
+                  (/src (Quote #t))
+                  (/src e)))
+            (Quote #f)
+            (syntax->list #'(tests ...)))]))
+#;
+(define (parse-cond stx env)
+  ;; this should be implemented as a macro once we have an expander
+  (define src (syntax->srcloc stx))
+  (define (/src e) (Ann e src))
+  (syntax-parse stx
+    #:datum-literals (else)
+    [(_ [test conseq] [else default])
+     (If ((parse-form env) #'test)
+         ((parse-form env) #'conseq)
+         ((parse-form env) #'default))]))
+
+(define (parse-cond stx env)
+  ;; this should be implemented as a macro once we have an expander
+  (define src (syntax->srcloc stx))
+  (define (/src e) (Ann e src))
+  (syntax-parse stx
+    #:datum-literals (else)
+    [(_ [test conseq] ... [else default])
+     (foldr (lambda (t c e)
+              (If ((parse-form env) t)
+                  ((parse-form env) c)
+                  (/src e)))
+            (Begin '() ((parse-form env) #'default))
+            (syntax->list #'(test ...))
+            (syntax->list #'(conseq ...)))]))
 
 #|
 Parse Type converts syntax objects to the core forms that
@@ -592,8 +643,9 @@ represents types in the grift abstract syntax tree.
      (=  . ,core-parse-prim)
      (>  . ,core-parse-prim)
      (>= . ,core-parse-prim)
-     (and . ,core-parse-prim)
-     (or  . ,core-parse-prim)
+     (and . ,(core parse-and))
+     (or  . ,(core parse-or))
+     (cond . ,(core parse-cond))
      (quotient . ,core-parse-prim)
      (print-bool . ,core-parse-prim)
      (read-bool . ,core-parse-prim)

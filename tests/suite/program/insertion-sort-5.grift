@@ -1,0 +1,61 @@
+#| UTILITIES |#
+
+(define (add1 n) (+ n 1))
+(define (sub1 n) (- n 1))
+
+#| VECTOR |#
+
+(define (make-vector n init)
+  (vector n init))
+
+(define (vector-equal? v u)
+  (and (= (vector-length v) (vector-length u))
+    (vector-equal^? v u 0 (vector-length v))))
+
+(define (vector-equal^? v u i n)
+  (or (= i n)
+      (and (= (vector-ref v i) (vector-ref u i))
+        (vector-equal^? v u (add1 i) n))))
+
+#| MAIN |#
+
+(define V1 ;; #(3 4 2 1 5)
+  (let ([v (make-vector 5 0)])
+    (begin
+      (vector-set! v 0 3)
+      (vector-set! v 1 4)
+      (vector-set! v 2 2)
+      (vector-set! v 3 1)
+      (vector-set! v 4 5)
+      v)))
+
+(define V2 ;; #(1 2 3 4 5)
+  (let ([v (make-vector 5 0)])
+    (begin
+      (vector-set! v 0 1)
+      (vector-set! v 1 2)
+      (vector-set! v 2 3)
+      (vector-set! v 3 4)
+      (vector-set! v 4 5)
+      v)))
+
+(letrec ([sort! (lambda (vs n) (sort^! vs 0 n))]
+         [sort^! (lambda (vs i n)
+                   (if (< i n)
+                       (begin
+                         (insert! vs i (vector-ref vs i))
+                         (sort^! vs (+ i 1) n))
+                       vs))]
+         [insert! (lambda (vs i u)
+                    (if (> i 0)
+                        (let ([v (vector-ref vs (- i 1))])
+                          (if (< u v)
+                              (begin
+                                (vector-set! vs i v)
+                                (insert! vs (- i 1) u))
+                              (vector-set! vs i u)))
+                        (vector-set! vs i u)))])
+  (begin
+    (sort! V1 5)
+    (vector-equal? V1 V2)))
+

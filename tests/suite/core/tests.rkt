@@ -133,4 +133,8 @@
    (test-file "core" "switch1.grift"   (bool #t))
    (test-file "core" "switch2.grift"   (bool #t))
    (test-file "core" "switch3.grift"   (bool #t))
+   ;; And
+   (test-file "core" "and1.grift"   (bool #f))
+   ;; Or
+   (test-file "core" "or1.grift"   (bool #t))
    ))
