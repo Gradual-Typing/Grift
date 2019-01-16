@@ -1,0 +1,54 @@
+#| LIST |#
+(define (null) (tuple #t))
+(define (null? ls) (tuple-proj ls 0))
+(define (cons a b) (tuple #f a b))
+(define (car ls) (tuple-proj ls 1))
+(define (cdr ls) (tuple-proj ls 2))
+
+(define (lon-equal? l1 l2)
+  (cond
+    [(null? l1) (null? l2)]
+    [(null? l2) #f]
+    [else (and (= (car l1) (car l2))
+            (lon-equal? (cdr l1) (cdr l2)))]))
+
+#| MAIN |#
+
+(define L1 ;; #(3 4 2 1 5)
+  (cons 3
+    (cons 4
+      (cons 2
+        (cons 1
+          (cons 5 (null)))))))
+
+(define L2 ;; #(1 2 3 4 5)
+  (cons 1
+    (cons 2
+      (cons 3
+        (cons 4
+          (cons 5 (null)))))))
+
+(define (merge-sort ls)
+  (cond
+    [(or (null? ls) (null? (cdr ls))) ls]
+    [else (let ([pr (split ls (null) (null))])
+            (merge (merge-sort (car pr))
+                   (merge-sort (cdr pr))))]))
+
+(define (split ls xs ys)
+  (cond
+    [(null? ls) (cons xs ys)]
+    [else (split (cdr ls) ys (cons (car ls) xs))]))
+
+(define (merge xs ys)
+  (cond
+    [(null? xs) ys]
+    [(null? ys) xs]
+    [(< (car xs) (car ys))
+     (cons (car xs)
+       (merge (cdr xs) ys))]
+    [else
+     (cons (car ys)
+       (merge xs (cdr ys)))]))
+
+(and (lon-equal? (merge-sort L1) L2))

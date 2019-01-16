@@ -57,5 +57,5 @@
                         (vector-set! vs i u)))])
   (begin
     (sort! V1 5)
-    (vector-equal? V1 V2)))
+    (: (vector-equal? V1 V2) Bool)))
 
