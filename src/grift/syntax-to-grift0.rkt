@@ -430,17 +430,6 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                   (/src e)))
             (Quote #f)
             (syntax->list #'(tests ...)))]))
-#;
-(define (parse-cond stx env)
-  ;; this should be implemented as a macro once we have an expander
-  (define src (syntax->srcloc stx))
-  (define (/src e) (Ann e src))
-  (syntax-parse stx
-    #:datum-literals (else)
-    [(_ [test conseq] [else default])
-     (If ((parse-form env) #'test)
-         ((parse-form env) #'conseq)
-         ((parse-form env) #'default))]))
 
 (define (parse-cond stx env)
   ;; this should be implemented as a macro once we have an expander
