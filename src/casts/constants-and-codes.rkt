@@ -552,9 +552,10 @@
      (define runtime-code
        (code$ (ty)
          (case$ ty
-           ;; TODO : Fix type hashconsing so that the following
-           ;; case isn't needed.
-           [(0) (Quote 0)]
+           ;; ;; Mu's are unitialized when allocated, but there isn't a way
+           ;; ;; of preventing them from hashing their initial state.
+           ;; [(0) (Quote 0)]
+
            ;; The hash value for primitive types are their runtime values. 
            [(data:TYPE-DYN-RT-VALUE) TYPE-DYN-RT-VALUE]
            [(data:TYPE-INT-RT-VALUE) TYPE-INT-RT-VALUE]
@@ -578,9 +579,11 @@
               [(data:TYPE-FN-TAG)
                (sr-tagged-array-ref ty TYPE-FN-TAG TYPE-FN-HASH-INDEX)]
               [(data:TYPE-MU-TAG)
-               ;; This is weird and may be wrong but as a first approximation
-               ;; of hashing on the debrujin index we are just hashing on a
-               ;; constant.
+               ;; Mu's have a hash code for the purpose of insertion into the
+               ;; hashconsing table, but there contribution to other objects
+               ;; hashcode is actually a constant. This may cause more hash
+               ;; collisions, but its sound as long as every mu is checked
+               ;; equirecusive equality during the hashconsing check.
                (Quote 42)]
               [else
                (op$ Print err-msg)
