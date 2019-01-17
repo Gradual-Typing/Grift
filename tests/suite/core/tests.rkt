@@ -137,4 +137,6 @@
    (test-file "core" "and1.grift"   (bool #f))
    ;; Or
    (test-file "core" "or1.grift"   (bool #t))
+   ;; Cond
+   (test-file "core" "cond1.grift"   (int 42))
    ))
