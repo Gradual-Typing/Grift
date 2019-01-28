@@ -33,10 +33,12 @@ Provide comments about where to find definitions of types and data
          "../configuration.rkt"
          "../errors.rkt"
          "../language/forms.rkt"
+         "../language/pprint.rkt"
          "../language/grift0.rkt"
          "../language/grift1.rkt"
          "../language/primitives.rkt"
          "../logging.rkt")
+
 (module+ test
   (require rackunit)
   (define (fresh-uids!)
@@ -109,7 +111,7 @@ Provide comments about where to find definitions of types and data
          ;; Scan through then next consective recusive bindings in t*
          ;; infer their types and accumulate them in reverse.
          [(cons (Ann2 (Define #t id t? e) s) t*-rest)
-          (define-values (ty new-e) (infer-recursive-binding-type t? e))
+          (define-values (ty new-e) (synthesize-recursive-binding-type t? e))
           (define valid-ty (validate-type s ty))
           (define i (Ann2 (Define #t id valid-ty new-e) s))
           (tc-rec-define* t*-rest (hash-set env id valid-ty) (cons i i*))]
@@ -202,9 +204,9 @@ Provide comments about where to find definitions of types and data
    (Fn 0 '() (Dyn))))
 
 ;; Assumed to not validate types
-(: infer-recursive-binding-type :
+(: synthesize-recursive-binding-type :
    (Option Grift-Type) G0-Ann-Expr -> (Values Grift-Type G0-Ann-Expr))
-(define (infer-recursive-binding-type id-type? rhs)
+(define (synthesize-recursive-binding-type id-type? rhs)
   ;; Normally a binding construct assumes that the lack of type
   ;; annotation means to infer the type of the rhs, but recursive
   ;; binding constructs cannot be trivially infered.
@@ -302,24 +304,24 @@ The type rules for core forms that have interesting type rules
        (define-values (s0 used?) (grift-type-abstract/used? u t1))
        (if used? (Mu s0) t1)]))
   (with-handlers ([Bottom? values])
-    (let rec/u ([t t] [g g] [a (hash)])
-    (let rec ([t t] [g g])
-      (match* (t g)
-        [(t t)     t]
-        [((Dyn) g) g]
-        [(t (Dyn)) t]
-        [((STuple ta t*) (STuple ga g*)) 
-         ;; for/list semantics on mismatched lists is important here
-         ;; this truncates the result to match the shortest list
-         (STuple ta (for/list ([t t*] [g g*]) (rec t g)))]
-        [((Fn ta ta* tr) (Fn ta ga* gr))
-         (Fn ta (map rec ta* ga*) (rec tr gr))] 
-        [((GRef t) (GRef g)) (GRef (rec t g))]
-        [((GVect t) (GVect g)) (GVect (rec t g))]
-        [((MRef t) (MRef g)) (MRef (rec t g))]
-        [((Mu s) g) (unfold a (cons t g) t (λ (t a) (rec/u t g a)))]
-        [(t (Mu s)) (unfold a (cons t g) g (λ (g a) (rec/u t g a)))]
-        [(t g) (raise (Bottom t g))])))))
+    (let rec/a ([t t] [g g] [a (hash)])
+      (let rec ([t t] [g g])
+        (match* (t g)
+          [(t t)     t]
+          [((Dyn) g) g]
+          [(t (Dyn)) t]
+          [((STuple ta t*) (STuple ga g*)) 
+           ;; for/list semantics on mismatched lists is important here
+           ;; this truncates the result to match the shortest list
+           (STuple ta (for/list ([t t*] [g g*]) (rec t g)))]
+          [((Fn ta ta* tr) (Fn ta ga* gr))
+           (Fn ta (map rec ta* ga*) (rec tr gr))] 
+          [((GRef t) (GRef g)) (GRef (rec t g))]
+          [((GVect t) (GVect g)) (GVect (rec t g))]
+          [((MRef t) (MRef g)) (MRef (rec t g))]
+          [((Mu s) g) (unfold a (cons t g) t (λ (t a) (rec/a t g a)))]
+          [(t (Mu s)) (unfold a (cons t g) g (λ (g a) (rec/a t g a)))]
+          [(t g) (raise (Bottom t g))])))))
 
 (module+ test
   (fresh-uids!)
@@ -409,7 +411,7 @@ The type rules for core forms that have interesting type rules
 ;; arguments types of the proceedure.
 (: application-type-rule (-> Grift-Type Grift-Type* Src Grift-Type))
 (define (application-type-rule t-rator t-rand* src)
-  (match (resolve t-rator)
+  (match (unfold-possible-mu t-rator)
     [(Dyn) (Dyn)]
     [(Fn arity t-fml* t-ret)
      (unless (= arity (length t-rand*))
@@ -656,18 +658,18 @@ The type rules for core forms that have interesting type rules
   (define (env-extend/bnd b env)
     (match-let ([(Bnd i t _) b])
       (hash-set env i t)))
-  (: letrec-infer-bnd-type :
+  (: letrec-synth-bnd-type :
      (Bnd Uid (Option Grift-Type) G0-Ann-Expr) -> (Bnd Uid Grift-Type G0-Ann-Expr))
-  (define (letrec-infer-bnd-type bnd)
+  (define (letrec-synth-bnd-type bnd)
     (match-define (Bnd id id-type? rhs) bnd)
     (define-values (id-type new-rhs)
-      (infer-recursive-binding-type id-type? rhs))
+      (synthesize-recursive-binding-type id-type? rhs))
     (Bnd id id-type new-rhs))
-  (: map-letrec-infer-bnd-type :
+  (: map-letrec-synth-bnd-type :
      (Listof (Bnd Uid (Option Grift-Type) G0-Ann-Expr)) ->
      (Listof (Bnd Uid Grift-Type G0-Ann-Expr)))
-  (define (map-letrec-infer-bnd-type bnd*)
-    (map letrec-infer-bnd-type bnd*))
+  (define (map-letrec-synth-bnd-type bnd*)
+    (map letrec-synth-bnd-type bnd*))
   (: map-recur (G0-Ann-Expr* -> (Values G1-Ann-Expr* Grift-Type*)))
   (define (map-recur e*)
     (for/lists ([e* : G1-Ann-Expr*] [t* : Grift-Type*]) ([e e*])
@@ -699,7 +701,7 @@ The type rules for core forms that have interesting type rules
            (define-values (body type-of-body) (tc-expr b (env-extend* env i* vt*)))
            (values (Lambda f* body)
                    (lambda-type-rule src vt* type-of-body vt?))]
-          [(Letrec (app map-letrec-infer-bnd-type bnd*) body)
+          [(Letrec (app map-letrec-synth-bnd-type bnd*) body)
            ;; letrce-infer-bnd-type maps validate type
            (define recursive-env (foldr env-extend/bnd env bnd*))
            (: rec/env : G0-Ann-Expr -> (Values G1-Ann-Expr Grift-Type))
@@ -833,37 +835,12 @@ The type rules for core forms that have interesting type rules
     (map-switch-case2 f a)))
 
 
-;; resolve :: takes a type and converts it to a equivalent type
+;; unfold-possible-mu :: takes a type and converts it to a equivalent type
 ;; where the outermost type is a concrete type constructor (like ->, Tuple, etc.) as
 ;; opposed to logical (like Rec).
 ;; NOTE: this should only be called on types that have been converted to normal form. 
-(define (resolve t)
+(define (unfold-possible-mu t)
   (let rec ([t t])
     (match t
-      [(Mu s) (resolve (grift-type-instantiate s t))]
+      [(Mu s) (unfold-possible-mu (grift-type-instantiate s t))]
       [t t])))
-
-(define (type->sexp t [e : (hash)])
-  (let rec ([t t])
-    (match t 
-      [(FVar id) (hash-ref e id)]
-      [(Fn n a* r) `(,@(map rec a*) -> ,(rec r))]
-      [(Mu s)
-       (define u (next-uid! ""))
-       (define X (gensym "X"))
-       (define t0 (grift-type-instantiate s (FVar u)))
-       `(Rec ,X ,(type->sexp t0 (hash-set e u X)))]
-      [(STuple n a*) `(Tuple ,@(map rec a*))]
-      [(GVect a) `(GVect ,(rec a))]
-      [(GRef a) `(GRef ,(rec a))]
-      [(MVect a) `(MVect ,(rec a))]
-      [(MRef a)  `(MRef ,(rec a))]
-      [(Unit) '()]
-      [other
-       (define-values (nfo _0) (struct-info other))
-       (define-values (sym _1 _2 _3 _4 _5 _6 _7) (struct-type-info nfo))
-       sym])))
-
-(define (type->string t)
-  (with-output-to-string
-    (lambda () (display (type->sexp t (hash))))))
