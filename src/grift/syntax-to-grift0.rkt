@@ -138,9 +138,12 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
      (let ([msg (format "~a\n\tin:~a\n\tin particular: ~a" message expr sub)])
        (error name msg))])) 
 
-;; This is a little ugly but I am using lexical vars for Recursive types
+;; lexical-var are used for both expression variables and type variables. 
 (struct lexical-var  (symbol))
+;; core syntax represents syntax transformers and core forms that are built into
+;; expander.
 (struct core (parser))
+;; core-atomic are symbolic names that are built into the expander
 (struct core-atomic (atom))
 
 (define (env-lookup env x)
@@ -154,7 +157,6 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
     [(lexical-var var) var]
     [other (error src "expected lexical variable for ~a: found ~a"
                   x other)]))
-
 
 (define (env-extend env x u)
   (hash-set env (syntax->datum x) (lexical-var u)))
