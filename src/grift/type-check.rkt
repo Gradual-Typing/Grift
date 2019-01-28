@@ -49,10 +49,12 @@ Provide comments about where to find definitions of types and data
 (require/typed racket/base
   [srcloc->string (srcloc -> String)])
 
-(provide type-check
-         (all-from-out
-          "../language/grift0.rkt"
-          "../language/grift1.rkt"))
+(provide
+ type-check
+ unfold-possible-mu
+ (all-from-out
+  "../language/grift0.rkt"
+  "../language/grift1.rkt"))
 
 (: type-check (Grift0-Lang -> Grift1-Lang))
 (define (type-check prgm)
