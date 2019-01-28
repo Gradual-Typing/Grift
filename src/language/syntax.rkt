@@ -238,3 +238,6 @@
 (define-syntax-rule (mvec-coercion$ t) (MVect-Coercion t))
 (define-syntax-rule (mvec-coercion?$ c) (MVect-Coercion c))
 (define-syntax-rule (mvec-coercion-type$ c) (MVect-Coercion-Type c))
+
+(define-syntax-rule (unfold-possible-mu$ c)
+  (let ([tmp c]) (If (Type-Mu-Huh tmp) (Type-Mu-Body tmp) tmp)))

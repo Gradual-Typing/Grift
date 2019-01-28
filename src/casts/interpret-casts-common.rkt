@@ -681,7 +681,7 @@ TODO write unit tests
       (If (dyn-immediate-tag=?$ v PBOX-DYN-EXPR)
           (let*$ ([val (dyn-box-value$ v)]
                   [ty  (dyn-box-type$ v)]
-                  [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                  [ty  (unfold-possible-mu$ ty)])
             (If (Type-GRef-Huh ty)
                 (let*$ ([tyof (Type-GRef-Of ty)]
                         [read-val (pbox-ref val)])
@@ -697,8 +697,8 @@ TODO write unit tests
       (If (ann (dyn-immediate-tag=?$ dyn-gbox PBOX-DYN-EXPR) CoC3-Expr)
           (let*$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
                   [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)]
-                  [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
-            (If (Type-GRef-Huh ty)
+                  [ty   (unfold-possible-mu$ ty)])
+                 (If (Type-GRef-Huh ty)
                 (let$ ([tyof (Type-GRef-Of ty)])
                   (cond$
                    [(op=? tyof t2)
@@ -717,7 +717,7 @@ TODO write unit tests
         [(dyn-immediate-tag=?$ dyn PBOX-DYN-EXPR)
          (let*$ ([maybe-pvec-val (dyn-box-value$ dyn)]
                  [ty             (dyn-box-type$ dyn)]
-                 [maybe-pvec-ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                 [maybe-pvec-ty  (unfold-possible-mu$ ty)])
            (cond$
             [(Type-GVect-Huh maybe-pvec-ty)
              (let$ ([elem-ty (Type-GVect-Of maybe-pvec-ty)]
@@ -736,7 +736,7 @@ TODO write unit tests
        [(dyn-immediate-tag=?$ dyn-gvec PBOX-DYN-EXPR)
         (let*$ ([maybe-vec      (dyn-box-value$ dyn-gvec)]
                 [ty             (dyn-box-type$  dyn-gvec)]
-                [maybe-vec-type (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                [maybe-vec-type (unfold-possible-mu$ ty)])
           (cond$ 
            [(Type-GVect-Huh maybe-vec-type)
             (let*$ ([elem-type (Type-GVect-Of maybe-vec-type)]
@@ -756,7 +756,7 @@ TODO write unit tests
        [(dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
         (let*$ ([val (dyn-box-value$ v)]
                 [ty  (dyn-box-type$ v)]
-                [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-GVect-Huh ty) (pvec-len val)]
            [else (Blame l)]))]
@@ -769,7 +769,7 @@ TODO write unit tests
        [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
         (let*$ ([val (dyn-box-value$ dyn)]
                 [ty  (dyn-box-type$ dyn)]
-                [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MRef-Huh ty) (mbox-ref val DYN-EXPR)]
            [else (Blame lbl)]))]
@@ -782,7 +782,7 @@ TODO write unit tests
        [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
         (let*$ ([mbox (dyn-box-value$ dyn)]
                 [t1 (dyn-box-type$ dyn)]
-                [t1 (If (Type-Mu-Huh t1) (Type-Mu-Body t1) t1)])
+                [t1 (unfold-possible-mu$ t1)])
           (cond$
            [(Type-MRef-Huh t1)
             (let$ ([tyof (Type-MRef-Of t1)])
@@ -798,7 +798,7 @@ TODO write unit tests
       (cond$
        [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
         (let*$ ([ty (dyn-box-type$ dyn)]
-                [ty (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                [ty (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MVect-Huh ty)
             (mvec-ref (dyn-box-value$ dyn) ind DYN-EXPR)]
@@ -812,7 +812,7 @@ TODO write unit tests
        [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
         (let*$ ([val (dyn-box-value$ dyn-mvec)]
                 [ty  (dyn-box-type$ dyn-mvec)]
-                [ty  (If (Type-Mu-Huh ty) (Type-Mu-Body ty) ty)])
+                [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MVect-Huh ty)
             (let$ ([tyof (Type-MVect-Of ty)])
@@ -847,9 +847,7 @@ TODO write unit tests
            [(dyn-immediate-tag=?$ dyn-v FN-DYN-DYN-EXPR)
             (let*$ ([unboxed-value (dyn-box-value$ dyn-v)]
                     [src-type (dyn-box-type$  dyn-v)]
-                    [src-type (If (Type-Mu-Huh src-type)
-                                         (Type-Mu-Body src-type)
-                                         src-type)])
+                    [src-type (unfold-possible-mu$ src-type)])
               (cond$
                [(Type-Fn-Huh src-type)
                 (let-values
@@ -882,7 +880,7 @@ TODO write unit tests
        [(ann (dyn-immediate-tag=?$ v TUPLE-DYN-EXPR) CoC3-Expr)
         (let*$ ([u  (ann (dyn-box-value$ v) CoC3-Expr)]
                 [t0 (ann (dyn-box-type$ v) CoC3-Expr)]
-                [ty (If (Type-Mu-Huh t0) (Type-Mu-Body t0) t0)])
+                [ty (unfold-possible-mu$ t0)])
           (cond$
            [(ann (and$ (Type-Tuple-Huh ty)
                        (Op '> (list (Type-Tuple-num ty) i)))
