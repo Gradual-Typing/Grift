@@ -95,7 +95,7 @@ Provide comments about where to find definitions of types and data
      (define ((tc-rec-define env) d)
        ;; The valid-id-type variable has already been validated in
        ;; tc-rec-define*
-       (match-define (Ann2 (Define #t id valid-id-type expr) src) d)
+       (match-define (Ann2 (Define _ id valid-id-type expr) src) d)
        (define-values (new-expr expr-type) (tc-expr expr env))
        (debug valid-id-type expr-type)
        (unless (consistent? valid-id-type expr-type)
