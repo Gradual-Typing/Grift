@@ -2,16 +2,16 @@
 #|------------------------------------------------------------------------------+
 |Pass: src/casts/convert-closures                                               |
 +-------------------------------------------------------------------------------+
-|Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)                              |
+|Author: Andre Kuhlenschmidt (akuhlens@indiana.edu)                              |
 +-------------------------------------------------------------------------------+
 Description: This pass performs closure conversion and optimization based off
 of the paper Optimizing closures in O(n) time. A cursory analysis shows that
 we don't quite get O(n) time, instead I think we are O(n^3). At this point
-I am not really concered about the runtime. 
+I am not really concerned about the runtime. 
 
 
 - Closure Conversion is performed by the function `uncover-closure-ops`:
- - Records the free varibales of each closure in the `Closure` form.
+ - Records the free variables of each closure in the `Closure` form.
  - Reduces the number of free variables by eliminating free variables that are
    known to be :
    - bound to constants (constant propagation)
@@ -21,7 +21,7 @@ I am not really concered about the runtime.
  - Calls function code directly when a closure is known (direct call optimization)
 - Closure optimization is performed by the function `optimize-closures`:
   - Identifies closures with the same lifetime 
-    - uses tarjan's algorithm to identify strongly connected components formed by
+    - uses Tarjan algorithm to identify strongly connected components formed by
       variable capture.
   - When one or more well-known closures exist with the same life 
     we share a single closure for the well-known closures.
@@ -43,49 +43,16 @@ I am not really concered about the runtime.
 Terminology:
 - a closure is *well-known* if we know where all of its call sites are.
   - we conservatively estimate this property by checking to see if the
-    closure is found in any argument possition.
+    closure is found in any argument position.
 - a closure is *known* if we know that a variable binds it at a particular
   location. 
 
 +-------------------------------------------------------------------------------+
-TODO Change Language Forms Everywhere
-TODO Remove uncover-free vars and add new convert closures
-TODO Make changes to specify for new forms
-TODO Tidy up Integrate Closure Optimization
-TODO rename optimize-closures file 
 TODO Investigate adding a stateful payload to Uids this could remove several
      hash table lookups.
 TODO We can generate better code in this pass for function casts.
 
-QUESTIONS
-Q Once a closure has been statically allocated should we
-  reference the self parameter any longer?
-
-Notes to be deleted after implementation
-;;   (define select-share (optimize-shared-closures prgm))
-;;   ;;4. Determine the required free variables for each closure, leaving
-;;   ;;out those that are unnecessary.
-
-;;   ;; Constant propogate statically allocated closure and 
-;;   ;; Constant propogate small constants
-;;   ;; Take into account free variables eliminated by closure conversion
-;;   ;; Copy propogation (Alias Propagation)
-;;   ;; 
-  
-;;   ;;5. Select the appropriate representation for each closure and
-;;   ;;whether it can share space with a closure from some outer strongly
-;;   ;;connected set of bindings.
-  
-  
-;;   ;;6. Rebuild the code based on these selections.
-
 +------------------------------------------------------------------------------|#
-;; (require "../helpers.rkt"
-;;          "../errors.rkt"
-;;          "../configuration.rkt"
-;;          "cast-profiler.rkt"
-;;          "../language/cast-or-coerce5.rkt"
-;;          "../language/cast-or-coerce6.rkt")
 
 (provide
  (rename-out
@@ -97,16 +64,14 @@ Notes to be deleted after implementation
   ;; sometimes use a flat closure model, but are converted to memory
   ;; operations here to avoid any conflict with choosing a different
   ;; representation.
-  [convert-closures-pass convert-closures])
- ;;TODO Move types to cast-or-coerce6
- #;(all-from-out "../language/cast-or-coerce6.rkt")
- )
+  [convert-closures-pass convert-closures]))
 
 (require 
  racket/hash
  racket/list
  racket/match
- racket/set
+ racket/set 
+ typed/racket/unsafe
  "./cast-profiler.rkt"
  "../configuration.rkt"
  "../language/cast-or-coerce3.1.rkt"
@@ -116,9 +81,17 @@ Notes to be deleted after implementation
  "../lib/dgraph.rkt"
  "../lib/mutable-set.rkt"
  (submod "../logging.rkt" typed)
- #;"../language/cast-or-coerce5.rkt"
  "../language/cast-or-coerce6.rkt"
  "../type-equality.rkt")
+
+(unsafe-require/typed
+ "../language/form-map.rkt"
+ ;; One common cause of type-checking time explosion is having type
+ ;; errors involving this type.
+ [form-map
+  (case->
+   [(U= CoC4-Expr) (CoC4-Expr -> CoC5-Expr) -> (U= CoC5-Expr)]
+   [CoC5-Expr (CoC5-Expr -> CoC6-Expr) -> CoC6-Expr])])
 
 (module+ test
   (require
@@ -129,7 +102,7 @@ Notes to be deleted after implementation
     syntax/location)
    typed/rackunit))
 
-;; TODO move this to configuration and make these passes optional.
+;;  TODO move this to configuration and make these passes optional.
 (define closure-optimizations : (Parameterof (Setof Symbol))
   (make-parameter
    (seteq 'self-reference
@@ -147,15 +120,11 @@ Notes to be deleted after implementation
 (: convert-closures-pass (Cast-or-Coerce4-Lang -> Cast-or-Coerce6-Lang))
 (define (convert-closures-pass prgm)
   (match prgm
-    [(Prog (list name next type)
-       ;; TODO Static-Let* everywhere
-       (Static* (list
-                 bnd-mu-type*
-                 bnd-type*
-                 bnd-mu-crcn*
-                 bnd-crcn*
-                 bnd-const*) 
-                main-expr))
+    [(Prog
+      (list name next type)
+      (Static*
+       (list bnd-mu-type* bnd-type* bnd-mu-crcn* bnd-crcn* bnd-const*) 
+       main-expr))
      
      (define uc (make-unique-counter next))
 
@@ -168,8 +137,7 @@ Notes to be deleted after implementation
        (optimize-closures static-closure* bnd-const*^ main-expr^))
 
      (debug bnd-static-code* static-closure*^ bnd-const*^^ main-expr^^)
-     
-     
+          
      (Prog (list name (unique-counter-next! uc) type)
        (Static*
         (list
@@ -178,17 +146,6 @@ Notes to be deleted after implementation
          bnd-static-code* static-closure*^
          bnd-const*^^)
         main-expr^^))]))
-
-(require typed/racket/unsafe)
-
-(unsafe-require/typed
- "../language/form-map.rkt"
- ;; One common cause of type-checking time explosion is having type
- ;; errors involving this type.
- [form-map
-  (case->
-   [(U= CoC4-Expr) (CoC4-Expr -> CoC5-Expr) -> (U= CoC5-Expr)]
-   [CoC5-Expr (CoC5-Expr -> CoC6-Expr) -> CoC6-Expr])])
 
 ;; Uncover Free Eliminates the following forms
 (define-type (U- E)
@@ -292,7 +249,7 @@ Notes to be deleted after implementation
        ;; This is the name of the closure that is never allocated.
        ;; After closure conversion it should never be seen.
        (define name (next-uid! ""))
-       ;; The label for the code that appies arbitray casted closures
+       ;; The label for the code that applies arbitrary casted closures
        ;; for functions of this arity.
        (define label (next-uid! (format "apply_casted_closure_arity~a" i))) 
        ;; The self variable for the code
@@ -303,8 +260,8 @@ Notes to be deleted after implementation
        (define v* (map (inst Var Uid) p*))
        ;; The free-variables of this closure.
        (define closure-field (next-uid! "closure-field"))
-       (define coercion-field (next-uid! "corcion-field"))
-       ;; TODO the apply line just used the caster from here
+       (define coercion-field (next-uid! "coercion-field"))
+       ;; TODO the apply line just uses the caster from here
        ;; code-gen cast-casted-closure and used that code
        ;; as the castor for this code.
        ;; TODO Can we speed up applications of this code?
@@ -342,7 +299,7 @@ Notes to be deleted after implementation
                   [free-variables : (MSet Uid) (mset)])
       (: propogate/recognize : (->* (Uid) (#:rator? Boolean) CoC5-Expr))
       ;; - propagate representative values and their binding depth
-      ;; - recognize free-variable occurences
+      ;; - recognize free-variable occurrences
       ;; - recognize escaping closures 
       (define (propogate/recognize u #:rator? [rator? #f])
         ;; Folding Constants and Aliases can reduce closure size
@@ -791,7 +748,7 @@ Notes to be deleted after implementation
 (define (optimize-closures c* const-bnd* e)
   ;; Closures that are not well-known but contain no free-variables
   ;; can be statically allocated and refered to by there constants name.
-  ;; Since they have no free variables, and thus no dependancies, the order of
+  ;; Since they have no free variables, and thus no dependencies, the order of
   ;; these bindings do not matter.
   (define static-code : (Bnd* (Code Uid* CoC6-Expr)) '())
   (define static-closures : (Closure* CoC6-Expr CoC6-Expr) '())
@@ -2292,11 +2249,6 @@ Notes to be deleted after implementation
              (Closure-App (Closure-Code (Var tmp-closure3))
                           (Var tmp-closure3)
                           '()))))))))
-
-
-
-
-
   )
 
 (: optimize? : Symbol -> Boolean)
@@ -2308,8 +2260,4 @@ Notes to be deleted after implementation
 (define (map-bnd* f b*)
   (for/list ([b b*]) (cons (car b) (f (cdr b)))))
 
-
-
-
-
-
+; LocalWords:  Propagant uid fn uids arg letrec src
