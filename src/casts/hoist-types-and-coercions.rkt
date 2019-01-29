@@ -251,9 +251,11 @@
   ;; of compile type hashconsing unrolled versions of types.
   (: recur : Src -> (Values Imm Nat))
   (define (recur t)
-    (define p? (hash-ref c t #f))
     (cond
-      [p? (values (car p?) (cdr p?))]
+      [(hash-ref c t #f)
+       =>
+       (lambda ([p : (Pair Imm Nat)])
+         (values (car p) (cdr p)))]
       [else
        (define-values (ret-i ret-r) (src->imm t))
        (hash-set! c t (cons ret-i ret-r))
