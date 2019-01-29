@@ -786,6 +786,39 @@ class literal constants
 (: meet+ : Grift-Type* -> Grift-Type?!)
 (define meet+ (move+ down))
 
+;; returns #t if `t1` is less precise than `t2`.
+;; if t1 and t2 are unrelated it returns #f.
+(: le-precise? : Grift-Type Grift-Type -> Boolean)
+(define (le-precise? t1 t2)
+  (let loop ([t1 t1]
+             [t2 t2]
+             [seen : (Setof (Pairof Grift-Type Grift-Type)) (set)])
+    (let rec/s ([t1 t1] [t2 t2])
+      (match* (t1 t2)
+        [(t t) #t]
+        [((Dyn) t) #t]
+        [((Fn n t1* t1) (Fn n t2* t2))
+         (and (rec/s t1 t2)
+              (for/and ([t1 t1*] [t2 t2*])
+                (rec/s t1 t2)))]
+        [((STuple n t1*) (STuple n t2*))
+         (for/and ([t1 t1*] [t2 t2*])
+           (rec/s t1 t2))]
+        [((GRef t1)(GRef t2)) (rec/s t1 t2)]
+        [((GVect t1) (GVect t2)) (rec/s t1 t2)]
+        [((MRef t1) (MRef t2)) (rec/s t1 t2)]
+        [((MVect t1) (MVect t2)) (rec/s t1 t2)]
+        [(t1 t2) #:when (or (Mu? t1) (Mu? t2))
+                 (define p (cons t1 t2))
+                 (match* (t1 t2)
+                   [(_ _) #:when (set-member? seen p) #t]
+                   [((Mu s) t2)
+                    (loop (grift-type-instantiate s t1) t2 (set-add seen p))]
+                   [(t1 (Mu s))
+                    (loop t1 (grift-type-instantiate s t2) (set-add seen p))])]
+        [(other wise) #f]))))
+
+
 (define-forms form:simple-branch
   ;; The following forms are used to parameterize
   ;; the cast forms for 1 versus 3 extra arguments

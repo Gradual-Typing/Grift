@@ -25,11 +25,12 @@ form, to the shortest branch of the cast tree that is relevant.
  (submod "../logging.rkt" typed)
  "../configuration.rkt"
  "../language/syntax.rkt"
-  "../language/syntax-with-constants.rkt"
+ "../language/syntax-with-constants.rkt"
  "../language/cast0.rkt"
  "../language/cast-or-coerce3.rkt"
+ "../lib/option-set.rkt"
  "./interpret-casts-common.rkt"
- "cast-profiler.rkt")
+ "./cast-profiler.rkt")
 
 (provide interpret-casts/coercions
          cast-runtime-constant-bindings)
@@ -56,62 +57,6 @@ form, to the shortest branch of the cast tree that is relevant.
         Grift-Coercion))
 (define (make-coercion t1 t2 lbl
                        #:top-level? [top-level? #f])
-  (: option-set-add : (Option (Setof Uid)) Uid -> (Option (Setof Uid)))
-  (define (option-set-add os x)
-    (and os (set-add os x)))
-  (: option-set-remove : (Option (Setof Uid)) (Option Uid) -> (Option (Setof Uid)))
-  (define (option-set-remove os x)
-    (and os x (set-remove os x)))
-  (: option-set-empty? : (Option (Setof Uid)) -> Boolean)
-  (define (option-set-empty? os)
-    (and os (set-empty? os)))
-  (: option-set-union : (Option (Setof Uid)) (Option (Setof Uid))
-     -> (Option (Setof Uid)))
-  (define (option-set-union os1 os2)
-    (and os1 os2 (set-union os1 os2)))
-  (: option-set-union* : (Listof (Option (Setof Uid))) -> (Option (Setof Uid)))
-  (define (option-set-union* os*)
-    (: and-foldr : (Setof Uid) (Listof (Option (Setof Uid)))
-       -> (Option (Setof Uid)))
-    (define (and-foldr acc os*)
-      (cond
-        [(null? os*) acc]
-        [(car os*)
-         (and-foldr (set-union acc (car os*)) (cdr os*))]
-        [else #f]))
-    (and-foldr (seteq) os*))
-
-  ;; returns #t if `t1` is less precise than `t2`.
-  ;; if t1 and t2 are unrelated it returns #f.
-  (: le-precise? : Grift-Type Grift-Type -> Boolean)
-  (define (le-precise? t1 t2)
-    (let loop ([t1 t1] [t2 t2]
-               [seen : (Setof (Pairof Grift-Type Grift-Type)) (set)])
-      (let rec/s ([t1 t1] [t2 t2])
-        (match* (t1 t2)
-          [(t t) #t]
-          [((Dyn) t) #t]
-          [((Fn n t1* t1) (Fn n t2* t2))
-           (and (rec/s t1 t2)
-                (for/and ([t1 t1*] [t2 t2*])
-                  (rec/s t1 t2)))]
-          [((STuple n t1*) (STuple n t2*))
-           (for/and ([t1 t1*] [t2 t2*])
-             (rec/s t1 t2))]
-          [((GRef t1)(GRef t2)) (rec/s t1 t2)]
-          [((GVect t1) (GVect t2)) (rec/s t1 t2)]
-          [((MRef t1) (MRef t2)) (rec/s t1 t2)]
-          [((MVect t1) (MVect t2)) (rec/s t1 t2)]
-          [(t1 t2) #:when (or (Mu? t1) (Mu? t2))
-           (define p (cons t1 t2))
-           (match* (t1 t2)
-             [(_ _) #:when (set-member? seen p) #t]
-             [((Mu s) t2)
-              (loop (grift-type-instantiate s t1) t2 (set-add seen p))]
-             [(t1 (Mu s))
-              (loop t1 (grift-type-instantiate s t2) (set-add seen p))])]
-          [(other wise) #f]))))
-  
   ;; mc - make-coercion recusive call
   ;; returns
   ;; 1) A coercions that is equivalent to cast from t1 to t2 with lbl
@@ -242,61 +187,6 @@ form, to the shortest branch of the cast tree that is relevant.
   : (Values Compile-Make-Coercion-Type Make-Med-Coercion-Type)
   (define make-coercion-uid (next-uid! "make-coercion"))
   (define make-med-coercion-uid (next-uid! "make-med-coercion"))
-  ;; (: interp-make-coercion Make-Coercion-Type)
-  ;; (define (interp-make-coercion t1 t2 lbl)
-  ;;   (apply-code make-coercion-uid t1 t2 lbl))
-  ;; (: interp-make-med-coercion Make-Coercion-Type)
-  ;; (define (interp-make-med-coercion t1 t2 lbl)
-  ;;   (apply-code make-med-coercion-uid t1 t2 lbl))
-  ;; ;; Invariant: t1 <> t2
-  ;; ;; The compile function takes care of this case
-  ;; (: code-gen-make-med-coercion Make-Coercion-Type)
-  ;; (define (code-gen-make-med-coercion t1 t2 lbl)
-  ;;   (let$ ([t1 t1] [t2 t2] [lbl lbl])
-  ;;     (ann
-  ;;      (cond$
-  ;;       [(and$ (type-fn?$ t1) (type-fn?$ t2))
-  ;;        ;; This line is a little tricky because
-  ;;        ;; unless we have actual types for this at
-  ;;        ;; compile time we have to generate code
-  ;;        ;; that can handle arbitry fn-arity.
-  ;;        ;; We delegate this task to specify representation because
-  ;;        ;; it involves safely allocating an object whos size cannot
-  ;;        ;; be determined until run-time.
-  ;;        ;; TODO insert primitives that would allow this functions creation here
-  ;;        (ann (If (op=? (type-fn-arity$ t1) (type-fn-arity$ t2))
-  ;;                 (Make-Fn-Coercion make-coercion-uid t1 t2 lbl)
-  ;;                 (Blame lbl))
-  ;;             CoC3-Expr)]
-  ;;       [(and$ (type-tup?$ t1)
-  ;;              (type-tup?$ t2)
-  ;;              (op<=? (type-tup-arity$ t2) (type-tup-arity$ t1)))
-  ;;        (ann (Make-Tuple-Coercion make-coercion-uid t1 t2 lbl)
-  ;;             CoC3-Expr)]
-  ;;       [(and$ (type-pvec?$ t1) (type-pvec?$ t2))
-  ;;        (ann (let*$ ([pvof1 (type-pvec-of$ t1)]
-  ;;                     [pvof2 (type-pvec-of$ t2)]
-  ;;                     [read_crcn  (interp-make-coercion pvof1 pvof2 lbl)]
-  ;;                     [write_crcn (interp-make-coercion pvof2 pvof1 lbl)])
-  ;;               (vec-coercion$ read_crcn write_crcn))
-  ;;             CoC3-Expr)]
-  ;;       [(and$ (type-pbox?$ t1) (type-pbox?$ t2))
-  ;;        (ann (let*$ ([pbof1 (type-pbox-of$ t1)]
-  ;;                     [pbof2 (type-pbox-of$ t2)]
-  ;;                     [read_crcn  (interp-make-coercion pbof1 pbof2 lbl)]
-  ;;                     [write_crcn (interp-make-coercion pbof2 pbof1 lbl)])
-  ;;               (ref-coercion$ read_crcn write_crcn))
-  ;;             CoC3-Expr)]
-  ;;       [(and$ (type-mvec?$ t1) (type-mvec?$ t2))
-  ;;        (ann (let$ ([t (type-mvec-of$ t2)])
-  ;;               (MVect-Coercion t))
-  ;;             CoC3-Expr)]
-  ;;       [(and$ (type-mbox?$ t1) (type-mbox?$ t2))
-  ;;        (ann (let$ ([t (type-mbox-of$ t2)])
-  ;;               (MRef-Coercion t))
-  ;;             CoC3-Expr)]
-  ;;       [else (ann (Failed-Coercion lbl) CoC3-Expr)])
-  ;;      CoC3-Expr)))
   (define mc-assoc-stack-uid (next-uid! "make-coercion-assoc-stack"))
   (define mc-assoc-stack (Var mc-assoc-stack-uid))
   (add-cast-runtime-constant! mc-assoc-stack-uid (op$ make-assoc-stack))
