@@ -201,13 +201,14 @@ TODO We can generate better code in this pass for function casts.
 (assert-subtype? (U (U= CoC5-Expr) (U+ CoC5-Expr)) CoC5-Expr)
 (assert-subtype? CoC5-Expr (U (U= CoC5-Expr) (U+ CoC5-Expr)))
 
+;; The depth field keeps track of the depth of the binding that binds
+;; this variable. If the depth is less than the current-lambda's
+;; binding depth then the variable is a free variable of the lambda.
 (struct Bound-Var
   ([uid : Uid]
    [var : (Var Uid)]
    [depth : Nat])
   #:transparent)
-
-
 
 ;; Here I use `Propagant` as things that are propagated
 (define-type Propagant
@@ -222,7 +223,7 @@ TODO We can generate better code in this pass for function casts.
                 CoC5-Expr)))
 (define (convert-closures
          const-bnd*
-         main-e
+         main-expr
          #:propagate?      [propogate? (optimize? 'propagate)]
          #:direct-call?    [direct-call? (optimize? 'direct-call)]
          #:self-reference? [self-reference? (optimize? 'self-reference)]
@@ -280,8 +281,8 @@ TODO We can generate better code in this pass for function casts.
        apply-casted-closure-i]))
 
   (: convert-closures-in-expr : CoC4-Expr (HashTable Uid Propagant) -> CoC5-Expr)
-  (define (convert-closures-in-expr e static-env)
-    (let rec/env ([current-e : CoC4-Expr e]
+  (define (convert-closures-in-expr expr static-env)
+    (let rec/env ([current-expr : CoC4-Expr expr]
                   ;; Immutable map from function (closure) names to code labels
                   [code-env : (HashTable Uid Uid) (hasheq)]
                   ;; Map from variable names to representative constant or variable
@@ -335,51 +336,51 @@ TODO We can generate better code in this pass for function casts.
             [else propagant]))
         (debug off u p/r-ret))
       
-      (let rec ([current-e current-e])
-        (debug off current-e)
+      (let rec ([current-expr current-expr])
+        (debug off current-expr)
         (cond
-          ;; Variable found in non-application possition
-          [(Var? current-e) (propogate/recognize (Var-id current-e))]
-          [(Letrec? current-e)
-           (debug off current-e)
-           (match-define (Letrec b* e) current-e)
+          ;; Variable found in non-application position
+          [(Var? current-expr) (propogate/recognize (Var-id current-expr))]
+          [(Letrec? current-expr)
+           (debug off current-expr)
+           (match-define (Letrec lr-bnd* lr-body) current-expr)
            (define letrec-binding-depth (add1 current-binding-depth))
            (define closures-in-this-binding : (MSet Uid) (mset))
            (define-values (code-label* self-parameter*)
              (for/lists ([code-label* : Uid*]
                          [self-parameter* : Uid*])
-                        ([b b*])
-               (match-define (cons name _) b)
+                        ([lr-bnd lr-bnd*])
+               (match-define (cons name _) lr-bnd)
                (define label (format-uid! "~a_code" name))
                (define self (format-uid! "~a_closure_self" name))
-               (mset-add! closures-in-this-binding name) 
-               ;; Assume all closures are well known. If if variable for
-               ;; this closure appears outside of the rator possition for
-               ;; function application then remove it from this set.
+               (mset-add! closures-in-this-binding name)
+               ;; Letrecs only bind closures due to the previous
+               ;; purify-letrec pass. Assume all closures are well
+               ;; known. If the variable for this closure appears
+               ;; outside of the operator position for function
+               ;; application then remove it from this set.
                (mset-add! well-known-closures name)
                (mset-add! well-known-closures self)
                (values label self)))
 
            ;; Extend the code-env bindings for Optimize Direct Call
            ;; Extend opt-env without trying to eliminate bindings.
-
            (define-values (code-env^ opt-env^) 
              (for/fold ([code-env^ : (HashTable Uid Uid) code-env]
                         [opt-env^ : (HashTable Uid Propagant) opt-env])
                        ([code-label code-label*]
-                        [b b*])
-               (match-define (cons x _) b)
+                        [lr-bnd lr-bnd*])
+               (match-define (cons x _) lr-bnd)
                (define bv (Bound-Var x (Var x) letrec-binding-depth)) 
                (values (hash-set code-env^ x code-label)
                        (hash-set opt-env^  x bv))))
 
-           ;; Note before we decide if a closure is well known we must
-           ;; process all the expression in which variables for that
-           ;; closure may appear...
-
+           ;; Note: before we decide if a closure is well known we
+           ;; must process all the expression in which variables for
+           ;; that closure may appear...
            ;; So we recur into the body...
-           (define rec-e
-             (rec/env e code-env^ opt-env^
+           (define lr-converted-body
+             (rec/env lr-body code-env^ opt-env^
                       letrec-binding-depth
                       current-closure-name
                       current-closure-self
@@ -387,17 +388,18 @@ TODO We can generate better code in this pass for function casts.
                       free-variables))
 
            ;; And then we process all of the letrec bindings ...
-           (define-values (fv** rec-e*)
-             (for/lists ([fv** : (Listof Uid*)]
-                         [rec-e* : (Listof CoC5-Expr)])
-                        ([b b*]
+           (define-values (lr-bnd-fv** lr-bnd-converted-body*)
+             (for/lists ([lr-bnd-fv** : (Listof Uid*)]
+                         [lr-bnd-converted-body* : (Listof CoC5-Expr)])
+                        ([lr-bnd lr-bnd*]
                          [code-label code-label*]
                          [self self-parameter*])
-               (match-define (cons closure-name (Lambda p* (Castable c? e))) b)
+               (match-define
+                 (cons closure-name (Lambda p* (Castable c? lr-bnd-body)))
+                 lr-bnd)
                (define lambda-binding-depth (add1 letrec-binding-depth))
                (define fvs : (MSet Uid) (mset))
-               (define code-env^^
-                 (hash-set code-env^ self code-label))
+               (define code-env^^ (hash-set code-env^ self code-label))
                ;; Optimize self reference
                (define self-bv (Bound-Var self (Var self) lambda-binding-depth))
                (define opt-env^2
@@ -410,8 +412,8 @@ TODO We can generate better code in this pass for function casts.
                            ([p p*])
                    (hash-set env p (Bound-Var p (Var p) lambda-binding-depth))))
 
-               (define rec-e
-                 (rec/env e code-env^^ opt-env^3
+               (define lr-bnd-converted-body
+                 (rec/env lr-bnd-body code-env^^ opt-env^3
                           lambda-binding-depth
                           closure-name
                           self
@@ -420,21 +422,22 @@ TODO We can generate better code in this pass for function casts.
 
                ;; We have to check each free variable at this depth
                ;; to see if they need added to the current free variable set.
-               ;; TODO find a way not to perfom this iteration/lookup again
+               ;; TODO find a way not to perform this iteration/lookup again
                ;; The sort here makes the ordering of the list deterministic.
 
-               (define fv* (sort (mset->list fvs) uid<?))
+               (define lr-bnd-body-fv* (sort (mset->list fvs) uid<?))
 
-               (for ([u fv*])
+               (for ([u lr-bnd-body-fv*])
                  (match (hash-ref opt-env^ u #f)
                    [(Bound-Var _ _ bd)
                     #:when (<= bd current-closure-depth)
                     (mset-add! free-variables u)]
                    [other (void)]))
                
-               (values fv* rec-e)))
+               (values lr-bnd-body-fv*
+                       lr-bnd-converted-body)))
 
-           ;; Only after we have recured on all of the bindings
+           ;; Only after we have recurred on all of the bindings
            ;; and the body can we decide if the closure is well known
            ;; and populate all the metadata.
 
@@ -444,21 +447,23 @@ TODO We can generate better code in this pass for function casts.
            (define captures : (DGraph Uid) (make-dgraph))
            (define u->c-hash
              (for/hasheq : (HashTable Uid (Closure Uid CoC5-Expr))
-                         ([b b*]
-                          [label code-label*]
-                          [self self-parameter*]
-                          [fv* fv**]
-                          [rec-e  rec-e*])
-               (match-define (cons name (Lambda fp* (Castable c? _))) b)
+                 ([lr-bnd lr-bnd*]
+                  [label code-label*]
+                  [self self-parameter*]
+                  [lr-bnd-fv* lr-bnd-fv**]
+                  [lr-bnd-converted-body  lr-bnd-converted-body*])
+               (match-define (cons name (Lambda fp* (Castable c? _))) lr-bnd)
                ;; Only after we have done every recursive call can we know
                ;; if the closure is well-kown.
                (define wk?
                  (and (mset-member? well-known-closures name)
                       (mset-member? well-known-closures self)))
                (debug off well-known-closures name self wk?)
-               (define c (Closure name wk? 'regular label self c? fv* fp* rec-e))
+               (define c
+                 (Closure name wk? 'regular label self c?
+                          lr-bnd-fv* fp* lr-bnd-converted-body))
                (dgraph-add-vertex! captures name)
-               (for ([fv fv*])
+               (for ([fv lr-bnd-fv*])
                  ;; we only care about the free variables that are bound
                  ;; in this binding. Filtering these here prevents `scc`
                  ;; from having to deal with them, and awkward code later
@@ -472,19 +477,19 @@ TODO We can generate better code in this pass for function casts.
            (: u->c : Uid -> (Closure Uid CoC5-Expr))
            (define (u->c x) (hash-ref u->c-hash x))
 
-           ;; Compute the strongly connected Components
-           ;; i.e. The sets of mutually recusive bindings.
-           ;; Tarjans algorithm also topologically sorts the bindings
+           ;; Compute the strongly connected components (scc*)
+           ;; i.e. The sets of mutually recursive bindings.
+           ;; Tarjan's algorithm also topologically sorts the bindings
            (define scc* : (Listof Uid*)
              (for/list ([scc (reverse (dgraph-scc captures))])
                (sort scc uid<?)))
 
            (let loop ([scc* scc*])
              (match scc*
-               ['() rec-e]
+               ['() lr-converted-body]
                [(cons scc scc*) (Let-Closures (map u->c scc) (loop scc*))]))]
-          [(Labels? current-e)
-           (match-define (Labels b* b) current-e)
+          [(Labels? current-expr)
+           (match-define (Labels b* b) current-expr)
            (define code-binding-depth (add1 current-binding-depth))
            (define rec-b* : (Bnd* (Fun CoC5-Expr))
              (for/list ([b b*])
@@ -501,8 +506,8 @@ TODO We can generate better code in this pass for function casts.
                                   current-closure-depth
                                   (mset))))))
            (Labels rec-b* (rec b))]
-          [(Let? current-e)
-           (match-define (Let b* e) current-e)
+          [(Let? current-expr)
+           (match-define (Let b* e) current-expr)
            (define let-binding-depth (add1 current-binding-depth))
            (define-values (b*^ opt-env^)
              (for/fold ([b*^ : (Bnd* CoC5-Expr) '()]
@@ -554,8 +559,8 @@ TODO We can generate better code in this pass for function casts.
            (cond
              [(null? b*^) rec-e]
              [else (Let b*^ rec-e)])]
-          [(Repeat? current-e)
-           (match-define (Repeat i e1 e2 a e3 e4) current-e)
+          [(Repeat? current-expr)
+           (match-define (Repeat i e1 e2 a e3 e4) current-expr)
            (define rec-e1 (rec e1))
            (define rec-e2 (rec e2))
            (define rec-e3 (rec e3))
@@ -573,19 +578,19 @@ TODO We can generate better code in this pass for function casts.
                       free-variables))
            (Repeat i rec-e1 rec-e2 a rec-e3 rec-e4)]
           ;; Castable Function Operations
-          [(Fn-Caster? current-e)
+          [(Fn-Caster? current-expr)
            ;; TODO If e is well known variable then we should be able
            ;; to know its arity and thus the static code that this
            ;; gets resolved to.
-           (match-define (Fn-Caster e) current-e)
+           (match-define (Fn-Caster e) current-expr)
            (Closure-Caster (rec e))]
-          [(App-Fn? current-e)
+          [(App-Fn? current-expr)
            (: let-clos-app : CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr) 
            (define (let-clos-app e e*)
              (let$ ([closure e]) (clos-app closure e*)))
            (: clos-app : (Var Uid) (Listof CoC5-Expr) -> CoC5-Expr) 
            (define (clos-app v e*) (Closure-App (Closure-Code v) v e*))
-           (match-define (App-Fn e (app (cmap rec) e*)) current-e)
+           (match-define (App-Fn e (app (cmap rec) e*)) current-expr)
            (match e
              [(Var u)
               (match (propogate/recognize u #:rator? #t)
@@ -610,8 +615,8 @@ TODO We can generate better code in this pass for function casts.
           ;; to do better here, because we have kept track
           ;; of if we can see the lambda.
           ;; But this also might be doable in a constant folding pass.
-          [(App-Fn-or-Proxy? current-e)
-           (match-define (App-Fn-or-Proxy cast-uid e e*) current-e)
+          [(App-Fn-or-Proxy? current-expr)
+           (match-define (App-Fn-or-Proxy cast-uid e e*) current-expr)
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -650,10 +655,10 @@ TODO We can generate better code in this pass for function casts.
                    [e^ (let-cast-clos-app cast-uid (rec e^) e*^)])]
                 [else (error 'covert-closures "Unkown Fn-Proxy Representaion")])]
              [else (error 'covert-closures "Unkown Cast Representaion")])]
-          [(Fn-Proxy? current-e)
+          [(Fn-Proxy? current-expr)
            (match-define
              (Fn-Proxy `(,i ,cast) (app rec clos) (app rec crcn))
-             current-e)
+             current-expr)
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep              
@@ -683,8 +688,8 @@ TODO We can generate better code in this pass for function casts.
                 [(Data)   (Fn-Proxy i clos crcn)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])]
-          [(Fn-Proxy-Huh? current-e)
-           (match-define (Fn-Proxy-Huh (app rec e)) current-e) 
+          [(Fn-Proxy-Huh? current-expr)
+           (match-define (Fn-Proxy-Huh (app rec e)) current-expr) 
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -696,8 +701,8 @@ TODO We can generate better code in this pass for function casts.
           ;; to exploit the layout chosen for closure representation
           ;; to reference the closure and coercion fields outside of
           ;; the closures.
-          [(Fn-Proxy-Closure? current-e)
-           (match-define (Fn-Proxy-Closure (app rec e)) current-e)
+          [(Fn-Proxy-Closure? current-expr)
+           (match-define (Fn-Proxy-Closure (app rec e)) current-expr)
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -705,8 +710,8 @@ TODO We can generate better code in this pass for function casts.
                 [(Data)   (Fn-Proxy-Closure e)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])]
-          [(Fn-Proxy-Coercion? current-e)
-           (match-define (Fn-Proxy-Coercion (app rec e)) current-e) 
+          [(Fn-Proxy-Coercion? current-expr)
+           (match-define (Fn-Proxy-Coercion (app rec e)) current-expr) 
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -714,7 +719,7 @@ TODO We can generate better code in this pass for function casts.
                 [(Data)   (Fn-Proxy-Coercion e)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])] 
-          [else (form-map current-e rec)]))))
+          [else (form-map current-expr rec)]))))
 
   (define static-env 
     (for/hasheq : (HashTable Uid Propagant)
@@ -725,15 +730,15 @@ TODO We can generate better code in this pass for function casts.
 
   (define new-const-bnd* : (Bnd* CoC5-Expr)
     (for/list ([b const-bnd*])
-      (match-define (cons id e) b)
-      (cons id (convert-closures-in-expr e static-env))))
+      (match-define (cons id const-expr) b)
+      (cons id (convert-closures-in-expr const-expr static-env))))
   
-  (define new-main-e : CoC5-Expr
-    (convert-closures-in-expr main-e static-env))
+  (define closure-coverted-main-expr : CoC5-Expr
+    (convert-closures-in-expr main-expr static-env))
   
   (values (hash-values arity->apply-casted-closure)
           new-const-bnd*
-          new-main-e))
+          closure-coverted-main-expr))
 
 (struct shared-tuple ([closure : Uid][free-variables : Uid*]))
 (struct shared-closure ([closure : Uid][free-variables : Uid*]))
@@ -948,7 +953,12 @@ TODO We can generate better code in this pass for function casts.
             (when (or (eq? fst-mode 'code-only)
                       (eq? fst-mode 'closure-only))
               (unless (null? (cdr not-wk-c*))
-                (error 'todo)))
+                (error 'grift/convert-closures
+                       (string-append
+                        "Invariant Violated:"
+                        "This code avoids code duplication by relying on the fact "
+                        "that we know that code-only or closure-only closures always "
+                        "appear in a singleton binding."))))
                         
             (hash-set! label->closure-status fst-label 'regular)
             
@@ -957,12 +967,6 @@ TODO We can generate better code in this pass for function casts.
 
             (define-values (fst-fv-set uid->uid^)
               (resolve-free-variables eliminated? uid->uid fst-fv-ls))
-
-            #;
-            (define fst-fv-set
-              (for/fold ([fv-set : (Setof Uid) (seteq)])
-                        ([fv fst-fv-ls] #:when (not (eliminated? fv)))
-                (set-add fv-set (or (hash-ref uid->uid fv #f) fv))))
 
             ;; Add fvs of wk closure to fvs of
             ;; - don't add fst-name if present
@@ -1005,11 +1009,7 @@ TODO We can generate better code in this pass for function casts.
                   c)
                 (hash-set! label->closure-status label 'regular)
                 (define-values (fv-set _) 
-                  (resolve-free-variables eliminated? uid->uid^^ f*)
-                  #;
-                  (for*/fold ([fv-set : (Setof Uid) (seteq)])
-                             ([fv f*] #:when (not (eliminated? fv)))
-                    (set-add fv-set (or (hash-ref uid->uid^ fv #f) fv))))
+                  (resolve-free-variables eliminated? uid->uid^^ f*))
                 (define fv-ls (sort (set->list fv-set) uid<?))
                 (define int-sc (shared-closure self fv-ls))
                 (define ext-sc (shared-closure name fv-ls))
@@ -1074,18 +1074,19 @@ TODO We can generate better code in this pass for function casts.
                  (set! static-code (cons (cons label (Code p* rec-e))
                                          static-code)))
                
-               ;; rst mostly regular cc
-               (for ([c      rst-nwk*]
+               ;; The rest get mostly regular closure conversion
+               (for ([nwk-c    rst-nwk*]
                      [fv-ls  rst-fv-ls*]
                      [fv-set rst-fv-set*]
                      [sc     rst-int-sc*])
                  (match-define
-                   (Closure name #f 'regular label self ctr? _ p* e)
-                   c)
+                   (Closure name #f 'regular label self ctr? _ p* nwk-c-body)
+                   nwk-c)
                  (define fv-init* (fv*->expr* fv->expr fv-ls))
                  (Closure
                   name #f 'regular label self ctr? fv-init* p*
-                  (rec/env e uid->uid^^
+                  (rec/env nwk-c-body
+                           uid->uid^^
                            (map-fv->closure-ref self fv-ls)
                            (filter-shared-closures fv-ls))))
                
@@ -1121,7 +1122,7 @@ TODO We can generate better code in this pass for function casts.
                                         uid->uid
                                         fv-set->clos)
                
-               ;; rst mostly regular cc
+               ;; the rest is mostly regular closure conversion
                (define rec-rst : (Closure* CoC6-Expr CoC6-Expr)
                  (for/list ([c      rst-nwk*]
                             [fv-ls  rst-fv-ls*]
@@ -1195,7 +1196,7 @@ TODO We can generate better code in this pass for function casts.
     (for ([c c*])
       (match-define (Closure name #t 'regular label self _ _ p* e) c)    
       (define sc (shared-closure self fv-ls))
-      (hash-set! uid->fv-set.clos self (cons fv-set sc))      
+      (hash-set! uid->fv-set.clos self (cons fv-set sc))
       (define rec-e
         (rec/env
          e
@@ -1256,34 +1257,6 @@ TODO We can generate better code in this pass for function casts.
     (list clos-app (Fn-Coercion-Return crcn) mono-address base-address index))
   (Let b* (App-Code cl args)))
 
-(define-type (Stackof A) (Stack A))
-(struct (A) Stack
-  ([list : (Listof A)])
-  #:mutable)
-
-(: make-stack (All (A) (Listof A) -> (Stackof A)))
-(define (make-stack ls) (Stack ls))
-
-(: stack-push! (All (A) (Stackof A) A -> Void))
-(define (stack-push! stk e)
-  (set-Stack-list! stk (cons e (Stack-list stk))))
-
-(: stack-pop! : (All (A) (Stackof A) -> A))
-(define (stack-pop! stk)
-  (define l (Stack-list stk))
-  (set-Stack-list! stk (cdr l))
-  (car l))
-
-
-(: scc<? : Uid* Uid* -> Boolean)
-(define (scc<? x y)
-  (cond
-    [(eq? x y) #f]
-    [(null? x) #t]
-    [(null? y) #f]
-    [else (uid<? (car (sort x uid<?))
-                 (car (sort y uid<?)))]))
-
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
 (define (bnd-code<? x y) (uid<? (car x) (car y)))
 
@@ -1339,8 +1312,6 @@ TODO We can generate better code in this pass for function casts.
          fv-set
          (set-add fv-set rep))
      u->u^)))
-
-
 
 (: fv*->expr* : (HashTable Uid CoC6-Expr) Uid* -> (Listof CoC6-Expr))
 (define (fv*->expr* fv->expr fv*)
@@ -2260,4 +2231,5 @@ TODO We can generate better code in this pass for function casts.
 (define (map-bnd* f b*)
   (for/list ([b b*]) (cons (car b) (f (cdr b)))))
 
-; LocalWords:  Propagant uid fn uids arg letrec src
+; LocalWords:  Propagant uid fn uids arg letrec src Letrecs rator env
+; LocalWords:  LocalWords rkt scc
