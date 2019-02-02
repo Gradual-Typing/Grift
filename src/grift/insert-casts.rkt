@@ -219,8 +219,9 @@
     [(Gbox e) (Gbox (ic-expr e))]
     [(Gunbox (and (Ann _ (cons e-src e-ty)) (app ic-expr e)))
      (cond
-       ;; Don't need to unfold-possible-mu here because cannon types
-       ;; don't include (Mu (Dyn)).
+       ;; Don't need to unfold-possible-mu here because canonical types
+       ;; don't allow (Mu (Scope (Dyn))) to occur. Properly constructed
+       ;; types would collapse that to just (Dyn). 
        [(Dyn? e-ty)
         (define lbl (mk-label "guarded unbox" e-src))
         (cond
