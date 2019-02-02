@@ -45,7 +45,7 @@ becuse it is actually more of a stmt contexts itself.
 ;; Add new local variables to the declaration to each body
 (: fv-body (D3-Body -> D4-Body))
 (define (fv-body body)
-  (match-define (Locals l* t) body)
+  (match-define (Locals l* s* t) body)
   (define new-locals : Uid* l*)
   (: local-next-uid! (String -> Uid))
   (define (local-next-uid! s)
@@ -168,7 +168,7 @@ becuse it is actually more of a stmt contexts itself.
       [(Begin e* v) (make-begin (snoc (fv-effect* e*) (sa v)) NO-OP)]
       [err (error 'simplify-assignment "unmatched datum ~a" err)]))
   (define tail (fv-tail t))
-  (Locals new-locals tail))
+  (Locals new-locals s* tail))
 
 (: fv-trivial (D3-Trivial -> D4-Trivial))
 (define (fv-trivial triv)

@@ -27,7 +27,7 @@
   (make-parameter #f))
 
 (: IMDT-C-TYPE String)
-(define IMDT-C-TYPE "int64_t")
+(define IMDT-C-TYPE "intptr_t")
 
 (: ~exit : Any -> String)
 (define (~exit error)
@@ -58,7 +58,8 @@
   (match-let ([(Prog (list name count type) (GlobDecs d* (Labels lbl* exp))) prgm])
     (call-with-output-file out-path #:exists 'replace #:mode 'text
       (lambda ([p : Output-Port])
-        (parameterize ([current-output-port p])
+        (parameterize ([current-output-port p]
+                       [current-unique-counter (make-unique-counter count)])
           (emit-program name type lbl* d* exp))))))
 
 (: emit-program (-> String Grift-Type D5-Bnd-Code* (Listof Uid) D5-Body Void))
@@ -180,14 +181,24 @@
           (init-types-hash-table-slots) (types-hash-table-load-factor))
   (display "types_unique_index_counter = 0;"))
 
+(: reserve-stack-space : (Bnd* Natural) -> Void)
+(define (reserve-stack-space stack-space*)
+  (for ([b stack-space*])
+    (define space (next-uid! "stack_space"))
+    (define s (uid->string space))
+    (match-define (cons i n) b)
+    (printf "~a ~a[~a];\n" IMDT-C-TYPE s n)
+    (printf "~a ~a = (~a)~a;\n" IMDT-C-TYPE (uid->string i) IMDT-C-TYPE s)))
+
 (: emit-main (-> D5-Body Void))
 (define (emit-main b)
   (display "\n//Obviously this is the main function\n")
-  (match-let ([(Locals local-var* tail) b])
+  (match-let ([(Locals local-var* stack-space* tail) b])
     (display "int main(int argc, char** argv)")
     (let ([local-var* (map uid->string local-var*)])
       (display "{\n")
       (display-seq local-var* "" (string-append IMDT-C-TYPE " ") "" ";\n" "")
+      (reserve-stack-space stack-space*)
       (initialize-garbage-collector)
       (initialize-types-table)
       (newline)
@@ -213,11 +224,11 @@
     [(If t c a)
      (begin (display "if ")
             (emit-pred t)
-            (emit-block '() c)
+            (emit-block '() '() c)
             (display " else ")
             ;; emit-block calls emit-tail which will cause problems if
             ;; main branches around return
-            (emit-block '() a)
+            (emit-block '() '() a)
             (newline))]
     [(Switch t c* d)
      (begin (display "switch (") (emit-value t) (display "){\n")
@@ -253,19 +264,20 @@
 
 (: emit-function (-> String String Uid* D5-Body Void))
 (define (emit-function returns name args body)
-  (match-let ([(Locals local-var* tail) body])
+  (match-let ([(Locals local-var* stack-space* tail) body])
     (emit-function-prototype returns name (map uid->string args))
-    (emit-block local-var* tail)
+    (emit-block local-var* stack-space* tail)
     (newline)
     (newline)))
 
-(: emit-block (-> Uid* D5-Tail Void))
-(define (emit-block local-var* tail)
-  (let ([local-var* (map uid->string local-var*)])
-    (display "{\n")
-    (display-seq local-var* "" (string-append IMDT-C-TYPE " ") "" ";\n" "")
-    (emit-tail tail)
-    (display "}")))
+(: emit-block (-> Uid* (Bnd* Natural) D5-Tail Void))
+(define (emit-block local-var* stack-space* tail)
+  (define lv* (map uid->string local-var*))
+  (display "{\n")
+  (display-seq lv* "" (string-append IMDT-C-TYPE " ") "" ";\n" "")
+  (reserve-stack-space stack-space*) 
+  (emit-tail tail)
+  (display "}"))
 
 (: emit-tail (-> D5-Tail Void))
 (define (emit-tail tail)
@@ -279,9 +291,9 @@
     [(If t c a)
      (begin (display "if ")
             (emit-pred t)
-            (emit-block '() c)
+            (emit-block '() '() c)
             (display " else ")
-            (emit-block '() a)
+            (emit-block '() '() a)
             (newline))]
     [(Switch t c* d)
      (begin (display "switch (") (emit-value t) (display "){\n")
@@ -324,13 +336,16 @@
     [(Op p exp*)      (emit-op p exp*)]
     [(Var i)          (display (uid->string i))]
     [(Global s)          (display s)]
+    ;; bit cast float using macro defined in backend-c/runtime/runtime.h
     [(Quote (? inexact-real? f))  (printf "float_to_imdt(~a)" f)]
     [(Quote (? char? c))
      (if (<= 0 (char->integer c) 255)
          (printf "'\\x~a'" (number->string (char->integer c) 16))
          (error 'generate-c/quote-char "currently only supports ASCII"))]
-    [(Quote k)            (print k)]
-    ;; TODO Consider changing how Halt is handled
+    [(Quote (? string? s)) (print s)]
+    ;; C doesn't allow implicit conversion of literal numbers to intptr_t
+    [(Quote (? exact-integer? i)) (printf "((~a)~a)" IMDT-C-TYPE i)]
+    ;; Todo Consider changing how Halt is handled
     [(Halt)           (display "exit(-1),-1")]
     [(Code-Label i)  (begin
                        (display "((")
@@ -442,6 +457,25 @@
   (emit-wrap (emit-wrap (display "double"))
              (emit-wrap (th))))
 
+(: imdt->grift-obj Caster)
+(define (imdt->grift-obj th)
+  (emit-wrap (emit-wrap (display "grift_obj"))
+             (emit-wrap (th))))
+
+(: grift-obj->imdt Caster)
+(define (grift-obj->imdt th)
+  (emit-wrap (emit-wrap (th)) (display ".as_int")))
+
+(: imdt->assoc-stack Caster)
+(define (imdt->assoc-stack th)
+  (emit-wrap (display "(grift_assoc_stack*)")
+             (emit-wrap (th))))
+
+(: assoc-stack->imdt Caster)
+(define (assoc-stack->imdt th)
+  (emit-wrap (emit-wrap (display IMDT-C-TYPE))
+             (emit-wrap (th))))
+
 (: no-cast Caster)
 (define (no-cast th) (th))
 (define imdt->int   no-cast)
@@ -450,6 +484,7 @@
 (define imdt->bool  no-cast)
 (define char->imdt  no-cast)
 (define imdt->char  no-cast)
+
 (: imdt->string Caster)
 (define (imdt->string th) (display "(char*)") (th))
 (define-type Implementation-Type (U 'function 'infix-op 'prefix-op 'identity))
@@ -520,7 +555,28 @@
      (print-char function  "print_ascii_char" (,imdt->char) ())
      (display-char function "display_ascii_char" (,imdt->char) ())
      (int->char  identity   "none"  (,imdt->char) ())
-     (char->int  identity   "none"  (,char->imdt) ()))))
+     (char->int  identity   "none"  (,char->imdt) ())
+     (make-assoc-stack
+      function "grift_make_assoc_stack"
+      () (,assoc-stack->imdt))
+     (assoc-stack-push!
+      function   "grift_assoc_stack_push"
+      (,imdt->assoc-stack ,imdt->grift-obj ,imdt->grift-obj ,imdt->grift-obj)
+      ())
+     (assoc-stack-pop!
+      function   "grift_assoc_stack_pop"
+      (,imdt->assoc-stack) (,grift-obj->imdt))
+     (assoc-stack-find
+      function   "grift_assoc_stack_find"
+      (,imdt->assoc-stack ,imdt->grift-obj ,imdt->grift-obj)
+      (,int->imdt))
+     (assoc-stack-set!
+      function   "grift_assoc_stack_set"
+      (,imdt->assoc-stack ,imdt->int ,imdt->grift-obj) ())
+     (assoc-stack-ref
+      function   "grift_assoc_stack_ref"
+      (,imdt->assoc-stack ,imdt->int)
+      (,grift-obj->imdt)))))
 
 (define (easy-p? [s : Symbol]) : Boolean
   (if (hash-ref prim-impl s #f) #t #f))

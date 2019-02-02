@@ -1,0 +1,44 @@
+;; a benchmark based off of sieve from the typed-racket benchmarks
+;; Calculates the 10001st prime number = 104743
+;; https://github.com/nuprl/gradual-typing-performance
+
+;; stream = (Rec Stream (Tuple Int (-> Stream)))
+;; Natrual = Int
+
+;; "Optimized" version
+;; - changes the order of function calls to improve data locality
+;; - manually inline "abstration hiding" functions
+;; - change recursive loop to iterative loop
+
+;; [stream-get st i] Get the [i]-th element from the stream [st]
+(define (stream-get [st : (Rec Stream (Tuple Int (-> Stream)))] [i : Int])
+  : Int
+  (tuple-proj (repeat (_ 0 i) (st st) ((tuple-proj st 1))) 0))
+
+;; `count-from n` Build a stream of integers starting from `n` and iteratively adding 1
+(define (count-from [n : Int])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (tuple n (lambda () (count-from (+ 1 n)))))
+
+;; `sift n st` Filter all elements in `st` that are divisable by `n`.
+(define (sift [n : Int] [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (let ([hd (tuple-proj st 0)]
+        [tl (tuple-proj st 1)])
+    (if (= 0 (%% hd n))
+        (sift n (tl))
+        (tuple hd (lambda () (sift n (tl)))))))
+
+;; `sieve st` Sieve of Eratosthenes
+(define (sieve [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : (Rec Stream (Tuple Int (-> Stream))) 
+  (let ([hd (tuple-proj st 0)]
+        [tl (tuple-proj st 1)])
+    (tuple hd (lambda () (sieve (sift hd (tl)))))))
+
+;; stream of prime numbers
+(define primes : (Rec Stream (Tuple Int (-> Stream)))
+  (sieve (count-from 2)))
+
+;; compute the 100th prime number (primes is 0 indexed)
+(stream-get primes 99)

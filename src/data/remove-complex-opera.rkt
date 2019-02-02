@@ -181,8 +181,8 @@
     (values s* t*))
   
   ;; body of rco-body
-  (match-define (Locals i* t) body)
+  (match-define (Locals i* s* t) body)
   (define tail (rco-tail t))
-  (Locals (append new-locals i*) tail))
+  (Locals (append new-locals i*) s* tail))
 
 

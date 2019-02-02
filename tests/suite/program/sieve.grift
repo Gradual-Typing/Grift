@@ -1,0 +1,73 @@
+;; a benchmark based off of sieve from the typed-racket benchmarks
+;; https://github.com/nuprl/gradual-typing-performance
+
+;; stream = (Rec Stream (Tuple Int (-> Stream)))
+;; Natrual = Int
+
+(define (stream [first : Int] [rest : (-> (Rec Stream (Tuple Int (-> Stream))))])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (tuple first rest))
+
+(define (stream-first [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : Int
+  (tuple-proj st 0))
+
+(define (stream-rest [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : (-> (Rec Stream (Tuple Int (-> Stream))))
+  (tuple-proj st 1))
+
+(define (make-stream [hd : Int] [thunk : (-> (Rec Stream (Tuple Int (-> Stream))))])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (stream hd thunk))
+
+;; Destruct a stream into its first value and
+;; the new stream produced by de-thunking the tail
+(define (stream-unfold [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : (Tuple Int (Rec Stream (Tuple Int (-> Stream))))
+  (tuple (stream-first st) ((stream-rest st))))
+
+;; [stream-get st i] Get the [i]-th element from the stream [st]
+(define (stream-get [st : (Rec Stream (Tuple Int (-> Stream)))] [i : Int])
+  : Int
+  (stream-first (repeat (_ 0 i) (st st) (tuple-proj (stream-unfold st) 1))))
+
+;; `count-from n` Build a stream of integers starting from `n` and iteratively adding 1
+(define (count-from [n : Int])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (make-stream n (lambda () (count-from (+ 1 n)))))
+
+;; `sift n st` Filter all elements in `st` that are equal to `n`.
+;; Return a new stream.
+(define (sift [n : Int] [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (let ([st (stream-unfold st)])
+    (let ([hd (tuple-proj st 0)]
+          [tl (tuple-proj st 1)])
+      (if (= 0 (%% hd n))
+          (sift n tl)
+          (make-stream hd (lambda () (sift n tl)))))))
+
+;; `sieve st` Sieve of Eratosthenes
+(define (sieve [st : (Rec Stream (Tuple Int (-> Stream)))])
+  : (Rec Stream (Tuple Int (-> Stream)))
+  (let ([st (stream-unfold st)])
+    (let ([hd (tuple-proj st 0)]
+          [tl (tuple-proj st 1)])
+      (make-stream hd (lambda () (sieve (sift hd tl)))))))
+
+;; stream of prime numbers
+(define primes : (Rec Stream (Tuple Int (-> Stream)))
+  (sieve (count-from 2)))
+
+;; Compute the 10,000th prime number
+(define N-1 : Int 9999)
+
+(define (main) : ()
+  (begin
+    #;(display "The ")
+    #;(print-int (+ N-1 1))
+    #;(display "th prime number is: ")
+    (print-int (stream-get primes N-1))
+    (display-char #\newline)))
+
+(main)

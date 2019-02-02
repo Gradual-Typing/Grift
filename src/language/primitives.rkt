@@ -10,7 +10,8 @@
 (define-predicate grift-primitive? Grift-Primitive)
 
 (define-type Grift-Prim
-  (U Int->Int-Primitive
+  (U Assoc-Stack-Primitive
+     Int->Int-Primitive
      IntxInt->Int-Primitive
      IntxInt->Bool-Primitive
      ->Int-Primitive
@@ -31,8 +32,19 @@
 
 (define-predicate grift-prim? Grift-Prim)
 
+(define-type Assoc-Stack-Primitive
+  (U 'make-assoc-stack
+     'assoc-stack-find
+     'assoc-stack-ref
+     'assoc-stack-pop!))
+
+(define-type Assoc-Stack!-Primitive
+  (U 'assoc-stack-set!
+     'assoc-stack-push!))
+
 (define-type Grift-Prim!
-  (U Timer-Primitive
+  (U Assoc-Stack!-Primitive
+     Timer-Primitive
      Char->Unit-Primitive
      Int->Unit-Primitive
      FloatxInt->Unit-Primitive))
@@ -234,6 +246,7 @@
 
 (define-type Dyn-Repr-Ctor
   (U 'make))
+
 (define-type Dyn-Repr-Access
   (U 'value
      'type
@@ -241,8 +254,21 @@
      'immediate-tag
      'box-value
      'box-type))
+
 (define-type Dyn-Repr-Pred
   (U 'immediate-tag=?))
+
+(define-type Gen-Data
+  (U Dyn))
+
+(define-type Gen-Ctor
+  (U Dyn-Repr-Ctor))
+
+(define-type Gen-Access
+  (U Dyn-Repr-Access))
+
+(define-type Gen-Pred
+  (U Dyn-Repr-Pred))
 
 (define-syntax-rule (dyn-make$ value type)
   (Construct DYN-TYPE 'make (list value type)))
@@ -290,8 +316,11 @@
 We are going to UIL
 -----------------------------------------------------------------------------|#
 
-(define-type UIL-Prim  (U Grift-Prim Array-Prim Types-Prim))
-(define-type UIL-Prim! (U Grift-Prim! Array-Prim! Print-Prim! Bottom-Prim))
+(define-type UIL-Prim  (U Grift-Prim Array-Prim Types-Prim
+                          Assoc-Stack-Primitive))
+(define-type UIL-Prim! (U Grift-Prim! Array-Prim! Print-Prim!
+                          Assoc-Stack!-Primitive
+                          Bottom-Prim))
 (define-predicate uil-prim-effect? UIL-Prim!)
 (define-predicate uil-prim-value? UIL-Prim)
 
@@ -306,7 +335,8 @@ We are going to UIL
      Int->Int-Primitive
      Int->Float-Primitive Array-Prim IxI->I-Prim ->I-Prim
      ->Char-Primitive Char->Int-Primitive Int->Char-Primitive
-     Types-Prim))
+     Types-Prim
+     Assoc-Stack-Primitive))
 
 (define-type UIL-Pred-Prim (U FloatxFloat->Bool-Primitive
                               IntxInt->Bool-Primitive))

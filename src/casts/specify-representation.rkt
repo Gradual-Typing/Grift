@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base
 #|------------------------------------------------------------------------------+
 |Pass: src/casts/specify-representation
 +-------------------------------------------------------------------------------+
@@ -13,17 +13,23 @@ but a static single assignment is implicitly maintained.
 | Target Grammar : Data0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require (for-syntax racket/syntax syntax/parse racket/list
-                     "../language/forms.rkt")
-         "../errors.rkt"
-         (submod "../logging.rkt" typed)
-         "../configuration.rkt"
-         "../language/cast-or-coerce6.rkt"
-         "../language/data0.rkt"
-         "../language/syntax.rkt"
-         "memory-layout-helpers.rkt"
-         "constants-and-codes.rkt"
-         "../unique-counter.rkt")
+(require
+ (for-syntax
+  racket/list  
+  syntax/parse 
+  racket/syntax
+  "../language/forms.rkt")
+ racket/list
+ racket/match
+ "../errors.rkt"
+ (submod "../logging.rkt" typed)
+ "../configuration.rkt"
+ "../language/cast-or-coerce6.rkt"
+ "../language/data0.rkt"
+ "../language/syntax.rkt"
+ "memory-layout-helpers.rkt"
+ "constants-and-codes.rkt"
+ "../unique-counter.rkt")
 
 ;; Only the pass is provided by this module
 (provide
@@ -35,33 +41,78 @@ but a static single assignment is implicitly maintained.
 (: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))
 (define (specify-representation prgm)
   (match-define
-    (Prog (list name next type) (Let-Static* type-bnd* crcn-bnd* exp))
+    (Prog (list name next type)
+      (Static* (list
+                mu-type-bnd*
+                type-bnd*
+                mu-crcn-bnd*
+                crcn-bnd*
+                code-bnd*
+                closure*
+                const-bnd*)
+               exp))
     prgm)
   (define unique (make-unique-counter next))
   (parameterize ([current-unique-counter unique])
-    (define new-exp    : D0-Expr
-      (begin
-        (set-box! boxed-bnd-code* '())
-        (set-box! mk-fn-coercion-code-label? #f)
-        (set-box! mk-tuple-coercion-code-label? #f)
-        (set-box! coerce-tuple-code-label? #f)
-        (set-box! coerce-tuple-in-place-code-label? #f)
-        (set-box! cast-tuple-code-label? #f)
-        (set-box! cast-tuple-in-place-code-label? #f)
-        (set-box! hashcons-types-code-label? #f)
-        (sr-expr (hash) empty-index-map exp)))
-    (define init-type* : D0-Expr* (map allocate-bound-type type-bnd*))
-    (define type-id*   : Uid*     (map (inst car Uid Any) type-bnd*))
-    (define init-crcn* : D0-Expr* (map allocate-bound-coercion crcn-bnd*))
-    (define crcn-id*   : Uid*     (map (inst car Uid Any) crcn-bnd*))
-    (define new-next (unique-counter-next! unique))
-    (define bnd-code*  : D0-Bnd-Code* (unbox boxed-bnd-code*))
-    (debug
-     (Prog
-         (list name new-next type)
-       (GlobDecs (append type-id* crcn-id*)
-         (Labels bnd-code*
-           (Begin (append init-type* init-crcn*) new-exp)))))))
+    (set-box! boxed-bnd-code* '())
+    (set-box! mk-fn-coercion-code-label? #f)
+    (set-box! mk-tuple-coercion-code-label? #f)
+    (set-box! coerce-tuple-code-label? #f)
+    (set-box! coerce-tuple-in-place-code-label? #f)
+    (set-box! cast-tuple-code-label? #f)
+    (set-box! cast-tuple-in-place-code-label? #f)
+    (set-box! hashcons-type-code-label? #f)
+    (set-box! access-type-hashcode-label? #f)
+    (set-box! calculate-type-hashcode-label? #f)
+
+    (define const-id* : Uid* (map (inst car Uid Any) const-bnd*))
+    (define init-const* : (Listof D0-Expr)
+      (for/list ([b const-bnd*])
+        (Assign (car b) (sr-expr (hash) empty-index-map (cdr b))))) 
+    (define new-exp : D0-Expr (sr-expr (hash) empty-index-map exp))
+    (define new-code* : (Bnd* (Fun D0-Expr))
+      (for/list ([b code-bnd*])
+        (match-define (cons l (Code p* e)) b)
+        (cons l (Code p* (sr-expr (hash) empty-index-map e)))))
+    (define-values (static-closure-code*
+                    static-closure-id*
+                    static-closure-alloc*
+                    static-closure-init*)
+      (sr-closures closure*))
+    (define-values (alloc-mu-type* init-mu-type*)
+      (for/lists ([alloc-mu-type* : D0-Expr*] [init-mu-type* : D0-Expr*])
+                 ([mu-type-bnd mu-type-bnd*])
+        (allocate-bound-mu-type mu-type-bnd)))
+    (define-values (alloc-mu-crcn* init-mu-crcn*)
+      (for/lists ([alloc-mu-crcn* : D0-Expr*] [init-mu-crcn* : D0-Expr*])
+                 ([mu-crcn-bnd mu-crcn-bnd*])
+        (allocate-bound-mu-crcn mu-crcn-bnd)))
+    (define init-type*  : D0-Expr* (map allocate-bound-type type-bnd*))
+    (define init-crcn*  : D0-Expr* (map allocate-bound-coercion crcn-bnd*))
+    (define mu-type-id* : Uid*     (map (inst car Uid Any) mu-type-bnd*))
+    (define type-id*    : Uid*     (map (inst car Uid Any) type-bnd*))
+    (define mu-crcn-id* : Uid*     (map (inst car Uid Any) mu-crcn-bnd*))
+    (define crcn-id*    : Uid*     (map (inst car Uid Any) crcn-bnd*))
+    (define new-next    : Nat      (unique-counter-next! unique))
+    (define bnd-code*   : D0-Bnd-Code* (unbox boxed-bnd-code*))
+    (Prog (list name new-next type)
+      (GlobDecs (append mu-type-id* type-id*
+                        mu-crcn-id* crcn-id*
+                        static-closure-id*
+                        const-id*)
+        (Labels (append bnd-code*
+                        new-code*
+                        static-closure-code*)
+          (Begin (append alloc-mu-type*
+                         init-type*
+                         init-mu-type*
+                         alloc-mu-crcn*
+                         init-crcn*
+                         init-mu-crcn*
+                         static-closure-alloc*
+                         static-closure-init*
+                         init-const*)
+                 new-exp))))))
 
 ;; Env must be maintained as a mapping from uids to how to access those
 ;; values. This is important because uid references to variable inside a
@@ -154,7 +205,7 @@ but a static single assignment is implicitly maintained.
         (sr-array-set! rt i t2a))]
      [else UNIT-IMDT])
     (sr-array-set! rt TYPE-TUPLE-COUNT-INDEX bigger-count)
-    (Assign hrt (app-code$ (get-hashcons-types!) tagged-rt))
+    (Assign hrt (hashcons-type tagged-rt))
     (Var hrt)))
 
 (: fn-type-glb ((Code-Label Uid) -> ((Var Uid) (Var Uid) -> D0-Expr)))
@@ -175,7 +226,7 @@ but a static single assignment is implicitly maintained.
       (sr-array-set! rt i t-glb))
     (sr-array-set! rt TYPE-FN-ARITY-INDEX arity)
     (sr-array-set! rt TYPE-FN-RETURN-INDEX t-rt)
-    (Assign hrt (app-code$ (get-hashcons-types!) tagged-rt))
+    (Assign hrt (hashcons-type tagged-rt))
     (Var hrt)))
 
 (: get-mk-fn-crcn! (Uid -> (Code-Label Uid)))
@@ -469,27 +520,27 @@ but a static single assignment is implicitly maintained.
            [else
             (error 'specify-representation/quote "invalid: ~a" k)])]
         ;; Closure Representation
-        [(App-Closure (app recur e) (app recur e^) (app recur* e*))
+        [(Closure-App (app recur e) (app recur e^) (app recur* e*))
          (App-Code e (cons e^ e*))]
-        [(LetP (app (sr-bndp* recur/env) p*) b)
-         (let* ([l*  : Uid* (map (inst car Uid D0-Code) p*)]
-                [env : Env  (extend* env l* (map label l*))])
-           (if (LetC? b)
-               (match-let ([(LetC c* e) b])
-                 (let* ([u*  : Uid* (map (inst car Uid Any) c*)]
-                        [env : Env  (extend* env u* (map var u*))]
-                        [recur      (recur-curry-env env cenv)])
-                   (let*-values ([(a*) (sr-bndc* recur c*)])                     
-                     (Labels p* (Begin a* (recur e)))))) 
-               (Labels p* (recur/env b env cenv))))]
-        [(Closure-caster (app recur e))
+        [(Let-Closures c* e)
+         (define-values (code* id* alloc* init*) (sr-closures c*))
+         (define rec-e (recur e))
+         (define alloc-e
+           (cond
+             [(null? alloc*) rec-e]
+             [else (Begin alloc* (Begin init* rec-e))])) 
+         (cond
+           [(null? code*) alloc-e]
+           [else (Labels code* alloc-e)])]
+        [(Closure-Caster (app recur e))
          (op$ Array-ref (op$ binary-and CLOSURE-VALUE-MASK e) CLOS-CSTR-INDEX)]
-        [(Closure-code (app recur e))
+        [(Closure-Code (app recur e))
          (op$ Array-ref (op$ binary-and CLOSURE-VALUE-MASK e) CLOS-CODE-INDEX)]
-        [(Closure-ref clos fvar)
-         (op$ Array-ref (op$ binary-and (Var clos) CLOSURE-VALUE-MASK)
-              (Quote (cenv clos fvar)))]
-        [(Var i) (lookup env i)]
+        [(Closure-Ref (app recur e) i)
+         (op$ Array-ref
+              (op$ binary-and e CLOSURE-VALUE-MASK)
+              (Quote (+ data:CLOS-FVAR-OFFSET i)))]
+        [(and v (Var _)) v]
         [(Global s) (Global s)]
         [(Assign u/s (app recur e)) (Assign u/s e)]
         [(Labels (app (sr-bnd-code* recur/env) b*) e)
@@ -500,10 +551,12 @@ but a static single assignment is implicitly maintained.
         [(Code-Label u) (Code-Label u)]
         ;; Type Representation
         [(Type t) (sr-prim-type t)]
-        [(Type-Fn-Huh (app recur e)) (type-fn? e)]
+        [(Type-Fn-Huh (app recur e)) (type-fn? e)] 
         [(Type-Fn-arity (app recur e)) (type-fn-arity-access e)]
         [(Type-Fn-return (app recur e)) (type-fn-return-access e)]
         [(Type-Fn-arg (app recur e1) (app recur e2)) (type-fn-fmls-access e1 e2)]
+        [(Type-Mu-Huh (app recur e)) (type-mu? e)]
+        [(Type-Mu-Body (app recur e)) (type-mu-body-access e)]
         [(Type-GRef-Huh (app recur e)) (type-gref? e)]
         [(Type-GRef-Of (app recur e)) (type-gref-type-access e)]
         [(Type-GVect-Huh (app recur e)) (type-gvect? e)]
@@ -579,6 +632,20 @@ but a static single assignment is implicitly maintained.
         [(HC-T2 (app recur h))
          (tagged-array-ref h HC-TAG-MASK HC-T2-INDEX)]
         [(HC-Med (app recur h)) (build-hc-med h)]
+        [(Make-Mu-Coercion) (sr-alloc-mu-id-coercion)]
+        [(Mu-Coercion-Huh (app recur e))
+         ;; TODO fix mediating coercions so that it is more obvious
+         ;; that they have a shared layout.
+         (begin$
+           (assign$ crcn-tag-word
+                    (sr-tagged-array-ref
+                     e COERCION-MEDIATING-TAG COERCION-MU-TAG-INDEX))
+           (assign$ crcn-med-tag (sr-get-tag crcn-tag-word COERCION-TAG-MASK))
+           (op$ = crcn-med-tag COERCION-MU-SECOND-TAG))]
+        [(Mu-Coercion-Body (app recur e))
+         (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MU-BODY-INDEX)]
+        [(Mu-Coercion-Body-Set! (app recur m) (app recur b))
+         (sr-mu-coercion-body-set! m b)]
         ;; Function Coercions
         [(Fn-Coercion-Huh (app recur e))
          (begin$
@@ -589,8 +656,8 @@ but a static single assignment is implicitly maintained.
         [(Fn-Coercion-Arity (app recur e))
          (begin$
            (assign$ tagged-arity
-             (sr-tagged-array-ref
-              e COERCION-MEDIATING-TAG COERCION-FN-ARITY-INDEX))
+                    (sr-tagged-array-ref
+                     e COERCION-MEDIATING-TAG COERCION-FN-ARITY-INDEX))
            (op$ %>> tagged-arity COERCION-SECOND-TAG-SHIFT))]
         [(Fn-Coercion-Arg (app recur e) (app recur i))
          (sr-tagged-array-ref
@@ -602,8 +669,8 @@ but a static single assignment is implicitly maintained.
         [(Fn-Coercion (app recur* e*) (app recur e))
          (begin$
            (assign$ tag_and_arity
-             (op$ + (op$ %<< (Quote (length e*)) COERCION-SECOND-TAG-SHIFT)
-                  COERCION-FN-SECOND-TAG))
+                    (op$ + (op$ %<< (Quote (length e*)) COERCION-SECOND-TAG-SHIFT)
+                         COERCION-FN-SECOND-TAG))
            (sr-alloc "fn_coercion" COERCION-MEDIATING-TAG
                      `(("arity" . ,tag_and_arity)
                        ("return" . ,e) .
@@ -649,24 +716,21 @@ but a static single assignment is implicitly maintained.
         [(Ref-Coercion-Huh (app recur e))
          (begin$
            (assign$ tmp-crcn
-             (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-TAG-INDEX))
+                    (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-TAG-INDEX))
            (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-REF-SECOND-TAG))]
         [(Ref-Coercion (app recur r) (app recur w) flag)
          (begin$
            (assign$ second-tag
-             (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
-                  COERCION-REF-SECOND-TAG))
-           (if (cast-profiler?)
-               (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
-                     `(("tag" . ,second-tag)
-                       ("read-coercion" . ,r)
-                       ("write-coercion" . ,w)
-                       ("flag" . ,(recur flag))))
-               (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
-                     `(("tag" . ,second-tag)
-                       ("read-coercion" . ,r)
-                       ("write-coercion" . ,w)))))]
+                    (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
+                         COERCION-REF-SECOND-TAG))
+           (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
+                         `(("tag" . ,second-tag)
+                           ("read-coercion" . ,r)
+                           ("write-coercion" . ,w)
+                           . ,(if (cast-profiler?)
+                                  `(("flag" . ,(recur flag)))
+                                  '()))))]
         [(Ref-Coercion-Read (app recur e))
          (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-READ-INDEX)]
         [(Ref-Coercion-Write (app recur e))
@@ -675,7 +739,7 @@ but a static single assignment is implicitly maintained.
          (if (cast-profiler?)
              (begin$
                (assign$ flag
-                 (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-FLAG-INDEX))
+                        (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-REF-FLAG-INDEX))
                (op$ = flag COERCION-REF-REF-FLAG))
              NO-OP)]
         [(Failed-Coercion-Huh (app recur e))
@@ -697,6 +761,9 @@ but a static single assignment is implicitly maintained.
         [(Fn-Proxy-Coercion (app recur e))
          (sr-tagged-array-ref e FN-PROXY-TAG FN-PROXY-CRCN-INDEX)]
         ;; Hybrid Proxy Stuff
+        [(Closure-Proxy (app recur clos))
+         (sr-tag-value clos FN-PROXY-TAG)]
+        #;
         [(Hybrid-Proxy apply (app recur clos) (app recur crcn))
          (sr-alloc "hybrid-proxy" FN-PROXY-TAG
                    `(("apply-hybrid-proxy" . ,(Code-Label apply))
@@ -765,6 +832,11 @@ but a static single assignment is implicitly maintained.
         ;; Guarded
         [(Unguarded-Box (app recur e))
          (sr-alloc "unguarded_box" UGBOX-TAG (list (cons "init_value" e)))]
+        [(Unguarded-Box-On-Stack (app recur e))
+         (sr-alloc-on-stack
+          "unguarded_box_on_stack" UGBOX-TAG
+          (list (cons "init_value" e)))]
+        
         [(Unguarded-Box-Ref (app recur e)) (op$ Array-ref e UGBOX-VALUE-INDEX)]
         [(Unguarded-Box-Set! (app recur e1) (app recur e2))
          (op$ Array-set! e1 UGBOX-VALUE-INDEX e2)]
@@ -892,8 +964,8 @@ but a static single assignment is implicitly maintained.
         [(MVect-Coercion-Huh (app recur e))
          (begin$
            (assign$ tmp-crcn
-             (sr-tagged-array-ref
-              e COERCION-MEDIATING-TAG COERCION-MVECT-TAG-INDEX))
+                    (sr-tagged-array-ref
+                     e COERCION-MEDIATING-TAG COERCION-MVECT-TAG-INDEX))
            (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-MVECT-SECOND-TAG))]
         [(MVect-Coercion-Type (app recur e))
@@ -901,14 +973,14 @@ but a static single assignment is implicitly maintained.
         [(MVect-Coercion (app recur t))
          (begin$
            (assign$ second-tag
-             (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
-                  COERCION-MVECT-SECOND-TAG))
+                    (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
+                         COERCION-MVECT-SECOND-TAG))
            (sr-alloc "mvect-coercion" COERCION-MEDIATING-TAG
                      `(("tag" . ,second-tag) ("type" . ,t))))]
         [(MRef-Coercion-Huh (app recur e))
          (begin$
            (assign$ tmp-crcn
-             (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MREF-TAG-INDEX))
+                    (sr-tagged-array-ref e COERCION-MEDIATING-TAG COERCION-MREF-TAG-INDEX))
            (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-MREF-SECOND-TAG))]
         [(MRef-Coercion-Type (app recur e))
@@ -916,8 +988,8 @@ but a static single assignment is implicitly maintained.
         [(MRef-Coercion (app recur t))
          (begin$
            (assign$ second-tag
-             (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
-                  COERCION-MREF-SECOND-TAG))
+                    (op$ + (op$ %<< ZERO-IMDT COERCION-SECOND-TAG-SHIFT)
+                         COERCION-MREF-SECOND-TAG))
            (sr-alloc "ref-coercion" COERCION-MEDIATING-TAG
                      `(("tag" . ,second-tag) ("type" . ,t))))]
         [(Make-GLB-Two-Fn-Types mk-glb (app recur t1) (app recur t2))
@@ -953,15 +1025,15 @@ but a static single assignment is implicitly maintained.
         [(Tuple-Coercion-Huh (app recur e))
          (begin$
            (assign$ tmp-crcn
-             (sr-tagged-array-ref
-              e COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
+                    (sr-tagged-array-ref
+                     e COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
            (assign$ crcn-tag (sr-get-tag tmp-crcn COERCION-TAG-MASK))
            (op$ = crcn-tag COERCION-TUPLE-SECOND-TAG))]
         [(Tuple-Coercion-Num (app recur e))
          (begin$
            (assign$ tagged-count
-             (sr-tagged-array-ref
-              e COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
+                    (sr-tagged-array-ref
+                     e COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
            (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))]
         [(Tuple-Coercion-Item (app recur e) (app recur i))
          (sr-tagged-array-ref
@@ -985,6 +1057,7 @@ but a static single assignment is implicitly maintained.
                     mono-address base-address index)]
         [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
+        #;
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]
         [(Mediating-Coercion-Huh (app recur e))
@@ -1001,48 +1074,6 @@ but a static single assignment is implicitly maintained.
 (define (build-hc-med [e : D0-Expr]) : D0-Expr
   (tagged-array-ref e HC-TAG-MASK HC-MED-INDEX))
 
-;; Allocate without forgetting to lift evaluating subterms first
-;; this prevents evaluating terms which may cause more allocation
-;; will initializing the values of an allocation
-;; it essentially produces expression of the form:
-;; (let ((t* e*) ...) (let ((tmp (alloc ...))) (begin (set tmp i t*) ... (binary-or tmp tag))))
-;; though it does eliminate any form that it can based on it's input
-(: sr-alloc (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
-(define (sr-alloc name tag? slots)
-  ;; As long as this is used to initialize all the data I have
-  ;; a faily stong guarentee that no other allocation could possibly occur.
-  (: sr-alloc-init ((Var Uid) -> (Index (Var Uid) -> D0-Expr)))
-  (define ((sr-alloc-init mem) offset value)
-    (op$ Array-set! mem (Quote offset) value))
-  ;; Take a list of variables and expressions paired with their names
-  ;; make variables that are bound to the expressions and the bindings
-  (: get-assignments/vars ((Listof (Pair String D0-Expr)) -> (Values D0-Expr* (Listof (Var Uid)))))
-  (define (get-assignments/vars b*)
-    (cond
-      [(null? b*) (values '() '())]
-      [else
-       (match-define (cons (cons n e) d) b*)
-       (define-values (a* v*) (get-assignments/vars d))
-       (cond
-         [(Var? e) (values a* (cons e v*))]
-         [else
-          (define u (track-next-uid!$ n))
-          (values (cons (Assign u e) a*) (cons (Var u) v*))])]))
-  (define size (length slots))
-  (when (= size 0)
-    (error 'specify-representation "Empty objects can not be allocated"))
-  (define-values (ass* var*) (get-assignments/vars slots))
-  (define ind* (range 0 size))
-  (define-track-next-uid!$ alloc-id)
-  (define alloc-var (Var alloc-id))
-  (define alloc-ass (Assign alloc-id (op$ Alloc (Quote size))))
-  (define set* (map (sr-alloc-init alloc-var) ind* var*)) 
-  (define tag-return : D0-Expr
-    (cond
-      [(not tag?) alloc-var]
-      [else (sr-tag-value alloc-var tag?)]))
-  (Begin (append ass* (cons alloc-ass set*)) tag-return))
-
 (: sr-prim-type (Immediate-Type -> D0-Expr))
 (define (sr-prim-type t)
   (match t
@@ -1055,7 +1086,19 @@ but a static single assignment is implicitly maintained.
     [(Static-Id u) (Var u)]
     [other (error 'specify-representation/primitive-type "unmatched ~a" other)]))
 
-(: allocate-bound-type (CoC6-Bnd-Type -> D0-Expr))
+;; The first expression returned allocates the mu
+;; The second value returned initializes the mu
+;; This allows Mu types to "tie the recursive knot" by initializing
+;; after all other types have been allocated, but allows
+(: allocate-bound-mu-type (Bnd-Mu-Type -> (Values D0-Expr D0-Expr)))
+(define (allocate-bound-mu-type bnd)
+  (match-define (cons u (Mu it)) bnd)
+  (values (Assign u (sr-type-mu (Quote 0)))
+          (begin$
+            (type-mu-body-assign (Var u) (sr-prim-type it))
+            (hashcons-type (Var u)))))
+
+(: allocate-bound-type (Bnd-Type -> D0-Expr))
 (define (allocate-bound-type bnd)
   (: sr-type (Compact-Type -> D0-Expr))
   (define (sr-type t)
@@ -1077,6 +1120,26 @@ but a static single assignment is implicitly maintained.
     [(Identity) COERCION-IDENTITY-IMDT]
     [(Static-Id id) (Var id)]
     [else (error 'sr-immediate-coercion "unhandled case in match")]))
+
+;; The first expression returned allocates the mu
+;; The second value returned initializes the mu
+;; This allows Mu types to "tie the recursive knot" by initializing
+;; after all other types have been allocated, but allows
+(: allocate-bound-mu-crcn (Bnd-Mu-Crcn -> (Values D0-Expr D0-Expr)))
+(define (allocate-bound-mu-crcn bnd)
+  (match-define (cons u (Mu c)) bnd)
+  (values (Assign u (sr-alloc-mu-id-coercion))
+          (sr-mu-coercion-body-set! (Var u) (sr-immediate-coercion c))))
+
+(: sr-alloc-mu-id-coercion : -> D0-Expr)
+(define (sr-alloc-mu-id-coercion)
+  (sr-alloc "mu-coercion" COERCION-MEDIATING-TAG
+            `(("tag" . ,COERCION-MU-SECOND-TAG)
+              ("body" . ,COERCION-IDENTITY-IMDT))))
+
+(: sr-mu-coercion-body-set! : D0-Expr D0-Expr -> D0-Expr)
+(define (sr-mu-coercion-body-set! m b) 
+  (sr-tagged-array-set! m COERCION-MEDIATING-TAG COERCION-MU-BODY-INDEX b))
 
 (: sr-coercion (Compact-Coercion -> D0-Expr))
 (define (sr-coercion t)
@@ -1193,7 +1256,9 @@ but a static single assignment is implicitly maintained.
 (: sr-observe ((String -> Uid) D0-Expr Grift-Type -> D0-Expr))
 (define (sr-observe next-uid! e t)
   (: generate-print ((Var Uid) Grift-Type -> D0-Expr))
-  (define (generate-print id ty)
+  (define (generate-print id t)
+    (define who 'sr-observe)
+    (debug off who id t)
     (cond
       [(Int? t) (op$ Printf (Quote "Int : %ld\n") id)]
       ;; This is a fragile hack
@@ -1217,6 +1282,9 @@ but a static single assignment is implicitly maintained.
       [(MVect? t) (op$ Print (Quote "MVector : ?\n"))]
       [(STuple? t) (op$ Print (Quote "Tuple : ?\n"))]
       [(Dyn? t) (op$ Print (Quote "Dynamic : ?\n"))]
+      [(Mu? t)
+       (match-define (Mu s) t)
+       (generate-print id (grift-type-instantiate s t))]
       [else (error 'sr-observe "printing other things")]))
   (begin$ (assign$ res e) (generate-print res t)))
 
@@ -1238,22 +1306,6 @@ but a static single assignment is implicitly maintained.
     [(STuple) TYPE-TUPLE-TAG]
     [else (error 'sr-tag "invalid: ~a" t)]))
 
-(: sr-bndp* ((CoC6-Expr Env IndexMap -> D0-Expr)
-             -> (CoC6-Bnd-Procedure* -> D0-Bnd-Code*)))
-(define ((sr-bndp* sr-expr) b*)
-  (: sr-bndp (CoC6-Bnd-Procedure -> D0-Bnd-Code))
-  (define (sr-bndp bnd)
-    (match-let ([(cons u (Procedure cp param* code ctr? fvar* exp)) bnd])
-      (let* ([offset (if ctr? 2 1)]
-             [closv  (Var cp)]
-             [env (for/hash : Env ([fvar fvar*]
-                                   [i (in-naturals offset)])
-                    (values fvar (op$ Array-ref closv (Quote i))))]
-             [env (extend* env param* (map var param*))]
-             [cenv (index-closure offset cp fvar*)])
-        (cons u (Code (cons cp param*) (sr-expr exp env cenv))))))
-  (map sr-bndp b*))
-
 (: index-closure (Nat Uid Uid* -> IndexMap))
 (define (index-closure offset clos fvar*)
   (define ((fvar-err f))
@@ -1272,31 +1324,6 @@ but a static single assignment is implicitly maintained.
       (if (uid=? c clos)
           (hash-ref map f (fvar-err f))
           (clos-err c f)))))
-
-(: sr-bndc* ((CoC6-Expr -> D0-Expr) CoC6-Bnd-Closure* -> D0-Expr*))
-(define (sr-bndc* sr-expr b*)
-  (: sr-bndc (CoC6-Bnd-Closure -> (Pair Uid (Pair D0-Expr D0-Expr*))))
-  (define (sr-bndc bnd)
-    (match-let ([(cons uid (Closure-Data lbl ctr? free*)) bnd])
-      (let* ([lbl   (sr-expr lbl)]
-             [free* (map sr-expr free*)]
-             [data  (cons lbl (if ctr? (cons (sr-expr ctr?) free*) free*))]
-             [size  (length data)]
-             [clos  (Var uid)]
-             [rhs  (op$ Alloc (Quote size))]
-             [set*  (for/list : (Listof D0-Expr)
-                        ([d : D0-Expr data]
-                         [i : Integer (in-naturals)])
-                      (op$ Array-set! clos (Quote i) d))])
-        (cons uid (ann (cons rhs set*) (Pair D0-Expr D0-Expr*))))))
-  (let* ([u.r.e*  (map sr-bndc b*)]
-         [u*      (map (inst car Uid Any) u.r.e*)]
-         [r.e*    (map (inst cdr Uid (Pair D0-Expr D0-Expr*)) u.r.e*)]
-         [r*      (map (inst car D0-Expr D0-Expr*) r.e*)]
-         [a*      (map (inst Assign Uid D0-Expr) u* r*)]
-         [e*      (append-map (inst cdr D0-Expr D0-Expr*) r.e*)])
-    ;; This code implies that the tag of a closure is #b000
-    (append a* e*)))
 
 (: sr-clos-ref-code (-> D0-Expr D0-Expr))
 (define (sr-clos-ref-code clos) (op$ Array-ref  clos CLOS-CODE-INDEX))
@@ -1341,3 +1368,35 @@ but a static single assignment is implicitly maintained.
 
 (define (empty-index-map u i)
   (error 'specify-representation "attempt to index without index map ~a ~a" u i))
+
+(: sr-closures : (Closure* CoC6-Expr CoC6-Expr) ->
+   (Values (Bnd* (Fun D0-Expr)) Uid* D0-Expr* D0-Expr*))
+(define (sr-closures c*)
+  (: rec : CoC6-Expr -> D0-Expr)
+  (define (rec e) (sr-expr (hasheq) empty-index-map e))
+  (for/fold ([c* : (Bnd* (Fun D0-Expr)) '()]
+             [i* : Uid* '()]
+             [a* : D0-Expr* '()]
+             [e* : D0-Expr* '()])
+            ([c c*])
+    (match-define (Closure name _ c/d label self ctr? f* p* e) c)
+    (define code*
+      (case c/d
+        [(regular code-only)
+         (cons (cons label (Code (cons self p*) (rec e))) c*)]
+        [else c*]))
+    (define-values (id* alloc* init*)
+      (case c/d
+        [(regular closure-only)
+         (define init-fv-expr* (map rec f*))
+         (define castor (if ctr? (Code-Label ctr?) FALSE-IMDT))
+         (define init-expr* (list* (Code-Label label) castor init-fv-expr*))
+         (define size   (Quote (+ 2 (length init-expr*))))
+         (define clos (Var name))
+         (values (cons name i*)
+                 (cons (Assign name (op$ Alloc size)) a*) 
+                 (for/fold ([e* : D0-Expr* e*])
+                           ([e init-expr*] [i (in-naturals)])
+                   (cons (op$ Array-set! clos (Quote i) e) e*)))]
+        [else (values i* a* e*)])) 
+    (values code* id* alloc* init*)))

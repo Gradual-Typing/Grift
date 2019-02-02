@@ -1,6 +1,7 @@
 #lang typed/racket/base
 (require "forms.rkt"
-         "primitives.rkt")
+         "primitives.rkt"
+         "data0.rkt")
 (provide (all-defined-out)
          (all-from-out "forms.rkt" "primitives.rkt"))
 
@@ -27,7 +28,8 @@
       (Op UIL-Expr-Prim D1-Value*)
       (Var Uid)
       (Global String)
-      Halt Success
+      Halt Success Stack-Alloc
+      (Var Uid)
       (Code-Label Uid)
       (Quote D1-Literal))))
 
@@ -39,6 +41,7 @@
          (App-Code V (Listof V))
          (Op UIL-Expr-Prim (Listof V))
          Halt
+         Stack-Alloc
          (Var Uid)
          (Global String)
          (Code-Label Uid)

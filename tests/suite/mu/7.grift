@@ -1,0 +1,12 @@
+(define (ones) : (Rec X (Tuple Int (-> X)))
+  (tuple 1 ones))
+
+(define (stream-ref [s : (Rec X (-> (Tuple Int X)))]
+                    [i : Int])
+  : Int
+  (if (< i 1)
+      (tuple-proj (s) 0)
+      (stream-ref (tuple-proj (s) 1) (- i 1))))
+
+(stream-ref ones 42)
+

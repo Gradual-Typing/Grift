@@ -15,46 +15,127 @@
 (require 
  (submod  "../logging.rkt" typed)
  "../errors.rkt"
- "../language/lambda0.rkt"
- "../language/lambda1.rkt"
+ "../type-equality.rkt"
+ "../language/cast-or-coerce3.1.rkt"
+ "../language/cast-or-coerce3.2.rkt"
  racket/match
  racket/list
- racket/set)
+ racket/set
+ typed/racket/unsafe)
+
+(unsafe-require/typed
+ "../language/form-map.rkt"
+ [form-map
+  (case->
+   ;; The case used in pl-expr
+   [(Purify-Letrec= CoC3.1-Expr) (CoC3.1-Expr -> CoC3.2-Expr)
+    -> (Purify-Letrec= CoC3.2-Expr)]
+   ;; The case used in replace-ref
+   [CoC3.2-Expr (CoC3.2-Expr -> CoC3.2-Expr) -> CoC3.2-Expr])])
 
 ;; Only the pass is provided by this module
 (provide
  purify-letrec
  (all-from-out
-  "../language/lambda0.rkt"
-  "../language/lambda1.rkt"))
+  "../language/cast-or-coerce3.1.rkt"
+  "../language/cast-or-coerce3.2.rkt"))
 
-(: purify-letrec (Lambda0-Lang -> Lambda1-Lang))
+(define-type (Purify-Letrec+ E)
+  (Letrec (Bnd* (Castable-Lambda E)) E))
+
+(define-type (Purify-Letrec- E)
+  (Letrec (Bnd* E) E))
+
+(define-type (Purify-Letrec= E)
+  (U (Castable-Lambda-Forms E)
+     (Fn-Proxy-Forms E) 
+     (Let (Bnd* E) E)
+     (Var Uid)
+     (Global String)
+     (Assign Id E)
+     (Gen-Data-Forms E)
+     (Code-Forms E)
+     (Quote-Coercion Immediate-Coercion)
+     (Coercion-Operation-Forms E)
+     (Hyper-Coercion-Operation-Forms E)
+     (Type Immediate-Type)
+     (Type-Operation-Forms E)
+     (Control-Flow-Forms E)
+     ;;Primitives
+     (Op Grift-Primitive (Listof E))
+     (Quote Cast-Literal)
+     No-Op
+     ;; Observations
+     (Blame E)
+     (Observe E Grift-Type)
+     (Unguarded-Forms E)
+     (Guarded-Proxy-Forms E)
+     (Monotonic-Forms E Immediate-Type)
+     (Error E)
+     (Tuple-Operation-Forms E)))
+
+;; Show that the types above are related to CoC3.1-Expr and CoC3.2-Expr
+(assert-subtype? (U (Purify-Letrec= CoC3.2-Expr)
+                    (Purify-Letrec+ CoC3.2-Expr))
+                 CoC3.2-Expr)
+(assert-subtype? CoC3.2-Expr
+                 (U (Purify-Letrec= CoC3.2-Expr)
+                    (Purify-Letrec+ CoC3.2-Expr)))
+
+(assert-subtype? (U (Purify-Letrec- CoC3.1-Expr)
+                    (Purify-Letrec= CoC3.1-Expr))
+                 CoC3.1-Expr)
+(assert-subtype? CoC3.1-Expr
+                 (U (Purify-Letrec- CoC3.1-Expr)
+                    (Purify-Letrec= CoC3.1-Expr)))
+
+
+
+(: purify-letrec (Cast-or-Coerce3.1-Lang -> Cast-or-Coerce3.2-Lang))
 (define (purify-letrec prgm)
   (match-define (Prog (list prgm-name prgm-next prgm-type)
-                  (Let-Static* prgm-type-bnd* prgm-crcn-bnd* prgm-expr))
+                  (Static* (list
+                            mu-type-bnd*
+                            prgm-type-bnd*
+                            mu-crcn-bnd*
+                            prgm-crcn-bnd*
+                            const-bnd*)
+                           prgm-expr))
     prgm)
 
   (define unique (make-unique-counter prgm-next))
 
-  (define expr/pure-letrec
+  (: expr/pure-letrec CoC3.2-Expr)
+  (: const-bnd*/pure-letrec CoC3.2-Bnd*)
+  (define-values (expr/pure-letrec const-bnd*/pure-letrec)
     (parameterize ([current-unique-counter unique])
-      (pl-expr prgm-expr)))
+      (values
+       (pl-expr prgm-expr)
+       (for/list ([b const-bnd*])
+         (match-define (cons id expr) b)
+         (cons id (pl-expr expr))))))
   
   (Prog (list prgm-name (unique-counter-next! unique) prgm-type)
-    (Let-Static* prgm-type-bnd* prgm-crcn-bnd* expr/pure-letrec)))
+    (Static* (list
+              mu-type-bnd*
+              prgm-type-bnd*
+              mu-crcn-bnd*
+              prgm-crcn-bnd*
+              const-bnd*/pure-letrec)
+             expr/pure-letrec)))
 
 ;; TODO: is it possible to merge simple? and pl-expr to make only one
 ;; pass over the AST?
-(: simple? (L0-Expr (Setof Uid) Integer Boolean -> Boolean))
+(: simple? (CoC3.1-Expr (Setof Uid) Integer Boolean -> Boolean))
 (define (simple? expr uid* depth outer-lambda?)
   
-  (define (recur [x : L0-Expr])
+  (define (recur [x : CoC3.1-Expr])
     (simple? x uid* (add1 depth) outer-lambda?))
 
-  (define (recur* [x* : L0-Expr*])
+  (define (recur* [x* : CoC3.1-Expr*])
     (andmap recur x*))
   
-  (: recur-all : (->* () #:rest L0-Expr Boolean))
+  (: recur-all : (->* () #:rest CoC3.1-Expr Boolean))
   (define (recur-all . x*)
     (recur* x*))
 
@@ -76,18 +157,18 @@
     [(or (Quote _) (Quote-Coercion _) (Type _) (Code-Label _) (Tag _) (No-Op)) #t]
     ;; All other forms are simple if their constituents are simple
     [(Letrec bnd* expr)
-     (and (recur expr) (recur* (map (inst cdr Uid L0-Expr) bnd*)))]
+     (and (recur expr) (recur* (map (inst cdr Uid CoC3.1-Expr) bnd*)))]
     [(Let bnd* expr)
-     (and (recur expr) (recur* (map (inst cdr Uid L0-Expr) bnd*)))]
+     (and (recur expr) (recur* (map (inst cdr Uid CoC3.1-Expr) bnd*)))]
     [(Labels b* e)
-     (define (bnd-code-extract-e [b : L0-Bnd-Code])
+     (define (bnd-code-extract-e [b : CoC3.1-Bnd-Code])
        (match-let ([(cons _ (Code _ e)) b])
          e))
      (and (recur e) (recur* (map bnd-code-extract-e b*)))]
     [(Op _ e*) (recur* e*)]
     [(If e1 e2 e3) (recur-all e1 e2 e3)]
     [(Switch e c* d)
-     (and (recur-all e d) (recur* (map (inst cdr Any L0-Expr) c*)))]
+     (and (recur-all e d) (recur* (map (inst cdr Any CoC3.1-Expr) c*)))]
     [(Begin e* e)  (and (recur e) (recur* e*))]
     [(Repeat i e1 e2 a e3 e4) (recur-all e1 e2 e3 e4)]
     [(Break-Repeat) #f] ;; TODO consider why this is false
@@ -146,10 +227,13 @@
     [(Type-GVect-Of e) (recur e)]
     [(Type-GRef-Huh e) (recur e)]
     [(Type-GVect-Huh e) (recur e)]
+    [(Type-Mu-Huh e) (recur e)]
+    [(Type-Mu-Body e) (recur e)]
     [(Type-Tag e) (recur e)]
     [(Blame e) (recur e)]
     [(Observe e t) (recur e)]
     [(Unguarded-Box e) (recur e)]
+    [(Unguarded-Box-On-Stack e) (recur e)] 
     [(Unguarded-Box-Ref e) (recur e)]
     [(Unguarded-Box-Set! e1 e2) (recur-all e1 e2)]
     [(Unguarded-Vect e1 e2) (recur-all e1 e2)]
@@ -215,34 +299,189 @@
     [(Check t p e e*) (and (recur e) (recur* e*))]
     [other (error 'purify-letrec/simple? "unmatched ~a" other)]))
 
+(: replace-ref :
+   CoC3.2-Expr (Setof Uid) (Setof Uid) (U 'ok 'error Uid) -> CoC3.2-Expr)
+;; takes an expression, the uids that refer to complex bindings, the
+;; uids that refer to lambda bindings, and a mode flag.  If the mode
+;; is ok the all references to complex bindings are replaced with
+;; unboxing of the complex binding, and all lambda references are
+;; allowed.  If the mode is error then all references to complex or
+;; lambda bindings result in a compile time error.  If the mode is a
+;; Uid then all references to complex or lambda bindings first check
+;; to ensure that the letrec has finished initializing then retrieve
+;; the referenced value.
+(define (replace-ref expr c* l* uid-inited)
+  (: recur : CoC3.2-Expr -> CoC3.2-Expr)
+  (define (recur e)
+    (cond
+      [(Var? e)
+       (match-define (Var x) e)
+       (cond
+         [(set-member? c* x)
+          (cond
+            [(eq? uid-inited 'ok) (Unguarded-Box-Ref e)] 
+            ;; TODO the following error should be more precise and
+            ;; indicates we should retain source locations for
+            ;; expressions throughout the compiler.
+            [(eq? uid-inited 'error)
+             (error 'purify-letrec "reference to uninitalized binding: ~a" x)]
+            [else
+             (define err-msg (format "reference to uninitalized binding: ~a" x))
+             (If (Unguarded-Box-Ref (Var uid-inited))
+                 (Unguarded-Box-Ref e)
+                 (Blame (Quote err-msg)))])]
+         [(set-member? l* x)
+          (cond
+            [(eq? uid-inited 'ok) e]
+            [(eq? uid-inited 'error) 
+             (error 'purify-letrec "reference to uninitalized binding: ~a" x)]
+            [else
+             (define err-msg (format "reference to unintialized binding: ~a" x))
+             (If (Unguarded-Box-Ref (Var uid-inited))
+                 e
+                 (Blame (Quote err-msg)))])]
+         [else e])]
+      ;; TODO this is currently less efficient than it should be. We
+      ;; could fix this by implementing the algorithim in "fixing
+      ;; letrec" ie a flow sensitive conservative approximation of
+      ;; when it is ok to reference recursive values.
+      [else (form-map e recur)]))
+  (recur expr))
+
 ;; A specialized version of replace-ref that knows it takes and recieves
 ;; lambda forms. Since recursive references are always initialized
 ;; by the time a lambda on the rhs of a letrec is found recursive
 ;; reference are always allowed.
-(: replace-ref-lam (L1-Lambda (Setof Uid) (Setof Uid) -> L1-Lambda))
+(: replace-ref-lam (CoC3.2-Lambda (Setof Uid) (Setof Uid) -> CoC3.2-Lambda))
 (define (replace-ref-lam expr c* l*)
   (match-let ([(Lambda f* (Castable ctr? e)) expr])
     (Lambda f* (Castable ctr? (replace-ref e c* l* 'ok)))))
 
-(: replace-ref (L1-Expr (Setof Uid) (Setof Uid) (U 'ok 'error Uid) -> L1-Expr))
-;; takes an expression, the uids that refer to complex bindings, the uids that
-;; refer to lambda bindings, and a mode flag.
-;; If the mode is ok the all references to complex bindings are replaced with
-;; unboxing of the complex binding, and all lambda references are allowed.
-;; If the mode is error then all references to complex or lambda bindings result
-;; in a compile time error.
-;; If the mode is a Uid then all references to complex or lambda bindings first
-;; check to ensure that the letrec has finished initializing then retrieve the
-;; referenced value.
-(define (replace-ref expr c* l* uid-inited)
-  (define (recur [e : L1-Expr])
+
+(: pl-expr (CoC3.1-Expr -> CoC3.2-Expr))
+(define (pl-expr e)
+  (cond
+    [(Letrec? e)
+     (match-define (Letrec bnd* (app pl-expr expr)) e)
+     (define who 'purify-letrec/pl-expr/letrec-matched)
+     (define who-return 'purify-letrec/pl-expr/letrec-match-returns)
+     (debug who (Letrec bnd* expr))
+     (define bound-uid* (list->set (map (inst car Uid CoC3.1-Expr) bnd*)))
+     ;; TODO casted lambdas are never invoked by there cast
+     ;; if we could determine which lambdas are the result of calling
+     ;; the cast runtime procedure then we wouldn't have to take a
+     ;; performance hit on these.
+     ;; One simple way of doing this would be to purify-letrec before
+     ;; lowering casts then implement the "fixing letrec" algorithm.
+     (: lambda* CoC3.2-Bnd-Lambda*)
+     (define-values (simple* complex* lambda*)
+       (for/fold ([s* : CoC3.2-Bnd* '()]
+                  [c* : CoC3.2-Bnd* '()]
+                  [l* : CoC3.2-Bnd-Lambda* '()])
+                 ([bnd : CoC3.1-Bnd bnd*])
+         (match bnd
+           [(cons i (Lambda f* (Castable ctr (app pl-expr expr)))) 
+            (values s* c* `([,i . ,(Lambda f* (Castable ctr expr))] . ,l*))]
+           [(cons i (app pl-expr expr))
+            (cond
+              [(simple? expr bound-uid* 0 #f)
+               (debug 'is-simple? i expr bound-uid*)
+               (values `([,i . ,expr] . ,s*) c* l*)]
+              [else (values s* `([,i . ,expr] . ,c*) l*)])])))
+     (debug 'purify-letrec complex* lambda*)
+     (define t* : Uid* (map (lambda (x) (next-uid! "tmp")) complex*))
+     (define c* : Uid* (map (inst car Uid Any) complex*))
+     (define l* : Uid* (map (inst car Uid Any) lambda*))
+     (define i  : Uid  (next-uid! "letrec_initialized"))
+     (define setofc* : (Setof Uid) (list->set c*))
+     (define setofl* : (Setof Uid) (list->set l*))
+     ;; Don't traverse expression unless there is work to be done
+     ;; Any replaced references do not need validity checks because
+     ;; the body of a letrec always runs after everything is initialized. 
+     (define expr^ : CoC3.2-Expr
+       (if (null? complex*)
+           expr 
+           (replace-ref expr setofc* setofl* 'ok)))
+     (define simple-bnd* : CoC3.2-Bnd* simple*)
+
+     (define (bnd-unitialized-box [c : Uid]) : CoC3.2-Bnd
+       (cons c (Unguarded-Box (Quote 0))))
+     
+     (define complex-bnd* : CoC3.2-Bnd* 
+       (if (null? complex*)
+           '()
+           (cons (ann (cons i (Unguarded-Box (Quote #f))) CoC3.2-Bnd)
+                 (debug (map bnd-unitialized-box c*)))))
+     ;; Don't traverse lambdas unless there is work to be done
+     (define lambda-bnd* : CoC3.2-Bnd-Lambda*
+       (cond
+         [(null? complex*) lambda*]
+         [else
+          (define (make-lambda-bnd [b : CoC3.2-Bnd-Lambda])
+            (match-define (cons i e) b)
+            ;; references to complex values in lambda bindings is unchecked because
+            ;; by the time a function in applied the letrec intialization
+            ;; must have completed.
+            (cons i (replace-ref-lam e setofc* setofl*)))
+          (map make-lambda-bnd lambda*)]))
+     
+     (define temp-bnd* : CoC3.2-Bnd*
+       (map (lambda ([t : Uid] [c : CoC3.2-Bnd])
+              : CoC3.2-Bnd
+              (match-define (cons _ e) c)
+              (cons t (replace-ref e setofc* setofl* i)))
+            (debug t*) complex*))
+     (define (make-move [c : Uid] [t : Uid]) : CoC3.2-Expr
+       (Unguarded-Box-Set! (Var c) (Var t)))
+     (define set-complex* : CoC3.2-Expr*
+       (let ([move* (map make-move c* t*)])
+         (if (null? complex*)
+             '()
+             (append move* (list (Unguarded-Box-Set! (Var i) (Quote #t)))))))
+     (define return
+       (let* ([let-tmps : CoC3.2-Expr
+                        (debug
+                         (cond
+                           [(null? temp-bnd*) expr^]
+                           [else (Let temp-bnd* (Begin set-complex* expr^))]))]
+              
+              [let-lambdas : CoC3.2-Expr
+                           (debug
+                            (cond
+                              [(null? lambda-bnd*) let-tmps]
+                              [else (Letrec lambda-bnd* let-tmps)]))]
+              [let-complex : CoC3.2-Expr
+                           (debug
+                            (cond
+                              [(null? complex-bnd*) let-lambdas]
+                              [else (Let complex-bnd* let-lambdas)]))])
+         (debug
+          (cond
+            [(null? simple*) let-complex]
+            [else (Let simple* let-complex)]))))
+     (debug who-return return)]
+    [else (form-map e pl-expr)]))
+
+
+
+
+
+
+
+
+
+
+
+
+
+#| Grave yard
+
+;; From replace-ref
+  (define (recur [e : CoC3.2-Expr])
     (replace-ref e c* l* uid-inited))
-  (define (recur* [e* : L1-Expr*])
+  (define (recur* [e* : CoC3.2-Expr*])
     (map recur e*))
   (match expr
-    ;; TODO this is currently less efficient than it should be. We could fix this
-    ;; by implementing the algorithim in "fixing letrec" ie a flow sensitive
-    ;; conservative approximation of when it is ok to reference recursive values.
     [(and v (Var x))
      (cond
        [(set-member? c* x)
@@ -274,17 +513,17 @@
     ;; wasted computation we are using unique identifiers
     ;; their shouldn't be binding overlaps
     [(Letrec b* e)
-     (define (recur-bnd-lambda [b : L1-Bnd-Lambda])
+     (define (recur-bnd-lambda [b : CoC3.2-Bnd-Lambda])
        (match-let ([(cons i (Lambda i* (Castable c? e))) b])
          (cons i (Lambda i* (Castable c? (recur e))))))
      (Letrec (map recur-bnd-lambda b*) (recur e))]
     [(Let b* e)
-     (define (recur-bnd [b : L1-Bnd])
+     (define (recur-bnd [b : CoC3.2-Bnd])
        (match-let ([(cons i e) b])
          (cons i (recur e))))
      (Let (map recur-bnd b*) (recur e))]
     [(Labels b* e)
-     (define (recur-bnd-code [b : L1-Bnd-Code])
+     (define (recur-bnd-code [b : CoC3.2-Bnd-Code])
        (match-let ([(cons i (Code i* e)) b])
          (cons i (Code i* (recur e)))))
      (Labels (map recur-bnd-code b*) e)]
@@ -398,6 +637,10 @@
      (Type-GRef-Huh e)]
     [(Type-GVect-Huh (app recur e))
      (Type-GVect-Huh e)]
+    [(Type-Mu-Huh (app recur e))
+     (Type-Mu-Huh e)]
+    [(Type-Mu-Body (app recur e))
+     (Type-Mu-Body e)]
     [(Type-Tag (app recur e))
      (Type-Tag e)]
     [(Construct t v (app recur* e*))
@@ -409,7 +652,7 @@
     [(If (app recur t) (app recur c) (app recur a))
      (If t c a)]
     [(Switch e c* d)
-     (: recur-case : (Switch-Case L1-Expr) -> (Switch-Case L1-Expr))
+     (: recur-case : (Switch-Case CoC3.2-Expr) -> (Switch-Case CoC3.2-Expr))
      (define/match (recur-case x)
        [((cons l r)) (cons l (recur r))])
      (Switch (recur e) (map recur-case c*) (recur d))]
@@ -426,6 +669,8 @@
      (Observe e t)]
     [(Unguarded-Box (app recur expr))
      (Unguarded-Box expr)]
+    [(Unguarded-Box-On-Stack e)
+     (Unguarded-Box-On-Stack (recur e))]
     [(Unguarded-Box-Ref (app recur expr))
      (Unguarded-Box-Ref expr)]
     [(Unguarded-Box-Set! (app recur expr1) (app recur expr2))
@@ -490,7 +735,7 @@
     [(MVect-Coercion e) (MVect-Coercion (recur e))]
     [(Error (app recur e)) (Error e)]
     [(Create-tuple e*) (Create-tuple (recur* e*))]
-    [(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
+[(Tuple-proj e i) (Tuple-proj (recur e) (recur i))]
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (recur e))]
     [(Type-Tuple-num e) (Type-Tuple-num (recur e))]
     [(Type-Tuple-item e i) (Type-Tuple-item (recur e) (recur i))]
@@ -503,128 +748,14 @@
      (Cast-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
                           (recur e5) (recur e6) (recur e7))]
     [(Coerce-Tuple uid e1 e2) (Coerce-Tuple uid (recur e1) (recur e2))]
-    [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
+[(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5)
      (Coerce-Tuple-In-Place uid (recur e1) (recur e2) (recur e3) (recur e4)
                             (recur e5))]
-    [other (error 'purify-letrec/replace-ref "unmatched ~a" other)]))
+[other (error 'purify-letrec/replace-ref "unmatched ~a" other)]))
+
+;; From pl-expr
 
 
-(: pl-expr (L0-Expr -> L1-Expr))
-(define (pl-expr expr)
-  (: pl-expr* (-> L0-Expr* L1-Expr*))
-  (define (pl-expr* e*) (map pl-expr e*))
-  (: pl-expr-bnd* (-> L0-Bnd* L1-Bnd*))
-  (define (pl-expr-bnd* b*)
-    (map (lambda ([b : L0-Bnd])
-           (match-let ([(cons i e) b])
-             (cons i (pl-expr e))))
-         b*))
-  (: pl-expr-bnd-code* (-> L0-Bnd-Code* L1-Bnd-Code*))
-  (define (pl-expr-bnd-code* b*)
-    (map (lambda ([b : L0-Bnd-Code])
-           (match-let ([(cons i (Code i* e)) b])
-             (cons i (Code i* (pl-expr e)))))
-         b*))
-  (match expr
-    ;; The only-interesting case
-    [(Letrec bnd* (app pl-expr expr))
-     (define who 'purify-letrec/pl-expr/letrec-matched)
-     (define who-return 'purify-letrec/pl-expr/letrec-match-returns)
-     (debug who (Letrec bnd* expr))
-     (define bound-uid* (list->set (map (inst car Uid L0-Expr) bnd*)))
-     ;; TODO casted lambdas are never invoked by there cast
-     ;; if we could determine which lambdas are the result of calling
-     ;; the cast runtime procedure then we wouldn't have to take a
-     ;; performance hit on these.
-     ;; One simple way of doing this would be to purify-letrec before
-     ;; lowering casts then implement the "fixing letrec" algorithm.
-     (: lambda* L1-Bnd-Lambda*)
-     (define-values (simple* complex* lambda*)
-       (for/fold ([s* : L1-Bnd* '()]
-                  [c* : L1-Bnd* '()]
-                  [l* : L1-Bnd-Lambda* '()])
-                 ([bnd : L0-Bnd bnd*])
-         (match bnd
-           [(cons i (Lambda f* (Castable ctr (app pl-expr expr)))) 
-            (values s* c* `([,i . ,(Lambda f* (Castable ctr expr))] . ,l*))]
-           [(cons i (app pl-expr expr))
-            (cond
-              [(simple? expr bound-uid* 0 #f)
-               (debug 'is-simple? i expr bound-uid*)
-               (values `([,i . ,expr] . ,s*) c* l*)]
-              [else (values s* `([,i . ,expr] . ,c*) l*)])])))
-     (debug 'purify-letrec complex* lambda*)
-     (define t* : Uid* (map (lambda (x) (next-uid! "tmp")) complex*))
-     (define c* : Uid* (map (inst car Uid Any) complex*))
-     (define l* : Uid* (map (inst car Uid Any) lambda*))
-     (define i  : Uid  (next-uid! "letrec_initialized"))
-     (define setofc* : (Setof Uid) (list->set c*))
-     (define setofl* : (Setof Uid) (list->set l*))
-     ;; Don't traverse expression unless there is work to be done
-     ;; Any replaced references do not need validity checks because
-     ;; the body of a letrec always runs after everything is initialized. 
-     (define expr^ : L1-Expr
-       (if (null? complex*)
-           expr 
-           (replace-ref expr setofc* setofl* 'ok)))
-     (define simple-bnd* : L1-Bnd* simple*)
-
-     (define (bnd-unitialized-box [c : Uid]) : L1-Bnd
-       (cons c (Unguarded-Box (Quote 0))))
-     
-     (define complex-bnd* : L1-Bnd* 
-       (if (null? complex*)
-           '()
-           (cons (ann (cons i (Unguarded-Box (Quote #f))) L1-Bnd)
-                 (debug (map bnd-unitialized-box c*)))))
-     ;; Don't traverse lambdas unless there is work to be done
-     (define lambda-bnd* : L1-Bnd-Lambda*
-       (cond
-         [(null? complex*) lambda*]
-         [else
-          (define (make-lambda-bnd [b : L1-Bnd-Lambda])
-            (match-define (cons i e) b)
-            ;; references to complex values in lambda bindings is unchecked because
-            ;; by the time a function in applied the letrec intialization
-            ;; must have completed.
-            (cons i (replace-ref-lam e setofc* setofl*)))
-          (map make-lambda-bnd lambda*)]))
-     
-     (define temp-bnd* : L1-Bnd*
-       (map (lambda ([t : Uid] [c : L1-Bnd])
-              : L1-Bnd
-              (match-define (cons _ e) c)
-              (cons t (replace-ref e setofc* setofl* i)))
-            (debug t*) complex*))
-     (define (make-move [c : Uid] [t : Uid]) : L1-Expr
-       (Unguarded-Box-Set! (Var c) (Var t)))
-     (define set-complex* : L1-Expr*
-       (let ([move* (map make-move c* t*)])
-         (if (null? complex*)
-             '()
-             (append move* (list (Unguarded-Box-Set! (Var i) (Quote #t)))))))
-     (define return
-       (let* ([let-tmps : L1-Expr
-                        (debug
-                         (cond
-                           [(null? temp-bnd*) expr^]
-                           [else (Let temp-bnd* (Begin set-complex* expr^))]))]
-              
-              [let-lambdas : L1-Expr
-                           (debug
-                            (cond
-                              [(null? lambda-bnd*) let-tmps]
-                              [else (Letrec lambda-bnd* let-tmps)]))]
-              [let-complex : L1-Expr
-                           (debug
-                            (cond
-                              [(null? complex-bnd*) let-lambdas]
-                              [else (Let complex-bnd* let-lambdas)]))])
-         (debug
-          (cond
-            [(null? simple*) let-complex]
-            [else (Let simple* let-complex)]))))
-     (debug who-return return)]
     [(or (Quote _) (Quote-Coercion _) (Type _)) expr]
     [(or  (Code-Label _) (Tag _) (No-Op)) expr]
     [(Code-Label u)
@@ -733,6 +864,8 @@
      (Type-Fn-arity e)]
     [(Type-Fn-Huh (app pl-expr e))
      (Type-Fn-Huh e)]
+    [(Type-Mu-Huh (app pl-expr e)) (Type-Mu-Huh e)]
+    [(Type-Mu-Body (app pl-expr e)) (Type-Mu-Body e)]
     [(Type-GRef-Of (app pl-expr e))
      (Type-GRef-Of e)]
     [(Type-GVect-Of (app pl-expr e))
@@ -762,7 +895,7 @@
     [(If (app pl-expr t) (app pl-expr c) (app pl-expr a))
      (If t c a)]
     [(Switch e c* d)
-     (: pl-expr-case : (Switch-Case L0-Expr) -> (Switch-Case L1-Expr))
+     (: pl-expr-case : (Switch-Case CoC3.1-Expr) -> (Switch-Case CoC3.2-Expr))
      (define/match (pl-expr-case c)
        [((cons l r)) (cons l (pl-expr r))])
      (Switch (pl-expr e) (map pl-expr-case c*) (pl-expr d))]
@@ -782,6 +915,8 @@
      (Observe e t)]
     [(Unguarded-Box (app pl-expr expr))
      (Unguarded-Box expr)]
+    [(Unguarded-Box-On-Stack (app pl-expr expr))
+     (Unguarded-Box-On-Stack expr)]
     [(Unguarded-Box-Ref (app pl-expr expr))
      (Unguarded-Box-Ref expr)]
     [(Unguarded-Box-Set! (app pl-expr expr1) (app pl-expr expr2))
@@ -861,87 +996,9 @@
     [(Type-Tuple-Huh e) (Type-Tuple-Huh (pl-expr e))]
     [(Type-Tuple-num e) (Type-Tuple-num (pl-expr e))]
     [(Type-Tuple-item e i) (Type-Tuple-item (pl-expr e) (pl-expr i))]
-    [(Make-Tuple-Coercion uid t1 t2 lbl) (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]
+    [(Make-Tuple-Coercion uid t1 t2 lbl)
+     (Make-Tuple-Coercion uid (pl-expr t1) (pl-expr t2) (pl-expr lbl))]
     [(Mediating-Coercion-Huh e) (Mediating-Coercion-Huh (pl-expr e))]
-    [other (error 'purify-letrec/expr "unmatched ~a" other)]))
+    [other (error 'purify-letrec/expr "unmatched ~a" other)]
 
-#|
-[(and (null? complex*) (null? lambda*) (null? simple*)) (return-state exp)]
-[(and (null? complex*) (null? simple*)) (return-state (Letrec lambda* exp))]
-[(and (null? complex*) (null? lambda*)) (return-state (Let simple* exp))]
-[(and (null? simple*) (null? lambda*))
- (return-state
-  (Let let-cbnd*
-    (Let let-tbnd* (Begin (map f c* t*) exp))))]
-[(null? lambda*)
- (return-state
-  (Let (append let-cbnd* let-tbnd*) (Begin (map f c* t*) exp)))]
-[(null? complex*)
- (return-state
-  (Let simple* (Letrec lambda* exp)))]
-[(null? simple*)
- (return-state
-  (Let let-cbnd*
-    (Letrec lambda*
-      (Let let-tbnd* (Begin (map f c* t*) exp)))))]
-[else
- (return-state
-  (Let simple*
-    (Let let-cbnd*
-      (Letrec lambda*
-        (Let let-tbnd* (Begin (map f c* t*) exp))))))]
-
-(let* (
-       
-       [let-cbnd* (map (inst cons Uid L1-Expr)
-                       c*
-                       (make-list (length c*) (Gbox (Quote 0))))]
-       [let-tbnd* (map (inst cons Uid L1-Expr) t* (map (inst cdr Uid L1-Expr) complex*))])
-
-  [(Lambda f* e) (Lambda f* (recur e))]
-  [(Cast exp r)
-   (exp : L1-Expr <- (pl-expr exp))
-   (match r
-     [(Twosome t1 t2 lbl)
-      (return-state (Cast exp (Twosome t1 t2 lbl)))]
-     [(Coercion c)
-      (return-state (Cast exp (Coercion c)))])]
-
-  [(Let bnd* exp)
-   (bnd* : L1-Bnd* <- (pl-bnd* bnd*))
-   (exp : L1-Expr  <- (pl-expr exp))
-   (return-state (Let bnd* exp))]
-  [(App exp exp*)
-   (exp  : L1-Expr  <- (pl-expr  exp))
-   (exp* : L1-Expr* <- (map-state pl-expr exp*))
-   (return-state (App exp exp*))]
-  [(Op p exp*)
-   (exp* : L1-Expr* <- (map-state pl-expr exp*))
-   (return-state (Op p exp*))]
-  [(If tst csq alt)
-   (tst : L1-Expr <- (pl-expr tst))
-   (csq : L1-Expr <- (pl-expr csq))
-   (alt : L1-Expr <- (pl-expr alt))
-   (return-state (If tst csq alt))]
-  [(Begin e* e)
-   (e* : L1-Expr* <- (map-state pl-expr e*))
-   (e  : L1-Expr  <- (pl-expr  e))
-   (return-state (Begin e* e))]
-  [(Repeat i e1 e2 e3)
-   (e1 : L1-Expr <- (pl-expr e1))
-   (e2 : L1-Expr <- (pl-expr e2))
-   (e3 : L1-Expr <- (pl-expr e3))
-   (return-state (Repeat i e1 e2 e3))]
-  [(Gbox e) (lift-state (inst Gbox L1-Expr) (pl-expr e))]
-  [(Gunbox e) (lift-state (inst Gunbox L1-Expr) (pl-expr e))]
-  [(Gbox-set! e1 e2) (lift-state (inst Gbox-set! L1-Expr L1-Expr)
-                                 (pl-expr e1) (pl-expr e2))]
-  [(Gvector n e) (lift-state (inst Gvector L1-Expr L1-Expr) (pl-expr n) (pl-expr e))]
-  [(Gvector-ref e index) (lift-state (inst Gvector-ref L1-Expr L1-Expr) (pl-expr e) (pl-expr index))]
-  [(Gvector-set! e1 index e2) (lift-state (inst Gvector-set! L1-Expr L1-Expr L1-Expr)
-                                          (pl-expr e1) (pl-expr index) (pl-expr e2))]
-  [(Var id)    (return-state (Var id))]
-  [(Quote lit) (return-state (Quote lit))]
-  
-  
-  |#
+;;|#

@@ -33,11 +33,11 @@
   (Rec E (U ;; Non-Terminals
           (Observe E Grift-Type)
           (Lambda Uid* E)
-	  (Letrec C0-Bnd* E)
-	  (Let C0-Bnd* E)
-	  (App E (Listof E))
-	  (Op Grift-Primitive (Listof E))
-	  (If E E E)
+          (Letrec C0-Bnd* E)
+          (Let C0-Bnd* E)
+          (App E (Listof E))
+          (Op Grift-Primitive (Listof E))
+          (If E E E)
           (Switch E (Switch-Case* E) E)
           (Cast E (Twosome Grift-Type Grift-Type Blame-Label))
           (Begin C0-Expr* E)
@@ -76,9 +76,9 @@
           (Dyn-Tuple-Proj E E E)
           (Create-tuple (Listof E))
           (Tuple-proj E Index)
-	  ;; Terminals
-	  (Var Uid)
-	  (Quote Cast-Literal)
+          ;; Terminals
+          (Var Uid)
+          (Quote Cast-Literal)
           No-Op)))
 
 (define-type C0-Expr* (Listof C0-Expr))

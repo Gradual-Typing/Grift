@@ -32,5 +32,5 @@
    ;; ackermans these are too long for the test suite
    (test-file "program" "ack-1-2-static.grift" (int 4))
    (test-file "program" "ack-2-3-static.grift" (int 9))
-   ;; These are too long perhaps make an long flag or something
-   ))
+   ;; compute the 10001st prime
+   (test-file "program" "sieve.100.grift" (int 541))))

@@ -1,0 +1,2 @@
+;; This test checks parsing of recursive types
+(lambda ([a : (Rec X (Tuple X))]) : (Rec Y Dyn) a)

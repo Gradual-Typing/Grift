@@ -14,7 +14,7 @@
                     (Labels D3-Bnd-Code*
                             D3-Body))))
 
-(define-type D3-Body (Locals Uid* D3-Tail))
+(define-type D3-Body (Locals Uid* (Bnd* Nat) D3-Tail))
 (define-type D3-Bnd-Code* (Listof D3-Bnd-Code))
 (define-type D3-Bnd-Code (Pairof Uid D3-Code))
 (define-type D3-Code (Code Uid* D3-Body))

@@ -7,47 +7,51 @@
 +-----------------------------------------------------------------------------|#
 
 (define-type Grift1-Lang
-  (Prog (List String Natural Grift-Type) (Listof S1-Top)))
+  (Prog (List String Natural Grift-Type) (Listof G1-Top)))
 
-(define-type S1-Top
-  (U (Define Boolean Uid Grift-Type S1-Expr)
-     (Observe S1-Expr Grift-Type)))
+(define-type G1-Top
+  (U (Define Boolean Uid Grift-Type G1-Ann-Expr)
+     (Observe G1-Ann-Expr Grift-Type)))
+(define-type G1-Top* (Listof G1-Top))
 
-(define-type S1-Expr
-  ;; This slightly complicated formulation of lambda's Structure allows me
-  ;; To rely on lambdas to have function types during cast insertion
-  (Rec E (U (Ann (Lambda Grift-Fml* E) (Pair Src Grift-Fn-Type))
-            (Ann (U
-                  (Letrec S1-Bnd* E)
-                  (Let S1-Bnd* E)
-                  (App E (Listof E))
-                  (Op (Ann Grift-Primitive Grift-Type*) (Listof E))
-                  (If E E E)
-                  (Switch E (Switch-Case* E) E)
-                  (Ascribe E Grift-Type (Option Blame-Label))
-                  (Var Uid)
-                  (Quote Grift-Literal)
-                  (Begin (Listof E) E)
-                  (Repeat Uid E E Uid E E)
-                  ;; Monotonic effects
-                  (Mbox E Grift-Type)
-                  (Munbox E)
-                  (Mbox-set! E E)
-                  (Mvector E E Grift-Type)
-                  (Mvector-ref E E)
-                  (Mvector-set! E E E)
-                  ;; Guarded effects
-                  (Gbox E)
-                  (Gunbox E)
-                  (Gbox-set! E E)
-                  (Gvector E E)
-                  (Gvector-set! E E E)
-                  (Gvector-ref E E)
-                  ;;
-                  (Create-tuple (Listof E))
-                  (Tuple-proj E Index))
-                 (Pair Src Grift-Type)))))
+(define-type G1-Ann-Expr (Ann G1-Expr (Pair Src Grift-Type)))
+(define-type G1-Ann-Expr* (Listof G1-Ann-Expr))
 
-(define-type S1-Bnd (Bnd Uid Grift-Type S1-Expr))
-(define-type S1-Bnd* (Listof S1-Bnd))
+(define-type G1-Expr
+  (U
+   (Lambda Grift-Fml* G1-Ann-Expr)
+   (Letrec G1-Bnd* G1-Ann-Expr)
+   (Let G1-Bnd* G1-Ann-Expr)
+   (App G1-Ann-Expr (Listof G1-Ann-Expr))
+   (Op (List Grift-Primitive Grift-Type*) (Listof G1-Ann-Expr))
+   (If G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+   (Switch G1-Ann-Expr (Switch-Case* G1-Ann-Expr) G1-Ann-Expr)
+   (Ascribe G1-Ann-Expr Grift-Type (Option Blame-Label))
+   (Var Uid)
+   (Quote Grift-Literal)
+   (Begin (Listof G1-Ann-Expr) G1-Ann-Expr)
+   (Repeat Uid G1-Ann-Expr G1-Ann-Expr Uid G1-Ann-Expr G1-Ann-Expr)
+   ;; Monotonic effects
+   (Mbox G1-Ann-Expr Grift-Type)
+   (Munbox G1-Ann-Expr)
+   (Mbox-set! G1-Ann-Expr G1-Ann-Expr)
+   (Mvector G1-Ann-Expr G1-Ann-Expr Grift-Type)
+   (Mvector-ref G1-Ann-Expr G1-Ann-Expr)
+   (Mvector-set! G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+   (Mvector-length G1-Ann-Expr)
+   ;; Guarded effects
+   (Gbox G1-Ann-Expr)
+   (Gunbox G1-Ann-Expr)
+   (Gbox-set! G1-Ann-Expr G1-Ann-Expr)
+   (Gvector G1-Ann-Expr G1-Ann-Expr)
+   (Gvector-set! G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+   (Gvector-ref G1-Ann-Expr G1-Ann-Expr)
+   (Gvector-length G1-Ann-Expr)
+   ;;
+   (Create-tuple (Listof G1-Ann-Expr))
+   (Tuple-proj G1-Ann-Expr Index)))
+(define-type G1-Expr* (Listof G1-Expr))
+
+(define-type G1-Bnd (Bnd Uid Grift-Type G1-Ann-Expr))
+(define-type G1-Bnd* (Listof G1-Bnd))
 

@@ -11,6 +11,7 @@ TODO write unit tests
 
 (require
  racket/match
+ racket/list
  "../language/forms.rkt"
  "../language/syntax.rkt"
  "../language/cast-or-coerce3.rkt"
@@ -85,12 +86,16 @@ TODO write unit tests
        (CoC3-Expr #:know-not-eq? Boolean) CoC3-Expr))
 
 (define-type Id-Coercion-Huh-Type (CoC3-Expr -> CoC3-Expr))
+
 (define-type Compile-Make-Coercion-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr)
        (#:top-level? Boolean #:know-not-eq? Boolean)
        CoC3-Expr))
+
 (define-type Make-Med-Coercion-Type
-  (->* (CoC3-Expr CoC3-Expr CoC3-Expr) (#:know-not-eq? Boolean) CoC3-Expr))
+  (->* (CoC3-Expr CoC3-Expr CoC3-Expr)
+       (#:know-not-eq? Boolean)
+       CoC3-Expr))
 
 (define-type Lambda-Type (Uid* CoC3-Expr -> CoC3-Expr)) 
 (define-type App-Type (CoC3-Expr CoC3-Expr* -> CoC3-Expr))
@@ -121,6 +126,7 @@ TODO write unit tests
 
 (define-type Compose-Coercions-Type
   (CoC3-Expr CoC3-Expr -> CoC3-Expr))
+
 (define-type Compile-Cast-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
        (CoC3-Expr CoC3-Expr CoC3-Expr #:t1-not-dyn Boolean #:t2-not-dyn Boolean)
@@ -674,7 +680,8 @@ TODO write unit tests
     (let*$ ([v dyn] [l lbl])
       (If (dyn-immediate-tag=?$ v PBOX-DYN-EXPR)
           (let*$ ([val (dyn-box-value$ v)]
-                  [ty  (dyn-box-type$ v)])
+                  [ty  (dyn-box-type$ v)]
+                  [ty  (unfold-possible-mu$ ty)])
             (If (Type-GRef-Huh ty)
                 (let*$ ([tyof (Type-GRef-Of ty)]
                         [read-val (pbox-ref val)])
@@ -688,9 +695,10 @@ TODO write unit tests
             [t2 t2]
             [lbl lbl])
       (If (ann (dyn-immediate-tag=?$ dyn-gbox PBOX-DYN-EXPR) CoC3-Expr)
-          (let$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
-                 [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)])
-            (If (Type-GRef-Huh ty)
+          (let*$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
+                  [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)]
+                  [ty   (unfold-possible-mu$ ty)])
+                 (If (Type-GRef-Huh ty)
                 (let$ ([tyof (Type-GRef-Of ty)])
                   (cond$
                    [(op=? tyof t2)
@@ -707,8 +715,9 @@ TODO write unit tests
     (let*$ ([dyn dyn][ind ind][lbl lbl])
       (cond
         [(dyn-immediate-tag=?$ dyn PBOX-DYN-EXPR)
-         (let$ ([maybe-pvec-val (dyn-box-value$ dyn)]
-                [maybe-pvec-ty  (dyn-box-type$ dyn)])
+         (let*$ ([maybe-pvec-val (dyn-box-value$ dyn)]
+                 [ty             (dyn-box-type$ dyn)]
+                 [maybe-pvec-ty  (unfold-possible-mu$ ty)])
            (cond$
             [(Type-GVect-Huh maybe-pvec-ty)
              (let$ ([elem-ty (Type-GVect-Of maybe-pvec-ty)]
@@ -725,8 +734,9 @@ TODO write unit tests
             [lbl lbl])
       (cond$
        [(dyn-immediate-tag=?$ dyn-gvec PBOX-DYN-EXPR)
-        (let$ ([maybe-vec      (dyn-box-value$ dyn-gvec)]
-               [maybe-vec-type (dyn-box-type$  dyn-gvec)])
+        (let*$ ([maybe-vec      (dyn-box-value$ dyn-gvec)]
+                [ty             (dyn-box-type$  dyn-gvec)]
+                [maybe-vec-type (unfold-possible-mu$ ty)])
           (cond$ 
            [(Type-GVect-Huh maybe-vec-type)
             (let*$ ([elem-type (Type-GVect-Of maybe-vec-type)]
@@ -740,29 +750,39 @@ TODO write unit tests
   
   (: code-gen-dyn-pvec-len Dyn-PVec-Len-Type)
   (define (code-gen-dyn-pvec-len expr lbl)
-    (let*$ ([v expr] [l lbl])
+    (let*$ ([v expr]
+            [l lbl])
       (cond$
-       [(and$ (dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
-              (Type-GVect-Huh (dyn-box-type$ v)))
-        (pvec-len (dyn-box-value$ v))]
+       [(dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
+        (let*$ ([val (dyn-box-value$ v)]
+                [ty  (dyn-box-type$ v)]
+                [ty  (unfold-possible-mu$ ty)])
+          (cond$
+           [(Type-GVect-Huh ty) (pvec-len val)]
+           [else (Blame l)]))]
        [else (Blame l)])))
   
   (: code-gen-dyn-mbox-ref Dyn-MBox-Ref-Type)
   (define (code-gen-dyn-mbox-ref dyn lbl)
     (let$ ([dyn dyn] [lbl lbl])
       (cond$
-       [(and$ (dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
-              (Type-MRef-Huh (dyn-box-type$ dyn)))
-        (mbox-ref (dyn-box-value$ dyn) DYN-EXPR)]
-       [else (Blame lbl)])))
+       [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
+        (let*$ ([val (dyn-box-value$ dyn)]
+                [ty  (dyn-box-type$ dyn)]
+                [ty  (unfold-possible-mu$ ty)])
+          (cond$
+           [(Type-MRef-Huh ty) (mbox-ref val DYN-EXPR)]
+           [else (Blame lbl)]))]
+        [else (Blame lbl)])))
   
   (: code-gen-dyn-mbox-set! Dyn-MBox-Set-Type)
   (define (code-gen-dyn-mbox-set! dyn-mbox wrt-val1 t2 lbl)
     (let$ ([dyn dyn-mbox] [val wrt-val1] [t2 t2] [lbl lbl])
       (cond$
        [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
-        (let$ ([mbox (dyn-box-value$ dyn)]
-               [t1 (dyn-box-type$ dyn)])
+        (let*$ ([mbox (dyn-box-value$ dyn)]
+                [t1 (dyn-box-type$ dyn)]
+                [t1 (unfold-possible-mu$ t1)])
           (cond$
            [(Type-MRef-Huh t1)
             (let$ ([tyof (Type-MRef-Of t1)])
@@ -776,9 +796,13 @@ TODO write unit tests
   (define (code-gen-dyn-mvec-ref dyn ind lbl)
     (let$ ([dyn dyn] [ind ind] [lbl lbl])
       (cond$
-       [(and$ (dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
-              (Type-MVect-Huh (dyn-box-type$ dyn)))
-        (mvec-ref (dyn-box-value$ dyn) ind DYN-EXPR)]
+       [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
+        (let*$ ([ty (dyn-box-type$ dyn)]
+                [ty (unfold-possible-mu$ ty)])
+          (cond$
+           [(Type-MVect-Huh ty)
+            (mvec-ref (dyn-box-value$ dyn) ind DYN-EXPR)]
+           [else (Blame lbl)]))]
        [else (Blame lbl)])))
   
   (: code-gen-dyn-mvec-set! Dyn-MVec-Set-Type)
@@ -786,8 +810,9 @@ TODO write unit tests
     (let$ ([dyn dyn-mvec] [ind ind] [vale wrt-val1] [t2 t2] [lbl lbl])
       (cond$
        [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
-        (let$ ([val (dyn-box-value$ dyn-mvec)]
-               [ty  (dyn-box-type$ dyn-mvec)])
+        (let*$ ([val (dyn-box-value$ dyn-mvec)]
+                [ty  (dyn-box-type$ dyn-mvec)]
+                [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MVect-Huh ty)
             (let$ ([tyof (Type-MVect-Of ty)])
@@ -800,60 +825,65 @@ TODO write unit tests
   
   (: code-gen-dyn-fn-app Dyn-Fn-App-Type)
   (define (code-gen-dyn-fn-app e e* t* le)
-    ;; Variable are created here instead of using let$
-    ;; because they appear in sub-expressions that
-    ;; are programmatically generated.
-    (define lu  (next-uid! "dyn-fn-blame-info"))
-    (define l (Var lu))
-    (define tyu (next-uid! "dyn_fn_ty"))
-    (define ty  (Var tyu))
-    (define vu (next-uid! "dyn-fn"))
-    (define v  (Var vu))
-    (define uu (next-uid! "dyn-fn-val"))
-    (define u  (Var uu))
-    (define-values (vu* v*)
-      (for/lists ([vu* : Uid*] [v* : CoC3-Expr*]) ([e : CoC3-Expr e*])
-        (define u (next-uid! "dyn_fn_arg"))
-        (values u (Var u))))
-    (unless (= (length v*) (length t*))
+    (define bnd (inst cons Uid CoC3-Expr))
+    (unless (= (length e*) (length t*))
       (error 'interpret-casts-with-hyper-coercions/make-fn-app
              "expected types to be same length as arguments"))
-    (define arg-casts : CoC3-Expr*
-      (for/list : (Listof CoC3-Expr)
-                ([v : CoC3-Expr v*]
-                 [t : Grift-Type t*]
-                 [i (in-naturals)])
-        (let$ ([dyn-fn-arg-type (Type-Fn-arg ty (Quote i))])
-          (compile-cast v (Type t) dyn-fn-arg-type l))))
-    (define casts-apply : CoC3-Expr (compile-app u arg-casts))
-
-    (define ret 
-      (Let `([,lu . ,le]
-             [,vu . ,e]
-             . ,(map (inst cons Uid CoC3-Expr) vu* e*))
-        (cond$
-         [(dyn-immediate-tag=?$ v FN-DYN-DYN-EXPR)
-          (Let `([,uu . ,(dyn-box-value$ v)]
-                 [,tyu . ,(dyn-box-type$ v)])
-            (cond$
-             [(Type-Fn-Huh ty)
-              (let$ ([ret-val casts-apply]
-                     [ret-ty  (Type-Fn-return ty)])
-                (compile-cast ret-val ret-ty DYN-EXPR l))]
-             [else (Blame l)]))]
-         [else (Blame l)])))
-    (define who 'code-gen-dyn-fn-app)
-    (debug off who e e* t* le ret))
+    (define app-arity (length e*))
+    (define fn-of-dyns-type
+      (Type (Fn app-arity (make-list app-arity DYN-TYPE) DYN-TYPE)))
+    (let$ ([dyn-fn-blame-info le] [dyn-v e])
+      (let-values
+          ;; I got tired of trying to make this discriptive name fit
+          ([(l) dyn-fn-blame-info]
+           [(u* v*) (for/lists ([u* : Uid*]
+                                [v* : (Listof (Var Uid))])
+                               ([_ e*])
+                      (define u (next-uid! "dyn_fn_arg"))
+                      (values u (Var u)))])
+        (Let (map bnd u* e*)
+          (cond$
+           ;; This condition asks if this is a boxed dynamic value
+           [(dyn-immediate-tag=?$ dyn-v FN-DYN-DYN-EXPR)
+            (let*$ ([unboxed-value (dyn-box-value$ dyn-v)]
+                    [src-type (dyn-box-type$  dyn-v)]
+                    [src-type (unfold-possible-mu$ src-type)])
+              (cond$
+               [(Type-Fn-Huh src-type)
+                (let-values
+                    ;; `cu*` Uids for casted expression bindings
+                    ;; `cv*` Vars for cu*
+                    ;; `ce*` The expressions that cast e*
+                    ([(cu* cv* ce*)
+                      ;; `v*` Vars of the `e*` bindings
+                      ;; `t` The type undyned and unfolded
+                      (for/lists ([cu* : Uid*]
+                                  [cv* : (Listof (Var Uid))]
+                                  [ce* : (Listof CoC3-Expr)])
+                                 ([v v*] [t t*] [i (in-naturals)])
+                        (define u (next-uid! "dyn-fn-casted-argument"))
+                        (values
+                         u (Var u)
+                         (compile-cast
+                          v (Type t) (Type-Fn-arg src-type (Quote i)) l)))])
+                  (Let (map bnd cu* ce*)
+                    (let$ ([ret-val (compile-app unboxed-value cv*)]
+                           [ret-ty  (Type-Fn-return src-type)])
+                      (compile-cast ret-val ret-ty DYN-EXPR l))))]
+               [else (Blame l)]))]
+          [else (Blame l)])))))
   
   (: code-gen-dyn-tup-prj Dyn-Tup-Prj-Type)
   (define (code-gen-dyn-tup-prj e ie le)
     (let$ ([v e] [i ie] [l le])
       (cond$
        [(ann (dyn-immediate-tag=?$ v TUPLE-DYN-EXPR) CoC3-Expr)
-        (let$ ([u  (ann (dyn-box-value$ v) CoC3-Expr)]
-               [ty (ann (dyn-box-type$ v) CoC3-Expr)])
+        (let*$ ([u  (ann (dyn-box-value$ v) CoC3-Expr)]
+                [t0 (ann (dyn-box-type$ v) CoC3-Expr)]
+                [ty (unfold-possible-mu$ t0)])
           (cond$
-           [(ann (and$ (Type-Tuple-Huh ty) (Op '> (list (Type-Tuple-num ty) i)))
+           [(ann (and$ (Type-Tuple-Huh ty)
+                       (Op '> (list (Type-Tuple-num ty) i)))
                  CoC3-Expr)
             (let$ ([prj-val (ann (Tuple-proj u i) CoC3-Expr)]
                    [prj-ty  (ann (Type-Tuple-item ty i) CoC3-Expr)])
@@ -953,10 +983,9 @@ TODO write unit tests
       code-gen-dyn-fn-app
       (apply-code-curry dtp))]))
 
-
 (define-type Compile-Med-Cast-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
-       (CoC3-Expr CoC3-Expr CoC3-Expr #:know-not-eq? Boolean)
+       (CoC3-Expr CoC3-Expr CoC3-Expr #:know-not-eq? Boolean #:interpret? Boolean)
        CoC3-Expr))
 
 (: code-gen-entire-med-cast
@@ -966,7 +995,8 @@ TODO write unit tests
                    #:pref-cast   Proxied-Cast-Type
                    #:pvec-cast   Proxied-Cast-Type
                    #:mbox-cast   Monotonic-Cast-Type
-                   #:mvec-cast   Monotonic-Cast-Type)
+                   #:mvec-cast   Monotonic-Cast-Type
+                   #:interp-med-cast Cast-Type)
        CoC3-Expr))
 
 ;; This is needed in case we want to manually inline 
@@ -976,7 +1006,8 @@ TODO write unit tests
                                   #:pref-cast  compile-pref-cast
                                   #:pvec-cast  compile-pvec-cast
                                   #:mbox-cast  compile-mbox-cast
-                                  #:mvec-cast  compile-mvec-cast)
+                                  #:mvec-cast  compile-mvec-cast
+                                  #:interp-med-cast interp-med-cast)
   ;; Assumes it will always be given values
   (precondition$ (and$ (not$ (op=? t1 t2))
                        (not$ (Type-Dyn-Huh t1))
@@ -999,6 +1030,18 @@ TODO write unit tests
       (compile-mbox-cast v (Type-MRef-Of t2))]
      [(and$ (Type-MVect-Huh t1) (Type-MVect-Huh t2))
       (compile-mvec-cast v (Type-MVect-Of t2))] 
+     [(Type-Mu-Huh t1)
+      (let$ ([t1-mu-body (Type-Mu-Body t1)])
+        (cond$
+         [(op=? t1-mu-body t2) v]
+         [else (interp-med-cast v t1-mu-body t2 l
+                                mono-address base-address index)]))]
+     [(Type-Mu-Huh t2)
+      (let$ ([t2-mu-body (Type-Mu-Body t2)])
+        (cond$
+         [(op=? t2-mu-body t1) v]
+         [else (interp-med-cast v t1 t2-mu-body l
+                                mono-address base-address index)]))]
      [else (Blame l)])))
 
 (: make-interp-med-cast-runtime!
@@ -1037,9 +1080,14 @@ TODO write unit tests
       #:pref-cast  compile-pref-cast
       #:pvec-cast  compile-pvec-cast
       #:mbox-cast  compile-mbox-cast
-      #:mvec-cast  compile-mvec-cast)))
-
+      #:mvec-cast  compile-mvec-cast
+      #:interp-med-cast interp-med-cast)))
+  
   interp-med-cast)
+
+
+(define *mu-casts* : (Parameterof Nat) (make-parameter 0))
+(define *mu-casts-limit* : (Parameterof Nat) (make-parameter 2))
 
 (: make-compile-med-cast
    (->* (#:fn-cast     Fn-Cast-Type
@@ -1051,120 +1099,180 @@ TODO write unit tests
          #:interp-med-cast Cast-Type)
         Compile-Med-Cast-Type))
 
-(define ((make-compile-med-cast
-          #:fn-cast    compile-fn-cast
-          #:tuple-cast compile-tuple-cast
-          #:pref-cast  compile-pref-cast
-          #:pvec-cast  compile-pvec-cast
-          #:mbox-cast  compile-mbox-cast
-          #:mvec-cast  compile-mvec-cast
-          #:interp-med-cast interp-med-cast)
-         v t1 t2 l
-         [mono-address : CoC3-Expr ZERO-EXPR]
-         [base-address : CoC3-Expr ZERO-EXPR]
-         [index : CoC3-Expr ZERO-EXPR]
-         #:know-not-eq? [know-not-eq? : Boolean #f])
+(define (make-compile-med-cast
+         #:fn-cast    compile-fn-cast
+         #:tuple-cast compile-tuple-cast
+         #:pref-cast  compile-pref-cast
+         #:pvec-cast  compile-pvec-cast
+         #:mbox-cast  compile-mbox-cast
+         #:mvec-cast  compile-mvec-cast
+         #:interp-med-cast interp-med-cast)
 
-   (: aux : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-    (define (aux v t1 t2 l mono-address base-address index)
-      (match* (t1 t2)
-        ;; TODO add tests that specifically target each of these cases
-        [((Type t1-t) (Type t2-t))
-         (match* (t1-t t2-t)
-           [((Fn a _ _) (Fn a _ _))
-            (compile-fn-cast v t1 t2 l)]
-           [((GRef t1) (GRef t2))
-            (compile-pref-cast v (Type t1) (Type t2) l)]
-           [((GVect t1) (GVect t2))
-            (compile-pvec-cast v (Type t1) (Type t2) l)]
-           [((MRef t1) (MRef t2))
-            (compile-mbox-cast v #:t1 (Type t1) (Type t2))]
-           [((MVect t1) (MVect t2))
-            (compile-mvec-cast v #:t1 (Type t1) (Type t2))]
-           [((STuple n _) (STuple m _)) #:when (<= m n)
-            (compile-tuple-cast v t1 t2 l mono-address base-address index)]
-           [(_ _) #;base-types (Blame l)])]
-        [((Type t1-t) t2) 
-         (match t1-t
-           [(Fn a _ _)
-            (If (and$ (Type-Fn-Huh t2) (op=? (Quote a) (Type-Fn-arity t2)))
-                (compile-fn-cast v t1 t2 l)
-                (Blame l))]
-           [(GRef t1-t)
-            (If (Type-GRef-Huh t2)
-                (compile-pref-cast v (Type t1-t) (Type-GRef-Of t2) l)
-                (Blame l))]
-           [(GVect t1-t)
-            (If (Type-GVect-Huh t2)
-                (compile-pvec-cast v (Type t1-t) (Type-GVect-Of t2) l)
-                (Blame l))]
-           [(MRef t1-t)
-            (If (Type-MRef-Huh t2)
-                (compile-mbox-cast v #:t1 (Type t1-t) (Type-MRef-Of t2))
-                (Blame l))]
-           [(MVect t1-t)
-            (If (Type-MVect-Huh t2)
-                (compile-mvec-cast v #:t1 (Type t1-t) (Type-MVect-Of t2))
-                (Blame l))]
-           [(STuple n _)
-            (If (and$ (Type-Tuple-Huh t2) (op<=? (Type-Tuple-num t2) (Quote n)))
-                (compile-tuple-cast v t1 t2 l mono-address base-address index)
-                (Blame l))]
-           [_ #; Base-Cases (Blame l)])]
-        [(t1 (Type t2-t))
-         (match t2-t
-           [(Fn a _ _)
-            (If (and$ (Type-Fn-Huh t1) (op=? (Quote a) (Type-Fn-arity t1)))
-                (compile-fn-cast v t1 t2 l)
-                (Blame l))]
-           [(GRef t2-t)
-            (If (Type-GRef-Huh t1)
-                (compile-pref-cast v (Type-GRef-Of t1) (Type t2-t) l)
-                (Blame l))]
-           [(GVect t2-t)
-            (If (Type-GVect-Huh t1)
-                (compile-pvec-cast v (Type-GVect-Of t1) (Type t2-t) l)
-                (Blame l))]
-           [(MRef t2-t)
-            (If (Type-MRef-Huh t1)
-                (compile-mbox-cast v (Type t2-t))
-                (Blame l))]
-           [(MVect t2-t)
-            (If (Type-MVect-Huh t1)
-                (compile-mvec-cast v (Type t2-t))
-                (Blame l))]
-           [(STuple n _)
-            (If (and$ (Type-Tuple-Huh t1) (op<=? (Quote n) (Type-Tuple-num t1)))
-                (compile-tuple-cast v t1 t2 l mono-address base-address index)
-                (Blame l))]
-           [_ #;base-cases (Blame l)])] 
-        [(t1 t2)
-         (cond
-           ;; This is super hacky we can do better
-           [(med-cast-inline-without-types?)
-            (code-gen-entire-med-cast
-             v t1 t2 l mono-address base-address index
-             #:fn-cast    compile-fn-cast
-             #:tuple-cast compile-tuple-cast
-             #:pref-cast  compile-pref-cast
-             #:pvec-cast  compile-pvec-cast
-             #:mbox-cast  compile-mbox-cast
-             #:mvec-cast  compile-mvec-cast)]
-           [else (interp-med-cast v t1 t2 l mono-address base-address index)])]))
+  (define limit (*mu-casts-limit*))
+  (: aux :
+     CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr
+     CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
+  (define (aux v t1 t2 l mono-address base-address index)
+    (match* (t1 t2)
+      ;; TODO add tests that specifically target each of these cases
+      [((Type t1-t) (Type t2-t))
+       (match* (t1-t t2-t)
+         ;; While this extra case may seem supperflous it allows us to
+         ;; Check that (Unfold (Mu s2)) == (Mu s1) this isn't as simple
+         ;; if we eliminate this case
+         [((Mu s) _)
+          (define mcs (*mu-casts*)) 
+          (define interp? (< mcs limit))
+          (define t3-t (grift-type-instantiate s t1-t))
+          (parameterize ([*mu-casts* (+ 1 mcs)])
+            (compile-med-cast v (Type t3-t) t2 l mono-address base-address index #:interpret? interp?))]
+         [(_ (Mu s))
+          (define mcs (*mu-casts*)) 
+          (define interp? (< mcs limit))
+          (define t3-t (grift-type-instantiate s t2-t))
+          (parameterize ([*mu-casts* (+ 1 mcs)])
+            (compile-med-cast v t1 (Type t3-t) l mono-address base-address index #:interpret? interp?))]         
+         [((Fn a _ _) (Fn a _ _))
+          (compile-fn-cast v t1 t2 l)]
+         [((GRef t1) (GRef t2))
+          (compile-pref-cast v (Type t1) (Type t2) l)]
+         [((GVect t1) (GVect t2))
+          (compile-pvec-cast v (Type t1) (Type t2) l)]
+         [((MRef t1) (MRef t2))
+          (compile-mbox-cast v #:t1 (Type t1) (Type t2))]
+         [((MVect t1) (MVect t2))
+          (compile-mvec-cast v #:t1 (Type t1) (Type t2))]
+         [((STuple n _) (STuple m _)) #:when (<= m n)
+          (compile-tuple-cast v t1 t2 l mono-address base-address index)]
+         [(_ _) #;base-types (Blame l)])]
+      [((Type t1-t) t2) 
+       (match t1-t
+         [(Mu s)
+          (define mcs (*mu-casts*)) 
+          (define interp? (< mcs limit))
+          (define t3-t (grift-type-instantiate s t1-t))
+          (parameterize ([*mu-casts* (+ 1 mcs)])
+            (compile-med-cast v (Type t3-t) t2 l mono-address base-address index #:interpret? interp?))]
+         [_
+          (let$ ([t2 (cond$
+                      [(Type-Mu-Huh t2) (Type-Mu-Body t2)]
+                      [else t2])])
+            (match t1-t
+              [(Fn a _ _)
+               (If (and$ (Type-Fn-Huh t2) (op=? (Quote a) (Type-Fn-arity t2)))
+                   (compile-fn-cast v t1 t2 l)
+                   (Blame l))]
+              [(GRef t1-t)
+               (If (Type-GRef-Huh t2)
+                   (compile-pref-cast v (Type t1-t) (Type-GRef-Of t2) l)
+                   (Blame l))]
+              [(GVect t1-t)
+               (If (Type-GVect-Huh t2)
+                   (compile-pvec-cast v (Type t1-t) (Type-GVect-Of t2) l)
+                   (Blame l))]
+              [(MRef t1-t)
+               (If (Type-MRef-Huh t2)
+                   (compile-mbox-cast v #:t1 (Type t1-t) (Type-MRef-Of t2))
+                   (Blame l))]
+              [(MVect t1-t)
+               (If (Type-MVect-Huh t2)
+                   (compile-mvec-cast v #:t1 (Type t1-t) (Type-MVect-Of t2))
+                   (Blame l))]
+              [(STuple n _)
+               (If (and$ (Type-Tuple-Huh t2) (op<=? (Type-Tuple-num t2) (Quote n)))
+                   (compile-tuple-cast v t1 t2 l mono-address base-address index)
+                   (Blame l))]
+              [_ #; Base-Cases (Blame l)]))])]
+      [(t1 (Type t2-t))
+       (match t2-t
+         [(Mu s)
+          (define mcs (*mu-casts*)) 
+          (define interp? (< mcs limit))
+          (define t3-t (grift-type-instantiate s t2-t))
+          (parameterize ([*mu-casts* (+ 1 mcs)])
+            (compile-med-cast
+             v t1 (Type t3-t) l
+             mono-address base-address index #:interpret? interp?))]
+         [_
+          (let$ ([t1 (cond$
+                      [(Type-Mu-Huh t1) (Type-Mu-Body t1)]
+                      [else t1])])
+            (match t2-t
+              [(Fn a _ _)
+               (If (and$ (Type-Fn-Huh t1) (op=? (Quote a) (Type-Fn-arity t1)))
+                   (compile-fn-cast v t1 t2 l)
+                   (Blame l))]
+              [(GRef t2-t)
+               (If (Type-GRef-Huh t1)
+                   (compile-pref-cast v (Type-GRef-Of t1) (Type t2-t) l)
+                   (Blame l))]
+              [(GVect t2-t)
+               (If (Type-GVect-Huh t1)
+                   (compile-pvec-cast v (Type-GVect-Of t1) (Type t2-t) l)
+                   (Blame l))]
+              [(MRef t2-t)
+               (If (Type-MRef-Huh t1)
+                   (compile-mbox-cast v (Type t2-t))
+                   (Blame l))]
+              [(MVect t2-t)
+               (If (Type-MVect-Huh t1)
+                   (compile-mvec-cast v (Type t2-t))
+                   (Blame l))]
+              [(STuple n _)
+               (If (and$ (Type-Tuple-Huh t1) (op<=? (Quote n) (Type-Tuple-num t1)))
+                   (compile-tuple-cast v t1 t2 l mono-address base-address index)
+                   (Blame l))]
+              [_ #;base-cases (Blame l)]))])]
+      [(t1 t2)
+       (cond
+         ;; This is super hacky we can do better
+         [(med-cast-inline-without-types?)
+          (code-gen-entire-med-cast
+           v t1 t2 l mono-address base-address index
+           #:fn-cast    compile-fn-cast
+           #:tuple-cast compile-tuple-cast
+           #:pref-cast  compile-pref-cast
+           #:pvec-cast  compile-pvec-cast
+           #:mbox-cast  compile-mbox-cast
+           #:mvec-cast  compile-mvec-cast
+           #:interp-med-cast interp-med-cast)]
+         [else (interp-med-cast v t1 t2 l mono-address base-address index)])]))
+  (: compile-med-cast Compile-Med-Cast-Type)
+  (define (compile-med-cast
+           v t1 t2 l
+           [mono-address : CoC3-Expr ZERO-EXPR]
+           [base-address : CoC3-Expr ZERO-EXPR]
+           [index : CoC3-Expr ZERO-EXPR]
+           #:know-not-eq? [know-not-eq? : Boolean #f]
+           #:interpret? [interpret? : Boolean #f])
     (bind-value$
      ([v v] [t1 t1] [t2 t2] [l l]
       [mono-address mono-address]
       [base-address base-address]
       [index index])
-     (match* (t1 t2)
-      [((Type (Dyn)) _)
-       (error 'interp-cast/code-gen-med-cast "t1 = Dyn, precondition false")]
-      [(_ (Type (Dyn)))
-       (error 'interp-cast/code-gen-med-cast "t2 = Dyn, precondition false")]
-      [(t t) v]
-      [((Type _) (Type _)) (aux v t1 t2 l mono-address base-address index)]
-      [(_ _) #:when know-not-eq? (aux v t1 t2 l mono-address base-address index)]
-      [(_ _) (If (op=? t1 t2) v (aux v t1 t2 l mono-address base-address index))])))
+     (let ([cast
+            (lambda ()
+              (if interpret?
+                  (interp-med-cast
+                   v t1 t2 l mono-address base-address index)
+                  (aux v t1 t2 l mono-address base-address index)))])
+       (match* (t1 t2)
+         ;; Check some invarients
+         [((Type (Dyn)) _)
+          (error 'interp-cast/code-gen-med-cast "t1 = Dyn, precondition false")]
+         [(_ (Type (Dyn)))
+          (error 'interp-cast/code-gen-med-cast "t2 = Dyn, precondition false")]
+         ;; Determine if there is enough type information
+         ;; or context to elide the eq check.
+         ;; TODO
+         ;; Now that equality isn't trivial we should check for type-equality
+         ;; instead of syntactic equality 
+         ;; [((Type t) (Type g)) #:when (type-eqv? t g) v]
+         [(t t) v]
+         [((Type _) (Type _)) (cast)]
+         [(_ _) #:when know-not-eq? (cast)]
+         [(_ _) (If (op=? t1 t2) v (cast))]))))
+  compile-med-cast)
 
 (define interp-cast-project/inject-inline? (make-parameter #f))
 (define interp-cast-med-cast-inline? (make-parameter #f))
@@ -1400,36 +1508,41 @@ TODO write unit tests
 
 (: make-compile-fn-cast/coercions
    (->* (#:get-fn-cast! (Nat -> Uid)
-         #:make-fn-coercion Make-Coercion-Type)
+         #:make-fn-coercion Make-Coercion-Type) 
         Fn-Cast-Type))
 (define (make-compile-fn-cast/coercions
          #:get-fn-cast! get-fn-cast! 
          #:make-fn-coercion make-fn-coercion)
+
   (define dfc? (direct-fn-cast-optimization?))
   (: compile-fn-cast Fn-Cast-Type)
   (define (compile-fn-cast v t1 t2 l)
-    (define c (make-fn-coercion t1 t2 l))
-    (match* (t1 t2)
-      [((Type (Fn n _ _)) _) #:when dfc?
-       (apply-code (get-fn-cast! n) v c)]
-      [(_ (Type (Fn n _ _))) #:when dfc?
-       (apply-code (get-fn-cast! n) v c)]
-      [(_ _)
-       (let$ ([v v] [c c])
-         ;; TODO!!! consider
-         ;; (App-Code (Fn-Caster v) (list v m))
-         ;; Benifit: no double-memory indirect
-         ;;          cast code can be specific
-         ;;          two branches eliminated
-         ;; Cost   : Proxies must have a caster slot
-         ;; (App-Code (Global-Cast-Table-Ref (Fn-Coercion-arity m))
-         ;;           (list v m))
-         ;; Benifit: Functions no longer have cast code cell
-         ;; Neg    : Another double memory indirect
-         ;;        : Another branch on the otherside cast code
-         (If (Fn-Proxy-Huh v)
-             (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
-             (App-Code (Fn-Caster v) (list v c))))]))
+    (let$ ([v v] [c (make-fn-coercion t1 t2 l)])
+      (cond$
+       ;; TODO: can this be more specialized to the implementation
+       ;; TODO: mk-fn-crcn is being implemented by make-coercion
+       [(Id-Coercion-Huh c) v]
+       [else
+        (match* (t1 t2)
+          [((Type (Fn n _ _)) _) #:when dfc?
+           (apply-code (get-fn-cast! n) v c)]
+          [(_ (Type (Fn n _ _))) #:when dfc?
+           (apply-code (get-fn-cast! n) v c)]
+          [(_ _)
+           ;; TODO!!! consider
+           ;; (App-Code (Fn-Caster v) (list v m))
+           ;; Benifit: no double-memory indirect
+           ;;          cast code can be specific
+           ;;          two branches eliminated
+           ;; Cost   : Proxies must have a caster slot
+           ;; (App-Code (Global-Cast-Table-Ref (Fn-Coercion-arity m))
+           ;;           (list v m))
+           ;; Benifit: Functions no longer have cast code cell
+           ;; Neg    : Another double memory indirect
+           ;;        : Another branch on the otherside cast code
+           (If (Fn-Proxy-Huh v)
+               (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
+               (App-Code (Fn-Caster v) (list v c)))])])))
   compile-fn-cast)
 
 (: make-compile-fn-cast
@@ -1454,18 +1567,20 @@ TODO write unit tests
 ;; worrying about the overhead of allocation here is too much.
 (: make-compile-apply-tuple-coercion
    (->* (#:apply-coercion-uid Uid) Apply-Coercion-Type))
-(define ((make-compile-apply-tuple-coercion #:apply-coercion-uid apply-coercion-uid)
+(define ((make-compile-apply-tuple-coercion
+          #:apply-coercion-uid apply-coercion-uid)
          [e : CoC3-Expr] [m : CoC3-Expr]
          [mono-address : CoC3-Expr ZERO-EXPR]
          [base-address : CoC3-Expr ZERO-EXPR]
          [index : CoC3-Expr ZERO-EXPR])
   (let$ ([v e][m m]
-              [mono-address mono-address]
-              [base-address base-address]
-              [index index])
+         [mono-address mono-address]
+         [base-address base-address]
+         [index index])
     (If (Op '= (list ZERO-EXPR mono-address))
         (Coerce-Tuple apply-coercion-uid v m)
-        (Coerce-Tuple-In-Place apply-coercion-uid v m mono-address base-address index))))
+        (Coerce-Tuple-In-Place apply-coercion-uid v m
+                               mono-address base-address index))))
 
 (: make-compile-cast-tuple/coercions
    (->* (#:apply-coercion-uid Uid
@@ -1492,15 +1607,19 @@ TODO write unit tests
 (: make-compile-cast-tuple 
    (->* (#:interp-cast-uid Uid) Cast-Tuple-Type))
 (define (make-compile-cast-tuple #:interp-cast-uid cast-uid)
+
   (: compile-cast-tuple Cast-Tuple-Type)
   (define (compile-cast-tuple e t1 t2 l mono-address base-address index)
     (cast-profile/inc-tuple-casts$
-     (ann (let$ ([v e] [t1 t1] [t2 t2] [l l] [mono-address mono-address]
-                       [base-address base-address] [index index])
+     (ann (let$ ([v e] [t1 t1] [t2 t2] [l l]
+                 [mono-address mono-address]
+                 [base-address base-address]
+                 [index index])
             (If (op=? mono-address ZERO-EXPR)
                 (Cast-Tuple cast-uid v t1 t2 l)
                 (Cast-Tuple-In-Place cast-uid v t1 t2 l mono-address base-address index)))
           CoC3-Expr)))
+
   compile-cast-tuple)
 
 ;; Note that the compile-cast-proxy-ref functions expects t1 and t2 to be

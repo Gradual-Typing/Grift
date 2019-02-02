@@ -8,11 +8,18 @@
 (define-type Bnd-Type* (Listof Bnd-Type))
 (define-type Bnd-Crcn (Pairof Uid Compact-Coercion))
 (define-type Bnd-Crcn* (Listof Bnd-Crcn))
+(define-type Bnd-Mu-Type (Pairof Uid Mu-Compact-Type))
+(define-type Bnd-Mu-Type* (Listof Bnd-Mu-Type))
+(define-type Bnd-Mu-Crcn (Pairof Uid Mu-Compact-Coercion))
+(define-type Bnd-Mu-Crcn* (Listof Bnd-Mu-Crcn))
 
 (define-type Lambda0-Lang
   (Prog (List String Natural Grift-Type)
-        (Let-Static* Bnd-Type* Bnd-Crcn*
-                     L0-Expr)))
+    (Let-Static* Bnd-Mu-Type*
+                 Bnd-Type*
+                 Bnd-Mu-Crcn*
+                 Bnd-Crcn*
+                 L0-Expr)))
 
 (define-type L0-Expr
   (Rec E (U
@@ -86,14 +93,16 @@
           (Type-GRef-Of  E)
           (Type-GVect-Huh E)
           (Type-GVect-Of E)
+          (Type-Mu-Huh E)
+          (Type-Mu-Body E)
           ;; Tags are exposed before specify This is bad
           ;; TODO fix this after the deadline
           (Type-Tag E)
           (Tag Tag-Symbol)
           ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
           ;; Binding Forms - Lambda
-	  (Letrec L0-Bnd* E)
-	  (Let L0-Bnd* E)
+          (Letrec L0-Bnd* E)
+          (Let L0-Bnd* E)
           (Var Uid)
           (Global String)
           (Assign Id E)

@@ -15,7 +15,7 @@
                     (Labels D2-Bnd-Code*
                             D2-Body))))
 
-(define-type D2-Body (Locals Uid* D2-Tail))
+(define-type D2-Body (Locals Uid* (Bnd* Nat) D2-Tail))
 (define-type D2-Bnd-Code* (Listof D2-Bnd-Code))
 (define-type D2-Bnd-Code (Pairof Uid D2-Code))
 (define-type D2-Code (Code Uid* D2-Body))

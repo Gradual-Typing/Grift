@@ -1,0 +1,9 @@
+;; This function test iso-recusive type equality
+;; in multiple ways
+;; It actually runs the example
+(define (ones) : (Rec X (Tuple Int (-> X)))
+  (tuple 1 ones))
+
+((ann ones (Rec X (-> (Tuple Dyn X)))))
+
+

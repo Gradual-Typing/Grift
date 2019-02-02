@@ -6,56 +6,61 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <math.h>
+
+/* floatptr_t is a floating point number that is the same width as a pointer */
+#if   (__SIZEOF_POINTER__ == __SIZEOF_DOUBLE__)
+typedef double floatptr_t;
+#elif (__SIZEOF_POINTER__ == __SIZEOF_FLOAT__)
+typedef float  floatptr_t;
+#else
+#error __file__ ":" __line__ ": unsupported floating point size"
+#endif
+
+typedef union grift_obj {
+  intptr_t         as_int;
+  uintptr_t        as_uint;
+  floatptr_t       as_float;
+  union grift_obj *as_ptr;
+  void            *as_voidptr;
+} grift_obj;
+
+
+typedef union {
+  intptr_t *p;
+  intptr_t i;
+  floatptr_t f;
+} imdt;
+  
+#define imdt_to_float(x) (((imdt)(x)).f)
+#define float_to_imdt(x) (((imdt)(x)).i)
+
+#include "boehm-gc-install/include/gc/gc.h"
+// TODO these should be moved to runtime.h
+#define NULL_GRIFT_OBJ ((grift_obj)(uintptr_t)0)
+#define GRIFT_MALLOC(size) ((grift_obj)GC_MALLOC(size));
+
+
+#define GRIFT_ERROR_IN_RUNTIME 1
+
 #include "hashcons.h"
 #include "castprofiler.h"
 
 extern table types_ht;
 extern int64_t types_unique_index_counter;
 
-/* 
-read_int
-runtime function for read-int primitive : (-> Int)
-reads a integer from the stdin port.
-*/
-int64_t read_int();
+#include "io.h"
 
-/* 
-read_float
-runtime function for read-float primitive : (-> Float)
-reads a floating point number from the stdin port.
-*/
-double read_float();
+#include "assoc_stack.h"
 
-/* 
-read_bool
-runtime function for read-bool primitive : (-> Bool)
-reads a #t or #f from the stdin port.
-*/
-int64_t read_bool();
+#define max(a,b)\
+({ __typeof__ (a) _a = (a);\
+   __typeof__ (b) _b = (b);\
+   _a > _b ? _a : _b; })
 
-typedef union {
-  int64_t *p;
-  int64_t i;
-  double f;
-} imdt;
-  
-#define imdt_to_float(x) (((imdt)(x)).f)
-#define float_to_imdt(x) (((imdt)(x)).i)
+#define min(a,b)\
+({ __typeof__ (a) _a = (a);\
+   __typeof__ (b) _b = (b);\
+   _a < _b ? _a : _b; })
 
-/*
-print_ascii_char
-prints out the character literal for a character
-*/
-void print_ascii_char(int64_t);
 
-/*
-display_char
-print a character to stdout
-*/
-void display_ascii_char(int64_t);
-
-int64_t read_ascii_char();
-
-double neg_float(double n);
-
-#endif
+#endif /* RUNTIME_INCLUDED */

@@ -1,0 +1,4 @@
+;; This function test equirecusive type equality
+;; in multiple ways
+(define (step) : (Rec X (-> X)) step)
+((ann (ann step (Rec X (-> X))) Dyn)) 

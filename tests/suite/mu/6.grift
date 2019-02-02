@@ -1,0 +1,5 @@
+(define (ones)  : (Rec X (Tuple Int (-> X)))
+  (tuple 1 ones))
+
+(tuple-proj (ones) 0)
+

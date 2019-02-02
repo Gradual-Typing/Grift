@@ -180,15 +180,15 @@
 (define-syntax (precondition$ stx)
   (syntax-case stx ()
     [(_ c b* ... b)
-     #'(let ([e (begin$ b* ... b)])
-         (if (check-asserts?)
-             (Begin
-               (list
-                (If c
-                    (Quote 0)
-                    (Blame (Quote (format "runtime precondition failed: ~a" (srcloc->string (quote-srcloc #,stx)))))))
-               e)
-             e))]))
+     #`(let ([e (begin$ b* ... b)])
+         (cond
+           [(check-asserts?)
+            (define src (srcloc->string (quote-srcloc #,stx)))
+            (define msg (format "runtime precondition failed: ~a" src))
+            (Begin
+              (list (If c (Quote 0) (Blame (Quote msg))))
+              e)]
+           [else e]))]))
 
 
 ;; Type-Repr syntax
@@ -238,3 +238,6 @@
 (define-syntax-rule (mvec-coercion$ t) (MVect-Coercion t))
 (define-syntax-rule (mvec-coercion?$ c) (MVect-Coercion c))
 (define-syntax-rule (mvec-coercion-type$ c) (MVect-Coercion-Type c))
+
+(define-syntax-rule (unfold-possible-mu$ c)
+  (let ([tmp c]) (If (Type-Mu-Huh tmp) (Type-Mu-Body tmp) tmp)))

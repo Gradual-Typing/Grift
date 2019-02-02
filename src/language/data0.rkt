@@ -15,23 +15,26 @@
 (define-type D0-Bnd-Code (Pairof Uid D0-Code))
 (define-type D0-Code (Code Uid* D0-Expr))
 
+(struct Stack-Alloc form:leaf ([bytes : Nat]) #:transparent)
+
 (define-type D0-Expr
   (Rec E (U (Labels D0-Bnd-Code* E)
 	    (App-Code E (Listof E))
-            (UIL-Op! E)
-            (UIL-Op E)
-            No-Op
+        (UIL-Op! E)
+        (UIL-Op E)
+        No-Op
 	    (If E E E)
-            (Switch E (Switch-Case* E) E)
+        (Switch E (Switch-Case* E) E)
 	    (Begin D0-Expr* E)
-            (Repeat Uid E E Uid E E)
-            Break-Repeat
+        (Repeat Uid E E Uid E E)
+        Break-Repeat
 	    (Var Uid)
-            (Global String)
+        (Global String)
 	    (Code-Label Uid)
 	    (Quote D0-Literal)
-            (Assign Id E)
-            Success)))
+        (Assign Id E)
+        Success
+        Stack-Alloc)))
 
 (define-type D0-Expr* (Listof D0-Expr))
 (define-type D0-Bnd* (Listof D0-Bnd))

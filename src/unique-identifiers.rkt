@@ -70,3 +70,11 @@
      (let-values ([(name0 next) (next-uid prefix0 next)])
        (let-uid* next ([name* prefix*] ...)
 		 body ...))]))
+
+(: format-uid! : String Uid -> Uid)
+(define (format-uid! fmt x)
+  (next-uid! (format fmt (Uid-prefix x))))
+
+(: uid<? : Uid Uid -> Boolean)
+(define (uid<? x y)
+  (and (not (eq? x y)) (< (Uid-suffix x) (Uid-suffix y))))

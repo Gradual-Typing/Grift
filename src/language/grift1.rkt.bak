@@ -1,0 +1,63 @@
+#lang typed/racket/base
+(require "forms.rkt" "primitives.rkt")
+(provide (all-from-out "forms.rkt" "primitives.rkt")
+         (all-defined-out))
+#|-----------------------------------------------------------------------------+
+| Language/Grift1 created by type-check
++-----------------------------------------------------------------------------|#
+
+(define-type Grift1-Lang
+  (Prog (List String Natural Grift-Type) (Listof G1-Top)))
+
+
+(define-type G1-Top
+  (U (Define Boolean Uid Grift-Type G1-Ann-Expr)
+     (Observe G1-Ann-Expr Grift-Type)))
+(define-type G1-Top* (Listof G1-Top))
+
+(define-type G1-Ann-Expr (Ann G1-Expr (Pair Src Grift-Type)))
+(define-type G1-Ann-Expr* (Listof G1-Ann-Expr))
+(define-type G1-Expr 
+  
+  (U 
+   #;(Lambda Grift-Fml* G1-Ann-Expr)
+   #;(Letrec G1-Bnd* G1-Ann-Expr)
+   #;(Let G1-Bnd* G1-Ann-Expr)
+   #;(App G1-Ann-Expr (Listof G1-Ann-Expr))
+   (Op (Ann Grift-Primitive Grift-Type*) (Listof G1-Ann-Expr))#;
+   #;
+   (U (If G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+      (Switch G1-Ann-Expr (Switch-Case* G1-Ann-Expr) G1-Ann-Expr)
+      (Ascribe G1-Ann-Expr Grift-Type (Option Blame-Label))
+      (Var Uid)
+      (Quote Grift-Literal))
+   #;
+   (U
+    (Begin (Listof G1-Ann-Expr) G1-Ann-Expr)
+    (Repeat Uid G1-Ann-Expr G1-Ann-Expr Uid G1-Ann-Expr G1-Ann-Expr)
+    ;; Monotonic effects
+    (Mbox G1-Ann-Expr Grift-Type)
+    (Munbox G1-Ann-Expr)
+    (Mbox-set! G1-Ann-Expr G1-Ann-Expr)
+    (Mvector G1-Ann-Expr G1-Ann-Expr Grift-Type)
+    (Mvector-ref G1-Ann-Expr G1-Ann-Expr)
+    (Mvector-set! G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+    (Mvector-length G1-Ann-Expr)
+    ;; Guarded effects
+    #;
+    (U
+     (Gbox G1-Ann-Expr)
+     (Gunbox G1-Ann-Expr)
+     (Gbox-set! G1-Ann-Expr G1-Ann-Expr)
+     (Gvector G1-Ann-Expr G1-Ann-Expr)
+     (Gvector-set! G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+     (Gvector-ref G1-Ann-Expr G1-Ann-Expr)
+     (Gvector-length G1-Ann-Expr)
+     ;;
+     (Create-tuple (Listof G1-Ann-Expr))
+     (Tuple-proj G1-Ann-Expr Index)))))
+
+(define-type G1-Expr* (Listof G1-Expr))
+(define-type G1-Bnd (Bnd Uid Grift-Type G1-Ann-Expr))
+(define-type G1-Bnd* (Listof G1-Bnd))
+

@@ -46,27 +46,23 @@
 (define (invoke-c-compiler c-path o-path)
   (let* ([in   (path->string c-path)]
          [out  (path->string o-path)]
-         [rt?  (runtime-path)]
-         [hc?  (hashcons-path)]
+         [rt?  (runtime-path)] 
          [flags (append-flags (c-flags))])
     (let* ([keep-s? (s-path)])
       (when keep-s?
         (system (format "cc ~a -S -o ~a ~a" in (path->string keep-s?) flags))))
     (cond
-      [(and rt? hc?) (cc/runtime out in flags #:runtime rt? #:hashcons hc?)]
       [rt? (cc/runtime out in flags #:runtime rt?)]
-      [hc? (cc/runtime out in flags #:hashcons hc?)]
       [else (cc/runtime out in flags)])
     o-path))
 
 
 
 
-(: cc/runtime (->* (String String String) (#:runtime Path #:hashcons Path)
+(: cc/runtime (->* (String String String) (#:runtime Path)
                    Void))
 (define (cc/runtime out in flags
-                    #:runtime [rt runtime.o-path]
-                    #:hashcons [hc hashcons.o-path])
+                    #:runtime [rt runtime.o-path])
   (define gc
     (match (garbage-collector)
       ['Boehm
@@ -85,7 +81,8 @@
         cast-profiler.o-path
         ""))
   (define cmd
-    (format "clang -o ~a ~a ~a ~a ~a ~a ~a ~a" out in rt hc rt-math gc rt-cast-profiler flags))
+    (format "clang -o ~a ~a ~a ~a ~a ~a ~a"
+            out in rt rt-math gc rt-cast-profiler flags))
   (when (trace? 'Vomit)
     (logf "System call: ~a" cmd))
   (flush-output (current-log-port))
