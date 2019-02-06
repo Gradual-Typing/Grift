@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 #|------------------------------------------------------------------------------+
 |Pass: src/insert-casts                                                         |
@@ -13,83 +13,27 @@
 |Input Grammar: Cast0-Lang                                                      |
 +------------------------------------------------------------------------------|#
 (require 
- (submod  "../logging.rkt" typed)
+ "../logging.rkt"
  "../errors.rkt"
  "../type-equality.rkt"
- "../language/cast-or-coerce3.1.rkt"
- "../language/cast-or-coerce3.2.rkt"
+ "../language/form-map.rkt"
+ "../language/forms.rkt"
  racket/match
  racket/list
- racket/set
- typed/racket/unsafe)
+ racket/set)
 
+#;
 (unsafe-require/typed
  "../language/form-map.rkt"
  [form-map
   (case->
    ;; The case used in pl-expr
    [(Purify-Letrec= CoC3.1-Expr) (CoC3.1-Expr -> CoC3.2-Expr)
-    -> (Purify-Letrec= CoC3.2-Expr)]
+                                 -> (Purify-Letrec= CoC3.2-Expr)]
    ;; The case used in replace-ref
    [CoC3.2-Expr (CoC3.2-Expr -> CoC3.2-Expr) -> CoC3.2-Expr])])
 
-;; Only the pass is provided by this module
-(provide
- purify-letrec
- (all-from-out
-  "../language/cast-or-coerce3.1.rkt"
-  "../language/cast-or-coerce3.2.rkt"))
-
-(define-type (Purify-Letrec+ E)
-  (Letrec (Bnd* (Castable-Lambda E)) E))
-
-(define-type (Purify-Letrec- E)
-  (Letrec (Bnd* E) E))
-
-(define-type (Purify-Letrec= E)
-  (U (Castable-Lambda-Forms E)
-     (Fn-Proxy-Forms E) 
-     (Let (Bnd* E) E)
-     (Var Uid)
-     (Global String)
-     (Assign Id E)
-     (Gen-Data-Forms E)
-     (Code-Forms E)
-     (Quote-Coercion Immediate-Coercion)
-     (Coercion-Operation-Forms E)
-     (Hyper-Coercion-Operation-Forms E)
-     (Type Immediate-Type)
-     (Type-Operation-Forms E)
-     (Control-Flow-Forms E)
-     ;;Primitives
-     (Op Grift-Primitive (Listof E))
-     (Quote Cast-Literal)
-     No-Op
-     ;; Observations
-     (Blame E)
-     (Observe E Grift-Type)
-     (Unguarded-Forms E)
-     (Guarded-Proxy-Forms E)
-     (Monotonic-Forms E Immediate-Type)
-     (Error E)
-     (Tuple-Operation-Forms E)))
-
-;; Show that the types above are related to CoC3.1-Expr and CoC3.2-Expr
-(assert-subtype? (U (Purify-Letrec= CoC3.2-Expr)
-                    (Purify-Letrec+ CoC3.2-Expr))
-                 CoC3.2-Expr)
-(assert-subtype? CoC3.2-Expr
-                 (U (Purify-Letrec= CoC3.2-Expr)
-                    (Purify-Letrec+ CoC3.2-Expr)))
-
-(assert-subtype? (U (Purify-Letrec- CoC3.1-Expr)
-                    (Purify-Letrec= CoC3.1-Expr))
-                 CoC3.1-Expr)
-(assert-subtype? CoC3.1-Expr
-                 (U (Purify-Letrec- CoC3.1-Expr)
-                    (Purify-Letrec= CoC3.1-Expr)))
-
-
+(provide purify-letrec)
 
 (: purify-letrec (Cast-or-Coerce3.1-Lang -> Cast-or-Coerce3.2-Lang))
 (define (purify-letrec prgm)
@@ -462,16 +406,60 @@
      (debug who-return return)]
     [else (form-map e pl-expr)]))
 
+;; Only the pass is provided by this module
+;; (provide
+;;  (all-from-out
+;;   "../language/cast-or-coerce3.1.rkt"
+;;   "../language/cast-or-coerce3.2.rkt"))
 
+;; (define-type (Purify-Letrec+ E)
+;;   (Letrec (Bnd* (Castable-Lambda E)) E))
 
+;; (define-type (Purify-Letrec- E)
+;;   (Letrec (Bnd* E) E))
 
+;; (define-type (Purify-Letrec= E)
+;;   (U (Castable-Lambda-Forms E)
+;;      (Fn-Proxy-Forms E) 
+;;      (Let (Bnd* E) E)
+;;      (Var Uid)
+;;      (Global String)
+;;      (Assign Id E)
+;;      (Gen-Data-Forms E)
+;;      (Code-Forms E)
+;;      (Quote-Coercion Immediate-Coercion)
+;;      (Coercion-Operation-Forms E)
+;;      (Hyper-Coercion-Operation-Forms E)
+;;      (Type Immediate-Type)
+;;      (Type-Operation-Forms E)
+;;      (Control-Flow-Forms E)
+;;      ;;Primitives
+;;      (Op Grift-Primitive (Listof E))
+;;      (Quote Cast-Literal)
+;;      No-Op
+;;      ;; Observations
+;;      (Blame E)
+;;      (Observe E Grift-Type)
+;;      (Unguarded-Forms E)
+;;      (Guarded-Proxy-Forms E)
+;;      (Monotonic-Forms E Immediate-Type)
+;;      (Error E)
+;;      (Tuple-Operation-Forms E)))
 
+;; ;; Show that the types above are related to CoC3.1-Expr and CoC3.2-Expr
+;; (assert-subtype? (U (Purify-Letrec= CoC3.2-Expr)
+;;                     (Purify-Letrec+ CoC3.2-Expr))
+;;                  CoC3.2-Expr)
+;; (assert-subtype? CoC3.2-Expr
+;;                  (U (Purify-Letrec= CoC3.2-Expr)
+;;                     (Purify-Letrec+ CoC3.2-Expr)))
 
-
-
-
-
-
+;; (assert-subtype? (U (Purify-Letrec- CoC3.1-Expr)
+;;                     (Purify-Letrec= CoC3.1-Expr))
+;;                  CoC3.1-Expr)
+;; (assert-subtype? CoC3.1-Expr
+;;                  (U (Purify-Letrec- CoC3.1-Expr)
+;;                     (Purify-Letrec= CoC3.1-Expr)))
 
 
 #| Grave yard
@@ -1002,3 +990,5 @@
     [other (error 'purify-letrec/expr "unmatched ~a" other)]
 
 ;;|#
+
+

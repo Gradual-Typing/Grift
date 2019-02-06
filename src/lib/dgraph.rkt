@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 (require "dhash.rkt")
 (provide
@@ -18,8 +18,7 @@
  dgraph-scc)
 
 (module+ test
-  (require
-   typed/rackunit))
+  (require rackunit))
 
 (define-type (DG N) (DHash N (DHash N True)))
 

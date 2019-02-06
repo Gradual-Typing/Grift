@@ -2,7 +2,7 @@
 Author:      Deyaaeldeen Almahallawi (dalmahal@indiana.edu)
 Description: Provides helpers for instrumenting the AST with cast profiling code
 |#
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 (require (for-syntax racket racket/syntax "../language/c-helpers.rkt")
          "../configuration.rkt"

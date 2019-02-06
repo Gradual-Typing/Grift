@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 #|
 Pass: interpret casts with hyper-coercions
 Used By: impose-cast-semantics (./impose-cast-semantics.rkt)
@@ -14,10 +14,10 @@ due to better locality, space consumption, and code organization.
          "../language/syntax-with-constants.rkt"
          "../configuration.rkt"
          "./interpret-casts-common.rkt"
-         (submod "../logging.rkt" typed)
+         "../logging.rkt"
          racket/match
          racket/list
-         (for-syntax syntax/parse typed/racket/base))
+         (for-syntax syntax/parse typed/racket/base/no-check))
 
 #|
 Compile the cast in the program to calls to a cast interpreter 

@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 #|-----------------------------------------------------------------------------+
 |Pass: src/casts/interpret-casts                                          |
 +------------------------------------------------------------------------------+
@@ -22,7 +22,7 @@ form, to the shortest branch of the cast tree that is relevant.
  racket/match
  racket/function
  racket/set
- (submod "../logging.rkt" typed)
+ "../logging.rkt"
  "../configuration.rkt"
  "../language/syntax.rkt"
  "../language/syntax-with-constants.rkt"
@@ -160,7 +160,7 @@ form, to the shortest branch of the cast tree that is relevant.
      c]))
 
 (module+ test
-  (require typed/rackunit)
+  (require rackunit)
   (define m1 (Mu (Scope (STuple 2 (list (Int) (Fn 0 '() (TVar 0)))))))
   (define m2 (Mu (Scope (Fn 0 '() (STuple 2 (list (Dyn) (TVar 0)))))))
   (define t1 (Fn 0 '() m1))

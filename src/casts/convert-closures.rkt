@@ -1,4 +1,4 @@
-#lang typed/racket/base 
+#lang typed/racket/base/no-check
 #|------------------------------------------------------------------------------+
 |Pass: src/casts/convert-closures                                               |
 +-------------------------------------------------------------------------------+
@@ -74,16 +74,19 @@ TODO We can generate better code in this pass for function casts.
  typed/racket/unsafe
  "./cast-profiler.rkt"
  "../configuration.rkt"
- "../language/cast-or-coerce3.1.rkt"
- "../language/cast-or-coerce4.rkt"
+ ;;"../language/cast-or-coerce3.1.rkt"
+ ;;"../language/cast-or-coerce4.rkt"
+ "../language/cast-or-coerce6.rkt"
+ "../language/forms.rkt"
  "../language/syntax.rkt"
  "../lib/function.rkt"
  "../lib/dgraph.rkt"
  "../lib/mutable-set.rkt"
- (submod "../logging.rkt" typed)
- "../language/cast-or-coerce6.rkt"
- "../type-equality.rkt")
+ "../logging.rkt"
+ "../type-equality.rkt"
+ "../language/form-map.rkt")
 
+#;
 (unsafe-require/typed
  "../language/form-map.rkt"
  ;; One common cause of type-checking time explosion is having type
@@ -100,7 +103,7 @@ TODO We can generate better code in this pass for function casts.
     racket/syntax
     syntax/parse
     syntax/location)
-   typed/rackunit))
+   rackunit))
 
 ;;  TODO move this to configuration and make these passes optional.
 (define closure-optimizations : (Parameterof (Setof Symbol))
@@ -146,60 +149,6 @@ TODO We can generate better code in this pass for function casts.
          bnd-static-code* static-closure*^
          bnd-const*^^)
         main-expr^^))]))
-
-;; Uncover Free Eliminates the following forms
-(define-type (U- E)
-  (U (Named-Castable-Lambda-Forms E)
-     (Fn-Proxy-Forms E)))
-
-;; Uncover Free Adds The following forms
-(define-type (U+ E)
-  (U (Closure-Ops E)
-     (Data-Fn-Proxy-Forms E)
-     (Hybrid-Fn-Proxy-Forms E)))
-
-;; Uncover Free is invariant in the following forms
-(define-type (U= E)
-  (U (Gen-Data-Forms E)
-     (Code-Forms E)
-     (Quote-Coercion Immediate-Coercion)
-     (Hyper-Coercion-Operation-Forms E)
-     (Coercion-Operation-Forms E)
-     (Type Immediate-Type)
-     (Type-Operation-Forms E)
-     (Let (Bnd* E) E)
-     (Var Uid)
-     (Global String)
-     (Assign Id E)
-     (Control-Flow-Forms E)
-     (Op Grift-Primitive (Listof E))
-     No-Op
-     (Quote Cast-Literal)
-     (Blame E)
-     (Observe E Grift-Type)
-     (Unguarded-Forms E)
-     (Guarded-Proxy-Forms E)
-     (Monotonic-Forms E Immediate-Type)
-     (Error E)
-     (Tuple-Operation-Forms E)))
-
-;; Debugging assertions (Are our types in the correct ballpark)
-(assert-subtype? (U- CoC4-Expr) CoC4-Expr)
-(assert-subtype? (U= CoC4-Expr) CoC4-Expr)
-(assert-subtype? (U+ CoC5-Expr) CoC5-Expr)
-(assert-subtype? (U= CoC5-Expr) CoC5-Expr)
-
-;; INVARIANT CoC4 = U= + U-
-;;We check this by checking subtyping in both directions because it is
-;;easier to know what is broken when this fails.
-(assert-subtype? (U (U= CoC4-Expr) (U- CoC4-Expr)) CoC4-Expr)
-(assert-subtype? CoC4-Expr (U (U= CoC4-Expr) (U- CoC4-Expr)))
-
-;; INVARIANT CoC4 = U= + U+
-;;We check this by checking subtyping in both directions because it is
-;;easier to know what is broken when this fails.
-(assert-subtype? (U (U= CoC5-Expr) (U+ CoC5-Expr)) CoC5-Expr)
-(assert-subtype? CoC5-Expr (U (U= CoC5-Expr) (U+ CoC5-Expr)))
 
 ;; The depth field keeps track of the depth of the binding that binds
 ;; this variable. If the depth is less than the current-lambda's
@@ -2230,6 +2179,62 @@ TODO We can generate better code in this pass for function casts.
 (: map-bnd* (All (A B) (A -> B) (Bnd* A) -> (Bnd* B)))
 (define (map-bnd* f b*)
   (for/list ([b b*]) (cons (car b) (f (cdr b)))))
+
+;; ;; Uncover Free Eliminates the following forms
+;; (define-type (U- E)
+;;   (U (Named-Castable-Lambda-Forms E)
+;;      (Fn-Proxy-Forms E)))
+
+;; ;; Uncover Free Adds The following forms
+;; (define-type (U+ E)
+;;   (U (Closure-Ops E)
+;;      (Data-Fn-Proxy-Forms E)
+;;      (Hybrid-Fn-Proxy-Forms E)))
+
+;; ;; Uncover Free is invariant in the following forms
+;; (define-type (U= E)
+;;   (U (Gen-Data-Forms E)
+;;      (Code-Forms E)
+;;      (Quote-Coercion Immediate-Coercion)
+;;      (Hyper-Coercion-Operation-Forms E)
+;;      (Coercion-Operation-Forms E)
+;;      (Type Immediate-Type)
+;;      (Type-Operation-Forms E)
+;;      (Let (Bnd* E) E)
+;;      (Var Uid)
+;;      (Global String)
+;;      (Assign Id E)
+;;      (Control-Flow-Forms E)
+;;      (Op Grift-Primitive (Listof E))
+;;      No-Op
+;;      (Quote Cast-Literal)
+;;      (Blame E)
+;;      (Observe E Grift-Type)
+;;      (Unguarded-Forms E)
+;;      (Guarded-Proxy-Forms E)
+;;      (Monotonic-Forms E Immediate-Type)
+;;      (Error E)
+;;      (Tuple-Operation-Forms E)))
+
+;; ;; Debugging assertions (Are our types in the correct ballpark)
+;; (assert-subtype? (U- CoC4-Expr) CoC4-Expr)
+;; (assert-subtype? (U= CoC4-Expr) CoC4-Expr)
+;; (assert-subtype? (U+ CoC5-Expr) CoC5-Expr)
+;; (assert-subtype? (U= CoC5-Expr) CoC5-Expr)
+
+;; ;; INVARIANT CoC4 = U= + U-
+;; ;;We check this by checking subtyping in both directions because it is
+;; ;;easier to know what is broken when this fails.
+;; (assert-subtype? (U (U= CoC4-Expr) (U- CoC4-Expr)) CoC4-Expr)
+;; (assert-subtype? CoC4-Expr (U (U= CoC4-Expr) (U- CoC4-Expr)))
+
+;; ;; INVARIANT CoC4 = U= + U+
+;; ;;We check this by checking subtyping in both directions because it is
+;; ;;easier to know what is broken when this fails.
+;; (assert-subtype? (U (U= CoC5-Expr) (U+ CoC5-Expr)) CoC5-Expr)
+;; (assert-subtype? CoC5-Expr (U (U= CoC5-Expr) (U+ CoC5-Expr)))
+
+
 
 ; LocalWords:  Propagant uid fn uids arg letrec src Letrecs rator env
 ; LocalWords:  LocalWords rkt scc

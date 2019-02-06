@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 #| 
 This file shares code among various implementations of runtime casts
 for the interpret-casts compiler pass. Logically this is the
@@ -18,8 +18,8 @@ TODO write unit tests
  "../language/cast0.rkt"
  "constants-and-codes.rkt"
  "../configuration.rkt"
-  "cast-profiler.rkt"
- (submod "../logging.rkt" typed))
+ "cast-profiler.rkt"
+ "../logging.rkt")
 
 (provide (all-defined-out))
 

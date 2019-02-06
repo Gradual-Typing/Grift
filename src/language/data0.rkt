@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require "forms.rkt"
          "primitives.rkt")
 (provide (all-defined-out)
@@ -15,7 +15,7 @@
 (define-type D0-Bnd-Code (Pairof Uid D0-Code))
 (define-type D0-Code (Code Uid* D0-Expr))
 
-(struct Stack-Alloc form:leaf ([bytes : Nat]) #:transparent)
+
 
 (define-type D0-Expr
   (Rec E (U (Labels D0-Bnd-Code* E)
