@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 #| This pass implements casts by error whenever anything that is non-static exists.
    It is used to implement a static varient of the GTLC that relies on as much
    of the same machinery of as the gradual varients as possible. 

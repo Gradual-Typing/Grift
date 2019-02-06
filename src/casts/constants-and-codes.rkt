@@ -1,13 +1,15 @@
-#lang typed/racket
+#lang racket/base
 
 (require
  (for-syntax
+  racket/base
   racket/list
   racket/syntax
   syntax/parse
   "../language/forms.rkt"
   "../language/c-helpers.rkt")
- "../language/data0.rkt"
+ racket/list
+ racket/match
  "../language/forms.rkt"
  "../language/syntax.rkt"
  "../logging.rkt"
@@ -241,17 +243,13 @@
        (if many-field-dtm
            (with-syntax ([arg (generate-temporary)]
                          [last-alloc-arg (generate-temporary)])
-             #`(define (func-alloc-name
-                        [alloc-arg* : D0-Expr] ...
-                        [last-alloc-arg : (Listof D0-Expr)])
-                 : D0-Expr
+             #`(define (func-alloc-name alloc-arg* ... last-alloc-arg)
                  (sr-hashcons-type
                   #,name-string tag-def
-                  `((field*
-                     . ,alloc-val*) ... .
-                    ,(map (lambda ([arg : D0-Expr]) (cons many-field arg))
-                          last-alloc-arg)))))
-           #`(define (func-alloc-name [alloc-arg* : D0-Expr] ...) : D0-Expr
+                  `((field* . ,alloc-val*)
+                    ... .
+                    ,(map (λ (arg) (cons many-field arg)) last-alloc-arg)))))
+           #`(define (func-alloc-name alloc-arg* ...)
                #,(cond
                    [(syntax->datum #'hashcons?)
                     #`(sr-hashcons-type
@@ -259,7 +257,7 @@
                    [else
                     #`(sr-alloc
                        #,name-string tag-def
-                      `(("index"    . ,(Quote 0))
+                       `(("index"    . ,(Quote 0))
                         ("hashcode" . ,(Quote 0))
                         (field* . ,alloc-val*) ...))]))))
      (define/with-syntax equal-arg (generate-temporary))
@@ -276,12 +274,9 @@
          (define/with-syntax lvalue-arg (generate-temporary))
          (define/with-syntax rvalue-arg (generate-temporary))
          #`(begin
-             (define (access-name [lvalue-arg : D0-Expr])
-               : D0-Expr
+             (define (access-name lvalue-arg)
                (sr-tagged-array-ref lvalue-arg tag-def #,index-def))
-             (define (assign-name [lvalue-arg : D0-Expr]
-                                  [rvalue-arg : D0-Expr])
-               : D0-Expr
+             (define (assign-name lvalue-arg rvalue-arg)
                (sr-tagged-array-set! lvalue-arg tag-def #,index-def rvalue-arg))))
        (define (gen-offset-func-access)
          (define/with-syntax access-name (gen-access-func-name many-field-dtm))
@@ -290,9 +285,7 @@
          (define/with-syntax ind-arg (generate-temporary))
          (define/with-syntax rvalue-arg (generate-temporary))
          #`(begin
-             (define (access-name [lvalue-arg : D0-Expr]
-                                  [ind-arg : D0-Expr])
-               : D0-Expr
+             (define (access-name lvalue-arg ind-arg)
                (sr-tagged-array-ref
                 lvalue-arg tag-def
                 (match ind-arg
@@ -300,10 +293,7 @@
                    (Quote (+ #,offset-data-def k))]
                   [otherwise
                    (Op '+ (list #,offset-def ind-arg))])))
-             (define (assign-name [lvalue-arg : D0-Expr]
-                                  [ind-arg : D0-Expr]
-                                  [rvalue-arg : D0-Expr])
-               : D0-Expr
+             (define (assign-name lvalue-arg ind-arg rvalue-arg)
                (sr-tagged-array-set!
                 lvalue-arg tag-def
                 (match ind-arg
@@ -321,7 +311,7 @@
            (hash-def 1)
            (sindex/offset-def* sindex/offset-val*) ...)
          func-alloc
-         (define (func-huh-name [equal-arg : D0-Expr]) : D0-Expr
+         (define (func-huh-name equal-arg)
            (sr-check-tag=? equal-arg namespace-mask-def tag-def))
          #,@(gen-func-access*))]))
 
@@ -336,12 +326,12 @@
 (define-types-memory-layout-helpers "type" "mu" #b110 #f ("body" single))
 
 
-(: sr-hashcons-type (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
+#;(: sr-hashcons-type (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
 (define (sr-hashcons-type name tag? slots)
-  (: sr-alloc-init ((Var Uid) -> (Nonnegative-Fixnum D0-Expr -> D0-Expr)))
+  #;(: sr-alloc-init ((Var Uid) -> (Nonnegative-Fixnum D0-Expr -> D0-Expr)))
   (define ((sr-alloc-init mem) offset value)
     (op$ Array-set! mem (Quote offset) value))
-  (: get-assignments/vars ((Listof (Pair String D0-Expr)) -> (Values D0-Expr* (Listof (Var Uid)))))
+  #;(: get-assignments/vars ((Listof (Pair String D0-Expr)) -> (Values D0-Expr* (Listof (Var Uid)))))
   (define (get-assignments/vars b*)
     (cond
       [(null? b*) (values '() '())]
@@ -363,7 +353,7 @@
   (define alloc-var (Var alloc-id))
   (define alloc-ass (Assign alloc-id (op$ Alloc (Quote allocation-size))))
   (define init* (map (sr-alloc-init alloc-var) ind* var*))
-  (define tagged-ptr : D0-Expr
+  (define tagged-ptr
     (cond
       [(not tag?) alloc-var]
       [else (sr-tag-value alloc-var tag?)]))
@@ -372,16 +362,16 @@
 
 ;; These bindings are C functions that are needed by the compiled code and is
 ;; hoisted by specify-representation
-(define boxed-bnd-code* : (Boxof D0-Bnd-Code*) (box '()))
+(define boxed-bnd-code* #;(Boxof D0-Bnd-Code*) (box '()))
 
-(: add-new-code! (D0-Bnd-Code -> Void))
+#;(: add-new-code! (D0-Bnd-Code -> Void))
 (define (add-new-code! b)
   (set-box! boxed-bnd-code* (cons b (unbox boxed-bnd-code*))))
 
-(: hashcons-type-code-label? (Boxof (Option (Code-Label Uid))))
+#;(: hashcons-type-code-label? (Boxof (Option (Code-Label Uid))))
 (define hashcons-type-code-label? (box #f))
 
-(: hashcons-type (D0-Expr -> D0-Expr))
+#;(: hashcons-type (D0-Expr -> D0-Expr))
 (define (hashcons-type ty)
   (define cl? (unbox hashcons-type-code-label?))
   (cond
@@ -396,7 +386,7 @@
          "    location: " (current-srcloc-as-string) "\n"
          "    invarient: Assumes all type tags are covered by cases\n"
          "               and that we recieve a valid type.\n")))
-     (define runtime-code : D0-Code
+     (define runtime-code
        (code$ (ty)
          (cond$
           [(op$ <= ty TYPE-MAX-ATOMIC-RT-VALUE) ty]
@@ -454,10 +444,10 @@
 
 
 
-(: calculate-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
+#;(: calculate-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
 (define calculate-type-hashcode-label? (box #f))
 
-(: calculate-type-hashcode ((Var Uid) -> D0-Expr))
+#;(: calculate-type-hashcode ((Var Uid) -> D0-Expr))
 (define (calculate-type-hashcode ty)
   (define cl? (unbox calculate-type-hashcode-label?))
   (cond
@@ -533,10 +523,10 @@
      (set-box! calculate-type-hashcode-label? cl)
      (App-Code cl (list ty))]))
 
-(: access-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
+#;(: access-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
 (define access-type-hashcode-label? (box #f))
 
-(: access-type-hashcode ((Var Uid) -> D0-Expr))
+#;(: access-type-hashcode ((Var Uid) -> D0-Expr))
 (define (access-type-hashcode ty)
   (define cl? (unbox access-type-hashcode-label?))
   (cond
@@ -593,4 +583,3 @@
      (define cl (Code-Label uid))
      (set-box! access-type-hashcode-label? cl)
      (App-Code cl (list ty))]))
-

@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang racket/base
 
 ;; This module defines macros that construct pieces of our AST and uses
 ;; constants from constants-and-codes.rkt module.

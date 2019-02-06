@@ -1,7 +1,8 @@
-#lang typed/racket
+#lang typed/racket/base/no-check
 
-(require "../language/data0.rkt"
-         "../language/syntax.rkt")
+(require
+ "../language/data0.rkt"
+ "../language/syntax.rkt")
 
 (provide (all-defined-out))
 

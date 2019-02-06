@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base/no-check
 #|
 Pass: src/casts/define->letrec
 Author: Andre Kuhlenshmidt (akuhlens@indiana.edu)
@@ -12,14 +12,15 @@ be fixed to conform with letrec* semantics.
 |Input Grammar Cast0-Language                                                   |
 |Output Grammar Cast0.5-Language                                                  |
 +------------------------------------------------------------------------------|#
-(require 
-         (submod "../logging.rkt" typed)
-         "../errors.rkt"
-         "../configuration.rkt"
-         "../language/cast0.rkt")
+(require
+ "../language/cast0.rkt" 
+ "../configuration.rkt"
+ "../errors.rkt"
+ "../logging.rkt")
 
-(provide define->let
-         (all-from-out "../language/cast0.rkt"))
+(provide
+ define->let
+ (all-from-out "../language/cast0.rkt"))
 
 ;; The entry point for this pass it is called by impose-casting semantics
 ;; Eventually we should make this 

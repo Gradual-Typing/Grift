@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base/no-check
 
 ;; While many of these syntaxes seem absurd they
 ;; provide a way to incrementally change the syntax
@@ -7,10 +7,13 @@
 ;; construct the AST.
 
 
-(require (for-syntax racket/syntax)
-         "forms.rkt"
-         "../configuration.rkt"
-         syntax/location)
+(require
+ (for-syntax
+  racket/base
+  racket/syntax)
+ "forms.rkt"
+ "../configuration.rkt"
+ syntax/location)
 (require/typed racket/base
   [srcloc->string (srcloc -> (Option String))])
 (provide (all-defined-out))

@@ -1,23 +1,26 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
+;;TODO rewrite the file in racket/base and remove type-racket imports
+
 #|
 This is a micro compiler that removes the cast language form.
 |#
 
-(require (submod "../logging.rkt" typed) 
-         "./purify-letrec.rkt"
-         "./hoist-types-and-coercions.rkt"
-         "define-to-let.rkt" 
-         "interpret-casts.rkt"
-         "label-lambdas.rkt"
-         "convert-closures.rkt"
-         "specify-representation.rkt"
-         "../language/cast0.rkt"
-         "../language/data0.rkt")
+(require 
+ "./purify-letrec.rkt"
+ "./hoist-types-and-coercions.rkt"
+ "define-to-let.rkt" 
+ "interpret-casts.rkt"
+ "label-lambdas.rkt"
+ "convert-closures.rkt"
+ "specify-representation.rkt"
+ "../language/cast0.rkt"
+ "../language/data0.rkt")
 
-(provide (all-defined-out)
-         (all-from-out
-          "../language/cast0.rkt"
-          "../language/data0.rkt"))
+(provide
+ (all-defined-out)
+ (all-from-out
+  "../language/cast0.rkt"
+  "../language/data0.rkt"))
 
 (: impose-cast-semantics : Cast0-Lang -> Data0-Lang)
 (define (impose-cast-semantics c0)

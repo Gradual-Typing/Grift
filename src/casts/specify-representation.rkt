@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 #|------------------------------------------------------------------------------+
 |Pass: src/casts/specify-representation
 +-------------------------------------------------------------------------------+
@@ -22,7 +22,7 @@ but a static single assignment is implicitly maintained.
  racket/list
  racket/match
  "../errors.rkt"
- (submod "../logging.rkt" typed)
+ "../logging.rkt"
  "../configuration.rkt"
  "../language/cast-or-coerce6.rkt"
  "../language/data0.rkt"

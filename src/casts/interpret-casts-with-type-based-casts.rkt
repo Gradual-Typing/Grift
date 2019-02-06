@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 ;; - This pass creates a cast-interpreter that can cast arbitrary values at
 ;;   runtime.
 ;; - Compiles casts to either calls to the cast interpereter or a specialization
