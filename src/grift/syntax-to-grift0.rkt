@@ -346,18 +346,6 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                   (map recur (syntax->list #'(c*.rhs ...))))
              (recur #'default))]))
 
-(define (parse-cond stx env)
-  (syntax-parse stx
-    #:datum-literals (else)
-    [(_ [p e** ...] ... [else e* ...])
-     (syntax-case stx ()
-       [(_ [else e* ...])
-        ((parse-form/no-ann env) (syntax/loc stx (begin e* ...)))]
-       [(cond [p e* ...] c ...)
-        (let* ([recur  (parse-form env)]
-               [conseq (recur (syntax/loc stx (begin e* ...)))])
-          (If (recur #'p) conseq (recur #'(cond c ...))))])]))
-
 (define ((parse-simple-form sym ctr arg-count) stx env)
   (syntax-parse stx
     #:context sym

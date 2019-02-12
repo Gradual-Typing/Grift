@@ -9,7 +9,6 @@ This is a micro compiler that removes the cast language form.
          "define-to-let.rkt" 
          "interpret-casts.rkt"
          "label-lambdas.rkt"
-         "uncover-free.rkt"
          "convert-closures.rkt"
          "specify-representation.rkt"
          "../language/cast0.rkt"
