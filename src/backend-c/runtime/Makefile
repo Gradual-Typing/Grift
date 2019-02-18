@@ -15,7 +15,7 @@ boehm-gc-install :
 %.c :
 
 %.o : %.c
-	cc $(NDEBUG) $< -c -o $@
+	cc $(NDEBUG) -std=c99 $< -c -o $@
 
 runtime.o : io.o assoc_stack.o hashcons.o
 	ld -r $^ -o $@
