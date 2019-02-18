@@ -1,7 +1,6 @@
-#lang typed/racket
+#lang typed/racket/no-check
 
-(require typed/rackunit
-         typed/rackunit/text-ui
+(require rackunit
          grift/tests/test-compile)
 
 (provide (all-defined-out))

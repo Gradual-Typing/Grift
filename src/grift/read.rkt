@@ -8,10 +8,11 @@
 |the function read-syntax so that the source locations may be lifted from the
 |syntax-objects as we convert them to core forms.
 +------------------------------------------------------------------------------|#
-(require "../language/grift0.rkt"
-         "../logging.rkt"
-         racket/exn
-         racket/path)
+(require
+ "../language/forms.rkt"
+ "../logging.rkt"
+ racket/exn
+ racket/path)
 
 (provide read)
 

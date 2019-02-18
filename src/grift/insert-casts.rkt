@@ -17,16 +17,12 @@
  "./type-check.rkt"
  "../configuration.rkt"
  "../errors.rkt"
- "../language/cast0.rkt"
  "../language/forms.rkt"
- "../language/grift1.rkt"
  "../logging.rkt")
 
 ;; Only the pass is provided by this module
-(provide insert-casts
-         (all-from-out
-          "../language/grift1.rkt"
-          "../language/cast0.rkt"))
+(provide
+ insert-casts)
 
 (: insert-casts (Grift1-Lang -> Cast0-Lang))
 (define (insert-casts prgm)

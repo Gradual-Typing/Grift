@@ -190,6 +190,16 @@ And a type constructor "name" expecting the types of field1 and field2
   (LetP bindings body)
   (LetC bindings body);; Can create cyclic immutable data
   (Procedure this params code caster bound-vars body)
+  ;; The dynamic type and it's operations
+  (Dyn-Object value type)
+  (Dyn-Value dyn)
+  (Dyn-Type  dyn)
+  (Dyn-Immediate-Value dyn)
+  (Dyn-Immediate-Tag=Huh dyn type)
+  (Dyn-Immediate-Object value type)
+  (Dyn-Box-Object value type)
+  (Dyn-Box-Value dyn)
+  (Dyn-Box-Type dyn)
   ;; represents a set of moves to initialize variables before
   (Code variables body)
   (Dyn-Fn-App expr expr* type* label)
@@ -229,7 +239,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Declares Local Variables
   (Locals names space body)
   (Return value)
-  (Relop primitive expression1 expression2)
+  (Relop primitive expressions)
   ;; Uil Memory Ops
   (Malloc expression)
   ;; Uil IO Primitives todo add C Calls and replace these
@@ -287,6 +297,18 @@ And a type constructor "name" expecting the types of field1 and field2
 (struct logical-type type ()
   #:transparent)
 (struct Unit base-type ()
+  #:transparent)
+(struct String base-type ()
+  #:transparent)
+(struct Void base-type ()
+  #:transparent)
+(struct Obj base-type ()
+  #:transparent)
+(struct RT-Type base-type ()
+  #:transparent)
+(struct Assoc-Stack base-type ()
+  #:transparent)
+(struct Bot base-type ()
   #:transparent)
 (struct Int base-type ()
   #:transparent)
@@ -403,23 +425,38 @@ And a type constructor "name" expecting the types of field1 and field2
 
 
 ;;Constants for the types
-(define UNIT-TYPE (Unit))
+(define UNIT (Unit))
+(define UNIT-TYPE UNIT)
 (define UNIT-EXPR (Type UNIT-TYPE))
 
-(define INT-TYPE (Int))
+(define STRING (String))
+
+(define VOID (Void))
+(define OBJ (Obj))
+(define RT-TYPE (RT-Type))
+(define ASSOC-STACK (Assoc-Stack))
+(define BOTTOM (Bot))
+
+(define INT (Int))
+(define INT-TYPE INT)
 (define INT-EXPR (Type INT-TYPE))
 
-(define FLOAT-TYPE (Float))
+(define FLOAT (Float))
+(define FLOAT-TYPE FLOAT)
 (define FLOAT-EXPR (Type FLOAT-TYPE))
 
-(define BOOL-TYPE (Bool))
+(define BOOL (Bool))
+(define BOOL-TYPE BOOL)
 (define BOOL-EXPR (Type BOOL-TYPE))
 
-(define CHAR-TYPE (Character))
+(define CHAR (Character))
+(define CHAR-TYPE CHAR)
 (define CHAR-EXPR (Type CHAR-TYPE))
 
 (define DYN-TYPE (Dyn))
 (define DYN-EXPR (Type DYN-TYPE))
+
+
 
 (define PBOX-DYN-TYPE (GRef DYN-TYPE))
 (define PBOX-DYN-EXPR (Type PBOX-DYN-TYPE))

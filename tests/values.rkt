@@ -1,10 +1,10 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 (require racket/port
          racket/match
          (rename-in (only-in racket/base char?)
                     [char? r:char?])
-         (prefix-in s: (submod "../src/logging.rkt" typed)))
+         (prefix-in s: "../src/logging.rkt"))
 
 (provide (all-defined-out))
 

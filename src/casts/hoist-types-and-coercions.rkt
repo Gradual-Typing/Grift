@@ -325,23 +325,16 @@
   ;; Recur through expression replacing types with their primitive counterparts
   (: recur (CoC3-Expr -> CoC3.1-Expr))
   (define (recur exp)
-    (cond
-      [(Type? exp)
-       (match-define (Type (app type->imdt t)) exp)
+    (match exp
+      [(Type (app type->imdt t))
        (Type t)]
-      [(Quote-Coercion? exp)
-       (match-define (Quote-Coercion (app crcn->imdt c)) exp)
+      [(Quote-Coercion (app crcn->imdt c))
        (Quote-Coercion c)]
-      [(Quote-HCoercion? exp)
-       (match-define (Quote-HCoercion (app crcn->imdt c)) exp)
+      [(Quote-HCoercion (app crcn->imdt c))
        (Quote-Coercion c)]
-      [(Mvector? exp)
-       (match-define (Mvector (app recur e1) (app recur e2) (app type->imdt t))
-         exp)
+      [(Mvector (app recur e1) (app recur e2) (app type->imdt t))
        (Mvector e1 e2 t)]
-      [(Mbox? exp)
-       (match-define (Mbox (app recur e) (app type->imdt t)) exp)
-       (Mbox e t)]
+      [(Mbox (app recur e) (app type->imdt t)) (Mbox e t)]
       [else (form-map exp recur)]))
   ;; Body of ht-expr just start the expression traversal
   (recur exp))

@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 #|
 This is a micro compiler that takes a path, reads the contents
@@ -7,20 +7,17 @@ ast, and finally converts that ast into an equivalent ast
 of the cast calculus.
 |#
 
-(require "../language/cast0.rkt")
-(provide (all-from-out "../language/cast0.rkt"))
+(require
+ "./insert-casts.rkt"
+ "./read.rkt"
+ "./syntax-to-grift0.rkt"
+ "./type-check.rkt")
 
-(module untyped racket/base
-  (require "./insert-casts.rkt"
-           "./read.rkt"
-           "./syntax-to-grift0.rkt"
-           "./type-check.rkt")
-  (provide reduce-to-cast-calculus)
-  (define (reduce-to-cast-calculus path)
-    (insert-casts (type-check (syntax->grift0 (read path))))))
+(provide reduce-to-cast-calculus)
 
-(require/typed/provide 'untyped
-  [reduce-to-cast-calculus ((U String Path) -> Cast0-Lang)])
+(define (reduce-to-cast-calculus path)
+  (insert-casts (type-check (syntax->grift0 (read path)))))
+
 
 
 

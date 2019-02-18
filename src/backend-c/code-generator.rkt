@@ -1,9 +1,8 @@
-#lang typed/racket
+#lang typed/racket/no-check
 
 (require ;;racket/path
          "../configuration.rkt"
          "../language/data5.rkt"
-         "../helpers.rkt"
          "./generate-c.rkt"
          syntax/location
          (for-syntax racket/system)
@@ -24,7 +23,6 @@
          [o-path (or (output-path) (build-path "a.out"))]
          [o-path (normalize-path o-path)])
     ;; Write the C code to a file
-    (logging c-backend-generate-code (Vomit) "~v" c-path)
     (with-output-to-file c-path #:mode 'text #:exists 'replace
       (lambda ()
         (generate-c uil c-path)))
@@ -83,9 +81,6 @@
   (define cmd
     (format "clang -o ~a ~a ~a ~a ~a ~a ~a"
             out in rt rt-math gc rt-cast-profiler flags))
-  (when (trace? 'Vomit)
-    (logf "System call: ~a" cmd))
-  (flush-output (current-log-port))
   (flush-output (current-error-port))
   (flush-output)
   (unless (system cmd)
@@ -103,7 +98,8 @@
             (unless (null? s)
               (display (car s))
               (display " ")
-              (loop (cdr s))))))))
+              (loop (cdr s)))
+            (display (default-flags)))))))
 
 ;; C compiler warnings written with regard to clang
 ;; I need to check to make sure that these option will work with gcc
@@ -117,6 +113,9 @@
 
 (define warn-unused-value : Opt-Warning
   (make-parameter '(#f . "unused-value")))
+
+(define warn-parentheses-equality : Opt-Warning
+  (make-parameter '(#f . "parentheses-equality")))
 
 
 
@@ -141,4 +140,5 @@
       (emit-optimize-c)
       (emit-opt-warning warn-format)
       (emit-opt-warning warn-int-conversion)
-      (emit-opt-warning warn-unused-value))))
+      (emit-opt-warning warn-unused-value)
+      (emit-opt-warning warn-parentheses-equality))))

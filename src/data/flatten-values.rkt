@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/no-check
 #|
 A little bit of clarification needs to be made in this pass
 This pass is really about flattening the value context. So
@@ -18,11 +18,11 @@ becuse it is actually more of a stmt contexts itself.
 |#
 
 
-(require "../language/data3.rkt"
-         "../language/data4.rkt"
-         (submod "../language/make-begin.rkt" typed)
-         "../configuration.rkt"
-         "../helpers.rkt")
+(require
+ "../language/forms.rkt"
+ "../language/make-begin.rkt"
+ "../configuration.rkt"
+ "../helpers.rkt")
 
 (provide flatten-values)
 (: flatten-values (Data3-Lang -> Data4-Lang))
@@ -108,6 +108,7 @@ becuse it is actually more of a stmt contexts itself.
   (: fv-pred (D3-Pred -> D4-Pred))
   (define (fv-pred pred)
     (match pred
+      [(Quote c) pred]
       [(If t c a)
        (let ([t (fv-pred t)]
              [c (fv-pred c)]
@@ -116,10 +117,7 @@ becuse it is actually more of a stmt contexts itself.
       [(Switch t c* d)
        (Switch t (map-switch-case* fv-pred c*) (fv-pred d))]
       [(Begin e* p) (Begin (fv-effect* e*) (fv-pred p))]
-      [(Relop p t1 t2)
-       (let ([t1 (fv-trivial t1)]
-             [t2 (fv-trivial t2)])
-         (Relop p t1 t2))]))
+      [(Relop p e*) (Relop p (map fv-trivial e*))]))
 
   (: fv-effect (D3-Effect -> D4-Effect))
   (define (fv-effect effect)

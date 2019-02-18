@@ -109,6 +109,15 @@
        (match-let ([(cons _ (Code _ e)) b])
          e))
      (and (recur e) (recur* (map bnd-code-extract-e b*)))]
+    [(Dyn-Object e t) (recur-all e t)]
+    [(Dyn-Value e) (recur e)]
+    [(Dyn-Type t) (recur t)]
+    [(Dyn-Immediate-Value dyn) (recur dyn)]
+    [(Dyn-Immediate-Tag=Huh dyn type) (recur dyn)]
+    [(Dyn-Immediate-Object e t) (recur e)]
+    [(Dyn-Box-Object value type) (recur-all value type)]
+    [(Dyn-Box-Value dyn) (recur dyn)]
+    [(Dyn-Box-Type dyn) (recur dyn)]
     [(Op _ e*) (recur* e*)]
     [(If e1 e2 e3) (recur-all e1 e2 e3)]
     [(Switch e c* d)

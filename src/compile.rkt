@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/no-check
 
 (require "./configuration.rkt"
          ;; "./helpers.rkt"

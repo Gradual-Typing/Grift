@@ -12,3 +12,6 @@
     "src/backend-c/runtime/hashcons.o"
     "src/backend-c/runtime/runtime.o"))
 
+(define test-include-paths
+  (list #rx".rkt$"))
+

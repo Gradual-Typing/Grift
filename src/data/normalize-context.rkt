@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/base/no-check
 #|------------------------------------------------------------------------------+
 |Pass: src/data/normalize-context                                          |
 +-------------------------------------------------------------------------------+
@@ -10,19 +10,17 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../helpers.rkt"
-         "../errors.rkt"
-         "../configuration.rkt"
-         "../language/data0.rkt"
-         "../language/data1.rkt"
-         "../casts/constants-and-codes.rkt"
-         (submod "../language/make-begin.rkt" typed))
+(require
+ "../helpers.rkt"
+ "../errors.rkt"
+ "../configuration.rkt"
+ "../language/forms.rkt"
+ "../language/primitives.rkt"
+ "../casts/constants-and-codes.rkt"
+ "../language/make-begin.rkt")
 
 ;; Only the pass is provided by this module
-(provide normalize-context
-         (all-from-out
-          "../language/data0.rkt"
-          "../language/data1.rkt"))
+(provide normalize-context)
 
 (: normalize-context (-> Data0-Lang Data1-Lang))
 (define (normalize-context prgm)
@@ -48,7 +46,7 @@
       [(Switch e c* d)
        (Switch (nc-value e) (map-switch-case* nc-tail c*) (nc-tail d))]
       [(Begin eff* exp)
-       (Begin (nc-effect* eff*) (nc-tail exp))]
+       (make-begin (nc-effect* eff*) (nc-tail exp))]
       [(Repeat i e1 e2 a e3 e4)
        ;; This breaks SSA but we don't rely on SSA currently
        (Begin
@@ -59,10 +57,7 @@
          (Var a))]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
-      [(Op p (app nc-value* v*))
-       (if (uil-prim-effect? p)
-           (Begin (list (Op p v*)) UNIT-IMDT)
-           (nc-value-op p v*))]
+      [(Op p (app nc-value* v*)) (nc-value-op p v*)]
       [(and (Stack-Alloc _) a) a]
       [(and (Var _) v) v]
       [(and (Global s) g) g]
@@ -101,10 +96,7 @@
       [(Break-Repeat) (Begin (list (Break-Repeat)) UNIT-IMDT)]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
-      [(Op p (app nc-value* v*))
-       (if (uil-prim-effect? p)
-           (Begin (list (Op p v*)) UNIT-IMDT)
-           (nc-value-op p v*))]
+      [(Op p (app nc-value* v*)) (nc-value-op p v*)]
       [(and (Stack-Alloc _) a) a]
       [(Var i)  (Var i)]
       [(Global s) (Global s)]
@@ -142,7 +134,7 @@
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]
       [(Op p exp*)
-       (if (uil-prim-effect? p)
+       (if (grift-primitive-effect? p)
            (Op p (nc-value* exp*))
            ;; evaluate values for their effects
            (make-begin (nc-effect* exp*) NO-OP))]
@@ -171,17 +163,19 @@
           (Assign a (nc-value e3))
           (Repeat i (nc-value e1) (nc-value e2) #f #f
                   (Assign a (nc-value e4))))
-         (Relop '= TRUE-IMDT (Var a)))]
+         (Relop '= (list TRUE-IMDT (Var a))))]
       [(Break-Repeat) (error 'nc-pred/unsuported/break-repeat)]
       [(Assign u e) (error 'nc-pred/unsuported/assign)]
       [(Op p (app nc-value* val*))
-       (if (IntxInt->Bool-primitive? p)
-           (match val*
-             [(list a b) (Relop p a b)]
-             [other (error 'nc-pred-op)])
-           (Relop '= TRUE-IMDT (nc-value-op p val*)))]
+       (cond
+         [(or (primitive-relop? p) (primitive-int? p) (array-ref? p))
+          (Relop p val*)]
+         [(primitive-bottom? p)
+          (Begin (list (Op p val*)) TRUE-IMDT)]
+         [else
+          (error 'grift/normalize-context/nc-pred "unexpected relop: ~a" p)])]
       [(No-Op) (error 'nc-pred "no-op in pred context")]
-      [(app nc-value v) (Relop '= TRUE-IMDT v)]))
+      [(app nc-value v) (Relop '= (list TRUE-IMDT v))]))
 
 (: nc-value* (-> D0-Expr* D1-Value*))
 (define (nc-value* exp*) (map nc-value exp*))
@@ -200,17 +194,38 @@
          (let ([b (cons u (Code u* (nc-tail t)))])
            (set-box! lifted-code* (cons b (unbox lifted-code*))))))
      bnd*))
-  (nc-tail prog))
+(nc-tail prog))
+
+(define (primitive-relop? p)
+  (Bool? (Fn-ret (grift-primitive->type p))))
+
+(define (array-ref? p) (eq? 'Array-ref p))
+
+;; This class of effects need to have unit returned for them
+(define (primitive-effect/unit-return? p)
+  (define prim (grift-primitive p))
+  (and (primitive-effectfull? prim)
+       (or (Unit? (Fn-ret (primitive-type prim)))
+           (Bot? (Fn-ret (primitive-type prim))))))
+
+(define (primitive-bottom? p)
+  (Bot? (Fn-ret (grift-primitive->type p))))
+
+(define (primitive-int? p)
+  (Int? (Fn-ret (grift-primitive->type p))))
 
 ;; This makes sure that the value #t is returned from predicates
 (: nc-value-op (-> (U UIL-Prim UIL-Prim!) D1-Value* D1-Value))
 (define (nc-value-op p exp*)
   (cond
-    [(uil-prim-pred? p)
-     (match exp*
-       [(list a b)
-        (If (Relop p a b) TRUE-IMDT FALSE-IMDT)]
-       [otherwise (error 'nc-expr-op "Unmatched ~a" exp)])]
-    [(uil-prim-value? p) (Op p exp*)]
-    [(uil-prim-effect? p) (Begin (list (Op p exp*)) UNIT-IMDT)]
-   [else (error 'nc-value-op "primitive out of context ~v ~v" p exp*)]))
+    [(primitive-relop? p)
+     (If (Relop p exp*) TRUE-IMDT FALSE-IMDT)]
+    [(primitive-effect/unit-return? p)
+     (Begin (list (Op p exp*)) UNIT-IMDT)]
+    [else (Op p exp*)]))
+
+(define (using-c-conditional-semantics?)
+  ;; This is a poor definition of this. Perhaps all this code
+  ;; belongs in backend-c. I guess we will see when we port to sham.
+  (and (eq? data:FALSE-IMDT 0)
+       (eq? data:TRUE-IMDT 1)))

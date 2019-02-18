@@ -1,20 +1,15 @@
-#lang typed/racket
+#lang typed/racket/no-check
+
 (require 
-         "./normalize-context.rkt"
-         "./uncover-locals.rkt"
-         "./remove-complex-opera.rkt"
-         "./flatten-values.rkt"
-         "./simplify-predicates.rkt"
-         "../configuration.rkt"
-         "../language/data0.rkt"
-         "../language/data5.rkt")
+ "./normalize-context.rkt"
+ "./uncover-locals.rkt"
+ "./remove-complex-opera.rkt"
+ "./flatten-values.rkt"
+ "./simplify-predicates.rkt")
 
-(provide convert-representation
-         (all-from-out
-          "../language/data0.rkt"
-          "../language/data5.rkt"))
+(provide convert-representation)
 
-(: convert-representation (Data0-Lang . -> . Data5-Lang))
+(: convert-representation (Data0-Lang -> Data5-Lang))
 (define (convert-representation d0)
   (let* ([d1 (normalize-context d0)]
          [d2 (uncover-locals d1)]

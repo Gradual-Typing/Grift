@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 #|------------------------------------------------------------------------------+
 |Pass: src/data/remove-let                                          |
 +-------------------------------------------------------------------------------+
@@ -16,16 +16,13 @@
          "../helpers.rkt"
          "../errors.rkt"
          "../configuration.rkt"
-         "../language/data0.rkt"
-         "../language/data1.rkt"
-         "../language/data2.rkt"
-         "../lib/mutable-set.rkt")
+         "../lib/mutable-set.rkt"
+         "../language/form-map.rkt"
+         "../language/forms.rkt")
 
 ;; Only the pass is provided by this module
-(provide uncover-locals
-         (all-from-out
-          "../language/data1.rkt"
-          "../language/data2.rkt"))
+(provide
+ uncover-locals)
 
 #;
 (TODO this pass has a very wierd interface for effects.
@@ -53,16 +50,6 @@
 (define ((ul-bnd-code dec*) bnd)
   (match-let ([(cons uid (Code uid* exp)) bnd])
     (cons uid (Code uid* (ul-body dec* exp)))))
-
-
-(unsafe-require/typed
- "../language/form-map.rkt"
- [form-map
-  (case->
-   [D1-Effect (D1-Effect -> D2-Effect) -> D2-Effect]
-   [D1-Pred (D1-Pred -> D2-Pred) -> D2-Pred]
-   [D1-Value (D1-Value -> D2-Value) -> D2-Value]
-   [D1-Tail (D1-Tail -> D2-Tail) -> D2-Tail])])
 
 (: ul-body ((MSet Uid) D1-Tail -> D2-Body))
 (define (ul-body gdecs tail)
