@@ -678,9 +678,9 @@ TODO write unit tests
   (: code-gen-dyn-pbox-ref Dyn-PBox-Ref-Type)
   (define (code-gen-dyn-pbox-ref dyn lbl)
     (let*$ ([v dyn] [l lbl])
-      (If (dyn-immediate-tag=?$ v PBOX-DYN-EXPR)
-          (let*$ ([val (dyn-box-value$ v)]
-                  [ty  (dyn-box-type$ v)]
+      (If (Dyn-Immediate-Tag=Huh v PBOX-DYN-EXPR)
+          (let*$ ([val (Dyn-Box-Value v)]
+                  [ty  (Dyn-Box-Type v)]
                   [ty  (unfold-possible-mu$ ty)])
             (If (Type-GRef-Huh ty)
                 (let*$ ([tyof (Type-GRef-Of ty)]
@@ -694,9 +694,9 @@ TODO write unit tests
             [wrt-val1 wrt-val1]
             [t2 t2]
             [lbl lbl])
-      (If (ann (dyn-immediate-tag=?$ dyn-gbox PBOX-DYN-EXPR) CoC3-Expr)
-          (let*$ ([gbox (ann (dyn-box-value$ dyn-gbox) CoC3-Expr)]
-                  [ty   (ann (dyn-box-type$ dyn-gbox) CoC3-Expr)]
+      (If (ann (Dyn-Immediate-Tag=Huh dyn-gbox PBOX-DYN-EXPR) CoC3-Expr)
+          (let*$ ([gbox (ann (Dyn-Box-Value dyn-gbox) CoC3-Expr)]
+                  [ty   (ann (Dyn-Box-Type dyn-gbox) CoC3-Expr)]
                   [ty   (unfold-possible-mu$ ty)])
                  (If (Type-GRef-Huh ty)
                 (let$ ([tyof (Type-GRef-Of ty)])
@@ -714,9 +714,9 @@ TODO write unit tests
   (define (code-gen-dyn-pvec-ref dyn ind lbl)
     (let*$ ([dyn dyn][ind ind][lbl lbl])
       (cond
-        [(dyn-immediate-tag=?$ dyn PBOX-DYN-EXPR)
-         (let*$ ([maybe-pvec-val (dyn-box-value$ dyn)]
-                 [ty             (dyn-box-type$ dyn)]
+        [(Dyn-Immediate-Tag=Huh dyn PBOX-DYN-EXPR)
+         (let*$ ([maybe-pvec-val (Dyn-Box-Value dyn)]
+                 [ty             (Dyn-Box-Type dyn)]
                  [maybe-pvec-ty  (unfold-possible-mu$ ty)])
            (cond$
             [(Type-GVect-Huh maybe-pvec-ty)
@@ -733,9 +733,9 @@ TODO write unit tests
             [t2 t2]
             [lbl lbl])
       (cond$
-       [(dyn-immediate-tag=?$ dyn-gvec PBOX-DYN-EXPR)
-        (let*$ ([maybe-vec      (dyn-box-value$ dyn-gvec)]
-                [ty             (dyn-box-type$  dyn-gvec)]
+       [(Dyn-Immediate-Tag=Huh dyn-gvec PBOX-DYN-EXPR)
+        (let*$ ([maybe-vec      (Dyn-Box-Value dyn-gvec)]
+                [ty             (Dyn-Box-Type  dyn-gvec)]
                 [maybe-vec-type (unfold-possible-mu$ ty)])
           (cond$ 
            [(Type-GVect-Huh maybe-vec-type)
@@ -753,9 +753,9 @@ TODO write unit tests
     (let*$ ([v expr]
             [l lbl])
       (cond$
-       [(dyn-immediate-tag=?$ v PVEC-DYN-EXPR)
-        (let*$ ([val (dyn-box-value$ v)]
-                [ty  (dyn-box-type$ v)]
+       [(Dyn-Immediate-Tag=Huh v PVEC-DYN-EXPR)
+        (let*$ ([val (Dyn-Box-Value v)]
+                [ty  (Dyn-Box-Type v)]
                 [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-GVect-Huh ty) (pvec-len val)]
@@ -766,9 +766,9 @@ TODO write unit tests
   (define (code-gen-dyn-mbox-ref dyn lbl)
     (let$ ([dyn dyn] [lbl lbl])
       (cond$
-       [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
-        (let*$ ([val (dyn-box-value$ dyn)]
-                [ty  (dyn-box-type$ dyn)]
+       [(Dyn-Immediate-Tag=Huh dyn MBOX-DYN-EXPR)
+        (let*$ ([val (Dyn-Box-Value dyn)]
+                [ty  (Dyn-Box-Type dyn)]
                 [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MRef-Huh ty) (mbox-ref val DYN-EXPR)]
@@ -779,9 +779,9 @@ TODO write unit tests
   (define (code-gen-dyn-mbox-set! dyn-mbox wrt-val1 t2 lbl)
     (let$ ([dyn dyn-mbox] [val wrt-val1] [t2 t2] [lbl lbl])
       (cond$
-       [(dyn-immediate-tag=?$ dyn MBOX-DYN-EXPR)
-        (let*$ ([mbox (dyn-box-value$ dyn)]
-                [t1 (dyn-box-type$ dyn)]
+       [(Dyn-Immediate-Tag=Huh dyn MBOX-DYN-EXPR)
+        (let*$ ([mbox (Dyn-Box-Value dyn)]
+                [t1 (Dyn-Box-Type dyn)]
                 [t1 (unfold-possible-mu$ t1)])
           (cond$
            [(Type-MRef-Huh t1)
@@ -796,12 +796,12 @@ TODO write unit tests
   (define (code-gen-dyn-mvec-ref dyn ind lbl)
     (let$ ([dyn dyn] [ind ind] [lbl lbl])
       (cond$
-       [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
-        (let*$ ([ty (dyn-box-type$ dyn)]
+       [(Dyn-Immediate-Tag=Huh dyn MVEC-DYN-EXPR)
+        (let*$ ([ty (Dyn-Box-Type dyn)]
                 [ty (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MVect-Huh ty)
-            (mvec-ref (dyn-box-value$ dyn) ind DYN-EXPR)]
+            (mvec-ref (Dyn-Box-Value dyn) ind DYN-EXPR)]
            [else (Blame lbl)]))]
        [else (Blame lbl)])))
   
@@ -809,9 +809,9 @@ TODO write unit tests
   (define (code-gen-dyn-mvec-set! dyn-mvec ind wrt-val1 t2 lbl) 
     (let$ ([dyn dyn-mvec] [ind ind] [vale wrt-val1] [t2 t2] [lbl lbl])
       (cond$
-       [(dyn-immediate-tag=?$ dyn MVEC-DYN-EXPR)
-        (let*$ ([val (dyn-box-value$ dyn-mvec)]
-                [ty  (dyn-box-type$ dyn-mvec)]
+       [(Dyn-Immediate-Tag=Huh dyn MVEC-DYN-EXPR)
+        (let*$ ([val (Dyn-Box-Value dyn-mvec)]
+                [ty  (Dyn-Box-Type dyn-mvec)]
                 [ty  (unfold-possible-mu$ ty)])
           (cond$
            [(Type-MVect-Huh ty)
@@ -844,9 +844,9 @@ TODO write unit tests
         (Let (map bnd u* e*)
           (cond$
            ;; This condition asks if this is a boxed dynamic value
-           [(dyn-immediate-tag=?$ dyn-v FN-DYN-DYN-EXPR)
-            (let*$ ([unboxed-value (dyn-box-value$ dyn-v)]
-                    [src-type (dyn-box-type$  dyn-v)]
+           [(Dyn-Immediate-Tag=Huh dyn-v FN-DYN-DYN-EXPR)
+            (let*$ ([unboxed-value (Dyn-Box-Value dyn-v)]
+                    [src-type (Dyn-Box-Type  dyn-v)]
                     [src-type (unfold-possible-mu$ src-type)])
               (cond$
                [(Type-Fn-Huh src-type)
@@ -877,9 +877,9 @@ TODO write unit tests
   (define (code-gen-dyn-tup-prj e ie le)
     (let$ ([v e] [i ie] [l le])
       (cond$
-       [(ann (dyn-immediate-tag=?$ v TUPLE-DYN-EXPR) CoC3-Expr)
-        (let*$ ([u  (ann (dyn-box-value$ v) CoC3-Expr)]
-                [t0 (ann (dyn-box-type$ v) CoC3-Expr)]
+       [(ann (Dyn-Immediate-Tag=Huh v TUPLE-DYN-EXPR) CoC3-Expr)
+        (let*$ ([u  (ann (Dyn-Box-Value v) CoC3-Expr)]
+                [t0 (ann (Dyn-Box-Type v) CoC3-Expr)]
                 [ty (unfold-possible-mu$ t0)])
           (cond$
            [(ann (and$ (Type-Tuple-Huh ty)
@@ -1394,8 +1394,8 @@ TODO write unit tests
     (: help Project-Type)
     (define (help v t2 l mono-address base-address index)
       (precondition$ (not$ (Type-Dyn-Huh t2))
-        (let*$ ([u  (dyn-value$ v)]
-                [t1 (dyn-type$ v)]) 
+        (let*$ ([u  (Dyn-Value v)]
+                [t1 (Dyn-Type v)]) 
           (compile-med-cast u t1 t2 l mono-address base-address index))))
     (match t2
       [(Type _) (help v t2 l mono-address base-address index)]
@@ -1434,13 +1434,13 @@ TODO write unit tests
          [(Type (Dyn))
           (error 'grift/make-code-gen-project "Called with t2 = Dyn")]
          [(Type (or (Int) (Character) (Unit) (Bool)))
-          (If (dyn-immediate-tag=?$ v t2)
-              (dyn-immediate-value$ v)
+          (If (Dyn-Immediate-Tag=Huh v t2)
+              (Dyn-Immediate-Value v)
               (interp-project v t2 l mono-address base-address index))]
          [(Type _) 
-          (If (dyn-immediate-tag=?$ v t2)
-              (let*$ ([u  (dyn-box-value$ v)]
-                      [t1 (dyn-box-type$ v)])
+          (If (Dyn-Immediate-Tag=Huh v t2)
+              (let*$ ([u  (Dyn-Box-Value v)]
+                      [t1 (Dyn-Box-Type v)])
                 (compile-med-cast u t1 t2 l mono-address base-address index))
               (interp-project v t2 l mono-address base-address index))]
          [_
@@ -1453,16 +1453,16 @@ TODO write unit tests
 (define (make-compile-inject)
   (define inject-code
     (code$ (e t)
-      (dyn-make$ e t)))
+      (Dyn-Object e t)))
   (define get-uid!
     (make-lazy-add-cast-runtime-binding! "inject" inject-code))
   (: compile-inject Inject-Type)
   (define (compile-inject e t)
     (cast-profile/inc-injects-casts$
      (cond
-       ;; make-dyn$ does specialization if the type is a type literal
+       ;; Dyn-Object does specialization if the type is a type literal
        [(or (Type? t) (inject-inline-without-types?))
-        (dyn-make$ e t)]
+        (Dyn-Object e t)]
        [else (apply-code (get-uid!) e t)])))
 
   compile-inject)

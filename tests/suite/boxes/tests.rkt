@@ -1,6 +1,6 @@
-#lang typed/racket
+#lang typed/racket/no-check
 
-(require "../../rackunit.rkt"
+(require rackunit
          "../../test-compile.rkt")
 
 (provide (all-defined-out))

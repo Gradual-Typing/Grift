@@ -1,11 +1,11 @@
-#lang typed/racket
+#lang typed/racket/no-check
 
-(require "../language/data4.rkt"
-         "../language/data5.rkt"
-         (submod "../language/make-begin.rkt" typed)
-         "../casts/constants-and-codes.rkt"
-         "../configuration.rkt"
-         "../helpers.rkt")
+(require
+ "../language/forms.rkt"
+ "../language/make-begin.rkt"
+ "../casts/constants-and-codes.rkt"
+ "../configuration.rkt"
+ "../helpers.rkt")
 
 (provide simplify-predicates)
 (: simplify-predicates (Data4-Lang -> Data5-Lang))
@@ -55,6 +55,7 @@
   (: sp-pred (D4-Pred -> (Values D5-Effect* D5-Pred)))
   (define (sp-pred pred)
     (match pred
+      [(Quote c) (values '() pred)]
       [(If (app sp-pred te* t)
            (app sp-pred ce* c)
            (app sp-pred ae* a))
@@ -62,22 +63,21 @@
        ;; This seems dumb both the if and the snoc we should make
        ;; effectfull begins able to handle having an effect in the
        ;; value position.
-       (define ce (Begin (snoc ce* (Assign u (If c TRUE-IMDT FALSE-IMDT))) NO-OP))
-       (define ae (Begin (snoc ae* (Assign u (If a TRUE-IMDT FALSE-IMDT))) NO-OP))
-       (values (snoc te* (If t ce ae))
-               (Relop '= (Var u) TRUE-IMDT))]
+       (define ce (Begin (snoc ce* (Assign u c)) NO-OP))
+       (define ae (Begin (snoc ae* (Assign u a)) NO-OP))
+       (values (snoc te* (If t ce ae)) (Var u))]
       [(Begin (app sp-effect* e*) (app sp-pred pe* p))
        (values (append e* pe*) p)]
-      [(Relop p (app sp-trivial t1) (app sp-trivial t2))
-       (values '() (Relop p t1 t2))]
+      [(Relop p (list (app sp-trivial t*) ...))
+       (values '() (Relop p t*))]
       [(Switch (app sp-trivial e) c* (app sp-pred d* d))
        (define u (local-next-uid! "tmp_sp"))
        (define (recur-sc* [rhs : D4-Pred])
          (define-values (e* e) (sp-pred rhs))
-         (Begin (snoc e* (Assign u (If e TRUE-IMDT FALSE-IMDT))) NO-OP))
+         (Begin (snoc e* (Assign u e)) NO-OP))
        (define c*^ (map-switch-case* recur-sc* c*))
-       (define d^  (Begin (snoc d* (Assign u (If d TRUE-IMDT FALSE-IMDT))) NO-OP))
-       (values (list (Switch e c*^ d^)) (Relop '= (Var u) TRUE-IMDT))]
+       (define d^  (Begin (snoc d* (Assign u d)) NO-OP))
+       (values (list (Switch e c*^ d^)) (Var u))]
       [o (error 'simplify-predicates/sp-pred "invalid: ~a" o)]))
   (: sp-value (D4-Value -> D5-Value))
   (define (sp-value v)

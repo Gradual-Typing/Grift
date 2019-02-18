@@ -1,20 +1,23 @@
-#lang typed/racket
+#lang typed/racket/no-check
 ;; This is a redo of the basic compiler with interpreters between every micro compiler.
 ;; Once the file is finished compiling the program is run and the value checked against
 ;; an expected value. The real compiler is then invoked. And the result once again checked.
 
-(require "./rackunit.rkt"
+(require rackunit #;"./rackunit.rkt"
+         racket/control
+         racket/exn
          "../src/configuration.rkt"
          "../src/errors.rkt"
          "../src/helpers.rkt"
          (only-in "../src/compile.rkt" compile)
          "./values.rkt"
          "./paths.rkt")
-(require/typed racket/control
-  (abort (Any -> Nothing)))
 
-(require/typed racket/exn
-  (exn->string (exn -> String)))
+;; (require/typed racket/control
+;;   (abort (Any -> Nothing)))
+
+;; (require/typed racket/exn
+;;   (exn->string (exn -> String)))
 
 (provide (all-defined-out)
          (all-from-out "./values.rkt"))

@@ -1,12 +1,11 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 (require
  racket/match
- "../language/data2.rkt"
-         "../language/data3.rkt"
-         (submod "../language/make-begin.rkt" typed)
-         "../configuration.rkt"
-         "../helpers.rkt")
+ "../language/make-begin.rkt"
+ "../language/forms.rkt"
+ "../configuration.rkt"
+ "../helpers.rkt")
 
 (provide remove-complex-opera)
 
@@ -16,9 +15,10 @@
   (define uc (make-unique-counter c))
   (define-values (body bnd*)
     (parameterize ([current-unique-counter uc])
-      (let* ([body (rco-body b)]
+      (with-handlers ([(λ a #t) (λ (e) (print b) (raise e))])
+        (let* ([body (rco-body b)]
              [bnd* (map rco-bnd-code b*)])
-        (values body bnd*))))
+          (values body bnd*)))))
   (Prog (list n (unique-counter-next! uc) t)
     (GlobDecs d* (Labels bnd* body))))
 
@@ -39,41 +39,46 @@
     u)
   (: rco-tail (D2-Tail -> D3-Tail))
   (define (rco-tail tail)
-    (match tail
-      [(If t c a) (If (rco-pred t) (rco-tail c) (rco-tail a))]
-      [(Switch e c* d)
-       (define-values (s* t) (trivialize-value e))
-       (make-begin s* (Switch t
-                              (map-switch-case* rco-tail c*)
-                              (rco-tail d)))]
-      [(Begin e* v) (make-begin (rco-effect* e*) (rco-tail v))]
-      [(App-Code v v*)
-       (define-values (s*1 t)  (trivialize-value v))
-       (define-values (s*2 t*) (trivialize-value* v*))
-       (make-begin s*1 (make-begin s*2 (Return (App-Code t t*))))]
-      [(Op p v*)
-       (define-values (s* t*) (trivialize-value* v*))
-       (make-begin s* (Return (Op p t*)))]
-      [(and cl (Code-Label i)) (Return cl)]
-      [(and v  (Var i))        (Return v)]
-      [(and g  (Global _))     (Return g)]
-      [(and d  (Quote k))      (Return d)]
-      [(and h  (Halt))         (Return h)]
-      [(and h  (Break-Repeat)) (Return h)]
-      [(and s  (Success))      (Return s)]
-      [other (error 'remove-complex-opera "unmatched ~a" other)]))
+    (with-handlers ([(λ a #t)
+                     (λ (e) (printf "rco-tail: ~a\n" tail) (raise e))])
+      (match tail
+        [(If t c a)
+         (If (rco-pred t) (rco-tail c) (rco-tail a))]
+        [(Switch e c* d)
+         (define-values (s* t) (trivialize-value e))
+         (make-begin s* (Switch t
+                                (map-switch-case* rco-tail c*)
+                                (rco-tail d)))]
+        [(Begin e* v) (make-begin (rco-effect* e*) (rco-tail v))]
+        [(App-Code v v*)
+         (define-values (s*1 t)  (trivialize-value v))
+         (define-values (s*2 t*) (trivialize-value* v*))
+         (make-begin s*1 (make-begin s*2 (Return (App-Code t t*))))]
+        [(Op p v*)
+         (unless (symbol? p)
+           (error 'remove-complex-opera.rkt "Found non-symbol primitive: ~a" p))
+         (define-values (s* t*) (trivialize-value* v*))
+         (make-begin s* (Return (Op p t*)))]
+        [(and cl (Code-Label i)) (Return cl)]
+        [(and v  (Var i))        (Return v)]
+        [(and g  (Global _))     (Return g)]
+        [(and d  (Quote k))      (Return d)]
+        [(and h  (Halt))         (Return h)]
+        [(and h  (Break-Repeat)) (Return h)]
+        [(and s  (Success))      (Return s)]
+        [other (error 'remove-complex-opera "unmatched ~a" other)]))
+    )
   (: rco-pred (D2-Pred -> D3-Pred))
   (define (rco-pred pred)
     (match pred
+      [(Quote c) (Quote c)]
       [(If t c a) (If (rco-pred t) (rco-pred c) (rco-pred a))]
       [(Switch e c* d)
        (define-values (s* t) (trivialize-value e))
        (make-begin s* (Switch t (map-switch-case* rco-pred c*) (rco-pred d)))]
       [(Begin e* v) (make-begin (rco-effect* e*) (rco-pred v))]
-      [(Relop p v1 v2)
-       (define-values (s*1 t1) (trivialize-value v1))
-       (define-values (s*2 t2) (trivialize-value v2))
-       (make-begin s*1 (make-begin s*2 (Relop p t1 t2)))]))
+      [(Relop p (list (app trivialize-value s** t*) ...))
+       (foldr make-begin (Relop p t*) s**)]))
   (: rco-effect (D2-Effect -> D3-Effect))
   (define (rco-effect effect)
     (match effect
@@ -104,6 +109,8 @@
        (define-values (s*2 t*) (trivialize-value* v*))
        (make-begin (append s*1 s*2 (list (App-Code t t*))) NO-OP)]
       [(Op p v*)
+       (unless (symbol? p)
+         (error 'remove-complex-opera.rkt "Found non-symbol primitive: ~a" p))
        (define-values (s* t*) (trivialize-value* v*))
        (make-begin (append s* (list (Op p t*))) NO-OP)]
       [(No-Op) NO-OP]
@@ -123,6 +130,8 @@
        (define-values (s*2 t*) (trivialize-value* v*))
        (make-begin s*1 (make-begin s*2 (App-Code t t*)))]
       [(Op p v*)
+       (unless (symbol? p)
+         (error 'remove-complex-opera.rkt "Found non-symbol primitive: ~a" p))
        (define-values (s* t*) (trivialize-value* v*))
        (make-begin s* (Op p t*))]
       [(and cl (Code-Label i)) cl]

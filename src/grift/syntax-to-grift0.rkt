@@ -25,7 +25,6 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
          "../errors.rkt"
          "../configuration.rkt"
          "../language/forms.rkt"
-         "../language/grift0.rkt"
          "../language/make-begin.rkt")
 
 (require syntax/stx)

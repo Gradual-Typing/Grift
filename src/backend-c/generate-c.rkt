@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/no-check
 #|------------------------------------------------------------------------------+
 |pass: src/generate-c
 +-------------------------------------------------------------------------------+
@@ -9,13 +9,13 @@
 | Grammer:
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
-(require "../helpers.rkt"
-         "../errors.rkt"
-         "../configuration.rkt"
-         "../language/data5.rkt"
-         "../macros.rkt"
-         "runtime-location.rkt"
-         "../casts/cast-profiler.rkt")
+(require
+ "../errors.rkt"
+ "../configuration.rkt"
+ "../language/forms.rkt"
+ "../macros.rkt"
+ "runtime-location.rkt"
+ "../casts/cast-profiler.rkt")
 
 ;; Only the pass is provided by this module
 (provide generate-c)
@@ -170,7 +170,7 @@
 (: emit-declarations (-> D5-Bnd-Code* Void))
 (define (emit-declarations code*)
   (display "\n//These are the declarations\n")
-  (for : Void ([bnd : D5-Bnd-Code code*])
+  (for ([bnd : D5-Bnd-Code code*])
        (match-let ([(cons lbl (Code var* exp)) bnd])
          (emit-function-prototype IMDT-C-TYPE (uid->string lbl) (map uid->string var*))
          (display ";\n"))))
@@ -214,7 +214,6 @@
 ;; This is dumb why do we have this and emit tail -andre
 (: emit-main-tail (-> D5-Tail Void))
 (define (emit-main-tail tail)
-  (logging emit-tail (Vomit) tail)
   (match tail
     [(Begin s* t)
      (begin (for ([s : D5-Effect s*])
@@ -223,7 +222,7 @@
             (emit-main-tail t))]
     [(If t c a)
      (begin (display "if ")
-            (emit-pred t)
+            (emit-wrap (emit-pred t))
             (emit-block '() '() c)
             (display " else ")
             ;; emit-block calls emit-tail which will cause problems if
@@ -251,9 +250,9 @@
 (: emit-subroutines (-> D5-Bnd-Code* Void))
 (define (emit-subroutines code*)
   (display "\n//Here are all the definitions for Subroutines\n")
-  (for : Void ([bnd : D5-Bnd-Code code*])
-       (match-let ([(cons lbl (Code var* body)) bnd])
-         (emit-function IMDT-C-TYPE (uid->string lbl) var* body))))
+  (for ([bnd : D5-Bnd-Code code*])
+    (match-let ([(cons lbl (Code var* body)) bnd])
+      (emit-function IMDT-C-TYPE (uid->string lbl) var* body))))
 
 (: emit-function-prototype (-> String String (Listof String) Void))
 (define (emit-function-prototype returns name vars)
@@ -281,7 +280,6 @@
 
 (: emit-tail (-> D5-Tail Void))
 (define (emit-tail tail)
-  (logging emit-tail (Vomit) tail)
   (match tail
     [(Begin s* t)
      (begin (for ([s : D5-Effect s*])
@@ -290,7 +288,7 @@
             (emit-tail t))]
     [(If t c a)
      (begin (display "if ")
-            (emit-pred t)
+            (emit-wrap (emit-pred t))
             (emit-block '() '() c)
             (display " else ")
             (emit-block '() '() a)
@@ -320,21 +318,22 @@
            (display ";\n")))]))
 
 (: emit-pred (-> D5-Pred Void))
-(define (emit-pred r)
-  (match r
-    #;[(If t c a) (emit-ternary (emit-pred t) (emit-pred c) (emit-pred a))]
-    #;[(Begin stm* pred) (emit-begin stm* (emit-pred pred))]
-    #;[(App v v*) (emit-function-call v v*)]
-    [(Relop p e1 e2) (emit-op p (list e1 e2))]))
+(define (emit-pred r) (emit-value r))
 
 (: emit-value (-> D5-Value Void))
 (define (emit-value e)
   (match e
-    [(If t c a)       (emit-ternary (emit-pred t) (emit-value c) (emit-value a))]
+    [(Var i)          (display (uid->string i))]
+    ;; This is evidence that the relop form shouldn't exist.
+    ;; In simplify predicates we now move relops out of predicate
+    ;; position on some complicated branches. 
+    [(Relop p e*) (emit-op p e*)]
+    [(If t c a)
+     (emit-ternary (emit-wrap (emit-pred t)) (emit-value c) (emit-value a))]
     #;[(Begin stm* exp) (emit-begin stm* (emit-value exp))]
     [(App-Code v v*)       (emit-function-call v v*)]
     [(Op p exp*)      (emit-op p exp*)]
-    [(Var i)          (display (uid->string i))]
+
     [(Global s)          (display s)]
     ;; bit cast float using macro defined in backend-c/runtime/runtime.h
     [(Quote (? inexact-real? f))  (printf "float_to_imdt(~a)" f)]
@@ -352,7 +351,7 @@
                        (display "int64_t)")
                        (display (uid->string i))
                        (display ")"))]
-    [other   (error 'generate-c-emit-value-match)]))
+    [other   (error 'generate-c-emit-value-match "unmatched: ~a" other)]))
 
 
 
@@ -361,7 +360,7 @@
   (match s
     [(If t (Begin c _) (Begin a _))
      (begin (display "if")
-            (emit-pred t)
+            (emit-wrap (emit-pred t))
             (display "{")
             (emit-begin c (void))
             (display "} else {")

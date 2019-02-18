@@ -138,39 +138,7 @@ but a static single assignment is implicitly maintained.
 (: mk-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
 (define mk-tuple-coercion-code-label? (box #f))
 
-;; The way that boxed immediate work currently bothers me.)    
-;; Since we have access to unboxed static ints should we just
-;; abandon the unboxed dyn integers another a mixture of static
-;; allocation and and constant lifting could be used to make all
-(: sr-dyn-make ((CoC6-Expr -> D0-Expr) D0-Expr CoC6-Expr -> D0-Expr))
-(define (sr-dyn-make sr-expr e1 e2)
-  (cond
-    [(Type? e2)
-     (match e2
-       [(Type (Int)) (op$ + (op$ %<< e1 DYN-IMDT-SHIFT) DYN-INT-TAG)]
-       [(Type (Bool)) (op$ + (op$ %<< e1 DYN-IMDT-SHIFT) DYN-BOOL-TAG)]
-       [(Type (Unit)) (op$ + (op$ %<< e1 DYN-IMDT-SHIFT) DYN-UNIT-TAG)]
-       [(Type (Character)) (op$ + (op$ %<< e1 DYN-IMDT-SHIFT) DYN-CHAR-TAG)]
-       [else (sr-alloc "dynamic_boxed" DYN-BOXED-TAG
-                       `(("value" . ,e1) ("type" . ,(sr-expr e2))))])]
-    [else
-     (begin$
-       (assign$ val e1)
-       (assign$ type (sr-expr e2))
-       (let* ([shifted-imm (op$ %<< val DYN-IMDT-SHIFT)]
-              [tag-shifted-imm
-               (lambda ([tag : D0-Expr])
-                 : D0-Expr
-                 (op$ binary-or shifted-imm tag))])
-         (case$ type
-           [(data:TYPE-INT-RT-VALUE) (tag-shifted-imm DYN-INT-TAG)]
-           [(data:TYPE-BOOL-RT-VALUE) (tag-shifted-imm DYN-BOOL-TAG)]
-           [(data:TYPE-UNIT-RT-VALUE) (tag-shifted-imm DYN-UNIT-TAG)]
-           [(data:TYPE-CHAR-RT-VALUE) (tag-shifted-imm DYN-CHAR-TAG)]
-           ;; float is handled in the else branch
-           [else
-            (sr-alloc
-             "dynamic_boxed" DYN-BOXED-TAG `(("" . ,val) ("" . ,type)))])))]))
+
 
 (: tuple-type-glb ((Code-Label Uid) -> ((Var Uid) (Var Uid) -> D0-Expr)))
 (define ((tuple-type-glb tglb-label) t1 t2)
@@ -507,10 +475,9 @@ but a static single assignment is implicitly maintained.
         [(Switch e c* d)
          (Switch (recur e) (map-switch-case* recur c*) (recur d))]
         [(Op p (app recur* e*))
-         (cond
-           [(uil-prim-value? p) (Op p e*)]
-           [(uil-prim-effect? p) (Op p e*)]
-           [else (error 'specify-representation/Op "~a" p)])]
+         (unless (symbol? p)
+           (error 'specify-representation "found non-symbol primitive ~a" p))
+         (Op p e*)]
         [(and (No-Op) nop) nop]
         [(Quote k)
          (cond
@@ -778,16 +745,39 @@ but a static single assignment is implicitly maintained.
         ;; TODO Fix me TAG should never have been exposed
         [(Tag t) (sr-tag t)]
         ;; Dynamic Values Representation
-        [(Construct (Dyn) 'make (list e t)) (sr-dyn-make recur (recur e) t)]
-        [(Access (Dyn) 'value (app recur e) #f)
+        [(Dyn-Object (app recur e) t)
+         (match t
+           [(Type (Int)) (op$ + (op$ %<< e DYN-IMDT-SHIFT) DYN-INT-TAG)]
+           [(Type (Bool)) (op$ + (op$ %<< e DYN-IMDT-SHIFT) DYN-BOOL-TAG)]
+           [(Type (Unit)) (op$ + (op$ %<< e DYN-IMDT-SHIFT) DYN-UNIT-TAG)]
+           [(Type (Character)) (op$ + (op$ %<< e DYN-IMDT-SHIFT) DYN-CHAR-TAG)]
+           [(Type _)
+            (sr-alloc "dynamic_boxed" DYN-BOXED-TAG
+                      `(("value" . ,e) ("type" . ,(recur t))))]
+           [_
+            (define (shift-and-tag value tag)
+              (op$ binary-or (op$ %<< value DYN-IMDT-SHIFT) tag))
+            (begin$
+              (assign$ val e)
+              (assign$ type (recur t))
+              (case$ type
+                 [(data:TYPE-INT-RT-VALUE)  (shift-and-tag val DYN-INT-TAG)]
+                 [(data:TYPE-BOOL-RT-VALUE) (shift-and-tag val DYN-BOOL-TAG)]
+                 [(data:TYPE-UNIT-RT-VALUE) (shift-and-tag val DYN-UNIT-TAG)]
+                 [(data:TYPE-CHAR-RT-VALUE) (shift-and-tag val DYN-CHAR-TAG)]
+                 ;; float is handled in the else branch
+                 [else (sr-alloc "dynamic_boxed" DYN-BOXED-TAG
+                                 `(("value" . ,val) ("type" . ,type)))]))])]
+        [(Dyn-Value (app recur e))
          (begin$
-           (assign$ tmp e)
+           (assign$ tmp (recur e))
            (assign$ tag (sr-get-tag tmp DYN-TAG-MASK))
            (If (op$ = tag DYN-BOXED-TAG)
                (op$ Array-ref tmp DYN-VALUE-INDEX)
                (op$ %>> tmp DYN-IMDT-SHIFT)))]
-        [(Access (Dyn) 'type (app recur e) #f)
-         (define err-msg (Quote "specify-representation/Dyn-type: switch failure"))
+        [(Dyn-Type (app recur e))
+         (define err-msg
+           (Quote "specify-representation/Dyn-type: switch failure"))
          (begin$
            (assign$ tmp e)
            (assign$ tag (sr-get-tag tmp DYN-TAG-MASK))
@@ -798,26 +788,21 @@ but a static single assignment is implicitly maintained.
              [(data:DYN-UNIT-TAG) TYPE-UNIT-RT-VALUE]
              [(data:DYN-CHAR-TAG) TYPE-CHAR-RT-VALUE]
              [else (op$ Print err-msg) (op$ Exit EXIT-FAILURE) UNDEF-IMDT]))]
-        [(Access (Dyn) 'immediate-value (app recur e) #f)
+        [(Dyn-Immediate-Value (app recur e))
          (op$ %>> e DYN-IMDT-SHIFT)]
-        [(Access (Dyn) 'immediate-tag (app recur e) #f)
-         (sr-get-tag e DYN-TAG-MASK)]
-        [(Access (Dyn) 'box-value (app recur e) #f)
+        [(Dyn-Immediate-Tag=Huh (app recur e) t)
+         (define (default-th) DYN-BOXED-TAG)
+         (op$ = (type->dyn-tag t default-th) (sr-get-tag e DYN-TAG-MASK))]
+        [(Dyn-Immediate-Object (app recur e) t)
+         (define (err-th)
+           (error 'Dyn-Immediate-Object "Shouldn't be used to allocate boxed types"))
+         (op$ + (op$ %<< e DYN-IMDT-SHIFT) (type->dyn-tag t err-th))]
+        [(Dyn-Box-Object (app recur e) (app recur t))
+         (sr-alloc "dynamic_boxed" DYN-BOXED-TAG `(("value" . ,e) ("type" . ,t)))]
+        [(Dyn-Box-Value (app recur e))
          (op$ Array-ref e DYN-VALUE-INDEX)]
-        [(Access (Dyn) 'box-type (app recur e) #f)
+        [(Dyn-Box-Type (app recur e))
          (op$ Array-ref e DYN-TYPE-INDEX)]
-        [(Check (Dyn) 'immediate-tag=? (app recur e) `(,t))
-         (match t
-           [(Type t)
-            (define tag
-              (match t
-                [(Int)  DYN-INT-TAG]
-                [(Bool) DYN-BOOL-TAG]
-                [(Unit) DYN-UNIT-TAG]
-                [(Character) DYN-CHAR-TAG]
-                [other  DYN-BOXED-TAG]))
-            (op$ = tag (sr-get-tag e DYN-TAG-MASK))]
-           [other (error 'dyn-immediate-tag=? "expected type literal: ~a" t)])]
         ;; Observable Results Representation
         [(Blame (app recur e))
          (begin$ (op$ Print e) (op$ Exit EXIT-FAILURE) UNDEF-IMDT)]
@@ -854,14 +839,11 @@ but a static single assignment is implicitly maintained.
          (begin$
            (assign$ ind e2)
            (assign$ vect e1)
-           ;; TODO This duplicates the error exit code (fix this so it doesn't)
            (if (bounds-checks?)
-               (If (op$ >= ind ZERO-IMDT) ;; vectors indices starts from 0
-                   (If (op$ < ind (op$ Array-ref vect ZERO-IMDT))
-                       (op$ Array-ref vect (op$ + ind UGVECT-OFFSET))
-                       (begin$
-                         (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit EXIT-FAILURE)))
+               (If (If (op$ >= ind ZERO-IMDT)
+                       (op$ < ind (op$ Array-ref vect ZERO-IMDT))
+                       FALSE-IMDT)
+                   (op$ Array-ref vect (op$ + ind UGVECT-OFFSET))
                    (begin$
                      (op$ Printf (Quote "index out of bound %ld\n") ind)
                      (op$ Exit EXIT-FAILURE)))
@@ -871,12 +853,10 @@ but a static single assignment is implicitly maintained.
            (assign$ ind e2)
            (assign$ vect e1)
            (if (bounds-checks?)
-               (If (op$ >= ind ZERO-IMDT) ;; vectors indices starts from 0
-                   (If (op$ < ind (op$ Array-ref vect ZERO-IMDT))
-                       (op$ Array-set! vect (op$ + ind UGVECT-OFFSET) e3)
-                       (begin$
-                         (op$ Printf (Quote "index out of bound %ld\n") ind)
-                         (op$ Exit EXIT-FAILURE)))
+               (If (If (op$ >= ind ZERO-IMDT)
+                       (op$ < ind (op$ Array-ref vect ZERO-IMDT))
+                       FALSE-IMDT)
+                   (op$ Array-set! vect (op$ + ind UGVECT-OFFSET) e3)
                    (begin$
                      (op$ Printf (Quote "index out of bound %ld\n") ind)
                      (op$ Exit EXIT-FAILURE)))
@@ -1285,7 +1265,8 @@ but a static single assignment is implicitly maintained.
       [(Mu? t)
        (match-define (Mu s) t)
        (generate-print id (grift-type-instantiate s t))]
-      [else (error 'sr-observe "printing other things")]))
+      [else
+       (error 'sr-observe "printing other things: ~a" t)]))
   (begin$ (assign$ res e) (generate-print res t)))
 
 #;(TODO GET RID OF TAGS IN THE COMPILER)
@@ -1400,3 +1381,12 @@ but a static single assignment is implicitly maintained.
                    (cons (op$ Array-set! clos (Quote i) e) e*)))]
         [else (values i* a* e*)])) 
     (values code* id* alloc* init*)))
+
+
+(define (type->dyn-tag t default-th)
+  (match t
+    [(Int)  DYN-INT-TAG]
+    [(Bool) DYN-BOOL-TAG]
+    [(Unit) DYN-UNIT-TAG]
+    [(Character) DYN-CHAR-TAG]
+    [other  (default-th)]))

@@ -18,6 +18,8 @@
        (Begin (append eff* value-eff*) value-value)]
       [(eff* value) (Begin eff* value)]))
 
+
+#;
 (module typed typed/racket/base
   (require "forms.rkt"
            "data1.rkt"
@@ -40,14 +42,14 @@
       #;(-> C7-Effect* C7-Value  C7-Value)
       #;(-> C7-Effect* No-Op C7-Effect)
       #;  (-> D3-Effect* D3-Trivial D3-Value)
-          (-> D2-Effect* D2-Value  D2-Value)
-          (-> D2-Effect* D2-Pred D2-Pred)
-          (-> D2-Effect* No-Op D2-Effect)
-          (-> D1-Effect* D1-Value  D1-Value)
-          (-> D1-Effect* No-Op D1-Effect)
-          (-> D4-Effect* D4-Tail D4-Tail)
-          (-> D4-Effect* No-Op D4-Effect)
-          (-> D5-Effect* D5-Tail D5-Tail)))
+      (-> D2-Effect* D2-Value  D2-Value)
+      (-> D2-Effect* D2-Pred D2-Pred)
+      (-> D2-Effect* No-Op D2-Effect)
+      (-> D1-Effect* D1-Value  D1-Value)
+      (-> D1-Effect* No-Op D1-Effect)
+      (-> D4-Effect* D4-Tail D4-Tail)
+      (-> D4-Effect* No-Op D4-Effect)
+      (-> D5-Effect* D5-Tail D5-Tail)))
 
   ;; make a begin language form but splice nested begins into the
   ;; newly made begin.

@@ -34,8 +34,6 @@ Provide comments about where to find definitions of types and data
          "../errors.rkt"
          "../language/forms.rkt"
          "../language/pprint.rkt"
-         "../language/grift0.rkt"
-         "../language/grift1.rkt"
          "../language/primitives.rkt"
          "../logging.rkt")
 
@@ -51,10 +49,7 @@ Provide comments about where to find definitions of types and data
 
 (provide
  type-check
- unfold-possible-mu
- (all-from-out
-  "../language/grift0.rkt"
-  "../language/grift1.rkt"))
+ unfold-possible-mu)
 
 (: type-check (Grift0-Lang -> Grift1-Lang))
 (define (type-check prgm)
