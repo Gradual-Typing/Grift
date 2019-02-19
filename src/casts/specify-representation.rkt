@@ -8,9 +8,6 @@ Description: This pass exposes the memory layout of aspects of the program.
 After this pass language complexity decreases greatly! But all operations are
 exposed as the effects that they truelly are. Lets bindings become assignments,
 but a static single assignment is implicitly maintained.
-+-------------------------------------------------------------------------------+
-| Source Grammar : Cast6
-| Target Grammar : Data0
 +------------------------------------------------------------------------------|#
 ;; The define-pass syntax
 (require
@@ -21,21 +18,16 @@ but a static single assignment is implicitly maintained.
   "../language/forms.rkt")
  racket/list
  racket/match
+ "../configuration.rkt"
  "../errors.rkt"
  "../logging.rkt"
- "../configuration.rkt"
- "../language/cast-or-coerce6.rkt"
- "../language/data0.rkt"
+ "../language/forms.rkt"
  "../language/syntax.rkt"
- "memory-layout-helpers.rkt"
- "constants-and-codes.rkt"
- "../unique-counter.rkt")
+ "./memory-layout-helpers.rkt"
+ "./constants-and-codes.rkt")
 
 ;; Only the pass is provided by this module
 (provide
- (all-from-out
-  "../language/cast-or-coerce6.rkt"
-  "../language/data0.rkt")
  specify-representation)
 
 (: specify-representation (Cast-or-Coerce6-Lang -> Data0-Lang))

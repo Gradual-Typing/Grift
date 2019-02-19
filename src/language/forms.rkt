@@ -1139,3 +1139,44 @@ class literal constants
   (check-true (form:leaf? (Quote 1))))
 
 (struct Stack-Alloc form:leaf (bytes) #:transparent)
+
+
+(struct Closure form:simple-branch
+  (name ; Uid
+   well-known? ; Boolean
+   code-generation ; (U 'regular 'code-only 'closure-only)
+   code-label ; Uid
+   self ; Uid
+   caster ; Uid
+   free-vars ; (Listof (U Uid Expr))
+   parameters ; Uid*
+   code ; Expr, but it is bogus if code-generation == 'code-only
+   )
+  #:transparent)
+
+(struct Closure-Code form:simple-branch
+  (arg)
+  #:transparent)
+
+(struct Closure-Caster form:simple-branch
+  (arg)
+  #:transparent)
+
+(struct Closure-Ref form:leaf
+  (arg key)
+  #:transparent)
+
+(struct Closure-App form:simple-branch
+  (code closure arguments)
+  #:transparent)
+
+(struct Static-Let* form:simple-branch
+  (bindings program)
+  #:transparent)
+
+(struct Closure-Proxy form:leaf (closure)
+  #:transparent)
+
+(struct Let-Closures form:simple-branch (bindings body)
+  #:transparent)
+
