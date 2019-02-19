@@ -12,15 +12,10 @@ This is a micro compiler that removes the cast language form.
  "interpret-casts.rkt"
  "label-lambdas.rkt"
  "convert-closures.rkt"
- "specify-representation.rkt"
- "../language/cast0.rkt"
- "../language/data0.rkt")
+ "specify-representation.rkt")
 
 (provide
- (all-defined-out)
- (all-from-out
-  "../language/cast0.rkt"
-  "../language/data0.rkt"))
+ impose-cast-semantics)
 
 (: impose-cast-semantics : Cast0-Lang -> Data0-Lang)
 (define (impose-cast-semantics c0)

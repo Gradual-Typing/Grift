@@ -1,13 +1,12 @@
 #lang typed/racket/no-check
 
-(require ;;racket/path
-         "../configuration.rkt"
-         "../language/data5.rkt"
-         "./generate-c.rkt"
-         syntax/location
-         (for-syntax racket/system)
-         (for-syntax "runtime-location.rkt")
-         "runtime-location.rkt")
+(require 
+ "../configuration.rkt"
+ "./generate-c.rkt"
+ syntax/location
+ (for-syntax racket/system)
+ (for-syntax "runtime-location.rkt")
+ "runtime-location.rkt")
 
 (provide (all-defined-out))
 

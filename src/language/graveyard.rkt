@@ -679,3 +679,303 @@
           (Monotonic-Forms E Immediate-Type)
           (Error E)
           (Tuple-Operation-Forms E))))
+
+(define-type (Purify-Letrec+ E)
+  (Letrec (Bnd* (Castable-Lambda E)) E))
+
+(define-type (Purify-Letrec- E)
+  (Letrec (Bnd* E) E))
+
+(define-type (Purify-Letrec= E)
+  (U (Castable-Lambda-Forms E)
+     (Fn-Proxy-Forms E) 
+     (Let (Bnd* E) E)
+     (Var Uid)
+     (Global String)
+     (Assign Id E)
+     (Gen-Data-Forms E)
+     (Code-Forms E)
+     (Quote-Coercion Immediate-Coercion)
+     (Coercion-Operation-Forms E)
+     (Hyper-Coercion-Operation-Forms E)
+     (Type Immediate-Type)
+     (Type-Operation-Forms E)
+     (Control-Flow-Forms E)
+     ;;Primitives
+     (Op Grift-Primitive (Listof E))
+     (Quote Cast-Literal)
+     No-Op
+     ;; Observations
+     (Blame E)
+     (Observe E Grift-Type)
+     (Unguarded-Forms E)
+     (Guarded-Proxy-Forms E)
+     (Monotonic-Forms E Immediate-Type)
+     (Error E)
+     (Tuple-Operation-Forms E)))
+
+(define-type Data0-Lang
+  (Prog (List String Natural Grift-Type)
+        (GlobDecs Uid* D0-Expr)))
+
+(define-type D0-Bnd-Code* (Listof D0-Bnd-Code))
+(define-type D0-Bnd-Code (Pairof Uid D0-Code))
+(define-type D0-Code (Code Uid* D0-Expr))
+
+
+
+(define-type D0-Expr
+  (Rec E (U (Labels D0-Bnd-Code* E)
+	    (App-Code E (Listof E))
+        (UIL-Op! E)
+        (UIL-Op E)
+        No-Op
+	    (If E E E)
+        (Switch E (Switch-Case* E) E)
+	    (Begin D0-Expr* E)
+        (Repeat Uid E E Uid E E)
+        Break-Repeat
+	    (Var Uid)
+        (Global String)
+	    (Code-Label Uid)
+	    (Quote D0-Literal)
+        (Assign Id E)
+        Success
+        Stack-Alloc)))
+
+(define-type D0-Expr* (Listof D0-Expr))
+
+(define-type Data5-Lang
+  (Prog (List String Natural Grift-Type)
+	(GlobDecs Uid*
+                    (Labels D5-Bnd-Code*
+                            D5-Body))))
+
+(define-type D5-Body (Locals Uid* (Bnd* Nat) D5-Tail))
+(define-type D5-Bnd-Code* (Listof D5-Bnd-Code))
+(define-type D5-Bnd-Code (Pairof Uid D5-Code))
+(define-type D5-Code (Code Uid* D5-Body))
+
+(define-type D5-Tail
+  (Rec T
+   (U (If D5-Pred T T)
+      (Switch D5-Trivial (Switch-Case* T) T)
+      (Begin D5-Effect* T)
+      (Return D5-Value)
+      (Return Success))))
+
+(define-type D5-Pred (Relop UIL-Pred-Prim D5-Trivial D5-Trivial))
+
+(define-type D5-Effect
+  (U (Repeat Uid D5-Trivial D5-Trivial #f #f (Begin D5-Effect* No-Op))
+     (If D5-Pred (Begin D5-Effect* No-Op) (Begin D5-Effect* No-Op))
+     Break-Repeat
+     (Switch D5-Trivial
+             (Switch-Case* (Begin D5-Effect* No-Op))
+             (Begin D5-Effect* No-Op))
+     (UIL-Op! D5-Trivial)
+     (Assign Id D5-Value)
+     No-Op))
+
+(define-type D5-Value
+  (U D5-Trivial
+     Halt
+     (UIL-Op D5-Trivial)
+     (App-Code D5-Trivial D5-Trivial*)
+     (If D5-Pred D5-Trivial D5-Trivial)))
+
+(define-type D5-Trivial
+  (U (Code-Label Uid)
+     (Var Uid)
+     (Global String)
+     (Quote D5-Literal)))
+
+
+(define-type Data4-Lang
+  (Prog (List String Natural Grift-Type)
+	(GlobDecs Uid*
+                    (Labels D4-Bnd-Code*
+                            D4-Body))))
+
+(define-type D4-Body (Locals Uid* (Bnd* Nat) D4-Tail))
+(define-type D4-Bnd-Code* (Listof D4-Bnd-Code))
+(define-type D4-Bnd-Code (Pairof Uid D4-Code))
+(define-type D4-Code (Code Uid* D4-Body))
+
+(define-type D4-Tail
+  (Rec T
+   (U (If D4-Pred T T)
+      (Switch D4-Trivial (Switch-Case* T) T)
+      (Begin D4-Effect* T)
+      (Return D4-Value)
+      (Return Success))))
+
+(define-type D4-Pred
+ (Rec P
+      (U (If D4-Pred P P)
+         (Switch D4-Trivial (Switch-Case* P) P)
+         (Begin D4-Effect* P)
+         (Relop UIL-Pred-Prim D4-Trivial D4-Trivial))))
+
+(define-type D4-Effect
+ (Rec E
+      (U (If D4-Pred E E)
+         (Switch D4-Trivial (Switch-Case* E) E)
+         (Begin D4-Effect* No-Op)
+         (Repeat Uid D4-Trivial D4-Trivial #f #f E)
+         (UIL-Op! D4-Trivial)
+         (Assign Id D4-Value)
+         Break-Repeat
+         No-Op)))
+
+(define-type D4-Value
+  (U D4-Trivial
+     Halt
+     (UIL-Op D4-Trivial)
+     (App-Code D4-Trivial D4-Trivial*)))
+
+(define-type D4-Trivial
+  (U (Code-Label Uid)
+     (Var Uid)
+     (Global String)
+     (Quote D4-Literal)))
+
+(define-type Data3-Lang
+  (Prog (List String Natural Grift-Type)
+	(GlobDecs Uid*
+                    (Labels D3-Bnd-Code*
+                            D3-Body))))
+
+(define-type D3-Body (Locals Uid* (Bnd* Nat) D3-Tail))
+(define-type D3-Bnd-Code* (Listof D3-Bnd-Code))
+(define-type D3-Bnd-Code (Pairof Uid D3-Code))
+(define-type D3-Code (Code Uid* D3-Body))
+
+(define-type D3-Tail
+  (Rec T
+   (U (If D3-Pred T T)
+      (Switch D3-Trivial (Switch-Case* T) T)
+      (Begin D3-Effect* T)
+      (Return D3-Value)
+      (Return Success))))
+
+(define-type D3-Value
+ (Rec V
+  (U D3-Trivial
+     Halt
+     (If D3-Pred V V)
+     (Switch D3-Trivial (Switch-Case* V) V)
+     (Begin D3-Effect* V)
+     (Op UIL-Expr-Prim (Listof D3-Trivial))
+     (App-Code D3-Trivial D3-Trivial*))))
+
+(define-type D3-Pred
+ (Rec P
+      (U (If D3-Pred P P)
+         (Switch D3-Trivial (Switch-Case* P) P)
+         (Begin D3-Effect* P)
+         (Relop UIL-Pred-Prim D3-Trivial D3-Trivial))))
+
+(define-type D3-Effect
+ (Rec E
+      (U (If D3-Pred E E)
+         (Switch D3-Trivial (Switch-Case* E) E)
+         (Begin D3-Effect* No-Op)
+         (Repeat Uid D3-Trivial D3-Trivial #f #f E)
+         Break-Repeat
+         (App-Code D3-Trivial D3-Trivial*)
+         (UIL-Op! D3-Trivial)
+         (Assign Id D3-Value)
+         No-Op)))
+
+;; (TODO halt is not trivial though because we are targeting c it may be treated so)
+;; remove Halt earlier
+(define-type D3-Trivial
+  (U (Code-Label Uid)
+     (Var Uid)
+     (Global String)
+     (Quote D3-Literal)))
+
+(define-type D3-Value* (Listof D3-Value))
+
+(define-type Data2-Lang
+  (Prog (List String Natural Grift-Type)
+        (GlobDecs Uid*
+                    (Labels D2-Bnd-Code*
+                            D2-Body))))
+
+(define-type D2-Body (Locals Uid* (Bnd* Nat) D2-Tail))
+(define-type D2-Bnd-Code* (Listof D2-Bnd-Code))
+(define-type D2-Bnd-Code (Pairof Uid D2-Code))
+(define-type D2-Code (Code Uid* D2-Body))
+
+(define-type D2-Tail D1-Tail)
+
+(define-type D2-Value D1-Value)
+
+(define-type D2-Pred D1-Pred)
+
+(define-type D2-Effect D1-Effect)
+
+(define-type D2-Value* (Listof D2-Value))
+
+(define-type D2-Effect* (Listof D2-Effect))
+
+(define-type D2-Literal Data-Literal)
+
+(define-type Data1-Lang
+  (Prog (List String Natural Grift-Type)
+        (GlobDecs Uid*
+                    (Labels D1-Bnd-Code*
+                            D1-Tail))))
+
+(define-type D1-Bnd-Code* (Listof D1-Bnd-Code))
+(define-type D1-Bnd-Code (Pairof Uid D1-Code))
+(define-type D1-Code (Code Uid* D1-Tail))
+
+(define-type D1-Tail
+  (Rec T
+   (U (If D1-Pred T T)
+      (Switch D1-Value (Switch-Case* T) T)
+      (Begin D1-Effect* T)
+      (App-Code D1-Value D1-Value*)
+      (Op UIL-Expr-Prim D1-Value*)
+      (Var Uid)
+      (Global String)
+      Halt Success Stack-Alloc
+      (Var Uid)
+      (Code-Label Uid)
+      (Quote D1-Literal))))
+
+(define-type D1-Value
+ (Rec V
+      (U (If D1-Pred V V)
+         (Switch V (Switch-Case* V) V)
+         (Begin D1-Effect* V)
+         (App-Code V (Listof V))
+         (Op UIL-Expr-Prim (Listof V))
+         Halt
+         Stack-Alloc
+         (Var Uid)
+         (Global String)
+         (Code-Label Uid)
+         (Quote D1-Literal))))
+
+(define-type D1-Pred
+ (Rec P
+      (U (If D1-Pred P P)
+         (Switch D1-Value (Switch-Case* P) P)
+         (Begin D1-Effect* P)
+         (Relop UIL-Pred-Prim D1-Value D1-Value))))
+
+(define-type D1-Effect
+ (Rec E
+      (U (If D1-Pred E E)
+         (Switch D1-Value (Switch-Case* E) E)
+         (Begin D1-Effect* No-Op)
+         (Repeat Uid D1-Value D1-Value #f #f E)
+         Break-Repeat
+         (App-Code D1-Value D1-Value*)
+         (UIL-Op! D1-Value)
+         (Assign Id D1-Value)
+         No-Op)))
