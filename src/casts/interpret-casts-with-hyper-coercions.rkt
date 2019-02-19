@@ -1,4 +1,5 @@
 #lang typed/racket/base/no-check
+
 #|
 Pass: interpret casts with hyper-coercions
 Used By: impose-cast-semantics (./impose-cast-semantics.rkt)
@@ -7,17 +8,21 @@ currently know as hyper-coercions (minmally bushy version of
 coercions). We hope that these lead to significantly better performance
 due to better locality, space consumption, and code organization.
 |#
+
 (provide interpret-casts/hyper-coercions)
-(require "../language/cast-or-coerce3.rkt"
-         "../language/cast0.rkt"
-         "../language/syntax.rkt"
-         "../language/syntax-with-constants.rkt"
-         "../configuration.rkt"
-         "./interpret-casts-common.rkt"
-         "../logging.rkt"
-         racket/match
-         racket/list
-         (for-syntax syntax/parse typed/racket/base/no-check))
+
+(require
+ (for-syntax
+  syntax/parse
+  typed/racket/base/no-check)
+ racket/match
+ racket/list
+ "../configuration.rkt"
+ "../language/forms.rkt"
+ "../language/syntax.rkt"
+ "../language/syntax-with-constants.rkt"
+ "../logging.rkt"
+ "./interpret-casts-common.rkt")
 
 #|
 Compile the cast in the program to calls to a cast interpreter 

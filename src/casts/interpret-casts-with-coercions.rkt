@@ -13,9 +13,6 @@ form, to the shortest branch of the cast tree that is relevant.
 - Replaces types that are structure with a psuedo constructor call
 - Replaces tags atomic types with the Type form.
 - Introduces the short lived dynamic type manipulation forms
-+------------------------------------------------------------------------------+
-|Input Grammar Cast1-Language                                                  |
-|Output Grammar Cast3-Language                                                 |
 +-----------------------------------------------------------------------------|#
 
 (require
@@ -24,13 +21,12 @@ form, to the shortest branch of the cast tree that is relevant.
  racket/set
  "../logging.rkt"
  "../configuration.rkt"
+ "../language/forms.rkt"
  "../language/syntax.rkt"
  "../language/syntax-with-constants.rkt"
- "../language/cast0.rkt"
- "../language/cast-or-coerce3.rkt"
  "../lib/option-set.rkt"
- "./interpret-casts-common.rkt"
- "./cast-profiler.rkt")
+ "./cast-profiler.rkt"
+ "./interpret-casts-common.rkt")
 
 (provide interpret-casts/coercions
          cast-runtime-constant-bindings)
@@ -43,7 +39,6 @@ form, to the shortest branch of the cast tree that is relevant.
 
 (define-type Make-Coercion/ID/FVS
   (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
-
 
 ;; Given two type literals and Blame-Label generate the equivalent
 ;; coercion literal. This function maintains and invarient that a

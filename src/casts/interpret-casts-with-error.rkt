@@ -1,13 +1,15 @@
 #lang typed/racket/base/no-check
-#| This pass implements casts by error whenever anything that is non-static exists.
-   It is used to implement a static varient of the GTLC that relies on as much
-   of the same machinery of as the gradual varients as possible. 
-|#
+
+#| This pass implements casts by error whenever anything that is
+non-static exists.  It is used to implement a static varient of the
+GTLC that relies on as much of the same machinery of as the gradual
+variants as possible.  |#
+
 (require
  racket/match
- "../language/cast0.rkt"
- "../language/cast-or-coerce3.rkt"
+ "../language/forms.rkt"
  "./interpret-casts-common.rkt")
+
 (provide interpret-casts/error)
 
 (: interpret-casts/error : -> (C0-Expr -> CoC3-Expr))

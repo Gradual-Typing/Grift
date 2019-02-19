@@ -1,9 +1,11 @@
-#lang typed/racket/base/no-check
-(require "forms.rkt" "primitives.rkt"
-         "cast-or-coerce3.1.rkt")
+#lang typed/racket/no-check
 
-(provide (all-defined-out)
-         (all-from-out "forms.rkt" "primitives.rkt"))
+;; The diffs between languages are one of the best sources of documentation
+;; of what passes do to the language grammar that we currently have.
+;; I want to leave them in place until we have contracts that are able to
+;; dynamically check the language grammars. With the hopes that we will
+;; be able to calculate the contracts based on the diffs.
+
 #|-----------------------------------------------------------------------------+
 | Language/Cast3 created by interpret-casts                                    |
 +-----------------------------------------------------------------------------|#
@@ -185,7 +187,6 @@
           (MVect-Coercion-Type E)
           (MVect-Coercion E)
           (Error E)
-          ;;
           (Create-tuple (Listof E))
           (Tuple-proj E E)
           (Tuple-Coercion-Huh E)
@@ -203,19 +204,41 @@
           (Make-Tuple-Coercion Uid E E E)
           (Mediating-Coercion-Huh E))))
 
-(define-type CoC3-Code (Code Uid* CoC3-Expr))
+;; Hoist Types and Coercions
+(define-type (HT&C+ E)
+  (U (Type Immediate-Type)
+     (Quote-Coercion Immediate-Coercion)
+     (Mvector E E Immediate-Type)
+     (Mbox E Immediate-Type)))
 
-(define-type CoC3-Expr* (Listof CoC3-Expr))
-(define-type CoC3-Bnd (Pairof Uid CoC3-Expr))
-(define-type CoC3-Bnd* (Listof CoC3-Bnd))
-(define-type CoC3-Bnd-Code (Pairof Uid CoC3-Code))
-(define-type CoC3-Bnd-Code* (Listof CoC3-Bnd-Code))
+(define-type (HT&C- E)
+  (U (Type Grift-Type)
+     (Quote-Coercion Grift-Coercion)
+     (Quote-HCoercion Mixed-Coercion)
+     (Mvector E E Grift-Type)
+     (Mbox E Grift-Type)))
 
-(define-type CoC3-Gen-Data
-  (U Dyn))
-(define-type CoC3-Gen-Ctor
-  (U Dyn-Repr-Ctor))
-(define-type CoC3-Gen-Access
-  (U Dyn-Repr-Access))
-(define-type CoC3-Gen-Pred
-  (U Dyn-Repr-Pred))
+(define-type (HT&C= E)
+  (U (Monotonic-Forms-w/o-Constructors E)
+     (Castable-Lambda-Forms E)
+     (Fn-Proxy-Forms E) 
+     (Letrec (Bnd* E) E)
+     (Let (Bnd* E) E)
+     (Var Uid)
+     (Global String)
+     (Assign Id E)
+     (Gen-Data-Forms E)
+     (Code-Forms E)
+     (Coercion-Operation-Forms E)
+     (Hyper-Coercion-Operation-Forms E)
+     (Type-Operation-Forms E)
+     (Control-Flow-Forms E)
+     (Op Grift-Primitive (Listof E))
+     (Quote Cast-Literal)
+     No-Op
+     (Blame E)
+     (Observe E Grift-Type)
+     (Unguarded-Forms E)
+     (Guarded-Proxy-Forms E)
+     (Error E)
+     (Tuple-Operation-Forms E)))

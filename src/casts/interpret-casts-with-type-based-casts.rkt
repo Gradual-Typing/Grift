@@ -9,12 +9,11 @@
  racket/match
  racket/list
  "../configuration.rkt"
- "../language/cast0.rkt"
- "../language/cast-or-coerce3.rkt"
- "constants-and-codes.rkt"
+ "../language/forms.rkt"
  "../language/syntax.rkt"
- "interpret-casts-common.rkt"
-  "cast-profiler.rkt")
+ "./cast-profiler.rkt"
+ "./constants-and-codes.rkt"
+ "./interpret-casts-common.rkt")
 
 (provide interpret-casts/type-based-casts)
 
