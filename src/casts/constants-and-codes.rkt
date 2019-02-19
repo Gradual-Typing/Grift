@@ -326,12 +326,12 @@
 (define-types-memory-layout-helpers "type" "mu" #b110 #f ("body" single))
 
 
-#;(: sr-hashcons-type (String (Option D0-Expr) (Listof (Pair String D0-Expr)) -> D0-Expr))
+;; String, (Option D0-Expr), (Listof (Pair String D0-Expr)) -> D0-Expr
 (define (sr-hashcons-type name tag? slots)
-  #;(: sr-alloc-init ((Var Uid) -> (Nonnegative-Fixnum D0-Expr -> D0-Expr)))
+  ;; (Var Uid) -> Nonnegative-Fixnum, D0-Expr -> D0-Expr
   (define ((sr-alloc-init mem) offset value)
     (op$ Array-set! mem (Quote offset) value))
-  #;(: get-assignments/vars ((Listof (Pair String D0-Expr)) -> (Values D0-Expr* (Listof (Var Uid)))))
+  ;; (Listof (Pair String D0-Expr)) -> D0-Expr*, (Listof (Var Uid))
   (define (get-assignments/vars b*)
     (cond
       [(null? b*) (values '() '())]
@@ -362,16 +362,17 @@
 
 ;; These bindings are C functions that are needed by the compiled code and is
 ;; hoisted by specify-representation
-(define boxed-bnd-code* #;(Boxof D0-Bnd-Code*) (box '()))
+;; (Boxof D0-Bnd-Code*)
+(define boxed-bnd-code* (box '()))
 
-#;(: add-new-code! (D0-Bnd-Code -> Void))
+;; (D0-Bnd-Code -> Void)
 (define (add-new-code! b)
   (set-box! boxed-bnd-code* (cons b (unbox boxed-bnd-code*))))
 
-#;(: hashcons-type-code-label? (Boxof (Option (Code-Label Uid))))
+;; (Boxof (Option (Code-Label Uid)))
 (define hashcons-type-code-label? (box #f))
 
-#;(: hashcons-type (D0-Expr -> D0-Expr))
+;; (D0-Expr -> D0-Expr)
 (define (hashcons-type ty)
   (define cl? (unbox hashcons-type-code-label?))
   (cond
@@ -444,10 +445,10 @@
 
 
 
-#;(: calculate-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
+;; (Boxof (Option (Code-Label Uid)))
 (define calculate-type-hashcode-label? (box #f))
 
-#;(: calculate-type-hashcode ((Var Uid) -> D0-Expr))
+;; ((Var Uid) -> D0-Expr)
 (define (calculate-type-hashcode ty)
   (define cl? (unbox calculate-type-hashcode-label?))
   (cond
@@ -523,10 +524,10 @@
      (set-box! calculate-type-hashcode-label? cl)
      (App-Code cl (list ty))]))
 
-#;(: access-type-hashcode-label? (Boxof (Option (Code-Label Uid))))
+;; (Boxof (Option (Code-Label Uid)))
 (define access-type-hashcode-label? (box #f))
 
-#;(: access-type-hashcode ((Var Uid) -> D0-Expr))
+;; ((Var Uid) -> D0-Expr)
 (define (access-type-hashcode ty)
   (define cl? (unbox access-type-hashcode-label?))
   (cond
@@ -542,10 +543,6 @@
      (define runtime-code
        (code$ (ty)
          (case$ ty
-           ;; ;; Mu's are unitialized when allocated, but there isn't a way
-           ;; ;; of preventing them from hashing their initial state.
-           ;; [(0) (Quote 0)]
-
            ;; The hash value for primitive types are their runtime values. 
            [(data:TYPE-DYN-RT-VALUE) TYPE-DYN-RT-VALUE]
            [(data:TYPE-INT-RT-VALUE) TYPE-INT-RT-VALUE]
