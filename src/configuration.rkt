@@ -32,10 +32,14 @@
 (define-type Ref-Semantics (U 'Monotonic 'Proxied))
 (define reference-semantics : (Parameterof (U 'Monotonic 'Proxied))
   (make-parameter 'Proxied))
+(: fn-proxy-representation (Parameterof (U 'Hybrid 'Data)))
+(define fn-proxy-representation (make-parameter 'Hybrid))
 (: inline-proxied-branch? (Parameterof Boolean))
 (define inline-proxied-branch? (make-parameter #t))
 (: inline-monotonic-branch? (Parameterof Boolean))
 (define inline-monotonic-branch? (make-parameter #t))
+
+
 
 ;; Cast behavior
 ;; TODO this is largely setup based on how the main

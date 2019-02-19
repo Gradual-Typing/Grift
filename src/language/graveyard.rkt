@@ -242,3 +242,117 @@
      (Guarded-Proxy-Forms E)
      (Error E)
      (Tuple-Operation-Forms E)))
+
+
+(define-type (Closure-Ops E)
+  (U (Let-Closures Uid E)
+     (Closure-Code E)
+     (Closure-Caster E)
+     (Closure-App E)))
+
+(define-type (Closure-Ops/Ref E)
+  (U (Let-Closures E E)
+     (Closure-Code E)
+     (Closure-Caster E)
+     (Closure-Ref E) 
+     (Closure-App E)))
+
+(define-type (Hybrid-Fn-Proxy-Forms E)
+  (U Closure-Proxy
+     (Hybrid-Proxy-Huh E)
+     (Hybrid-Proxy-Closure E)
+     (Hybrid-Proxy-Coercion E)))
+
+(define-type (Data-Fn-Proxy-Forms E)
+  (U (Fn-Proxy Index E E)
+     (Fn-Proxy-Huh E)
+     (Fn-Proxy-Closure E)
+     (Fn-Proxy-Coercion E)))
+
+
+(define-type Cast-or-Coerce6-Lang
+  (Prog (List String Natural Grift-Type)
+        (Static*
+         (List Bnd-Mu-Type*
+               Bnd-Type*
+               Bnd-Mu-Crcn*
+               Bnd-Crcn*
+               (Bnd* (Fun CoC6-Expr))
+               (Closure* CoC6-Expr CoC6-Expr)
+               (Bnd* CoC6-Expr))
+         CoC6-Expr)))
+
+(define-type CoC5-Expr
+  (Rec
+   E
+   (U (Closure-Ops E)
+      (Data-Fn-Proxy-Forms E)
+      (Hybrid-Fn-Proxy-Forms E)
+      (Gen-Data-Forms E)
+      (Code-Forms E)
+      (Quote-Coercion Immediate-Coercion)
+      (Hyper-Coercion-Operation-Forms E)
+      (Coercion-Operation-Forms E)
+      (Type Immediate-Type)
+      (Type-Operation-Forms E)
+      (Let (Bnd* E) E)
+      (Var Uid)
+      (Global String)
+      (Assign Id E)
+      (Control-Flow-Forms E)
+      (Op Grift-Primitive (Listof E))
+      No-Op
+      (Quote Cast-Literal)
+      (Blame E)
+      (Observe E Grift-Type)
+      (Unguarded-Forms E)
+      (Guarded-Proxy-Forms E)
+      (Monotonic-Forms E Immediate-Type)
+      (Error E)
+      (Tuple-Operation-Forms E))))
+
+(define-type CoC6-Expr
+  (Rec
+   E
+   (U (Closure-Ops/Ref E)
+      (Data-Fn-Proxy-Forms E)
+      (Hybrid-Fn-Proxy-Forms E)
+      (Gen-Data-Forms E)
+      (Code-Forms E)
+      (Quote-Coercion Immediate-Coercion)
+      (Hyper-Coercion-Operation-Forms E)
+      (Coercion-Operation-Forms E)
+      (Type Immediate-Type)
+      (Type-Operation-Forms E)
+      (Let (Bnd* E) E)
+      (Var Uid)
+      (Global String)
+      (Assign Id E)
+      (Control-Flow-Forms E)
+      (Op Grift-Primitive (Listof E))
+      No-Op
+      (Quote Cast-Literal)
+      (Blame E)
+      (Observe E Grift-Type)
+      (Unguarded-Forms E)
+      (Guarded-Proxy-Forms E)
+      (Monotonic-Forms E Immediate-Type)
+      (Error E)
+      (Tuple-Operation-Forms E))))
+
+(define-type Code-Generation
+  (U
+   ;; both code and closure
+   'regular
+   ;; Only generate the code, but be compatible with
+   ;; any identical fv-list. This is used for the
+   ;; definition closure-casters, and when a well-known
+   ;; closure shares the closures of closure that isn't
+   ;; well-known.
+   ;; TODO list invarients needed by 'code-only-code
+   'code-only
+   ;; Only allocate the closure, don't generate the
+   ;; code. This is used to share code between function
+   ;; cast, apply-casted closure, of the same arity.
+   'closure-only))
+

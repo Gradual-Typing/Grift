@@ -2,22 +2,17 @@
 
 (require
  racket/match
- "../unique-identifiers.rkt"
  "../configuration.rkt"
- "../language/cast0.rkt"
- "../language/cast-or-coerce3.rkt"
- "interpret-casts-common.rkt"
- "interpret-casts-with-type-based-casts.rkt"
- "interpret-casts-with-coercions.rkt"
- "interpret-casts-with-hyper-coercions.rkt"
- "interpret-casts-with-error.rkt"
- )
+ "../language/forms.rkt"
+ "../unique-identifiers.rkt"
+ "./interpret-casts-common.rkt"
+ "./interpret-casts-with-type-based-casts.rkt"
+ "./interpret-casts-with-coercions.rkt"
+ "./interpret-casts-with-hyper-coercions.rkt"
+ "./interpret-casts-with-error.rkt")
 
 (provide
- interpret-casts
- (all-from-out
-  "../language/cast0.rkt"
-  "../language/cast-or-coerce3.rkt"))
+ interpret-casts)
 
 (: interpret-casts : Cast0.5-Lang -> Cast-or-Coerce3-Lang)
 (define (interpret-casts prgm)
@@ -31,12 +26,14 @@
                  [types-greatest-lower-bound-code-label? #f])
 
     (define ic-expr! : (C0-Expr -> CoC3-Expr)
-      (case (cast-representation) 
+      (case (cast-representation)
         [(|Type-Based Casts|) (interpret-casts/type-based-casts)]
         [(Coercions) (interpret-casts/coercions)]
         [(Hyper-Coercions) (interpret-casts/hyper-coercions)]
         [(Static) (interpret-casts/error)]
-        [else (error 'todo)]))
+        [else (error 'grift/interpret-casts
+                     "unexpected cast representation: ~a"
+                     (cast-representation))]))
     
     (define new-e (ic-expr! e))
     
