@@ -11,11 +11,11 @@
 ;; The define-pass syntax
 (require
  "../errors.rkt"
+ "../casts/cast-profiler.rkt"
  "../configuration.rkt"
  "../language/forms.rkt"
  "../macros.rkt"
- "runtime-location.rkt"
- "../casts/cast-profiler.rkt")
+ "runtime-location.rkt")
 
 ;; Only the pass is provided by this module
 (provide generate-c)
