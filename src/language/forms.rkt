@@ -70,7 +70,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (define-forms form:simple-branch
   ;; Conditionals
   (If test then else)
-    ;; Top level wrapper for combining compiler
+  ;; Top level wrapper for combining compiler
   ;; state, meta-information, and the program AST
   (Prog annotation expression)
   ;; Top level define marker
@@ -263,27 +263,15 @@ And a type constructor "name" expecting the types of field1 and field2
   (Guarded-Proxy-Huh expression)
   )
 
-;; (define-type (Switch-Case  e) (Pair (Listof Integer) e))
-;; (define-type (Switch-Case* e) (Listof (Switch-Case e)))
-
-
-#;
-(: map-switch-case :
-   (All (A B) (A -> B) -> ((Switch-Case A) -> (Switch-Case B))))
 (define ((map-switch-case f) c)
   (cons (car c) (f (cdr c))))
 
-#;
-(: map-switch-case* :
-   (All (A B) (A -> B) (Switch-Case* A) -> (Switch-Case* B)))
 (define (map-switch-case* f c*)
   (map (map-switch-case f) c*))
 
 (define NO-OP (No-Op))
 
-#;(define-type Blame-Label String)
 (define blame-label? string?)
-
 
 #| Types throughout the languages |#
 
@@ -337,7 +325,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (struct TVar (index) #:transparent)
 (struct FVar (name) #:transparent)
 
-;; (Grift-Type (Grift-Type -> Grift-Type) -> Grift-Type)
+;; Grift-Type (Grift-Type -> Grift-Type) -> Grift-Type
 (define (grift-type-map t f)
   (match t
     [(Fn n a* r)
@@ -356,12 +344,12 @@ And a type constructor "name" expecting the types of field1 and field2
      (Mu (Scope (f t)))]
     [t t]))
 
-;; (: grift-type-instantiate/used? : (Scope Grift-Type) Grift-Type -> (Values Grift-Type Boolean))
+;; (Scope Grift-Type) Grift-Type -> (Values Grift-Type Boolean)
 (define (grift-type-instantiate/used? s t1)
   (define used? #;(Boxof Boolean) (box #f))
-  #;(: subst : Natural -> (Grift-Type -> Grift-Type))
+  ;; Natural -> (Grift-Type -> Grift-Type)
   (define (subst i)
-    #;(: rec : Grift-Type -> Grift-Type)
+    ;; Grift-Type -> Grift-Type
     (define (rec t0)
       (define who 'grift-type-instantiate:subst:rec)
       (debug off who s t1 i t0)
@@ -375,7 +363,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (define t2 ((subst 0) (Scope-open s)))
   (values t2 (unbox used?)))
 
-#;(: grift-type-instantiate : (Scope Grift-Type) Grift-Type -> Grift-Type)
+;; (Scope Grift-Type) Grift-Type -> Grift-Type
 (define (grift-type-instantiate s t)
   (define-values (t0 _) (grift-type-instantiate/used? s t))
   t0)
@@ -394,19 +382,16 @@ And a type constructor "name" expecting the types of field1 and field2
   (check-equal? (grift-type-abstract u1 ln1)
                 (Scope (Mu (Scope (STuple 2 (list (TVar 1) (TVar 0))))))))
 
-#;(: unfold-mu : (Mu (Scope Grift-Type)) -> Grift-Type)
+;; (Mu (Scope Grift-Type)) -> Grift-Type
 (define (unfold-mu t)
   (match-define (Mu s) t)
   (grift-type-instantiate s t))
 
 ;; Close over a free variable in a type
-;; Uid Grift-Type -> Grift-Type
-#;(: grift-type-abstract/used? : Uid Grift-Type -> (Values (Scope Grift-Type) Boolean))
+;; Uid, Grift-Type -> (Scope Grift-Type), Boolean
 (define (grift-type-abstract/used? x t)
   (define used? #;(Boxof Boolean) (box #f))
-  #;(: subst : Natural -> (Grift-Type -> Grift-Type))
   (define (subst i)
-    #;(: rec : Grift-Type -> Grift-Type)
     (define (rec t)
       (cond
         [(and (FVar? t) (equal? x (FVar-name t)))
@@ -418,7 +403,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (define s (Scope ((subst 0) t)))
   (values s (unbox used?)))
 
-#;(: grift-type-abstract : Uid Grift-Type -> (Scope Grift-Type))
+;; Uid, Grift-Type -> (Scope Grift-Type)
 (define (grift-type-abstract x t)
   (define-values (s _) (grift-type-abstract/used? x t))
   s)
@@ -482,7 +467,7 @@ And a type constructor "name" expecting the types of field1 and field2
 	 (define-type id* (c* id)) ...))
 
 ;; Are two types consistent at the top of the types?
-#;(: shallow-consistent? (Any Any -> Boolean))
+;; (Any Any -> Boolean)
 (define (shallow-consistent? t g)
   ;; Typed racket made me do it
   ;; This uber modular structure speeds up type checking
@@ -513,39 +498,29 @@ And a type constructor "name" expecting the types of field1 and field2
 
 
 ;; Is the type t devoid of dyn?
-#;(: completely-static-type? : Grift-Type -> Boolean)
+;; Grift-Type -> Boolean
 (define (completely-static-type? t)
   ;; Typed Racket made me do it
   ;; This uber modular structure speeds up type checking
-  #;
-  (define-type CST-Type
-    (Grift-Type (Setof (Mu (Scope Grift-Type))) -> Boolean))
-  ;; Is it a completely static function type?
-  #;(: fn-completely-static? CST-Type)
   (define (fn-completely-static? t ms)
     (and (Fn? t)
          (andmap (cst/ms? ms) (Fn-fmls t))
          (cst? (Fn-ret t) ms)))
   ;; Is it a completely static tuple type?
-  #;(: tuple-completely-static? CST-Type)
   (define (tuple-completely-static? t ms)
     (and (STuple? t) (andmap (cst/ms? ms) (STuple-items t))))
   ;; Is it a completely static reference type?
-  #;(: ref-completely-static? CST-Type)
   (define (ref-completely-static? t ms)
     (or (and (GRef? t) (cst? (GRef-arg t) ms))
         (and (MRef? t) (cst? (MRef-arg t) ms))
         (and (GVect? t) (cst? (GVect-arg t) ms))
         (and (MVect? t) (cst? (MVect-arg t) ms))))
   ;; Is it a completely static recursive type?
-  #;(: mu-completely-static? CST-Type)
   (define (mu-completely-static? t ms)
     (and (Mu? t)
          (or (set-member? ms t)
              (cst? (grift-type-instantiate (Mu-body t) t) (set-add ms t)))))
-  #;(: cst/ms? : (Setof (Mu (Scope Grift-Type))) -> (Grift-Type -> Boolean))
   (define ((cst/ms? ms) t) (cst? t ms))
-  #;(: cst? CST-Type)
   (define (cst? t ms)
     (or (Int? t)
         (Bool? t)
@@ -568,16 +543,6 @@ Only Integers and Booleans in the grift language are first
 class literal constants
 |#
 
-#;
-(define-type Grift-Literal
-  (U Integer Boolean Null Real Char))
-
-#;(: platform-integer? (Any -> Boolean : Integer))
-#;
-(define (platform-integer? x)
-  (fixnum? x))
-
-#;(: grift-literal? (Any -> Boolean : Grift-Literal))
 (define (grift-literal? x)
   (or (exact-integer? x)
       (char? x)
@@ -585,7 +550,6 @@ class literal constants
       (null? x)
       (real? x)))
 
-#;(: grift-literal->base-type (Grift-Literal -> Base-Type))
 (define (grift-literal->base-type x)
   (cond
     [(char? x) CHAR-TYPE]
@@ -595,45 +559,19 @@ class literal constants
     [(null? x)    UNIT-TYPE]
     [else (error 'language/grift-literal->type "~a" x)]))
 
-#;
-(define-type+ Grift-Type ([Grift-Type* Listof]
-                          [Grift-Type? Option])
-  (U Dyn
-     Base-Type
-     Grift-Fn-Type
-     Grift-Ref-Type
-     Grift-Tuple-Type
-     Grift-Mu-Type
-     FVar
-     TVar))
+;; Grift Type =
+;; (U Dyn Base-Type Grift-Fn-Type Grift-Ref-Type
+;;    Grift-Tuple-Type Grift-Mu-Type FVar TVar)
 
 ;; type known at runtime only for monotonic references, the uid is for
 ;; the entire reference cell, you have to access the second component
 ;; of the cell to get the type.
 
 #;
-(define-type Grift-Fn-Type
-  (Fn Index Grift-Type* Grift-Type))
-
-;; (define-type Grift-Tuple-Type
-;;   (STuple Index Grift-Type*))
-
-;; (define-type Grift-Ref-Type
-;;   (U (GRef  Grift-Type)
-;;      (GVect Grift-Type)
-;;      (MRef  Grift-Type)
-;;      (MVect Grift-Type)))
-
-;; (define-type Grift-Mu-Type
-;;   (Mu (Scope Grift-Type)))
-
-;; (define-type Atomic-Type (U Base-Type Dyn))
-
-;; (: atomic-type? : Any -> Boolean : Atomic-Type)
 (define (atomic-type? x)
   (or (Dyn? x) (base-type? x)))
 
-;; (: grift-type? (Any -> Boolean : Grift-Type))
+#;
 (define (grift-type? x)
   (or (atomic-type? x)
       (grift-fn? x)
@@ -643,12 +581,14 @@ class literal constants
       (TVar? x)
       (FVar? x)))
 
+#;
 (define (grift-type*? x)
   (or (null? x)
       (and (pair? x)
            (grift-type? (car x))
            (grift-type*? (cdr x)))))
 
+#;
 (define (grift-fn? x)
   (and (Fn? x)
        (exact-integer? (Fn-arity x))
@@ -656,55 +596,27 @@ class literal constants
        (= (length (Fn-fmls x)) (Fn-arity x))
        (grift-type? (Fn-ret x))))
 
+#;
 (define (grift-tuple? x)
   (and (STuple? x)
        (exact-integer? (STuple-num x))
        (grift-type*? (STuple-items x))
        (= (length (STuple-items x)) (STuple-num x))))
 
-(define (grift-ref? x)
-  (error 'todo "Grift-Ref-Type predicate"))
 
-(define (grift-mu? x)
-  (error 'todo "Grift-Mu-Type predicate"))
-
-#;
-(define-type+ Grift-Fml ([Grift-Fml* Listof])
-  (Fml Uid Grift-Type))
-
-#;(: consistent? (Grift-Type Grift-Type -> Boolean))
+;; Grift-Type, Grift-Type -> Boolean
 (define (consistent? t g)
-  #;(: set-memp : (All (A) (Setof A) A -> (Option (Setof A))))
   (define (set-memp st x)
     (and (set-member? st x) st))
-  #;
-  (: andfold
-     (All (A B)
-          (A B -> (Option B)) (Option B) (Listof A)
-          -> (Option B)))
   (define (andfold f a ls)
     (cond
       [(not a) #f]
       [(null? ls) a]
       [else (andfold f (f (car ls) a) (cdr ls))]))  
-  #;
-  (: consist-pair? :
-     (Pairof Grift-Type Grift-Type)
-     (Setof (Pairof Grift-Type Grift-Type)) ->
-     (Option (Setof (Pairof Grift-Type Grift-Type))))
   (define (consist-pair? p ms)
     (consist? (car p) (cdr p) ms))
-  #;
-  (: consist?-fold :
-     (Option (Setof (Pairof Grift-Type Grift-Type)))
-     (Listof Grift-Type) (Listof Grift-Type) ->
-     (Option (Setof (Pairof Grift-Type Grift-Type))))
   (define (consist?-fold ms l1 l2)
     (andfold consist-pair? ms (map cons l1 l2)))
-  #;
-  (: consist? :
-     Grift-Type Grift-Type (Setof (Pairof Grift-Type Grift-Type))
-     -> (Option (Setof (Pairof Grift-Type Grift-Type))))
   (define (consist? t g ms)
     (match* (t g)
       [(_ _) #:when (or (Dyn? t) (Dyn? g) (equal? t g))
@@ -738,9 +650,9 @@ class literal constants
 
 (struct Bottom (t1 t2) #:transparent)
 
-#;(define-type Grift-Type?! (U Bottom Grift-Type))
+;; Grift-Type?! (U Bottom Grift-Type)
 
-#;(: up ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type)))
+;; (Bottom -> Grift-Type) -> Grift-Type, Grift-Type -> Grift-Type
 (define ((up exit) t g)
   (match* (t g)
     [((Dyn) g)     g]
@@ -748,7 +660,7 @@ class literal constants
     [(t     t)     t]
     [(t     g)     (exit (Bottom t g))]))
 
-#;(: down ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type)))
+;; (Bottom -> Grift-Type) -> Grift-Type Grift-Type -> Grift-Type
 (define ((down exit) t g)
   (match* (t g)
     [((and t (Dyn)) _) t]
@@ -756,18 +668,10 @@ class literal constants
     [(t t) t]
     [(t g) (exit (Bottom t g))]))
 
-#;
-(define-type Grift-Mu-Map
-  (HashTable (Pairof Grift-Type Grift-Type) FVar))
 
-#;
-(: move :
-   (Grift-Type Grift-Type -> Grift-Type)
-   -> (Grift-Type Grift-Type -> Grift-Type))
+;; (Grift-Type, Grift-Type -> Grift-Type) -> Grift-Type, Grift-Type -> Grift-Type
 (define (move u/d/fail)
-  #;(: mv/e : Grift-Mu-Map -> (Grift-Type Grift-Type -> Grift-Type))
   (define (mv/e e)
-    #;(: mv : Grift-Type Grift-Type -> Grift-Type)
     (define (mv t g)
       (match* (t g) 
         [((Fn ta ta* tr) (Fn ga ga* gr)) #:when (= ta ga)
@@ -786,10 +690,6 @@ class literal constants
           (cond
             [x? x?]
             [else
-             #;
-             (: move-mu :
-                Grift-Mu-Type (Grift-Mu-Map Grift-Type -> Grift-Type) ->
-                Grift-Type)
              (define (move-mu t mv)
                (match-define (Mu s) t)
                (define u  (next-uid! 'r))
@@ -801,28 +701,24 @@ class literal constants
                  [else (Mu s0)]))
              (match* (t g) 
                [((Mu _) g)
-                #;(: mv/other : Grift-Mu-Map Grift-Type -> Grift-Type)
                 (define (mv/other e t0) ((mv/e e) t0 g))
                 (move-mu t mv/other)]
                [(t (Mu _))
-                #;(: mv/other : Grift-Mu-Map Grift-Type -> Grift-Type)
                 (define (mv/other e g0) ((mv/e e) t g0))
                 (move-mu g mv/other)])])]
          [(t g) (u/d/fail t g)]))
     mv)
   (mv/e (hash)))
 
-#;
-(: move?! : ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type))
-   -> (Grift-Type Grift-Type -> Grift-Type?!))
+;; ((Bottom -> Grift-Type) -> Grift-Type, Grift-Type -> Grift-Type) ->
+;;    Grift-Type, Grift-Type -> Grift-Type?!
 (define ((move?! u/d) t g)
   (call/ec
    (lambda (return)
      ((move (u/d return)) t g))))
 
-#;
-(: move+ : ((Bottom -> Grift-Type) -> (Grift-Type Grift-Type -> Grift-Type))
-   -> (Grift-Type* -> Grift-Type?!))
+;; ((Bottom -> Grift-Type) -> Grift-Type Grift-Type -> Grift-Type) ->
+;;       Grift-Type* -> Grift-Type?!
 (define ((move+ u/d) t+)
   (call/ec
    (lambda (return)
@@ -833,24 +729,25 @@ class literal constants
          [(list t) t]
          [(cons t t+) (m t (move+ t+))])))))
 
-#;(: join : Grift-Type Grift-Type -> Grift-Type?!)
+;; Grift-Type, Grift-Type -> Grift-Type?!
 (define join (move?! up))
 
-#;(: join+ : Grift-Type* -> Grift-Type?!)
+;; Grift-Type* -> Grift-Type?!
 (define join+ (move+ up))
 
-#;(: meet : Grift-Type Grift-Type -> Grift-Type?!)
+;; Grift-Type, Grift-Type -> Grift-Type?!
 (define meet (move?! down))
-#;(: meet+ : Grift-Type* -> Grift-Type?!)
+;; Grift-Type* -> Grift-Type?!
 (define meet+ (move+ down))
 
 ;; returns #t if `t1` is less precise than `t2`.
 ;; if t1 and t2 are unrelated it returns #f.
-#;(: le-precise? : Grift-Type Grift-Type -> Boolean)
+;; Grift-Type, Grift-Type -> Boolean
 (define (le-precise? t1 t2)
   (let loop ([t1 t1]
              [t2 t2]
-             [seen #;(Setof (Pairof Grift-Type Grift-Type)) (set)])
+             ;; seen : (Setof (Pairof Grift-Type Grift-Type))
+             [seen (set)])
     (let rec/s ([t1 t1] [t2 t2])
       (match* (t1 t2)
         [(t t) #t]
@@ -866,14 +763,15 @@ class literal constants
         [((GVect t1) (GVect t2)) (rec/s t1 t2)]
         [((MRef t1) (MRef t2)) (rec/s t1 t2)]
         [((MVect t1) (MVect t2)) (rec/s t1 t2)]
-        [(t1 t2) #:when (or (Mu? t1) (Mu? t2))
-                 (define p (cons t1 t2))
-                 (match* (t1 t2)
-                   [(_ _) #:when (set-member? seen p) #t]
-                   [((Mu s) t2)
-                    (loop (grift-type-instantiate s t1) t2 (set-add seen p))]
-                   [(t1 (Mu s))
-                    (loop t1 (grift-type-instantiate s t2) (set-add seen p))])]
+        [(t1 t2)
+         #:when (or (Mu? t1) (Mu? t2))
+         (define p (cons t1 t2))
+         (match* (t1 t2)
+           [(_ _) #:when (set-member? seen p) #t]
+           [((Mu s) t2)
+            (loop (grift-type-instantiate s t1) t2 (set-add seen p))]
+           [(t1 (Mu s))
+            (loop t1 (grift-type-instantiate s t2) (set-add seen p))])]
         [(other wise) #f]))))
 
 (define-forms form:simple-branch
@@ -987,153 +885,20 @@ class literal constants
 (struct CVar form:leaf (uid) #:transparent)
 (struct CRec form:simple-branch (uid body) #:transparent)
 
-#;(define-type Cast-Fml* (Listof Cast-Fml))
-#;(define-type Cast-Fml (Fml Uid Grift-Type))
-
-#;(define-type Cast-Literal (U Grift-Literal Blame-Label))
-
-#;(define-type Src srcloc)
-
-#;
-(define-type Tag-Symbol (U 'Int 'Bool 'Char 'Unit
-                           'Fn 'Atomic 'Boxed 'GRef
-                           'GVect 'MRef 'MVect 'STuple))
-
-#;(define-type Proxied-Symbol (U 'GRef 'GVect))
-
-#;
-(define-type (Mediating-Coercion C)
-  (U Identity
-     (Fn Index (Listof C) C)
-     (CTuple Index (Listof C))
-     (Ref C C Proxied-Symbol)
-     (MonoRef Grift-Type)
-     (MonoVect Grift-Type)
-     (Failed Blame-Label)
-     (CRec C)
-     CVar))
-
-#;
-(define-type Grift-Coercion
-  (Rec C (U (Project Grift-Type Blame-Label)
-            (Inject Grift-Type)
-            (Sequence C C)
-            (Mediating-Coercion C))))
-
-#;
-(define-type Hyper-Coercion
-  (HC Boolean Grift-Type (Option Blame-Label)
-      Boolean Grift-Type
-      (Mediating-Coercion Hyper-Coercion)))
-
-#;
-(define-type Mixed-Coercion
-  (U Grift-Coercion
-     Hyper-Coercion
-     (Mediating-Coercion Hyper-Coercion)))
-
-#;(define-type Mixed-Coercion* (Listof Mixed-Coercion))
-
 (define IDENTITY (Identity))
 (define ID-EXPR (Quote-Coercion IDENTITY))
 (define ZERO-EXPR (Quote 0))
 
-
-#;(define-type Grift-Coercion* (Listof Grift-Coercion))
-
-#;(define-type Data-Literal (U Integer Inexact-Real Char String))
-
-#;(: data-literal? : Any -> Boolean : Data-Literal)
 (define (data-literal? x)
   (or (exact-integer? x)
       (inexact-real? x)
       (char? x)
       (string? x)))
 
-#|------------------------------------------------------------------------------
-  Compact Types and Coercions are a compile time hash-consing of types
-  They are introduced by hoist types in Language Cast-or-Coerce3.1
-------------------------------------------------------------------------------|#
-
-;; Represents the shallow tree structure of types where all subtrees
-;; of the type are either and atomic type or a identifier for a type.
-#;
-(define-type Compact-Type
-  (U (Fn Index (Listof Immediate-Type) Immediate-Type)
-     (STuple Index (Listof Immediate-Type))
-     (GRef Immediate-Type) (MRef Immediate-Type)
-     (GVect Immediate-Type) (MVect Immediate-Type)))
-
-#;(define-type Mu-Compact-Type (Mu Immediate-Type))
-;; Represent the shallow tree structure of coercions where all
-;; subtrees of the type are either atomic types, the identity coercion
-;; or coercion identifiers.
-#;
-(define-type Compact-Coercion
-  (U (Project Immediate-Type Blame-Label)
-     (Inject Immediate-Type)
-     (Sequence Immediate-Coercion Immediate-Coercion)
-     (HC Boolean Immediate-Type (Option Blame-Label)
-         Boolean Immediate-Type
-         Immediate-Coercion)
-     (Failed Blame-Label)
-     (Fn Index (Listof Immediate-Coercion) Immediate-Coercion)
-     (MonoRef Immediate-Type)
-     (MonoVect Immediate-Type)
-     (CTuple Index (Listof Immediate-Coercion))
-     (Ref Immediate-Coercion Immediate-Coercion Proxied-Symbol)))
-
-#;(define-type Mu-Compact-Coercion (Mu Immediate-Coercion))
-
-#;(define-type Immediate-Type (U Atomic-Type (Static-Id Uid)))
-
-;; A type representing coercions that have already been
-;; allocated at runntime or are small enought to fit into
-;; a register at runtime. 
-;; TODO (andre) since types are completely static consider changing
-;; the type representation so that types are allocated as
-;; untagged values. Doing so would simplify type case and
-;; allow cheaper allocation of fails and injects at runtime.
-;; (NOTE) This should be done after implementation of the non
-;; N^2 implementation of guarded reference coercions because
-;; that may require injects to carry blame labels thus reducing
-;; the impact of this optimization.
-#;(define-type Immediate-Coercion (U Identity (Static-Id Uid)))
- 
-#;
-(define-type Coercion/Immediate-Type
-  (Rec C (U Identity
-            (Failed Blame-Label)
-            (Project Immediate-Type Blame-Label)
-            (Inject Immediate-Type)
-            (Sequence C C)
-            (Fn Index (Listof C) C)
-            (Ref C C Proxied-Symbol)
-            (MonoRef Immediate-Type)
-            (MonoVect Immediate-Type)
-            (CTuple Index (Listof C)))))
-
-#;(define-type Coercion/Immediate-Type* (Listof Coercion/Immediate-Type))
-
-#;
-(define-type (Map-Bnd E1 E2)
-  (case->
-   [(Bnd Uid Grift-Type E1) -> (Bnd Uid Grift-Type E2)]
-   [(Pair Uid E1) -> (Pair Uid E2)]))
-
-#;(: map-bnd (All (A B) (A -> B) -> (Map-Bnd A B)))
 (define ((map-bnd f) b)
   (match b
     [(Bnd i t e) (Bnd i t (f e))]
     [(cons i e) (cons i (f e))]))
-
-#;(define-type Id (U Uid String))
-
-#;(define-type VectorAccessMode (U 'check-bounds 'no-check-bounds))
-
-;; (define-type (Fun E) (Code Uid* E))
-;; (define-type (CLambda E) (Lambda Uid* (Castable (Option Uid) E)))
-;; (define-type (Bnd* E) (Listof (Pairof Uid E)))
 
 (module+ test
   (check-true (form:leaf? (Quote 1))))
