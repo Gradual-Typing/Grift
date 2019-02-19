@@ -12,28 +12,15 @@
 | purification earlier. In general I don't like this because letrec is not
 | fundemental to the system but is being forced into the center stage. Perhaps
 | enforcing the use of letrec only on functions is enough to eliminate this pass
-|
-+-------------------------------------------------------------------------------+
-| Grammer:
 +------------------------------------------------------------------------------|#
 (require
- "../language/form-map.rkt"
  "../configuration.rkt"
  "../errors.rkt"
  "../helpers.rkt"
  "../language/forms.rkt"
- ;; "../language/cast-or-coerce3.2.rkt"
- ;; "../language/cast-or-coerce4.rkt"
- "../unique-counter.rkt"
- "../unique-identifiers.rkt"
- "../type-equality.rkt")
-
-#;
-(unsafe-require/typed
  "../language/form-map.rkt"
- [form-map ((Label-Lambdas= CoC3.2-Expr)
-            (CoC3.2-Expr -> CoC4-Expr)
-            -> (Label-Lambdas= CoC4-Expr))])
+ "../unique-counter.rkt"
+ "../unique-identifiers.rkt")
 
 (provide label-lambdas)
 
@@ -119,50 +106,3 @@
       (Var (Uid "id" 0))))
   (parameterize ([current-unique-counter (make-unique-counter 0)])
     (check-equal? (ll-expr e2) e2)))
-
-
-;; ;; This pass removes Lambdas from expression contexts
-;; (define-type (Label-Lambdas- E)
-;;   (Castable-Lambda E))
-
-;; ;; And leaves the rest expression forms alone.
-;; (define-type (Label-Lambdas= E)
-;;   (U (Named-Castable-Lambda-Forms E)
-;;      (App-Fn E (Listof E))
-;;      (Fn-Proxy-Forms E)
-;;      (Let (Bnd* E) E)
-;;      (Var Uid)
-;;      (Global String)
-;;      (Assign Id E)
-;;      (Gen-Data-Forms E)
-;;      (Code-Forms E)
-;;      (Quote-Coercion Immediate-Coercion)
-;;      (Coercion-Operation-Forms E)
-;;      (Hyper-Coercion-Operation-Forms E)
-;;      (Type Immediate-Type)
-;;      (Type-Operation-Forms E)
-;;      (Control-Flow-Forms E)
-;;      (Op Grift-Primitive (Listof E))
-;;      (Quote Cast-Literal)
-;;      No-Op
-;;      (Blame E)
-;;      (Observe E Grift-Type)
-;;      (Unguarded-Forms E)
-;;      (Guarded-Proxy-Forms E)
-;;      (Monotonic-Forms E Immediate-Type)
-;;      (Error E)
-;;      (Tuple-Operation-Forms E)))
-
-;; ;; Show that the invariant language forms equivalent to the target
-;; ;; language.
-;; (assert-subtype? (Label-Lambdas= CoC4-Expr) CoC4-Expr)
-;; (assert-subtype? CoC4-Expr (Label-Lambdas= CoC4-Expr))
-
-;; ;; Show that src language is equivalent to language forms removed
-;; ;; plus the invariant language forms.
-;; (assert-subtype? (U (Label-Lambdas- CoC3.2-Expr)
-;;                     (Label-Lambdas= CoC3.2-Expr))
-;;                  CoC3.2-Expr)
-;; (assert-subtype? CoC3.2-Expr
-;;                  (U (Label-Lambdas- CoC3.2-Expr)
-;;                     (Label-Lambdas= CoC3.2-Expr)))
