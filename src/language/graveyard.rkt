@@ -356,3 +356,38 @@
    ;; cast, apply-casted closure, of the same arity.
    'closure-only))
 
+;; Uncover Free Eliminates the following forms
+(define-type (U- E)
+  (U (Named-Castable-Lambda-Forms E)
+     (Fn-Proxy-Forms E)))
+
+;; Uncover Free Adds The following forms
+(define-type (U+ E)
+  (U (Closure-Ops E)
+     (Data-Fn-Proxy-Forms E)
+     (Hybrid-Fn-Proxy-Forms E)))
+
+;; Uncover Free is invariant in the following forms
+(define-type (U= E)
+  (U (Gen-Data-Forms E)
+     (Code-Forms E)
+     (Quote-Coercion Immediate-Coercion)
+     (Hyper-Coercion-Operation-Forms E)
+     (Coercion-Operation-Forms E)
+     (Type Immediate-Type)
+     (Type-Operation-Forms E)
+     (Let (Bnd* E) E)
+     (Var Uid)
+     (Global String)
+     (Assign Id E)
+     (Control-Flow-Forms E)
+     (Op Grift-Primitive (Listof E))
+     No-Op
+     (Quote Cast-Literal)
+     (Blame E)
+     (Observe E Grift-Type)
+     (Unguarded-Forms E)
+     (Guarded-Proxy-Forms E)
+     (Monotonic-Forms E Immediate-Type)
+     (Error E)
+     (Tuple-Operation-Forms E)))
