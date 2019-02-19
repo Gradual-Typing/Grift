@@ -305,4 +305,3 @@
                  (cons
                   (Uid "static_fn_type" 1)
                   (Fn 0 '() (Static-Id (Uid "static_fn_type" 0)))))))
-
