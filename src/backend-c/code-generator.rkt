@@ -92,6 +92,10 @@
 (define (append-flags s)
   (if (null? s)
       (default-flags)
+      ;; The loop that follows writes to a string using display
+      ;; This avoids quadratic behavior of repeatedly appending strings.
+      ;; This may be overkill as these strings are small in general,
+      ;; but we will be deprecating this back end soon.
       (with-output-to-string
         (lambda ()
           (let loop ([s s])
