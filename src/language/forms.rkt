@@ -281,7 +281,6 @@ And a type constructor "name" expecting the types of field1 and field2
 (struct structural-type type ()
   #:transparent)
 (struct base-type structural-type () #:transparent)
-#;(define-type Base-Type base-type)
 (struct logical-type type ()
   #:transparent)
 (struct Unit base-type ()
@@ -346,7 +345,7 @@ And a type constructor "name" expecting the types of field1 and field2
 
 ;; (Scope Grift-Type) Grift-Type -> (Values Grift-Type Boolean)
 (define (grift-type-instantiate/used? s t1)
-  (define used? #;(Boxof Boolean) (box #f))
+  (define used? (box #f))
   ;; Natural -> (Grift-Type -> Grift-Type)
   (define (subst i)
     ;; Grift-Type -> Grift-Type
@@ -390,7 +389,7 @@ And a type constructor "name" expecting the types of field1 and field2
 ;; Close over a free variable in a type
 ;; Uid, Grift-Type -> (Scope Grift-Type), Boolean
 (define (grift-type-abstract/used? x t)
-  (define used? #;(Boxof Boolean) (box #f))
+  (define used? (box #f))
   (define (subst i)
     (define (rec t)
       (cond
@@ -471,19 +470,19 @@ And a type constructor "name" expecting the types of field1 and field2
 (define (shallow-consistent? t g)
   ;; Typed racket made me do it
   ;; This uber modular structure speeds up type checking
-  (define (both-int? t g) #;Boolean (and (Int? t)  (Int? g)))
-  (define (both-bool? t g) #;Boolean (and (Bool? t) (Bool? g)))
-  (define (both-fn? t g)  #;Boolean
+  (define (both-int? t g)  (and (Int? t)  (Int? g)))
+  (define (both-bool? t g) (and (Bool? t) (Bool? g)))
+  (define (both-fn? t g)  
     (and (Fn? t)
          (Fn? g)
          (equal? (Fn-arity t)
                  (Fn-arity g))))
-  (define (both-tuple? t g)  #; Boolean
+  (define (both-tuple? t g)  
     (and (STuple? t)
          (STuple? g)
          (equal? (STuple-num t)
                  (STuple-num g))))
-  (define (ref-shallow-consistent? t g) #; Boolean
+  (define (ref-shallow-consistent? t g)
     (or (and (GRef? t) (GRef? g))
         (and (GVect? t) (GVect? g))
         (and (MRef? t) (MRef? t))
@@ -567,42 +566,6 @@ class literal constants
 ;; the entire reference cell, you have to access the second component
 ;; of the cell to get the type.
 
-#;
-(define (atomic-type? x)
-  (or (Dyn? x) (base-type? x)))
-
-#;
-(define (grift-type? x)
-  (or (atomic-type? x)
-      (grift-fn? x)
-      (grift-ref? x)
-      (grift-tuple? x)
-      (grift-mu? x)
-      (TVar? x)
-      (FVar? x)))
-
-#;
-(define (grift-type*? x)
-  (or (null? x)
-      (and (pair? x)
-           (grift-type? (car x))
-           (grift-type*? (cdr x)))))
-
-#;
-(define (grift-fn? x)
-  (and (Fn? x)
-       (exact-integer? (Fn-arity x))
-       (grift-type*? (Fn-fmls x))
-       (= (length (Fn-fmls x)) (Fn-arity x))
-       (grift-type? (Fn-ret x))))
-
-#;
-(define (grift-tuple? x)
-  (and (STuple? x)
-       (exact-integer? (STuple-num x))
-       (grift-type*? (STuple-items x))
-       (= (length (STuple-items x)) (STuple-num x))))
-
 
 ;; Grift-Type, Grift-Type -> Boolean
 (define (consistent? t g)
@@ -642,9 +605,9 @@ class literal constants
   (not (not (consist? t g (set)))))
 
 (module+ test
-  (define mu-dyn #;Grift-Type
+  (define mu-dyn
     (Mu (Scope (STuple 2 (list DYN-TYPE (TVar 0))))))
-  (define mu-int #;Grift-Type
+  (define mu-int
     (Mu (Scope (STuple 2 (list INT-TYPE (TVar 0))))))
   (test-equal? "Mu type" (consistent? mu-dyn mu-int) #t))
 

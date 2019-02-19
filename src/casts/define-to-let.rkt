@@ -13,14 +13,13 @@ be fixed to conform with letrec* semantics.
 |Output Grammar Cast0.5-Language                                                  |
 +------------------------------------------------------------------------------|#
 (require
- "../language/cast0.rkt" 
  "../configuration.rkt"
  "../errors.rkt"
+ "../language/forms.rkt"
  "../logging.rkt")
 
 (provide
- define->let
- (all-from-out "../language/cast0.rkt"))
+ define->let)
 
 ;; The entry point for this pass it is called by impose-casting semantics
 ;; Eventually we should make this 

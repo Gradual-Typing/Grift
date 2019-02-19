@@ -979,3 +979,290 @@
          (UIL-Op! D1-Value)
          (Assign Id D1-Value)
          No-Op)))
+
+(define-type Cast-or-Coerce4-Lang
+  (Prog (List String Natural Grift-Type)
+    (Static* (List CoC4-Bnd-Mu-Type*
+                   CoC4-Bnd-Type*
+                   CoC4-Bnd-Mu-Crcn*
+                   CoC4-Bnd-Crcn*
+                   CoC4-Bnd-Data*)
+             CoC4-Expr)))
+
+(define-type (Named-Castable-Lambda-Forms E)
+  (U (Letrec (Bnd* (Castable-Lambda E)) E)
+     (Fn-Caster E)
+     (App-Fn E (Listof E))))
+
+(define-type CoC4-Expr
+  (Rec E (U
+          (Gen-Data-Forms E)
+          (Code-Forms E)
+          (Named-Castable-Lambda-Forms E)
+          (Fn-Proxy-Forms E)
+          (Quote-Coercion Immediate-Coercion)
+          (Hyper-Coercion-Operation-Forms E)
+          (Coercion-Operation-Forms E)
+          (Type Immediate-Type)
+          (Type-Operation-Forms E)
+          (Let (Bnd* E) E)
+          (Var Uid)
+          (Global String)
+          (Assign Id E)
+          (Control-Flow-Forms E)
+          (Op Grift-Primitive (Listof E))
+          No-Op
+          (Quote Cast-Literal)
+          (Blame E)
+          (Observe E Grift-Type)
+          (Unguarded-Forms E)
+          (Guarded-Proxy-Forms E)
+          (Monotonic-Forms E Immediate-Type)
+          (Error E)
+          (Tuple-Operation-Forms E)
+          )))
+
+(define-type Cast0-Lang
+  (Prog (List String Natural Grift-Type) C0-Top*))
+
+(define-type C0-Top* (Listof C0-Top))
+
+(define-type C0-Top
+  (U (Define Boolean Uid Grift-Type C0-Expr)
+     (Observe C0-Expr Grift-Type)))
+
+(define-type Cast0.5-Lang
+  (Prog (List String Natural Grift-Type) C0-Expr))
+
+(define-type C0-Expr
+  (Rec E (U ;; Non-Terminals
+          (Observe E Grift-Type)
+          (Lambda Uid* E)
+          (Letrec C0-Bnd* E)
+          (Let C0-Bnd* E)
+          (App E (Listof E))
+          (Op Grift-Primitive (Listof E))
+          (If E E E)
+          (Switch E (Switch-Case* E) E)
+          (Cast E (Twosome Grift-Type Grift-Type Blame-Label))
+          (Begin C0-Expr* E)
+          (Repeat Uid E E Uid E E)
+          ;; Guarded effects
+          (Gbox E)
+          (Gunbox E)
+          (Gbox-set! E E)
+          (Gvector E E)
+          (Gvector-set! E E E)
+          (Gvector-ref E E)
+          (Gvector-length E)
+          ;; Monotonic
+          (Mbox E Grift-Type)
+          (Munbox E) ;; fast read
+          (Mbox-set! E E) ;; fast write
+          (MBoxCastedRef E Grift-Type)
+          (MBoxCastedSet! E E Grift-Type)
+          (Mvector E E Grift-Type)
+          (Mvector-ref E E) ;; fast read
+          (Mvector-set! E E E) ;; fast write
+          (MVectCastedRef E E Grift-Type)
+          (MVectCastedSet! E E E Grift-Type)
+          (Mvector-length E)
+          ;; Dynamic Operations
+          (Dyn-GVector-Set! E E E Grift-Type Blame-Label)
+          (Dyn-GVector-Ref E E Blame-Label)
+          (Dyn-GVector-Len E E)
+          (Dyn-GRef-Set! E E Grift-Type Blame-Label)
+          (Dyn-GRef-Ref E Blame-Label)
+          (Dyn-MVector-Set! E E E Grift-Type Blame-Label)
+          (Dyn-MVector-Ref E E Blame-Label)
+          (Dyn-MRef-Set! E E Grift-Type Blame-Label)
+          (Dyn-MRef-Ref E Blame-Label)
+          (Dyn-Fn-App E C0-Expr* Grift-Type* Blame-Label)
+          (Dyn-Tuple-Proj E E E)
+          (Create-tuple (Listof E))
+          (Tuple-proj E Index)
+          ;; Terminals
+          (Var Uid)
+          (Quote Cast-Literal)
+          No-Op)))
+
+(define-type C0-Expr* (Listof C0-Expr))
+
+(define-type Cast-or-Coerce5-Lang
+  (Prog (List String Natural Grift-Type)
+    (Let-Static* Bnd-Mu-Type*
+                 Bnd-Type*
+                 Bnd-Mu-Crcn*
+                 Bnd-Crcn* 
+                 CoC5-Expr)))
+
+(define-type CoC5-Expr
+  (Rec E
+       (U
+        (Construct CoC5-Gen-Data CoC5-Gen-Ctor (Listof E))
+        (Access CoC5-Gen-Data CoC5-Gen-Access E (Option E))
+        (Check CoC5-Gen-Data CoC5-Gen-Pred E (Listof E))
+        ;; Code Labels
+        (Code-Label Uid)
+        (Labels CoC5-Bnd-Code* E)
+        (App-Code E (Listof E))
+        ;; Functions as an interface
+        (Lambda Uid* (Castable (Option Uid) E))
+        (Fn-Caster E)
+        (App-Fn E (Listof E))
+        ;; Our Lovely Function Proxy Representation
+        (App-Fn-or-Proxy Uid E (Listof E))
+        (Fn-Proxy (List Index Uid) E E)
+        (Fn-Proxy-Huh E)
+        (Fn-Proxy-Closure E)
+        (Fn-Proxy-Coercion E)
+        ;; Coercions
+        (Quote-Coercion Immediate-Coercion)
+        ;(Compose-Coercions E E)
+        (HC E E E E E E)
+        (HC-Inject-Huh E)
+        (HC-Project-Huh E)
+        (HC-Identity-Huh E)
+        (HC-Label E)
+        (HC-T1 E)
+        (HC-T2 E)
+        (HC-Med E)
+        (Id-Coercion-Huh E)
+        (Fn-Coercion-Huh E)
+        (Make-Fn-Coercion Uid E E E)
+        (Fn-Coercion (Listof E) E)
+        (Fn-Coercion-Arity E)
+        (Fn-Coercion-Arg E E)
+        (Fn-Coercion-Return E)
+        (Id-Fn-Coercion E)
+        (Fn-Coercion-Return-Set! E E)
+        (Fn-Coercion-Arg-Set! E E E)
+        (Ref-Coercion E E E)
+        (Ref-Coercion-Huh E)
+        (Ref-Coercion-Read E)
+        (Ref-Coercion-Write E)
+        (Ref-Coercion-Ref-Huh E)
+        (Sequence-Coercion E E)
+        (Sequence-Coercion-Huh E)
+        (Sequence-Coercion-Fst E)
+        (Sequence-Coercion-Snd E)
+        (Project-Coercion E E)
+        (Project-Coercion-Huh E)
+        (Project-Coercion-Type E)
+        (Project-Coercion-Label E)
+        (Inject-Coercion E)
+        (Inject-Coercion-Type E)
+        (Inject-Coercion-Huh E)
+        (Failed-Coercion E)
+        (Failed-Coercion-Huh E)
+        (Failed-Coercion-Label E)
+        ;;Type operations
+        (Type Immediate-Type)
+        (Type-Fn-arity E)
+        (Type-Fn-arg E E)
+        (Type-Fn-return E)
+        (Type-GRef-Of  E)
+        (Type-GVect-Of E)
+        (Type-Dyn-Huh E)
+        (Type-Fn-Huh E)
+        (Type-GRef-Huh E)
+        (Type-GVect-Huh E)
+        (Type-Mu-Huh E)
+        (Type-Mu-Body E)
+        ;; Tags are exposed before specify This is bad
+        ;; TODO fix this after the deadline
+        (Type-Tag E)
+        (Tag Tag-Symbol)
+        ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
+        ;; Binding Forms - Lambda
+        (Letrec CoC5-Bnd-Lambda* E)
+        (Let CoC5-Bnd-Data* E)
+        (Var Uid)
+        (Global String)
+        (Assign Id E)
+        ;; Controll Flow
+        (If E E E)
+        (Switch E (Switch-Case* E) E)
+        (Begin CoC5-Expr* E)
+        (Repeat Uid E E Uid E E)
+        Break-Repeat
+        ;;Primitives
+        (Op Grift-Primitive (Listof E))
+        No-Op
+        (Quote Cast-Literal)
+        ;; Observations
+        (Blame E)
+        (Observe E Grift-Type)
+        ;; Unguarded-Representation
+        (Unguarded-Box E)
+        (Unguarded-Box-Ref E)
+        (Unguarded-Box-Set! E E)
+        (Unguarded-Vect E E)
+        (Unguarded-Vect-Ref E E)
+        (Unguarded-Vect-Set! E E E)
+        (Guarded-Proxy-Huh E)
+        (Guarded-Proxy E (Twosome E E E))
+        (Guarded-Proxy E (Coercion E))
+        (Guarded-Proxy-Ref E)
+        (Guarded-Proxy-Source E)
+        (Guarded-Proxy-Target E)
+        (Guarded-Proxy-Blames E)
+        (Guarded-Proxy-Coercion E)
+        (Unguarded-Vect-length E)
+        ;; Monotonic references
+        (Mbox E Immediate-Type)
+        (Mbox-val-set! E E)
+        (Mbox-val-ref E)
+        (Mbox-rtti-set! E E)
+        (Mbox-rtti-ref E)
+        (Make-GLB-Two-Fn-Types Uid E E)
+        (Make-GLB-Two-Tuple-Types Uid E E)
+        (MRef-Coercion-Huh E)
+        (MRef-Coercion-Type E)
+        (MRef-Coercion E)
+        (Type-GRef E) ;; glb need to create new types in runtime
+        (Type-GVect E)
+        (Type-MRef E)
+        (Type-MRef-Huh E)
+        (Type-MRef-Of E)
+        (Error E)
+        (Mvector E E Immediate-Type)
+        (Mvector-length E)
+        (Mvector-val-ref E E VectorAccessMode)
+        (Mvector-val-set! E E E VectorAccessMode)
+        (Mvector-rtti-ref E)
+        (Mvector-rtti-set! E E)
+        (Type-MVect E)
+        (Type-MVect-Huh E)
+        (Type-MVect-Of E)
+        (MVect-Coercion-Huh E)
+        (MVect-Coercion-Type E)
+        (MVect-Coercion E)
+        ;;
+        (Create-tuple (Listof E))
+        (Copy-Tuple E E)
+        (Tuple-proj E E)
+        (Tuple-Coercion-Huh E)
+        (Tuple-Coercion-Num E)
+        (Tuple-Coercion-Item E E)
+        (Id-Tuple-Coercion E)
+        (Tuple-Coercion-Item-Set! E E E)
+        (Coerce-Tuple Uid E E)
+        (Coerce-Tuple-In-Place Uid E E E E E)
+        (Cast-Tuple Uid E E E E)
+        (Cast-Tuple-In-Place Uid E E E E E E E)
+        (Type-Tuple-Huh E)
+        (Type-Tuple-num E)
+        (Type-Tuple-item E E)
+        (Make-Tuple-Coercion Uid E E E)
+        (Mediating-Coercion-Huh E))))
+
+(define-type CoC5-Expr* (Listof CoC5-Expr))
+(define-type CoC5-Code (Code Uid* CoC5-Expr))
+(define-type CoC5-Bnd-Code (Pairof Uid CoC5-Code))
+(define-type CoC5-Bnd-Code* (Listof CoC5-Bnd-Code))
+(define-type CoC5-Lambda (Lambda Uid* (Free (Option Uid) Uid* CoC5-Expr)))
+(define-type CoC5-Bnd-Lambda  (Pairof Uid CoC5-Lambda))
+(define-type CoC5-Bnd-Lambda* (Listof CoC5-Bnd-Lambda))
+(define-type CoC5-Bnd-Data  (Pairof Uid CoC5-Expr))
+(define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
