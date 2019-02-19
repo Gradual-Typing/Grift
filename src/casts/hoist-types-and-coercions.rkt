@@ -13,9 +13,6 @@
 | hashconsing of types is still needed to ensure pointer
 | equality is the same as type equality. This pass greatly reduces the amount
 | of runtime type allocation. 
-+------------------------------------------------------------------------------+
-| Input Grammar Cast or Coercion Language 3
-| Output Grammar Cast or Coercion Language 3.1
 +-----------------------------------------------------------------------------|#
 ;; The define-pass syntax
 (require
@@ -24,18 +21,16 @@
  "../unique-counter.rkt"
  "../errors.rkt"
  "../type-equality.rkt"
- "../language/cast-or-coerce3.rkt"
- "../language/cast-or-coerce3.1.rkt"
+ "../language/forms.rkt"
+ "../language/primitives.rkt"
  "../language/form-map.rkt"
  racket/match
  racket/list)
 
-(define-type Immediate-Coercion* (Listof Immediate-Coercion))
-
 ;; Only the pass is provided by this module
 (provide hoist-types-and-coercions)
 
-#;(: hoist-types-and-coercions : Cast-or-Coerce3-Lang -> Cast-or-Coerce3.1-Lang)
+;; Cast-or-Coerce3-Lang -> Cast-or-Coerce3.1-Lang
 (define (hoist-types-and-coercions prgm)
   (match-define (Prog (list prgm-name next-unique-number prgm-type)
                   (Static* (list bnd-const*) exp))
@@ -50,13 +45,12 @@
   (define coercion->immediate
     (make-identify-coercion! type->immediate crcn-table))
 
-  ;; (: new-exp CoC3.1-Expr)
-  ;; (: new-bnd-const* CoC3.1-Bnd*)
+  ;; CoC3.1-Expr, CoC3.1-Bnd*
   (define-values (new-exp new-bnd-const*)
     ;; Map through the expression mutating the above state to collect
     ;; all type and coercions.
     (parameterize ([current-unique-counter unique-state])
-      #;(: map-expr : CoC3-Expr -> CoC3.1-Expr)
+      ;; CoC3-Expr -> CoC3.1-Expr
       (define (map-expr e)
         (map-hoisting-thru-Expr type->immediate coercion->immediate e))
       (values
@@ -98,58 +92,24 @@
 
 ;; The Crcn-Table is a mirror of this but for coercions. 
 
-;; (define-type (Table Src Cpt Imm)
-;;   (List (Cache Src Imm) (Mu!* Imm) (Sorted-Bnd* Cpt)))
-
-;; (define-type (Cache Src Imm) (HashTable Src (Pair Imm Nat)))
-
-;; (define-type (Mu!* Imm) (Boxof (Listof (Pair Uid (Mu Imm)))))
-
-;; (define-type (Sorted-Bnd* Cpt) (GVectorof (Listof (Pair Uid Cpt))))
-
-;; (define-type Type-Table (Table Grift-Type Compact-Type Immediate-Type))
-
-;; (define-type Type-Cache (Cache Grift-Type Immediate-Type))
-
-;; (define-type Mu-Type* (Mu!* Immediate-Type))
-
-;; (define-type Sorted-Bnd-Type* (Sorted-Bnd* Compact-Type))
-
-;; (define-type Crcn-Table
-;;   (Table Mixed-Coercion Compact-Coercion Immediate-Coercion))
-
-;; (define-type Crcn-Cache (Cache Mixed-Coercion Immediate-Coercion))
-
-;; (define-type Mu-Crcn* (Mu!* Immediate-Coercion))
-
-;; (define-type Sorted-Bnd-Crcn* (Sorted-Bnd* Compact-Coercion))
-
-
-#;(: make-type-table : -> Type-Table)
+;; -> Type-Table
 (define (make-type-table)
   (list (ann (make-hash) Type-Cache)
         (ann (box '())   Mu-Type*)
         (ann (make-gvector 8 '()) Sorted-Bnd-Type*)))
 
-(: make-crcn-table : -> Crcn-Table)
+;; -> Crcn-Table
 (define (make-crcn-table)
   (list (ann (make-hash) Crcn-Cache) 
         (ann (box '()) Mu-Crcn*)
         (ann (make-gvector 8 '()) Sorted-Bnd-Crcn*)))
 
-(: table->list
-   (All (Src Cpt Imm)
-        (Table Src Cpt Imm) -> (Listof (Pair Uid Cpt))))
 (define (table->list tt)
   (append* (gvector->list (car (cdr (cdr tt))))))
 
-(: table-mus
-   (All (Src Cpt Imm)
-        (Table Src Cpt Imm) -> (Listof (Pair Uid (Mu Imm)))))
 (define (table-mus tt)
   (unbox (car (cdr tt))))
 
-(: sorted-bnd*-add! (All (A) (Sorted-Bnd* A) Nat (Pair Uid A) -> Void))
 (define (sorted-bnd*-add! bnd* rank new-bnd)
   (define old-bnd* : (Listof (Pair Uid A)) 
     (if (< rank (gvector-length bnd*))
@@ -157,7 +117,7 @@
         '()))
   (gvector-set! bnd* rank (cons new-bnd old-bnd*)))
 
-(: boxed-list-cons! (All (A) A (Boxof (Listof A)) -> Void))
+;; forall A, A, (Boxof (Listof A)) -> Void 
 (define (boxed-list-cons! a d)
   (set-box! d (cons a (unbox d))))
 
@@ -305,14 +265,6 @@
          (name-crcn! sb* "static_tuple_crcn" (CTuple i a*) m)])))
   (make-identify! ct make-id-coercion!))
 
-#;(require typed/racket/unsafe)
-#;
-(unsafe-require/typed
- "../language/form-map.rkt"
- [form-map ((HT&C= CoC3-Expr)
-            (CoC3-Expr -> CoC3.1-Expr)
-            -> (HT&C= CoC3.1-Expr))])
-
 (: map-hoisting-thru-Expr :
    (Grift-Type     -> Immediate-Type)
    (Mixed-Coercion -> Immediate-Coercion)
@@ -352,59 +304,5 @@
                  (cons (Uid "static_fn_type" 0) (Fn 0 '() (Dyn)))
                  (cons
                   (Uid "static_fn_type" 1)
-                  (Fn 0 '() (Static-Id (Uid "static_fn_type" 0))))))
-  )
-
-
-
-;; (define-type (HT&C+ E)
-;;   (U (Type Immediate-Type)
-;;      (Quote-Coercion Immediate-Coercion)
-;;      (Mvector E E Immediate-Type)
-;;      (Mbox E Immediate-Type)))
-
-;; (define-type (HT&C- E)
-;;   (U (Type Grift-Type)
-;;      (Quote-Coercion Grift-Coercion)
-;;      (Quote-HCoercion Mixed-Coercion)
-;;      (Mvector E E Grift-Type)
-;;      (Mbox E Grift-Type)))
-
-;; (define-type (HT&C= E)
-;;   (U (Monotonic-Forms-w/o-Constructors E)
-;;      (Castable-Lambda-Forms E)
-;;      (Fn-Proxy-Forms E) 
-;;      (Letrec (Bnd* E) E)
-;;      (Let (Bnd* E) E)
-;;      (Var Uid)
-;;      (Global String)
-;;      (Assign Id E)
-;;      (Gen-Data-Forms E)
-;;      (Code-Forms E)
-;;      (Coercion-Operation-Forms E)
-;;      (Hyper-Coercion-Operation-Forms E)
-;;      (Type-Operation-Forms E)
-;;      (Control-Flow-Forms E)
-;;      (Op Grift-Primitive (Listof E))
-;;      (Quote Cast-Literal)
-;;      No-Op
-;;      (Blame E)
-;;      (Observe E Grift-Type)
-;;      (Unguarded-Forms E)
-;;      (Guarded-Proxy-Forms E)
-;;      (Error E)
-;;      (Tuple-Operation-Forms E)))
-
-;; (assert-subtype? (HT&C+ CoC3.1-Expr) CoC3.1-Expr)
-;; (assert-subtype? (HT&C= CoC3.1-Expr) CoC3.1-Expr)
-;; (assert-subtype? (U (HT&C= CoC3.1-Expr) (HT&C+ CoC3.1-Expr))
-;;                  CoC3.1-Expr)
-;; (assert-subtype? CoC3.1-Expr
-;;                  (U (HT&C= CoC3.1-Expr) (HT&C+ CoC3.1-Expr)))
-;; (assert-subtype? (HT&C- CoC3-Expr) CoC3-Expr)
-;; (assert-subtype? (HT&C= CoC3-Expr) CoC3-Expr)
-;; (assert-subtype? (U (HT&C- CoC3-Expr) (HT&C= CoC3-Expr))
-;;                  CoC3-Expr)
-;; (assert-subtype? CoC3-Expr
-;;                  (U (HT&C- CoC3-Expr) (HT&C= CoC3-Expr)))
+                  (Fn 0 '() (Static-Id (Uid "static_fn_type" 0)))))))
 

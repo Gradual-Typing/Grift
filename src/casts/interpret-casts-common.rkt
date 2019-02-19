@@ -12,14 +12,12 @@ TODO write unit tests
 (require
  racket/match
  racket/list
+ "../configuration.rkt"
  "../language/forms.rkt"
  "../language/syntax.rkt"
- "../language/cast-or-coerce3.rkt"
- "../language/cast0.rkt"
- "constants-and-codes.rkt"
- "../configuration.rkt"
- "cast-profiler.rkt"
- "../logging.rkt")
+ "../logging.rkt"
+ "./cast-profiler.rkt"
+ "./constants-and-codes.rkt")
 
 (provide (all-defined-out))
 
@@ -1144,7 +1142,7 @@ TODO write unit tests
           (compile-mvec-cast v #:t1 (Type t1) (Type t2))]
          [((STuple n _) (STuple m _)) #:when (<= m n)
           (compile-tuple-cast v t1 t2 l mono-address base-address index)]
-         [(_ _) #;base-types (Blame l)])]
+         [(_ _) (Blame l)])]
       [((Type t1-t) t2) 
        (match t1-t
          [(Mu s)
@@ -1182,7 +1180,7 @@ TODO write unit tests
                (If (and$ (Type-Tuple-Huh t2) (op<=? (Type-Tuple-num t2) (Quote n)))
                    (compile-tuple-cast v t1 t2 l mono-address base-address index)
                    (Blame l))]
-              [_ #; Base-Cases (Blame l)]))])]
+              [_ (Blame l)]))])]
       [(t1 (Type t2-t))
        (match t2-t
          [(Mu s)
@@ -1222,7 +1220,7 @@ TODO write unit tests
                (If (and$ (Type-Tuple-Huh t1) (op<=? (Quote n) (Type-Tuple-num t1)))
                    (compile-tuple-cast v t1 t2 l mono-address base-address index)
                    (Blame l))]
-              [_ #;base-cases (Blame l)]))])]
+              [_ (Blame l)]))])]
       [(t1 t2)
        (cond
          ;; This is super hacky we can do better
