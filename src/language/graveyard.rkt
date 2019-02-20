@@ -282,34 +282,6 @@
                (Bnd* CoC6-Expr))
          CoC6-Expr)))
 
-(define-type CoC5-Expr
-  (Rec
-   E
-   (U (Closure-Ops E)
-      (Data-Fn-Proxy-Forms E)
-      (Hybrid-Fn-Proxy-Forms E)
-      (Gen-Data-Forms E)
-      (Code-Forms E)
-      (Quote-Coercion Immediate-Coercion)
-      (Hyper-Coercion-Operation-Forms E)
-      (Coercion-Operation-Forms E)
-      (Type Immediate-Type)
-      (Type-Operation-Forms E)
-      (Let (Bnd* E) E)
-      (Var Uid)
-      (Global String)
-      (Assign Id E)
-      (Control-Flow-Forms E)
-      (Op Grift-Primitive (Listof E))
-      No-Op
-      (Quote Cast-Literal)
-      (Blame E)
-      (Observe E Grift-Type)
-      (Unguarded-Forms E)
-      (Guarded-Proxy-Forms E)
-      (Monotonic-Forms E Immediate-Type)
-      (Error E)
-      (Tuple-Operation-Forms E))))
 
 (define-type CoC6-Expr
   (Rec
@@ -1266,3 +1238,291 @@
 (define-type CoC5-Bnd-Lambda* (Listof CoC5-Bnd-Lambda))
 (define-type CoC5-Bnd-Data  (Pairof Uid CoC5-Expr))
 (define-type CoC5-Bnd-Data* (Listof CoC5-Bnd-Data))
+
+
+
+(define-type Lambda1-Lang
+  (Prog (List String Natural Grift-Type)
+    (Let-Static* Bnd-Mu-Type*
+                 Bnd-Type*
+                 Bnd-Mu-Crcn*
+                 Bnd-Crcn*
+                 L1-Expr)))
+
+(define-type L1-Lambda (Lambda Uid* (Castable (Option Uid) L1-Expr)))
+
+(define-type L1-Expr
+  (Rec E (U
+          (Construct L1-Gen-Data L1-Gen-Ctor (Listof E))
+          (Access L1-Gen-Data L1-Gen-Access E (Option E))
+          (Check L1-Gen-Data L1-Gen-Pred E (Listof E))
+          ;; Code Labels
+          (Code-Label Uid)
+          (Labels L1-Bnd-Code* E)
+          (App-Code E (Listof E))
+          ;; Functions as an interface
+          L1-Lambda
+          (Fn-Caster E)
+          (App-Fn E (Listof E))
+          ;; Our Lovely Function Proxy Representation
+          (App-Fn-or-Proxy Uid E (Listof E))
+          (Fn-Proxy (List Index Uid) E E)
+          (Fn-Proxy-Huh E)
+          (Fn-Proxy-Closure E)
+          (Fn-Proxy-Coercion E)
+          ;; Coercions
+          (Quote-Coercion Immediate-Coercion)
+          (Compose-Coercions E E)
+          (HC E E E E E E)
+          (HC-Inject-Huh E)
+          (HC-Project-Huh E)
+          (HC-Identity-Huh E)
+          (HC-Label E)
+          (HC-T1 E)
+          (HC-T2 E)
+          (HC-Med E)
+          (Id-Coercion-Huh E)
+          (Fn-Coercion-Huh E)
+          (Make-Fn-Coercion Uid E E E)
+          (Fn-Coercion (Listof E) E)
+          (Fn-Coercion-Arity E)
+          (Fn-Coercion-Arg E E)
+          (Fn-Coercion-Return E)
+          (Fn-Coercion-Return-Set! E E)
+          (Fn-Coercion-Arg-Set! E E E)
+          (Id-Fn-Coercion E) 
+          (Ref-Coercion E E E)
+          (Ref-Coercion-Huh E)
+          (Ref-Coercion-Read E)
+          (Ref-Coercion-Write E)
+          (Ref-Coercion-Ref-Huh E)
+          (Sequence-Coercion E E)
+          (Sequence-Coercion-Huh E)
+          (Sequence-Coercion-Fst E)
+          (Sequence-Coercion-Snd E)
+          (Project-Coercion E E)
+          (Project-Coercion-Huh E)
+          (Project-Coercion-Type E)
+          (Project-Coercion-Label E)
+          (Inject-Coercion E)
+          (Inject-Coercion-Type E)
+          (Inject-Coercion-Huh E)
+          (Failed-Coercion E)
+          (Failed-Coercion-Huh E)
+          (Failed-Coercion-Label E)
+          ;;Type operations
+          (Type Immediate-Type)
+          (Type-Dyn-Huh E)
+          (Type-Fn-Huh E)
+          (Type-Fn-arity E)
+          (Type-Fn-arg E E)
+          (Type-Fn-return E)
+          (Type-GRef-Huh E)
+          (Type-GRef-Of  E)
+          (Type-GVect-Huh E)
+          (Type-GVect-Of E)
+          ;; Tags are exposed before specify This is bad
+          ;; TODO fix this after the deadline
+          (Type-Tag E)
+          (Tag Tag-Symbol)
+          ;;(Type-Ctr-Case E Type-Ctr-Case-Clause* E)
+          ;; Binding Forms - Lambda
+	  (Letrec L1-Bnd-Lambda* E)
+	  (Let L1-Bnd* E)
+          (Var Uid)
+          (Global String)
+          (Assign Id E)
+          ;; Controll Flow
+          (If E E E)
+          (Switch E (Switch-Case* E) E)
+          (Begin L1-Expr* E)
+          (Repeat Uid E E Uid E E)
+          Break-Repeat
+          ;;Primitives
+          (Op Grift-Primitive (Listof E))
+          (Quote Cast-Literal)
+          ;; Observations
+          (Blame E)
+          (Observe E Grift-Type)
+          ;; Unguarded-Representation
+          (Unguarded-Box E)
+          (Unguarded-Box-Ref E)
+          (Unguarded-Box-Set! E E)
+          (Unguarded-Vect E E)
+          (Unguarded-Vect-Ref E E)
+          (Unguarded-Vect-Set! E E E)
+          (Guarded-Proxy-Huh E)
+          (Guarded-Proxy E (Twosome E E E))
+          (Guarded-Proxy E (Coercion E))
+          (Guarded-Proxy-Ref E)
+          (Guarded-Proxy-Source E)
+          (Guarded-Proxy-Target E)
+          (Guarded-Proxy-Blames E)
+          (Guarded-Proxy-Coercion E)
+          (Unguarded-Vect-length E)
+          ;; Monotonic references
+          (Mbox E Immediate-Type)
+          (Mbox-val-set! E E)
+          (Mbox-val-ref E)
+          (Mbox-rtti-set! E E)
+          (Mbox-rtti-ref E)
+          (Make-GLB-Two-Fn-Types Uid E E)
+          (Make-GLB-Two-Tuple-Types Uid E E)
+          (MRef-Coercion-Huh E)
+          (MRef-Coercion-Type E)
+          (MRef-Coercion E)
+          (Type-GRef E) ;; glb need to create new types in runtime
+          (Type-GVect E)
+          (Type-MRef E)
+          (Type-MRef-Huh E)
+          (Type-MRef-Of E)
+          (Error E)
+          (Mvector E E Immediate-Type)
+          (Mvector-length E)
+          (Mvector-val-ref E E VectorAccessMode)
+          (Mvector-val-set! E E E VectorAccessMode)
+          (Mvector-rtti-ref E)
+          (Mvector-rtti-set! E E)
+          (Type-MVect E)
+          (Type-MVect-Huh E)
+          (Type-MVect-Of E)
+          (MVect-Coercion-Huh E)
+          (MVect-Coercion-Type E)
+          (MVect-Coercion E)
+          ;;
+          (Create-tuple (Listof E))
+          (Tuple-proj E E)
+          (Tuple-Coercion-Huh E)
+          (Tuple-Coercion-Num E)
+          (Tuple-Coercion-Item E E)
+          (Tuple-Coercion-Item-Set! E E E)
+          (Id-Tuple-Coercion E)
+          (Coerce-Tuple Uid E E)
+          (Coerce-Tuple-In-Place Uid E E E E E)
+          (Cast-Tuple Uid E E E E)
+          (Cast-Tuple-In-Place Uid E E E E E E E)
+          (Type-Tuple-Huh E)
+          (Type-Tuple-num E)
+          (Type-Tuple-item E E)
+          (Make-Tuple-Coercion Uid E E E)
+          (Mediating-Coercion-Huh E)
+          No-Op)))
+
+(define-type L1-Code (Code Uid* L1-Expr))
+(define-type L1-Expr* (Listof L1-Expr))
+(define-type L1-Bnd (Pairof Uid L1-Expr))
+(define-type L1-Bnd* (Listof L1-Bnd))
+(define-type L1-Bnd-Code (Pairof Uid L1-Code))
+(define-type L1-Bnd-Code* (Listof L1-Bnd-Code))
+(define-type L1-Bnd-Lambda (Pairof Uid L1-Lambda))
+(define-type L1-Bnd-Lambda* (Listof L1-Bnd-Lambda))
+
+(define-type Syntax-Lang (Prog String (Listof Any)))
+
+
+
+#|-----------------------------------------------------------------------------+
+| Language/Grift0 this is the language returned by grift/syntax->grift0
++-----------------------------------------------------------------------------|#
+(define-type Grift0-Lang
+  (Prog (List String Natural) (Listof G0-Top)))
+
+(define-type G0-Top
+  ;; Using Ann2 here instead of Ann keeps a bug in typed racket
+  ;; from getting Ann at different places in the type signature
+  ;; confused.
+  (Ann2 (U (Observe G0-Ann-Expr (Option Grift-Type))
+           (Define Boolean Uid (Option Grift-Type) G0-Ann-Expr))
+        srcloc))
+(define-type G0-Top* (Listof G0-Top))
+
+(define-type G0-Ann-Expr (Ann G0-Expr Src))
+(define-type G0-Ann-Expr* (Listof G0-Ann-Expr))
+
+(define-type G0-Expr
+  (U (Lambda Grift-Fml* (List G0-Ann-Expr (Option Grift-Type)))
+     (Letrec G0-Bnd* G0-Ann-Expr)
+     (Let G0-Bnd* G0-Ann-Expr)
+     (App G0-Ann-Expr G0-Ann-Expr*)
+     (Op Grift-Primitive G0-Ann-Expr*)
+     (If G0-Ann-Expr G0-Ann-Expr G0-Ann-Expr)
+     (Switch G0-Ann-Expr (Switch-Case* G0-Ann-Expr) G0-Ann-Expr)
+     (Ascribe G0-Ann-Expr Grift-Type (Option Blame-Label))
+     (Var Uid)
+     (Quote Grift-Literal)
+     (Begin G0-Ann-Expr* G0-Ann-Expr)
+     (Repeat Uid G0-Ann-Expr G0-Ann-Expr (List Uid (Option Grift-Type)) G0-Ann-Expr G0-Ann-Expr)
+     ;; Monotonic effects
+     (MboxS G0-Ann-Expr)
+     (Munbox G0-Ann-Expr)
+     (Mbox-set! G0-Ann-Expr G0-Ann-Expr)
+     (MvectorS G0-Ann-Expr G0-Ann-Expr)
+     (Mvector-set! G0-Ann-Expr G0-Ann-Expr G0-Ann-Expr)
+     (Mvector-ref G0-Ann-Expr G0-Ann-Expr)
+     (Mvector-length G0-Ann-Expr)
+     ;; Guarded effects
+     (Gbox G0-Ann-Expr)
+     (Gunbox G0-Ann-Expr)
+     (Gbox-set! G0-Ann-Expr G0-Ann-Expr)
+     (Gvector G0-Ann-Expr G0-Ann-Expr)
+     (Gvector-set! G0-Ann-Expr G0-Ann-Expr G0-Ann-Expr)
+     (Gvector-ref G0-Ann-Expr G0-Ann-Expr)
+     (Gvector-length G0-Ann-Expr)
+     ;;
+     (Create-tuple G0-Ann-Expr*)
+     (Tuple-proj G0-Ann-Expr Index)))
+(define-type G0-Expr* (Listof G0-Expr))
+
+(define-type G0-Bnd (Bnd Uid Grift-Type? G0-Ann-Expr))
+(define-type G0-Bnd* (Listof G0-Bnd))
+
+
+(define-type Grift1-Lang
+  (Prog (List String Natural Grift-Type) (Listof G1-Top)))
+
+(define-type G1-Top
+  (U (Define Boolean Uid Grift-Type G1-Ann-Expr)
+     (Observe G1-Ann-Expr Grift-Type)))
+(define-type G1-Top* (Listof G1-Top))
+
+(define-type G1-Ann-Expr (Ann G1-Expr (Pair Src Grift-Type)))
+(define-type G1-Ann-Expr* (Listof G1-Ann-Expr))
+
+(define-type G1-Expr
+  (U
+   (Lambda Grift-Fml* G1-Ann-Expr)
+   (Letrec G1-Bnd* G1-Ann-Expr)
+   (Let G1-Bnd* G1-Ann-Expr)
+   (App G1-Ann-Expr (Listof G1-Ann-Expr))
+   (Op (List Grift-Primitive Grift-Type*) (Listof G1-Ann-Expr))
+   (If G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+   (Switch G1-Ann-Expr (Switch-Case* G1-Ann-Expr) G1-Ann-Expr)
+   (Ascribe G1-Ann-Expr Grift-Type (Option Blame-Label))
+   (Var Uid)
+   (Quote Grift-Literal)
+   (Begin (Listof G1-Ann-Expr) G1-Ann-Expr)
+   (Repeat Uid G1-Ann-Expr G1-Ann-Expr Uid G1-Ann-Expr G1-Ann-Expr)
+   ;; Monotonic effects
+   (Mbox G1-Ann-Expr Grift-Type)
+   (Munbox G1-Ann-Expr)
+   (Mbox-set! G1-Ann-Expr G1-Ann-Expr)
+   (Mvector G1-Ann-Expr G1-Ann-Expr Grift-Type)
+   (Mvector-ref G1-Ann-Expr G1-Ann-Expr)
+   (Mvector-set! G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+   (Mvector-length G1-Ann-Expr)
+   ;; Guarded effects
+   (Gbox G1-Ann-Expr)
+   (Gunbox G1-Ann-Expr)
+   (Gbox-set! G1-Ann-Expr G1-Ann-Expr)
+   (Gvector G1-Ann-Expr G1-Ann-Expr)
+   (Gvector-set! G1-Ann-Expr G1-Ann-Expr G1-Ann-Expr)
+   (Gvector-ref G1-Ann-Expr G1-Ann-Expr)
+   (Gvector-length G1-Ann-Expr)
+   ;;
+   (Create-tuple (Listof G1-Ann-Expr))
+   (Tuple-proj G1-Ann-Expr Index)))
+(define-type G1-Expr* (Listof G1-Expr))
+
+(define-type G1-Bnd (Bnd Uid Grift-Type G1-Ann-Expr))
+(define-type G1-Bnd* (Listof G1-Bnd))
+
