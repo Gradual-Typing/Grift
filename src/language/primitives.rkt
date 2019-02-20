@@ -107,6 +107,7 @@
   (print-float        #t (Float Int -> Unit))
   (read-float         #t (-> Float))
   (float->int         #f (Float -> Int))
+  (int->float         #f (Int -> Float))
   (fl<                #f (Float Float -> Bool))
   (fl<=               #f (Float Float -> Bool))
   (fl=                #f (Float Float -> Bool))
