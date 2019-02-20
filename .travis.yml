@@ -12,7 +12,7 @@ before_install:
 
 install:
 - # cat /proc/meminfo
-- make
+- raco pkg install
 
 script:
 - make test
