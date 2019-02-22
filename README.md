@@ -53,11 +53,11 @@ documentation here.
 ```bnf
 Variables, X   ::= X
 Formals, F     ::= X | [X : Type]
-TopLevel, TE   ::= (define X E) | (define (ID F ...) E ...) | E | TE ...
+TopLevel, TE   ::= (define X E) | (define (X F ...) E ...) | E | TE ...
 Expression, E  ::=
 Ascription     |   (ann E T [Blame Label])
 Binding        |   (let ((X [: T] E) ...) [: T] E ...)
-               |   (letrec ((ID [: T] E) ...) E ...)
+               |   (letrec ((X [: T] E) ...) E ...)
 Functions      |   (lambda (F ...) [: T] E ...)
 Application    |   (E_rator E_rand ...)
 Conditionals   |   (if E_cond E_conseq E_alt)
