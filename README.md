@@ -30,7 +30,7 @@ The installation should install a "launcher" for `grift`. If not investigate
 where racket puts such things for your platform and add that to your path.
 
 ```bash
-grift -o f5 test/suite/program/fact-church-5.grift
+grift -o f5 tests/suite/program/fact-church-5.grift
 ./f5
 ```
 
