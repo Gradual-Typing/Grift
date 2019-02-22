@@ -53,9 +53,9 @@ documentation here.
 ```bnf
 Expression, E  ::= 
 Ascription     |   (ann E T [Blame Label])
-Binding        |   (let ((X [: T] E) ...) [: T] E)
-               |   (letrec ((ID [: T] E) ...) E)
-Functions      |   (lambda (X ...) [: T] E)
+Binding        |   (let ((X [: T] E) ...) [: T] E ...)
+               |   (letrec ((ID [: T] E) ...) E ...)
+Functions      |   (lambda (X ...) [: T] E ...)
 Application    |   (E_rator E_rand ...)
 Conditionals   |   (if E_cond E_conseq E_alt)
 Iteration      |   (repeat (x_i E_start E_end) [(x_acc E_init)] E)
@@ -66,11 +66,13 @@ Floats         |   n_f64 | (op_float E ...)
 Tuples         |   (tuple E ...) | (tuple-proj E n)
 References     |   (box E) | (unbox E) | (box-set! E_box E_box_update)
                |   (make-vector E E) | (vector-ref E E) | (vector-set! E E E)
-ops            ::=  + | -  | * | binary-and | binary-or | ...
-               |    fl+ | fl- | fl* | ...
-               | < | <= | = | >= | > | ...
-               | fl< | fl<= | fl= | fl>= | fl> | ...
-Type, T        ::= Dyn | Int | Bool | Unit | (-> Type ...) | (Ref Type)
+ops            ::= + | -  | * | binary-and | binary-or | ...
+               |   fl+ | fl- | fl* | ...
+               |   < | <= | = | >= | > | ...
+               |   fl< | fl<= | fl= | fl>= | fl> | ...
+Type, T        ::= Dyn | Unit | Bool | Int | Float 
+	           |   (-> Type ...) | (Ref Type) | (Vect Type) | (Tuple Type ...)
+			   |   X | (Rec X Type)
 ```
 
 ### Tinkering with the compiler
