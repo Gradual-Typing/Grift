@@ -53,7 +53,7 @@ documentation here.
 ```bnf
 Variables, X   ::= X
 Formals, F     ::= X | [X : Type]
-TopLevel, TE   ::= (define X E) | (define (X F ...) E ...) | E | TE ...
+TopLevel, TE   ::= (define X E) | (define (X F ...) [: T] E ...) | E | TE ...
 Expression, E  ::=
 Ascription     |   (ann E T [Blame Label])
 Binding        |   (let ((X [: T] E) ...) [: T] E ...)
@@ -74,8 +74,8 @@ ops            ::= + | -  | * | binary-and | binary-or | ...
                |   < | <= | = | >= | > | ...
                |   fl< | fl<= | fl= | fl>= | fl> | ...
 Type, T        ::= Dyn | Unit | Bool | Int | Float 
-               |   (-> Type ...) | (Ref Type) | (Vect Type) | (Tuple Type ...)
-               |   X | (Rec X Type)
+               |   (-> T ...) | (Ref T) | (Vect T) | (Tuple T ...)
+               |   X | (Rec X T)
 ```
 
 ### Tinkering with the compiler
