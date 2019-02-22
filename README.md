@@ -51,11 +51,14 @@ we will try to document the language more carefully and link to that
 documentation here.
 
 ```bnf
-Expression, E  ::= 
+Variables, X   ::= X
+Formals, F     ::= X | [X : Type]
+TopLevel, TE   ::= (define X E) | (define (ID F ...) E ...) | E | TE ...
+Expression, E  ::=
 Ascription     |   (ann E T [Blame Label])
 Binding        |   (let ((X [: T] E) ...) [: T] E ...)
                |   (letrec ((ID [: T] E) ...) E ...)
-Functions      |   (lambda (X ...) [: T] E ...)
+Functions      |   (lambda (F ...) [: T] E ...)
 Application    |   (E_rator E_rand ...)
 Conditionals   |   (if E_cond E_conseq E_alt)
 Iteration      |   (repeat (x_i E_start E_end) [(x_acc E_init)] E)
@@ -71,8 +74,8 @@ ops            ::= + | -  | * | binary-and | binary-or | ...
                |   < | <= | = | >= | > | ...
                |   fl< | fl<= | fl= | fl>= | fl> | ...
 Type, T        ::= Dyn | Unit | Bool | Int | Float 
-	           |   (-> Type ...) | (Ref Type) | (Vect Type) | (Tuple Type ...)
-			   |   X | (Rec X Type)
+               |   (-> Type ...) | (Ref Type) | (Vect Type) | (Tuple Type ...)
+               |   X | (Rec X Type)
 ```
 
 ### Tinkering with the compiler
