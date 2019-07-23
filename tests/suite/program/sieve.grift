@@ -62,7 +62,7 @@
 ;; Compute the 10,000th prime number
 (define N-1 : Int 9999)
 
-(define (main) : ()
+(define (main) : Unit
   (begin
     #;(display "The ")
     #;(print-int (+ N-1 1))
