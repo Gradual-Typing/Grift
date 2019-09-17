@@ -11,12 +11,13 @@ of the cast calculus.
  "./insert-casts.rkt"
  "./read.rkt"
  "./syntax-to-grift0.rkt"
- "./type-check.rkt")
+ "./type-check.rkt"
+ "../language/contracts.rkt")
 
 (provide reduce-to-cast-calculus)
 
 (define (reduce-to-cast-calculus path)
-  (insert-casts (type-check (syntax->grift0 (read path)))))
+  (insert-casts ((optionally-contract type-check) (syntax->grift0 (read path)))))
 
 
 

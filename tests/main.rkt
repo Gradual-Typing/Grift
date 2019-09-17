@@ -208,6 +208,8 @@
  #:once-any
  ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
  ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
+ #:once-each
+ [("-C" "--with-contracts") "Check compiler invariants" (with-contracts #t)]
  #:args ()
  (debug off (test-suite-dir) (test-cast-representation))
  ((main-function)))
