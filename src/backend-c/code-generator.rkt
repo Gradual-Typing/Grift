@@ -101,8 +101,8 @@
             (unless (null? s)
               (display (car s))
               (display " ")
-              (loop (cdr s)))
-            (display (default-flags)))))))
+              (loop (cdr s))))
+          (display (default-flags))))))
 
 ;; C compiler warnings written with regard to clang
 ;; I need to check to make sure that these option will work with gcc
