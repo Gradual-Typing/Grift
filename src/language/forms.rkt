@@ -4,7 +4,8 @@
  "../unique-identifiers.rkt"
  "../errors.rkt"
  "../logging.rkt"
- (for-syntax racket/base)
+ (for-syntax racket/base racket/syntax)
+ racket/contract/base
  racket/match
  racket/set)
 
@@ -32,12 +33,19 @@ name-field2 - accessor for field2
 And a type constructor "name" expecting the types of field1 and field2 
 |#
 
+
 (define-syntax (define-forms stx)
   (syntax-case stx ()
     [(_ super (name* field** ...) ...)
-     #'(begin
-         (struct name* super (field** ...) #:transparent)
-         ...)]))
+     (begin
+       (define (f name) (format-id stx "~a/c" name))
+       (with-syntax ([(name/c* ...) (map f (syntax->list #'(name* ...)))])
+         #'(begin
+             (struct name* super (field** ...) #:transparent)
+             ...
+             (define (name/c* field** ...)
+               (struct/c name* field** ...))
+             ...)))]))
 
 ;; These struct types describe how AST are mapped
 ;; and form a unsafe description of how to map an AST
@@ -881,6 +889,18 @@ class literal constants
    code ; Expr, but it is bogus if code-generation == 'code-only
    )
   #:transparent)
+(define closure-code-generation/c (symbols 'regular 'code-only 'closure-only))
+(define (Closure/c E)
+  (struct/c Closure
+            Uid?
+            boolean?
+            closure-code-generation/c
+            Uid?
+            Uid?
+            Uid?
+            (or/c (listof Uid?) (listof E))
+            (listof Uid?)
+            E))
 
 (struct Closure-Code form:simple-branch
   (arg)

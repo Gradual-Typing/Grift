@@ -143,9 +143,14 @@
      (symbol->primitive sym/prim err)]
     [else sym/prim]))
 
+(define (grift-primitive? p)
+  (or (and (symbol? p) (symbol->primitive p #f) #t)
+      (primitive? p)))
+
 (define (grift-primitive-effect? p)
   (primitive-effectfull? (grift-primitive p)))
 
 (module+ test
   (require rackunit)
-  (check-true (Fn? (grift-primitive->type 'flacos))))
+  (check-true (Fn? (grift-primitive->type 'flacos)))
+  (check-true (grift-primitive? 'read-bool)))

@@ -48,8 +48,9 @@
       [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
    [("--check-asserts")
-    ((format "Compile coded with assertions (~a)" (check-asserts?)))
+    ((format "Compile code with assertions (~a)" (check-asserts?)))
     (check-asserts? #t)]
+   [("--with-contracts" "-C") "enable contract checking in the compiler" (with-contracts #t)]
    [("--assert-statically-typed")
     "Raise an error unless the program is statically typed"
     (program-must-be-statically-typed?)]

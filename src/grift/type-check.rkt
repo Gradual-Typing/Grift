@@ -1,4 +1,4 @@
-#lang typed/racket/base/no-check
+#lang racket/base
 #|------------------------------------------------------------------------------+
 |Pass: compiler/grift/typecheck                                                  |
 +-------------------------------------------------------------------------------+
@@ -27,15 +27,21 @@ Provide a comment for how each pass is layed out in code.
 Provide comments about where to find definitions of types and data
 +------------------------------------------------------------------------------|#
 
-(require racket/function
-         racket/match
-         racket/set
-         "../configuration.rkt"
-         "../errors.rkt"
-         "../language/forms.rkt"
-         "../language/pprint.rkt"
-         "../language/primitives.rkt"
-         "../logging.rkt")
+(require
+ racket/contract
+ racket/contract/option
+ racket/function
+ racket/list
+ racket/match
+ racket/set
+ "../configuration.rkt"
+ "../errors.rkt"
+ "../language/contracts.rkt"
+ "../language/forms.rkt"
+ "../language/pprint.rkt"
+ "../language/primitives.rkt"
+ "../language/grift.rkt"
+ "../logging.rkt")
 
 (module+ test
   (require rackunit)
@@ -43,16 +49,12 @@ Provide comments about where to find definitions of types and data
     (current-unique-counter (make-unique-counter 0)))
   (define s (srcloc #f #f #f #f #f)))
 
-
-(require/typed racket/base
-  [srcloc->string (srcloc -> String)])
-
 (provide
  type-check
  unfold-possible-mu)
 
-(: type-check (Grift0-Lang -> Grift1-Lang))
-(define (type-check prgm)
+(define/contract (type-check prgm)
+  (option/c (-> Grift-Lang/c any/c))
   (define who 'type-check)
   (match-define (Prog (list n c) top-level*) prgm)
 
@@ -64,8 +66,10 @@ Provide comments about where to find definitions of types and data
   (debug off
          (Prog (list n (unique-counter-next! uc) INT-TYPE) g1-top-level*)))
 
-(: tc-top* : G0-Top* Env -> G1-Top*)
-(define (tc-top* t* env)
+(define Env/c hash?)
+
+(define/contract (tc-top* t* env)
+  (option/c (-> G0-Top*/c Env/c any/c))
   (match t*
     [(cons (Ann2 (Define #f i t? e) s) t*-rest)
      (define-values (new-e e-type) (tc-expr e env))
@@ -85,12 +89,13 @@ Provide comments about where to find definitions of types and data
      ;; This makes a two pass sweep of consequtive recursive bindings
      ;; The first pass "infers" and accumulates the recursive environment
      ;; The second pass does the actual type-checking
-     (define-type G0-Rec-Def  (Ann2 (Define #t Uid (Option Grift-Type) G0-Ann-Expr) srcloc))
-     (define-type G0-IRec-Def  (Ann2 (Define #t Uid Grift-Type G0-Ann-Expr) srcloc))
-     (define-type G0-IRec-Def* (Listof G0-IRec-Def))
-     (define-type G1-IRec-Def  (Define #t Uid Grift-Type G1-Ann-Expr))
 
-     (: tc-rec-define : Env -> (G0-IRec-Def -> G1-IRec-Def))
+     ;; (define-type G0-Rec-Def  (Ann2 (Define #t Uid (Option Grift-Type) G0-Ann-Expr) srcloc))
+     ;; (define-type G0-IRec-Def  (Ann2 (Define #t Uid Grift-Type G0-Ann-Expr) srcloc))
+     ;; (define-type G0-IRec-Def* (Listof G0-IRec-Def))
+     ;; (define-type G1-IRec-Def  (Define #t Uid Grift-Type G1-Ann-Expr))
+
+     ;(: tc-rec-define : Env -> (G0-IRec-Def -> G1-IRec-Def))
      (define ((tc-rec-define env) d)
        ;; The valid-id-type variable has already been validated in
        ;; tc-rec-define*
@@ -102,7 +107,7 @@ Provide comments about where to find definitions of types and data
                 (srcloc->string src) valid-id-type expr-type))
        (Define #t id valid-id-type new-expr))
 
-     (: tc-rec-define* : G0-Top* Env G0-IRec-Def* -> G1-Top*)
+     ;(: tc-rec-define* : G0-Top* Env G0-IRec-Def* -> G1-Top*)
      (define (tc-rec-define* t* env i*)
        (match t*
          ;; Scan through then next consective recusive bindings in t*
@@ -119,7 +124,7 @@ Provide comments about where to find definitions of types and data
           (define c* (map (tc-rec-define env) i*)) 
           (define c*-rest (tc-top* t*-rest env))
           ;; reverse c* and append c*-rest
-          (foldl (inst cons G1-Top G1-Top*) c*-rest c*)]))
+          (foldl cons c*-rest c*)]))
      (tc-rec-define* t* env '())]
     [(cons (Ann2 (Observe expr #f) src) t*-rest)
      (define-values (new-expr type) (tc-expr expr env))
@@ -127,9 +132,9 @@ Provide comments about where to find definitions of types and data
     [(list) '()]
     [other (error 'tc-top* "unhandled case: ~a" other)]))
 
-(define-type Env (HashTable Uid Grift-Type))
 
-(: env-extend* : Env Uid* Grift-Type* -> Env)
+
+;(: env-extend* : Env Uid* Grift-Type* -> Env)
 (define (env-extend* e x* v*) 
   (for/fold ([e e]) ([x (in-list x*)] [v (in-list v*)])
     (hash-set e x v)))
@@ -137,15 +142,19 @@ Provide comments about where to find definitions of types and data
 ;; Checks to make sure Mu types obey the productivity check
 ;; Return the a version of type where superflouos mu are droped
 ;; and unrolled Mus are rerolled.
-(: validate-type : srcloc Grift-Type -> Grift-Type)
-(define (validate-type src t)
+;(: validate-type : srcloc Grift-Type -> Grift-Type)
+(define/contract (validate-type src t)
+  (option/c (-> srcloc? type? type?) #:with-contract #t)
+
   (define who 'validate-type)
   (debug who src t)
-  (: eqs (HashTable Grift-Type Grift-Type))
-  (define eqs (make-hash '()))
-  (: vt : (Setof Uid) -> (Grift-Type -> Grift-Type))
-  (define (vt pending)
-    (: rec : Grift-Type -> Grift-Type)
+
+  (define/contract eqs
+    (option/c (hash/c type? type?))
+    (make-hash '()))
+
+  (define/contract (vt pending)
+    (option/c (-> (set/c Uid?) (-> type? type?)) #:with-contract #t)
     (define (rec t)
       (cond
         [(Mu? t)
@@ -201,8 +210,8 @@ Provide comments about where to find definitions of types and data
    (Fn 0 '() (Dyn))))
 
 ;; Assumed to not validate types
-(: synthesize-recursive-binding-type :
-   (Option Grift-Type) G0-Ann-Expr -> (Values Grift-Type G0-Ann-Expr))
+;; (: synthesize-recursive-binding-type :
+;;    (Option Grift-Type) G0-Ann-Expr -> (Values Grift-Type G0-Ann-Expr))
 (define (synthesize-recursive-binding-type id-type? rhs)
   ;; Normally a binding construct assumes that the lack of type
   ;; annotation means to infer the type of the rhs, but recursive
@@ -218,8 +227,7 @@ Provide comments about where to find definitions of types and data
      (match rhs
        [(Ann (Lambda (and f* (list (Fml _ _) ...)) (list b return-type?))
              s)
-        (define fml-type (inst Fml-type Uid Grift-Type))
-        (define t* (map fml-type f*))
+        (define t* (map Fml-type f*))
         (cond
           [return-type?
            (define id-type (Fn (length t*) t* return-type?))
@@ -246,8 +254,8 @@ The type rules for core forms that have interesting type rules
 ;; The type of a lambda that is annotated is the type of the annotation
 ;; as long as the annotation is consistent with the type of the
 ;; body
-(: lambda-type-rule (-> Src Grift-Type* Grift-Type Grift-Type?
-			(Fn Index Grift-Type* Grift-Type)))
+;; (: lambda-type-rule (-> Src Grift-Type* Grift-Type Grift-Type?
+;; 			(Fn Index Grift-Type* Grift-Type)))
 (define (lambda-type-rule src ty-param* t-body return-ann)
   (cond
     [(not return-ann) (Fn (length ty-param*) ty-param* t-body)]
@@ -273,7 +281,7 @@ The type rules for core forms that have interesting type rules
    #rx"static type error:"
    (lambda () (lambda-type-rule s '() (Int) (Bool)))))
 
-(: tuple-type-rule (Grift-Type* -> Grift-Type))
+;(: tuple-type-rule (Grift-Type* -> Grift-Type))
 (define (tuple-type-rule t*)
   (STuple (length t*) t*))
 
@@ -326,7 +334,7 @@ The type rules for core forms that have interesting type rules
                            (STuple 2 (list (Int) (Dyn))))
                 (STuple 2 (list (Int) (Mu (Scope (STuple 2 (list (Int) (TVar 0)))))))))
 
-(: tuple-proj-type-rule (Grift-Type Integer -> Grift-Type))
+;(: tuple-proj-type-rule (Grift-Type Integer -> Grift-Type))
 (define (tuple-proj-type-rule ty i)
   (define proj-arity (add1 i))
   (define proj-template (STuple proj-arity (make-list proj-arity DYN-TYPE)))
@@ -348,7 +356,7 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of a annotated let binding is the type of the annotation
 ;; as long as it is consistent with the type of the expression.
-(: let-binding-type-rule (-> Grift-Type? Grift-Type Uid Src Grift-Type))
+;(: let-binding-type-rule (-> Grift-Type? Grift-Type Uid Src Grift-Type))
 (define (let-binding-type-rule t-bnd t-exp id src)
   (cond
     [(not t-bnd) t-exp]
@@ -357,8 +365,8 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of a cast is the cast-type if the expression type and
 ;; the cast type are consistent.
-(: ascription-type-rule (-> Grift-Type Grift-Type Src (Option String)
-			    Grift-Type))
+;; (: ascription-type-rule (-> Grift-Type Grift-Type Src (Option String)
+;; 			    Grift-Type))
 (define (ascription-type-rule ty-exp ty-cast src label)
   (if (not (consistent? ty-exp ty-cast))
       (if label
@@ -374,8 +382,8 @@ The type rules for core forms that have interesting type rules
 ;; The type of an if is the join of the consequence and alternative
 ;; types if the type of the branches are consistent and the test is
 ;; consistent with Bool.
-(: if-type-rule (-> Grift-Type Grift-Type Grift-Type Src
-		    Grift-Type))
+;; (: if-type-rule (-> Grift-Type Grift-Type Grift-Type Src
+;; 		    Grift-Type))
 (define (if-type-rule t-tst t-csq t-alt src)
   (define if-t (join t-csq t-alt))
   (cond
@@ -385,7 +393,7 @@ The type rules for core forms that have interesting type rules
      (error 'if-inconsistent-branches "~a ~a ~a" src t-csq t-alt)]
     [else if-t]))
 
-(: switch-type-rule : Grift-Type Grift-Type* Grift-Type -> Grift-Type)
+;(: switch-type-rule : Grift-Type Grift-Type* Grift-Type -> Grift-Type)
 (define (switch-type-rule exp clause* default)
   (define switch-t (join+ (cons default clause*)))
   (cond
@@ -398,7 +406,7 @@ The type rules for core forms that have interesting type rules
     [else switch-t]))
 
 ;; The type of literal constants are staticly known
-(: const-type-rule (Grift-Literal -> Base-Type))
+;(: const-type-rule (Grift-Literal -> Base-Type))
 (define (const-type-rule c)
   (define who 'type-check/const-type-rule)
   (grift-literal->base-type c))
@@ -406,7 +414,7 @@ The type rules for core forms that have interesting type rules
 ;; The type of an application is the return type of the applied
 ;; procedure given that the arguments are consistent with the
 ;; arguments types of the proceedure.
-(: application-type-rule (-> Grift-Type Grift-Type* Src Grift-Type))
+;(: application-type-rule (-> Grift-Type Grift-Type* Src Grift-Type))
 (define (application-type-rule t-rator t-rand* src)
   (match (unfold-possible-mu t-rator)
     [(Dyn) (Dyn)]
@@ -471,10 +479,10 @@ The type rules for core forms that have interesting type rules
 ;; I am really just defining this in order to maintain
 ;; the abstraction but the type of a begin is the type
 ;; of it's final argument
-(: begin-type-rule (-> Grift-Type* Grift-Type Grift-Type))
+;(: begin-type-rule (-> Grift-Type* Grift-Type Grift-Type))
 (define (begin-type-rule t* ty) ty)
 
-(: repeat-type-rule (Grift-Type Grift-Type Grift-Type Grift-Type -> Grift-Type))
+;(: repeat-type-rule (Grift-Type Grift-Type Grift-Type Grift-Type -> Grift-Type))
 (define (repeat-type-rule tstart tstop tacc tbody)
   (cond
     [(not (consistent? tstart INT-TYPE))
@@ -493,13 +501,13 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of wrapping a value in a gaurded box is a
 ;; Gref of the value's type
-(: gbox-type-rule (-> Grift-Type Grift-Type))
+;(: gbox-type-rule (-> Grift-Type Grift-Type))
 (define (gbox-type-rule ty) (GRef ty))
 
 ;; The type of unwrapping a Dyn value is also Dyn
 ;; The type of unwrapping a Ref is the type that the reference is
 ;; parameterized by.
-(: gunbox-type-rule (-> Grift-Type Grift-Type))
+;(: gunbox-type-rule (-> Grift-Type Grift-Type))
 (define (gunbox-type-rule ty)
   (match ty
     [(Dyn) DYN-TYPE]
@@ -507,7 +515,7 @@ The type rules for core forms that have interesting type rules
     [otherwise (error 'type-check/todo)]))
 
 ;; The type of setting a reference is always unit
-(: gbox-set!-type-rule (-> Grift-Type Grift-Type Grift-Type))
+;(: gbox-set!-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (gbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) UNIT-TYPE]
@@ -524,13 +532,13 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of wrapping a value in a monotonic box is a
 ;; MRef of the value's type
-(: mbox-type-rule (-> Grift-Type Grift-Type))
+;(: mbox-type-rule (-> Grift-Type Grift-Type))
 (define (mbox-type-rule ty) (MRef ty))
 
 ;; The type of unboxing a Dyn value is also Dyn
 ;; The type of unboxing a MRef is the type that the reference is
 ;; parameterized by.
-(: munbox-type-rule (-> Grift-Type Grift-Type))
+;(: munbox-type-rule (-> Grift-Type Grift-Type))
 (define (munbox-type-rule ty)
   (match ty
     [(Dyn) DYN-TYPE]
@@ -539,7 +547,7 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of setting a dyn value is dyn
 ;; The type of setting a MRef value is the type of the argument
-(: mbox-set!-type-rule (-> Grift-Type Grift-Type Grift-Type))
+;(: mbox-set!-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (mbox-set!-type-rule box-ty val-ty)
   (match box-ty
     [(Dyn) UNIT-TYPE]
@@ -548,7 +556,7 @@ The type rules for core forms that have interesting type rules
                   (error 'type-check/todo))]
     [otherwise (error 'type-check/todo)]))
 
-(: mbox-val-type (-> Grift-Type Grift-Type))
+;(: mbox-val-type (-> Grift-Type Grift-Type))
 (define (mbox-val-type box-ty)
   (match box-ty
     [(Dyn) DYN-TYPE]
@@ -557,7 +565,7 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of creating an array is Vect of the type of the initializing argument
 ;; The size argument must be consistent with Int
-(: gvector-type-rule (-> Grift-Type Grift-Type Grift-Type))
+;(: gvector-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (gvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (GVect init-ty)
@@ -566,7 +574,7 @@ The type rules for core forms that have interesting type rules
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
 ;; The type of the index must be consistent with Int
-(: gvector-ref-type-rule (-> Grift-Type Grift-Type Grift-Type))
+;(: gvector-ref-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (gvector-ref-type-rule vect-ty index-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -581,7 +589,7 @@ The type rules for core forms that have interesting type rules
 ;; The indice must be consistent with int
 
 ;; FIXME: return unit after setting a vector cell
-(: gvector-set!-type-rule (-> Grift-Type Grift-Type Grift-Type Grift-Type))
+;(: gvector-set!-type-rule (-> Grift-Type Grift-Type Grift-Type Grift-Type))
 (define (gvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -595,19 +603,19 @@ The type rules for core forms that have interesting type rules
 
 ;; The type of creating an array is Vect of the type of the initializing argument
 ;; The size argument must be consistent with Int
-(: mvector-type-rule (-> Grift-Type Grift-Type Grift-Type))
+;(: mvector-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (mvector-type-rule size-ty init-ty)
   (if (consistent? size-ty INT-TYPE)
       (MVect init-ty)
       (error 'type-check/todo)))
 
-(: mvector-length-type-rule (-> Grift-Type Grift-Type))
+;(: mvector-length-type-rule (-> Grift-Type Grift-Type))
 (define (mvector-length-type-rule vect-ty)
   (if (or (MVect? vect-ty) (Dyn? vect-ty))
       INT-TYPE
       (error 'type-check/todo)))
 
-(: gvector-length-type-rule (-> Grift-Type Grift-Type))
+;(: gvector-length-type-rule (-> Grift-Type Grift-Type))
 (define (gvector-length-type-rule vect-ty)
   (if (or (GVect? vect-ty) (Dyn? vect-ty))
       INT-TYPE
@@ -616,7 +624,7 @@ The type rules for core forms that have interesting type rules
 ;; The type of reffing into an Dyn is Dyn
 ;; The type of reffing into a Vect T is T
 ;; The type of the index must be consistent with Int
-(: mvector-ref-type-rule (-> Grift-Type Grift-Type Grift-Type))
+;(: mvector-ref-type-rule (-> Grift-Type Grift-Type Grift-Type))
 (define (mvector-ref-type-rule vect-ty index-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -629,7 +637,7 @@ The type rules for core forms that have interesting type rules
 ;; The new value as long as the new value is consistent with the old value
 ;; The type of setting a Dyn is Dyn
 ;; The indice must be consistent with int
-(: mvector-set!-type-rule (-> Grift-Type Grift-Type Grift-Type Grift-Type))
+;(: mvector-set!-type-rule (-> Grift-Type Grift-Type Grift-Type Grift-Type))
 (define (mvector-set!-type-rule vect-ty index-ty val-ty)
   (if (consistent? index-ty INT-TYPE)
       (match vect-ty
@@ -640,7 +648,7 @@ The type rules for core forms that have interesting type rules
         [otherwise (error 'type-check/todo)])
       (error 'type-check/todo)))
 
-(: mvector-val-type (-> Grift-Type Grift-Type))
+;(: mvector-val-type (-> Grift-Type Grift-Type))
 (define (mvector-val-type vect-ty)
   (match vect-ty
     [(Dyn) DYN-TYPE]
@@ -648,60 +656,67 @@ The type rules for core forms that have interesting type rules
     [otherwise (error 'type-check/mvector-val-type)]))
                       
 ;;; Procedures that destructure and restructure the ast
-(: tc-expr (-> G0-Ann-Expr Env (values G1-Ann-Expr Grift-Type)))
-(define (tc-expr exp env)
+;(: tc-expr (-> G0-Ann-Expr Env (values G1-Ann-Expr Grift-Type)))
+(define/contract (tc-expr exp env)
+  (option/c
+   (-> G0-Ann-Expr/c (hash/c Uid? type?) (values any/c type?))
+   #:with-contract #t)
   (debug 'tc-expr exp env)
-  (: env-extend/bnd ((Bnd Uid Grift-Type Any) Env -> Env))
-  (define (env-extend/bnd b env)
+
+  (define/contract (env-extend/bnd b env)
+    (option/c
+     (-> (Bnd/c Uid? type? any/c) (hash/c Uid? type?) (hash/c Uid? type?))
+     #:with-contract #t)
     (match-let ([(Bnd i t _) b])
       (hash-set env i t)))
-  (: letrec-synth-bnd-type :
-     (Bnd Uid (Option Grift-Type) G0-Ann-Expr) -> (Bnd Uid Grift-Type G0-Ann-Expr))
+
+  ;; (: letrec-synth-bnd-type :
+  ;;    (Bnd Uid (Option Grift-Type) G0-Ann-Expr) -> (Bnd Uid Grift-Type G0-Ann-Expr))
   (define (letrec-synth-bnd-type bnd)
+    (option/c
+     (-> (Bnd/c Uid? (?/c type?) G0-Ann-Expr/c) (Bnd/c Uid? type? G0-Ann-Expr/c))
+     #:with-contract #t)
     (match-define (Bnd id id-type? rhs) bnd)
     (define-values (id-type new-rhs)
       (synthesize-recursive-binding-type id-type? rhs))
     (Bnd id id-type new-rhs))
-  (: map-letrec-synth-bnd-type :
-     (Listof (Bnd Uid (Option Grift-Type) G0-Ann-Expr)) ->
-     (Listof (Bnd Uid Grift-Type G0-Ann-Expr)))
-  (define (map-letrec-synth-bnd-type bnd*)
+
+  (define (map-letrec-synth-bnd-type bnd*)    
     (map letrec-synth-bnd-type bnd*))
-  (: map-recur (G0-Ann-Expr* -> (Values G1-Ann-Expr* Grift-Type*)))
+
   (define (map-recur e*)
-    (for/lists ([e* : G1-Ann-Expr*] [t* : Grift-Type*]) ([e e*])
+    (for/lists (e* t*) ([e e*])
       (tc-expr e env)))
-  (: recur-switch-case* :
-     (Switch-Case* G0-Ann-Expr) ->
-     (Values (Switch-Case* G1-Ann-Expr) Grift-Type*))
-  (define (recur-switch-case* c*)
+
+  (define (recur-switch-case* c*)    
     (map-switch-case2* recur c*))
-  (: recur (-> G0-Ann-Expr (Values G1-Ann-Expr Grift-Type)))
-  (define (recur e)
-    (: src srcloc)
+  ;; (: recur (-> G0-Ann-Expr (Values G1-Ann-Expr Grift-Type)))
+  (define/contract (recur e)
+    (option/c
+     (-> G0-Ann-Expr/c (values any/c type?))
+     #:with-contract #t)
+
     (define src (Ann-data e))
-    (: validate : Grift-Type -> Grift-Type)
+
     (define (validate t) (validate-type src t))
-    (: new-exp G1-Expr)
-    (: type Grift-Type)
-    (define (trace-type-error [e : exn])
+ 
+    (define (trace-type-error e)
       (printf "error while type-checking: ~a\n" (srcloc->string src))
       (raise e))
+
     (define-values (new-exp type)
       (with-handlers ([exn? trace-type-error])
         (match (Ann-value e)
           [(Lambda f* (list b t?))
-           (define i* (map (inst Fml-identifier Uid Grift-Type) f*))
-           (define t* (map (inst Fml-type Uid Grift-Type) f*))
+           (define i* (map Fml-identifier f*))
+           (define t* (map Fml-type f*))
            (define vt* (map validate t*))
            (define vt? (and t? (validate t?)))
            (define-values (body type-of-body) (tc-expr b (env-extend* env i* vt*)))
            (values (Lambda f* body)
                    (lambda-type-rule src vt* type-of-body vt?))]
           [(Letrec (app map-letrec-synth-bnd-type bnd*) body)
-           ;; letrce-infer-bnd-type maps validate type
            (define recursive-env (foldr env-extend/bnd env bnd*))
-           (: rec/env : G0-Ann-Expr -> (Values G1-Ann-Expr Grift-Type))
            (define (rec/env e) (tc-expr e recursive-env))
            (define new-bnd (map (tc-binding src rec/env) bnd*))
            (define-values (new-body type) (rec/env body))
@@ -788,47 +803,44 @@ The type rules for core forms that have interesting type rules
            (values (Create-tuple e*) (tuple-type-rule t*))]
           [(Tuple-proj (app recur e t) i)
            (values (Tuple-proj e i) (tuple-proj-type-rule t i))]
-          [other (error 'type-check "unmatched ~a" other)]))
-      )
+          [other (error 'type-check "unmatched ~a" other)])))
     (values (Ann new-exp (cons src type)) type))
   (recur exp))
 
 
 ;; Type checks the rhs to be consistent with type annotation if
 ;; provided the resulting type is the type of the annotation.
-(: tc-binding :
-   Src (-> G0-Ann-Expr (values G1-Ann-Expr Grift-Type)) -> (-> G0-Bnd G1-Bnd))
+;; (: tc-binding :
+;;    Src (-> G0-Ann-Expr (values G1-Ann-Expr Grift-Type)) -> (-> G0-Bnd G1-Bnd))
 (define ((tc-binding src tc-expr) bnd)
   (match-define (Bnd id t0 rhs) bnd)
   (define-values (new-rhs rhs-type) (tc-expr rhs))
   (define t1 (let-binding-type-rule (and t0 (validate-type src t0)) rhs-type id src))
   (Bnd id t1 new-rhs))
 
-(: map-tc-binding :
-   Src (-> G0-Ann-Expr (values G1-Ann-Expr Grift-Type))
-   -> (-> G0-Bnd* G1-Bnd*))
+;; (: map-tc-binding :
+;;    Src (-> G0-Ann-Expr (values G1-Ann-Expr Grift-Type))
+;;    -> (-> G0-Bnd* G1-Bnd*))
 (define ((map-tc-binding src tc-expr) bnd*)
   (map (tc-binding src tc-expr) bnd*))
 
 
-(: map-switch-case2 :
-   (All (A B C)
-        (A -> (Values B C))
-        (Switch-Case A) ->
-        (Values (Switch-Case B) C)))
+;; (: map-switch-case2 :
+;;    (All (A B C)
+;;         (A -> (Values B C))
+;;         (Switch-Case A) ->
+;;         (Values (Switch-Case B) C)))
 (define (map-switch-case2 f c)
   (define-values (r0 r1) (f (cdr c)))
   (values (cons (car c) r0) r1))
-(: map-switch-case2* :
-   (All (A B C)
-        (A -> (Values B C))
-        (Switch-Case* A)
-        ->
-        (Values (Switch-Case* B) (Listof C))))
+;; (: map-switch-case2* :
+;;    (All (A B C)
+;;         (A -> (Values B C))
+;;         (Switch-Case* A)
+;;         ->
+;;         (Values (Switch-Case* B) (Listof C))))
 (define (map-switch-case2* f a*)
-  (for/lists ([b* : (Switch-Case* B)]
-              [c* : (Listof C)])
-             ([a a*])
+  (for/lists (b* c*) ([a a*])
     (map-switch-case2 f a)))
 
 
@@ -836,7 +848,8 @@ The type rules for core forms that have interesting type rules
 ;; where the outermost type is a concrete type constructor (like ->, Tuple, etc.) as
 ;; opposed to logical (like Rec).
 ;; NOTE: this should only be called on types that have been converted to normal form. 
-(define (unfold-possible-mu t)
+(define/contract (unfold-possible-mu t)
+  (option/c (-> type? type?) #:with-contract #t)
   (let rec ([t t])
     (match t
       [(Mu s) (unfold-possible-mu (grift-type-instantiate s t))]
