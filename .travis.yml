@@ -6,8 +6,8 @@ env:
 - PATH=~/racket/bin:$PATH
 
 before_install:
-- export DISPLAY=:99.0
-- curl -L -o installer.sh http://plt.eecs.northwestern.edu/snapshots/current/installers/racket-test-current-x86_64- linux-precise.sh
+- "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16"
+- curl -L -o installer.sh http://www.cs.utah.edu/plt/snapshots/current/installers/racket-current-x86_64-linux-precise.sh
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
 
