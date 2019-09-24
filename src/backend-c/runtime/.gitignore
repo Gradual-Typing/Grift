@@ -1,3 +1,6 @@
 # ignore boehm directory that gets generated
 boehm-gc-install
 boehm-gc
+castprofiler.c
+castprofiler.h
+constants.h
