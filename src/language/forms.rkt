@@ -621,7 +621,7 @@ class literal constants
 
 (struct Bottom (t1 t2) #:transparent)
 
-;; Grift-Type?! (U Bottom Grift-Type)
+;; (define-type Grift-Type?! (U Bottom Grift-Type))
 
 ;; (Bottom -> Grift-Type) -> Grift-Type, Grift-Type -> Grift-Type
 (define ((up exit) t g)
