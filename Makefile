@@ -7,8 +7,7 @@ timed:
 	time raco make main.rkt
 
 test: all
-	raco make -v tests/main.rkt
-	racket tests/main.rkt --with-contracts	
+	raco test .
 
 clean:
 	rm -f *~ *#* *.c *.out *.o *.s

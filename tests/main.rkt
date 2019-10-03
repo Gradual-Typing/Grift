@@ -166,6 +166,9 @@
 ;; Parse the command line arguments
 (define main-function (make-parameter old-run-tests))
 
+;; Default to running with contracts
+(with-contracts #t)
+
 (command-line
  #:program "grift-test-runner"
  #:once-any
@@ -209,7 +212,9 @@
  ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
  ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
  #:once-each
- [("-C" "--with-contracts") "Check compiler invariants" (with-contracts #t)]
+ [("--without-contracts" "-C")
+  "Speed up tests by not checking compiler invariants"
+  (with-contracts #f)]
  #:args ()
  (debug off (test-suite-dir) (test-cast-representation))
  ((main-function)))
