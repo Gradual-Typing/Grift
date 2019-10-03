@@ -224,8 +224,4 @@
      (Begin (list (Op p exp*)) UNIT-IMDT)]
     [else (Op p exp*)]))
 
-(define (using-c-conditional-semantics?)
-  ;; This is a poor definition of this. Perhaps all this code
-  ;; belongs in backend-c. I guess we will see when we port to sham.
-  (and (eq? data:FALSE-IMDT 0)
-       (eq? data:TRUE-IMDT 1)))
+
