@@ -1,7 +1,7 @@
 #lang typed/racket/no-check
 
 (require rackunit
-         grift/tests/test-compile)
+         "../../../test-compile.rkt")
 
 (provide (all-defined-out))
 
