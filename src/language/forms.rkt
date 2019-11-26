@@ -153,9 +153,7 @@ And a type constructor "name" expecting the types of field1 and field2
   (Copy-Tuple n v)
   (Tuple-proj tuple index)
   (Coerce-Tuple cast value coercion)
-  (Coerce-Tuple-In-Place cast value coercion mono-address base-address index)
   (Cast-Tuple cast value t1 t2 lbl)
-  (Cast-Tuple-In-Place cast value t1 t2 lbl mono-address base-address index)
   ;; Effectfull expressions
   ;; typed bindings annotations
   (Fml identifier type)

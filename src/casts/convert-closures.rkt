@@ -1185,20 +1185,17 @@ TODO We can generate better code in this pass for function casts.
 (: cast-apply-cast (Uid (Var Uid) (Listof CoC5-Expr) (Var Uid) -> CoC5-Expr))
 (define (cast-apply-cast cast-uid fun arg* crcn)
   (define cl (Code-Label cast-uid))
-  (define mono-address ZERO-EXPR)
-  (define base-address ZERO-EXPR)
-  (define index ZERO-EXPR)
   (define-values (v* b*)
     (for/lists ([v* : (Listof (Var Uid))]
                 [b* : (Bnd* CoC5-Expr)])
                ([arg arg*] [i (in-naturals)])
       (define u (next-uid! (format "fn-cast-arg~a" i)))
       (define arg-crcn (Fn-Coercion-Arg crcn (Quote i)))
-      (define args (list arg arg-crcn mono-address base-address index))
+      (define args (list arg arg-crcn))
       (values (Var u) (cons u (App-Code cl args)))))
   (define clos-app (Closure-App (Closure-Code fun) fun v*))
   (define args
-    (list clos-app (Fn-Coercion-Return crcn) mono-address base-address index))
+    (list clos-app (Fn-Coercion-Return crcn)))
   (Let b* (App-Code cl args)))
 
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
@@ -1337,12 +1334,11 @@ TODO We can generate better code in this pass for function casts.
           (app-code$
            (Code-Label cast)
            v1
-           (Fn-Coercion-Arg v2 (Quote 0)) (Quote 0) (Quote 0) (Quote 0))))
+           (Fn-Coercion-Arg v2 (Quote 0)))))
      (app-code$
       (Code-Label cast) 
       (Closure-App (Closure-Code v0) v0 (list (Var a0)))
-      (Fn-Coercion-Return v2)
-      (Quote 0) (Quote 0) (Quote 0))))
+      (Fn-Coercion-Return v2))))
   
   
   ;; TODO Write tests for most of the features of optimize closures

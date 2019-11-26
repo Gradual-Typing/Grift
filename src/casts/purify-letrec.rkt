@@ -226,10 +226,7 @@
     [(Tuple-Coercion-Num e) (recur e)]
     [(Tuple-Coercion-Item e i) (recur-all e i)]
     [(Coerce-Tuple uid e1 e2) (recur-all e1 e2)]
-    [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5) (recur-all e1 e2 e3 e4 e5)]
     [(Cast-Tuple uid e1 e2 e3 e4) (recur-all e1 e2 e3 e4)]
-    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
-     (recur-all e1 e2 e3 e4 e5 e6 e7)]
     [(Type-Tuple-Huh e) (recur e)]
     [(Type-Tuple-num e) (recur e)]
     [(Type-Tuple-item e i) (recur-all e i)]

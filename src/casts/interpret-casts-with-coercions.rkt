@@ -582,7 +582,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (add-cast-runtime-binding!
    apply-coercion-uid
-   (code$ (v c mono-address base-address index)
+   (code$ (v c)
      (cond$
       [(Id-Coercion-Huh c) v]
       [(Sequence-Coercion-Huh c)
@@ -609,23 +609,19 @@ form, to the shortest branch of the cast tree that is relevant.
                          [else (apply-code apply-coercion-uid v seq-fst mt)])])
                 (inject v (Inject-Coercion-Type c)))])]
            [else
-            (let$ ([v (apply-code apply-coercion-uid v seq-fst
-                                  mono-address base-address index)])
-              (apply-code apply-coercion-uid v seq-snd
-                          mono-address base-address index))]))]
+            (let$ ([v (apply-code apply-coercion-uid v seq-fst)])
+              (apply-code apply-coercion-uid v seq-snd))]))]
       [(Project-Coercion-Huh c)
-       (project v (Project-Coercion-Type c) (Project-Coercion-Label c)
-                mono-address base-address index)]
+       (project v (Project-Coercion-Type c) (Project-Coercion-Label c))]
       [(Inject-Coercion-Huh c)
        (inject v (Inject-Coercion-Type c))]
       [(Mediating-Coercion-Huh c)
        (cond$
         [(Fn-Coercion-Huh c) (apply-fn-coercion v c)]
         [(Tuple-Coercion-Huh c)
-         (apply-tup-coercion v c mono-address base-address index)]
+         (apply-tup-coercion v c)]
         [(Mu-Coercion-Huh c)
-         (apply-code apply-coercion-uid v (Mu-Coercion-Body c)
-                     mono-address base-address index)]
+         (apply-code apply-coercion-uid v (Mu-Coercion-Body c))]
         [(Ref-Coercion-Huh c)
          (if (cast-profiler?)
              (cond$
@@ -845,12 +841,9 @@ form, to the shortest branch of the cast tree that is relevant.
     (make-compose-coercions #:make-coercion compile-make-coercion
                             #:greatest-lower-bound greatest-lower-bound))
   (define apply-coercion-uid (next-uid! "apply-coercion"))
-  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr]
-                          [mono-address : CoC3-Expr ZERO-EXPR]
-                          [base-address : CoC3-Expr ZERO-EXPR]
-                          [index : CoC3-Expr ZERO-EXPR])
+  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr])
     : CoC3-Expr
-    (apply-code apply-coercion-uid v c mono-address base-address index))
+    (apply-code apply-coercion-uid v c))
 
   (define get-fn-cast!
     (make-fn-cast-helpers
@@ -907,11 +900,8 @@ form, to the shortest branch of the cast tree that is relevant.
        (define interp-cast-uid (next-uid! "interp-cast"))
 
        (: interp-cast Cast-Type)
-       (define (interp-cast v t1 t2 l
-                            [mono-address : CoC3-Expr ZERO-EXPR]
-                            [base-address : CoC3-Expr ZERO-EXPR]
-                            [index : CoC3-Expr ZERO-EXPR])
-         (apply-code interp-cast-uid v t1 t2 l mono-address base-address index))
+       (define (interp-cast v t1 t2 l)
+         (apply-code interp-cast-uid v t1 t2 l))
 
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
@@ -991,20 +981,12 @@ form, to the shortest branch of the cast tree that is relevant.
        (define interp-cast-uid (next-uid! "interp-cast"))
        
        (: interp-cast/coercions Cast-Type)
-       (define (interp-cast/coercions v t1 t2 l
-                                      [mono-address : CoC3-Expr ZERO-EXPR]
-                                      [base-address : CoC3-Expr ZERO-EXPR]
-                                      [index : CoC3-Expr ZERO-EXPR]) 
-         (apply-coercion v (compile-make-coercion t1 t2 l #:top-level? #t)
-                         mono-address base-address index))
+       (define (interp-cast/coercions v t1 t2 l) 
+         (apply-coercion v (compile-make-coercion t1 t2 l #:top-level? #t)))
 
        (: interp-med-cast/coercions Cast-Type)
-       (define (interp-med-cast/coercions v t1 t2 l
-                                          [mono-address : CoC3-Expr ZERO-EXPR]
-                                          [base-address : CoC3-Expr ZERO-EXPR]
-                                          [index : CoC3-Expr ZERO-EXPR])
-         (apply-coercion v (compile-make-med-coercion t1 t2 l)
-                         mono-address base-address index))
+       (define (interp-med-cast/coercions v t1 t2 l)
+         (apply-coercion v (compile-make-med-coercion t1 t2 l)))
        
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
