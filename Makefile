@@ -7,6 +7,9 @@ timed:
 	time raco make main.rkt
 
 test: all
+# Investigate why travis fails with undefined reference errors when
+# running the tests for the runtime.
+# make -C src/backend-c/runtime test
 	raco test .
 
 clean:
