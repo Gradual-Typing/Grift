@@ -22,6 +22,20 @@
 (define-runtime-path hashcons.c-path "runtime/hashcons.c")
 (define-runtime-path hashcons.h-path "runtime/hashcons.h")
 
+(: cast_queue.o-path Path)
+(: cast_queue.c-path Path)
+(: cast_queue.h-path Path)
+(define-runtime-path cast_queue.o-path "runtime/cast_queue.o")
+(define-runtime-path cast_queue.c-path "runtime/cast_queue.c")
+(define-runtime-path cast_queue.h-path "runtime/cast_queue.h")
+
+(: suspended_cast.o-path Path)
+(: suspended_cast.c-path Path)
+(: suspended_cast.h-path Path)
+(define-runtime-path suspended_cast.o-path "runtime/suspended_cast.o")
+(define-runtime-path suspended_cast.c-path "runtime/suspended_cast.c")
+(define-runtime-path suspended_cast.h-path "runtime/suspended_cast.h")
+
 (: boehm-gc.h-path Path)
 (: boehm-gc.a-path Path)
 (define-runtime-path boehm-gc-dir "runtime/boehm-gc")

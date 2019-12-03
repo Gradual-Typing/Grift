@@ -1,42 +1,16 @@
 #ifndef RUNTIME_INCLUDED
 #define RUNTIME_INCLUDED
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 #include <math.h>
+#include "obj.h"
 
-/* floatptr_t is a floating point number that is the same width as a pointer */
-#if   (__SIZEOF_POINTER__ == __SIZEOF_DOUBLE__)
-typedef double floatptr_t;
-#elif (__SIZEOF_POINTER__ == __SIZEOF_FLOAT__)
-typedef float  floatptr_t;
-#else
-#error __file__ ":" __line__ ": unsupported floating point size"
-#endif
-
-typedef union grift_obj {
-  intptr_t         as_int;
-  uintptr_t        as_uint;
-  floatptr_t       as_float;
-  union grift_obj *as_ptr;
-  void            *as_voidptr;
-} grift_obj;
-
-
-typedef union {
-  intptr_t *p;
-  intptr_t i;
-  floatptr_t f;
-} imdt;
-  
 #define imdt_to_float(x) (((imdt)(x)).f)
 #define float_to_imdt(x) (((imdt)(x)).i)
 
 #include "boehm-gc-install/include/gc/gc.h"
-// TODO these should be moved to runtime.h
-#define NULL_GRIFT_OBJ ((grift_obj)(uintptr_t)0)
 #define GRIFT_MALLOC(size) ((grift_obj)GC_MALLOC(size));
 
 
@@ -44,9 +18,13 @@ typedef union {
 
 #include "hashcons.h"
 #include "castprofiler.h"
+#include "cast_queue.h"
+#include "suspended_cast.h"
 
 extern table types_ht;
 extern int64_t types_unique_index_counter;
+extern cast_queue* mref_cast_q;
+extern cast_queue* mvect_cast_q;
 
 #include "io.h"
 
