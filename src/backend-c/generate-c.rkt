@@ -164,6 +164,7 @@
 (define (emit-var-declarations d*)
   (display "\n//These are the variable declarations\n")
   (display "\ntable types_ht;\nint64_t types_unique_index_counter;\n")
+  (display "\ncast_queue* mref_cast_q;\ncast_queue* mvect_cast_q;\n")
   (display cast-profiler/external-c-decl*)
   (display-seq (map uid->string d*) "" (string-append IMDT-C-TYPE " ") "" ";\n" ""))
 
