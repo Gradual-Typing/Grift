@@ -113,6 +113,7 @@
      (and (recur-all e d) (recur* (map (inst cdr Any CoC3.1-Expr) c*)))]
     [(Begin e* e)  (and (recur e) (recur* e*))]
     [(Repeat i e1 e2 a e3 e4) (recur-all e1 e2 e3 e4)]
+    [(While e1 e2) (recur-all e1 e2)]
     [(Break-Repeat) #f] ;; TODO consider why this is false
     [(Lambda f* (Castable c e)) (recur e)]
     [(Fn-Caster e) (recur e)]

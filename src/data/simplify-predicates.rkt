@@ -104,6 +104,7 @@
       [(Begin e* _) (sp-effect* e*)]
       [(Repeat i (app sp-trivial t1) (app sp-trivial t2) #f #f e)
        (list (Repeat i t1 t2 #f #f (Begin (sp-effect e) NO-OP)))]
+      [(While (app sp-pred e* t) e2) (snoc e* (While t (Begin (sp-effect e2) NO-OP)))]
       [(Op p t*) (list (Op p (sp-trivial* t*)))]
       [(and e (or (Halt) (No-Op))) (list e)]
       [(and v (Break-Repeat)) (list v)]

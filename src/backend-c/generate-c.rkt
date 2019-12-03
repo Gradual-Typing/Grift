@@ -399,6 +399,12 @@
             ;;(display "__asm__(\"\");")
             (emit-begin e* (void))
             (display "}\n"))]
+    [(While e (Begin e* _))
+     (begin (display "while(")
+            (emit-pred e)
+            (display ") {\n")
+            (emit-begin e* (void))
+            (display "}\n"))]
     [(Op p exp*)
      (emit-op p exp*)]
     [(Halt) (display C-EXIT)]
