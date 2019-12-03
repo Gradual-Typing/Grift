@@ -104,6 +104,7 @@
                       (Assign u2 t2)
                       (Repeat i (Var u1) (Var u2) #f #f (rco-effect e))))
         NO-OP)]
+      [(While e1 e2) (make-begin (list (While (rco-pred e1) (rco-effect e2))) NO-OP)]
       [(App-Code v v*)
        (define-values (s*1 t)  (trivialize-value v))
        (define-values (s*2 t*) (trivialize-value* v*))

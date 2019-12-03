@@ -805,6 +805,7 @@ but a static single assignment is implicitly maintained.
         [(Repeat i (app recur e1) (app recur e2) u (app recur e3) e4)
          (Repeat i e1 e2 u e3
            (recur/env e4 (extend (extend env u (Var u)) i (Var i)) cenv))]
+        [(While (app recur e1) (app recur e2)) (While e1 e2)]
         [(Break-Repeat) (Break-Repeat)]
         ;; Guarded
         [(Unguarded-Box (app recur e))

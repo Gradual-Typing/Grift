@@ -239,6 +239,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Benchmarking tools language forms
   ;; low cost repetition
   (Repeat var start end acc init body)
+  (While bool-expression expression)
   (Break-Repeat)
   ;; TODO figue out an appropriate comment about all forms here
   (Halt)

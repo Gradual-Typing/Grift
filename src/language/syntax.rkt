@@ -135,6 +135,11 @@
            (let ([i (Var iu)] [a (Var au)])
              (begin$ b* ... b))))]))
 
+(define-syntax (while$ stx)
+  (syntax-case stx ()
+    [(_ e b* ... b)
+     #'(While e (begin$ b* ... b))]))
+
 (define-syntax cond$
   (syntax-rules (else)
     [(_ [else ee* ... ee]) (begin$ ee* ... ee)]
