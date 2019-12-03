@@ -582,7 +582,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (add-cast-runtime-binding!
    apply-coercion-uid
-   (code$ (v c)
+   (code$ (v c top-level?)
      (cond$
       [(Id-Coercion-Huh c) v]
       [(Sequence-Coercion-Huh c)
@@ -609,27 +609,27 @@ form, to the shortest branch of the cast tree that is relevant.
                          [else (apply-code apply-coercion-uid v seq-fst mt)])])
                 (inject v (Inject-Coercion-Type c)))])]
            [else
-            (let$ ([v (apply-code apply-coercion-uid v seq-fst)])
-              (apply-code apply-coercion-uid v seq-snd))]))]
+            (let$ ([v (apply-code apply-coercion-uid v seq-fst top-level?)])
+              (apply-code apply-coercion-uid v seq-snd top-level?))]))]
       [(Project-Coercion-Huh c)
-       (project v (Project-Coercion-Type c) (Project-Coercion-Label c))]
+       (project v (Project-Coercion-Type c) (Project-Coercion-Label c) top-level?)]
       [(Inject-Coercion-Huh c)
        (inject v (Inject-Coercion-Type c))]
       [(Mediating-Coercion-Huh c)
        (cond$
         [(Fn-Coercion-Huh c) (apply-fn-coercion v c)]
         [(Tuple-Coercion-Huh c)
-         (apply-tup-coercion v c)]
+         (apply-tup-coercion v c top-level?)]
         [(Mu-Coercion-Huh c)
-         (apply-code apply-coercion-uid v (Mu-Coercion-Body c))]
+         (apply-code apply-coercion-uid v (Mu-Coercion-Body c) top-level?)]
         [(Ref-Coercion-Huh c)
          (if (cast-profiler?)
              (cond$
               [(Ref-Coercion-Ref-Huh c) (apply-pref-coercion v c)]
               [else (apply-pvec-coercion v c)])
              (apply-pref-coercion v c))] 
-        [(MRef-Coercion-Huh c) (mbox-cast v (MRef-Coercion-Type c))]
-        [(MVect-Coercion-Huh c) (mvec-cast v (MRef-Coercion-Type c))]
+        [(MRef-Coercion-Huh c) (mbox-cast v (MRef-Coercion-Type c) top-level?)]
+        [(MVect-Coercion-Huh c) (mvec-cast v (MRef-Coercion-Type c) top-level?)]
         [else (Blame (Quote "bad implemention of mediating coercions"))])]
       ;; the coercion must be failure
       [else
@@ -841,9 +841,9 @@ form, to the shortest branch of the cast tree that is relevant.
     (make-compose-coercions #:make-coercion compile-make-coercion
                             #:greatest-lower-bound greatest-lower-bound))
   (define apply-coercion-uid (next-uid! "apply-coercion"))
-  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr])
+  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr] [top-level? : CoC3-Expr (Quote #t)])
     : CoC3-Expr
-    (apply-code apply-coercion-uid v c))
+    (apply-code apply-coercion-uid v c top-level?))
 
   (define get-fn-cast!
     (make-fn-cast-helpers
@@ -900,8 +900,8 @@ form, to the shortest branch of the cast tree that is relevant.
        (define interp-cast-uid (next-uid! "interp-cast"))
 
        (: interp-cast Cast-Type)
-       (define (interp-cast v t1 t2 l)
-         (apply-code interp-cast-uid v t1 t2 l))
+       (define (interp-cast v t1 t2 l [top-level? (Quote #t)])
+         (apply-code interp-cast-uid v t1 t2 l top-level?))
 
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
@@ -981,13 +981,13 @@ form, to the shortest branch of the cast tree that is relevant.
        (define interp-cast-uid (next-uid! "interp-cast"))
        
        (: interp-cast/coercions Cast-Type)
-       (define (interp-cast/coercions v t1 t2 l) 
-         (apply-coercion v (compile-make-coercion t1 t2 l #:top-level? #t)))
+       (define (interp-cast/coercions v t1 t2 l [top-level? (Quote #t)])
+         (apply-coercion v (compile-make-coercion t1 t2 l #:top-level? #t) top-level?))
 
        (: interp-med-cast/coercions Cast-Type)
-       (define (interp-med-cast/coercions v t1 t2 l)
-         (apply-coercion v (compile-make-med-coercion t1 t2 l)))
-       
+       (define (interp-med-cast/coercions v t1 t2 l [top-level? (Quote #t)])
+         (apply-coercion v (compile-make-med-coercion t1 t2 l) top-level?))
+
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
        (define compile-tuple-cast/coercions

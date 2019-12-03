@@ -185,6 +185,12 @@
 (define-syntax-rule (op<=? e1 e2) (op$ <= e1 e2))
 (define-syntax-rule (op>=? e1 e2) (op$ >= e1 e2))
 
+(define-syntax (when$ stx)
+  (syntax-case stx ()
+    [(_ c b* ... b)
+     #`(let ([e (begin$ b* ... b)])
+         (If c e (No-Op)))]))
+
 (define-syntax (precondition$ stx)
   (syntax-case stx ()
     [(_ c b* ... b)
