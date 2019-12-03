@@ -302,6 +302,8 @@ And a type constructor "name" expecting the types of field1 and field2
   #:transparent)
 (struct Assoc-Stack base-type ()
   #:transparent)
+(struct Suspended-Cast base-type ()
+  #:transparent)
 (struct Bot base-type ()
   #:transparent)
 (struct Int base-type ()
@@ -426,6 +428,7 @@ And a type constructor "name" expecting the types of field1 and field2
 (define OBJ (Obj))
 (define RT-TYPE (RT-Type))
 (define ASSOC-STACK (Assoc-Stack))
+(define SUSPENDED-CAST (Suspended-Cast))
 (define BOTTOM (Bot))
 
 (define INT (Int))

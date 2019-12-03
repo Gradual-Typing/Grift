@@ -182,6 +182,11 @@
           (init-types-hash-table-slots) (types-hash-table-load-factor))
   (display "types_unique_index_counter = 0;"))
 
+(: initialize-suspended-cast-queues (-> Void))
+(define (initialize-suspended-cast-queues)
+  (display "mref_cast_q = allocate_cast_queue();\n")
+  (display "mvect_cast_q = allocate_cast_queue();\n"))
+
 (: reserve-stack-space : (Bnd* Natural) -> Void)
 (define (reserve-stack-space stack-space*)
   (for ([b stack-space*])
@@ -202,6 +207,7 @@
       (reserve-stack-space stack-space*)
       (initialize-garbage-collector)
       (initialize-types-table)
+      (initialize-suspended-cast-queues)
       (newline)
       (emit-main-tail tail)
       (print-cast-profile-result)
@@ -646,6 +652,34 @@
      (display ")")]
     [('Types-gen-index! (list))
      (display "types_unique_index_counter++")]
+    [('mref-cast-queue-enqueue (list addr ty))
+     (display "cast_queue_enqueue(mref_cast_q,")
+     (emit-value addr)
+     (display ",")
+     (emit-value ty)
+     (display ")")]
+    [('mref-cast-queue-dequeue (list))
+     (display "cast_queue_dequeue(mref_cast_q)")]
+    [('mref-cast-queue-not-empty? (list))
+     (bool->imdt (lambda () (display "cast_queue_is_not_empty(mref_cast_q)")))]
+    [('mref-cast-queue-peek-address (list))
+     (display "cast_queue_peek_address(mref_cast_q)")]
+    [('mref-cast-queue-peek-type (list))
+     (display "cast_queue_peek_type(mref_cast_q)")]
+    [('mvect-cast-queue-enqueue (list addr ty))
+     (display "cast_queue_enqueue(mvect_cast_q,")
+     (emit-value addr)
+     (display ",")
+     (emit-value ty)
+     (display ")")]
+    [('mvect-cast-queue-dequeue (list))
+     (display "cast_queue_dequeue(mvect_cast_q)")]
+    [('mvect-cast-queue-not-empty? (list))
+     (bool->imdt (lambda () (display "cast_queue_is_not_empty(mvect_cast_q)")))]
+    [('mvect-cast-queue-peek-address (list))
+     (display "cast_queue_peek_address(mvect_cast_q)")]
+    [('mvect-cast-queue-peek-type (list))
+     (display "cast_queue_peek_type(mvect_cast_q)")]
     [('timer-start (list)) (display timer-start)]
     [('timer-stop  (list)) (display timer-stop)]
     [('timer-report (list)) (display timer-report)]
