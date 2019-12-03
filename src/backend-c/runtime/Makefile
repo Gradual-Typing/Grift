@@ -22,6 +22,9 @@ boehm-gc-install/lib/libgc.a :
 runtime.o : boehm-gc-install/lib/libgc.a io.o assoc_stack.o hashcons.o suspended_cast.o cast_queue.o
 	ld -r $^ -o $@
 
+test : runtime.o
+	cd tests && make all && ./tests
+
 tidy :
 	rm -f *.o
 
@@ -29,6 +32,7 @@ clean : tidy
 	rm -rf boehm-gc-install
 	-$(MAKE) -C boehm-gc/libatomic_ops -k distclean
 	-$(MAKE) -C boehm-gc -k distclean
+	cd tests && make clean
 
 ndebug :
 	$(eval NDEBUG := )
