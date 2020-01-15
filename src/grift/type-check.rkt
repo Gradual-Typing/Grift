@@ -140,62 +140,161 @@ Provide comments about where to find definitions of types and data
     (hash-set e x v)))
 
 ;; Checks to make sure Mu types obey the productivity check
-;; Return the a version of type where superflouos mu are droped
-;; and unrolled Mus are rerolled.
-;(: validate-type : srcloc Grift-Type -> Grift-Type)
+;; Returns the minimized version of the type
+;; TODO consider adding a cache
 (define/contract (validate-type src t)
   (option/c (-> srcloc? type? type?) #:with-contract #t)
 
-  (define who 'validate-type)
-  (debug who src t)
-
-  (define/contract eqs
-    (option/c (hash/c type? type?))
-    (make-hash '()))
-
-  (define/contract (vt pending)
-    (option/c (-> (set/c Uid?) (-> type? type?)) #:with-contract #t)
-    (define (rec t)
-      (cond
-        [(Mu? t)
-         (match-define (Mu s0) t)
+  ;; Check to see if all uses of recursive type variables are productive.
+  ;; pending is the set of mus that still need to pass through a
+  ;; datatype constructor before they are considered productive.
+  (let loop/pending ([pending (seteq)] [t t])
+    (let loop ([t t])
+      (match t
+        [(Mu s0)
          (define rec-uvar (next-uid! 'rec-fvar))
          (define rec-fvar (FVar rec-uvar))
          (define t0 (grift-type-instantiate s0 rec-fvar))
-         (define t1 ((vt (set-add pending rec-uvar)) t0))
-         ;; If the inner type is a Mu then we merge the
-         ;; Mu we are creating with the inner one.
-         ;; This is because both Mu's variables point to
-         ;; the same location in the type.
-         (define t2
-           (cond
-             [(Mu? t1)
-              (match-define (Mu s1) t1)
-              (grift-type-instantiate s1 rec-fvar)]
-             [else t1]))
-         (define-values (s1 used?)
-           (grift-type-abstract/used? rec-uvar t2))
-         ;; if rec-uvar isn't abstracted then t1 doesn't contain
-         ;; any occurences of it and we don't have to bind it.
-         (define ret (if used? (Mu s1) t2))
-         (hash-set! eqs (grift-type-instantiate s1 ret) ret)
-         ret]
-        [(FVar? t)
-         (match-define (FVar u) t)
+         (loop/pending (set-add pending rec-uvar) t0)]
+        [(FVar u)
          (when (set-member? pending u)
            (error 'non-productive-variable
                   "recursive variable appears in non-productive position ~a"
-                  src))
-         t]
-        [else
-         ;; If the type constructor is for actual data then the mu is productive
-         ;; and we can clear the pending recursive variables.
-         (define vt/pending
-           (if (structural-type? t) (vt (set)) rec))
-         (define r (grift-type-map t vt/pending))
-         (or (hash-ref eqs r #f) r)]))
-    rec)
-  (debug who src type ((vt (set)) t)))
+                  src))]
+        [(structural-type) (grift-type-map (λ (x) (loop/pending (seteq) x)) t)]
+        [t (grift-type-map loop t)])))
+  
+  ;; Find the minimal equirecursive type for any type.
+  (cond
+    [(or (Dyn? t) (base-type? t)) t]
+    [else
+     ;; A list of all the nodes sorted my depth of finding them
+     (define nodes (box '()))
+     (define mu-transitions (make-hasheq '()))
+     (define (sigma x)
+       (let ([t (hash-ref mu-transitions x)])
+         (values (car t) (cdr t))))
+     (let collect-nodes ([t t] [visited-nodes (seteq)])
+       (cond
+         [(and (Mu? t) (set-member? visited-nodes t)) (void)]
+         [else
+          (set-box! nodes (cons t (unbox nodes)))
+          (cond
+            [(Mu? t)
+             (match-define (Mu s) t)
+             (define t^ (grift-type-instantiate s t))
+             (hash-set! mu-transitions s t^)
+             (collect-nodes t^ (set-add visited-nodes s))]
+            [else (grift-type-map (λ (x) (collect-nodes x visited-nodes)) t)])]))
+     
+     ;; define graph structure of type for graph eq?
+     
+     ;; Discriminates types based on only their top level constructor and a
+     ;; function which tell if two types are different
+     (define/contract ((maybe-equal? know-to-be-different?) t1 t2)
+       (option/c (-> (-> type? type? boolean?) (-> type? type? boolean?)) #:with-contract #t)
+       (define (not-diff? x y) (or (eq? t1 t2) (not (know-to-be-different? t1 t2))))
+       (cond
+         [(or (logical-type? t1) (logical-type? t1))
+          (let loop ([t1 t1] [t2 t2])
+            (match* (t1 t2)
+              [((Mu s1) _) (loop (sigma t1) t2)]
+              [(_ (Mu s2)) (loop t1 (sigma s2))]
+              [(t1 t2) (not-diff? t1 t2)]))]
+         ;; no need for an eq? test here the algorithm should never compare two eq? objects
+         [(and (base-type? t1) (base-type? t2)) (equal? t1 t2)]
+         [(and (structural-type? t1) (structural-type? t2))
+          (match* (t1 t2)
+            [((Dyn) (Dyn)) #t]
+            [((Fn n a1* r1) (Fn n a2* r2))
+             (and (not-diff? r1 r2) (andmap not-diff? a1* a2*))]
+            [((STuple n t1*) (STuple n t2*))
+             (andmap not-diff? t1* t2*)]
+            [((GRef t1) (GRef t2))
+             (not-diff? t1 t2)]
+            [((GVect t1) (GVect t2))
+             (not-diff? t1 t2)]
+            [((MRef t1) (MRef t2))
+             (not-diff? t1 t2)]
+            [((MVect t1) (MVect t2))
+             (not-diff? t1 t2)]
+            [(_ _) #f])]
+         ;; This last case need to cover all cases where there may some
+         ;; ambiguity
+         [else #f]))
+
+     
+     ;; The set of all known differences found by iterative shallow discrimination
+     ;; a mutable set (equal?) of immutable seteq (commutative pairs of pointers)
+     (define known-differences (mutable-set))
+     
+     (define (known-difference? x y)
+       (set-member? known-differences (seteq x y)))
+     
+     (define shallowly-the-same? (maybe-equal? known-difference?))
+
+     ;; Filter a list of possibly equivalent types. Add types that
+     ;; are discovered to be shallowly different to the known
+     ;; differences set.
+     (define (filter-shallowly-different! head rest)
+       (define (eq-head!? x)
+         (cond
+           [(shallowly-the-same? head x) #t]
+           [else
+            (set-add! known-differences (seteq head x))]))
+       (partition eq-head!? rest))
+
+     ;; N^2 in the size of the eq-class
+     (define (update-eq-classes! eq-classes)
+       (let update-loop ([eq-classes eq-classes] [acc '()])
+         (match eq-classes
+           ['() (reverse acc)]
+           [(cons (cons head rest) rest-eq-classes)
+            (let eq-class-loop ([head head] [rest rest] [acc acc])
+              (define-values (eqs not-eqs) (filter-shallowly-different! head rest))
+              (define acc^ (cons (cons head eqs) acc))
+              (match not-eqs
+                [(list) (update-loop rest-eq-classes acc^)]
+                [(cons head rest) (eq-class-loop head rest acc^)]))])))
+
+     ;; At max |nodes| iterations to show that all nodes are disjoint?
+     (define eq-classes
+       (let fixpoint-loop ([count-last-iteration -1] [possible-eq-classes  (list (unbox nodes))])
+         (define new-possible-eq-classes
+           (update-eq-classes! possible-eq-classes))
+         (define known-differences-count
+           (set-count known-differences))
+         (cond
+           [(= count-last-iteration known-differences-count)
+            new-possible-eq-classes]
+           [else (fixpoint-loop known-differences-count new-possible-eq-classes)])))
+
+     (define (eq-class-of-t? x) (set-member? x t))
+
+     (printf "eq-classes:~a\n" eq-classes)
+     ;; return the smallest element of the equivalence class which
+     ;; is equivalent to the original type.
+     (define representative-map
+       (for*/hasheq ([eq-class (in-list eq-classes)]
+                     [representative (in-value (car eq-class))]
+                     [member (in-list (cdr eq-class))])
+                    (values member representative)))
+
+     ;; Minimize all substructures
+     (let loop ([t t] [visited (seteq)])
+       (cond
+         [(hash-ref representative-map t #f) => loop]
+         [(structural-type? t) (grift-type-map t loop)]
+         [(logical-type? t)
+          (match t
+            [(Mu s) 
+             (define-values (t x) (sigma s))
+             (define t^ (loop t))
+             (define (s^ u?) (grift-type-abstract/used? x t^))
+             (cond
+               [u? (Mu s^)]
+               [else t])])]
+         [else t]))]))
 
 (module+ test
   (current-unique-counter (make-unique-counter 0))
@@ -854,3 +953,5 @@ The type rules for core forms that have interesting type rules
     (match t
       [(Mu s) (unfold-possible-mu (grift-type-instantiate s t))]
       [t t])))
+
+
