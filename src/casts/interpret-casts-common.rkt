@@ -87,6 +87,9 @@ TODO write unit tests
 
 (define-type Id-Coercion-Huh-Type (CoC3-Expr -> CoC3-Expr))
 
+;; top-level? optional keyword parameter is a runtime boolean value that
+;; indiciates whether the current call to the cast interpreter is not a
+;; recursive call under another one that does a monotonic ref/vector cast.
 (define-type Compile-Make-Coercion-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr)
        (#:top-level? Boolean #:know-not-eq? Boolean)
@@ -1799,8 +1802,8 @@ TODO write unit tests
                        (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
                                [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))]
                                [t4 (Mvector-rtti-ref address)])
-                         (Mvector-rtti-set! address t3)
-                         (Mvector-val-set! address i cvi 'no-check-bounds))))))))
+                         (Mvector-val-set! address i cvi 'no-check-bounds)))
+                     (Mvector-rtti-set! address t3))))))
 
 (: make-compile-mbox-cast
    (->* (#:interp-cast Cast-Type
