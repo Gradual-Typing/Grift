@@ -113,6 +113,7 @@
      (and (recur-all e d) (recur* (map (inst cdr Any CoC3.1-Expr) c*)))]
     [(Begin e* e)  (and (recur e) (recur* e*))]
     [(Repeat i e1 e2 a e3 e4) (recur-all e1 e2 e3 e4)]
+    [(While e1 e2) (recur-all e1 e2)]
     [(Break-Repeat) #f] ;; TODO consider why this is false
     [(Lambda f* (Castable c e)) (recur e)]
     [(Fn-Caster e) (recur e)]
@@ -225,11 +226,8 @@
     [(Tuple-Coercion-Huh e) (recur e)]
     [(Tuple-Coercion-Num e) (recur e)]
     [(Tuple-Coercion-Item e i) (recur-all e i)]
-    [(Coerce-Tuple uid e1 e2) (recur-all e1 e2)]
-    [(Coerce-Tuple-In-Place uid e1 e2 e3 e4 e5) (recur-all e1 e2 e3 e4 e5)]
-    [(Cast-Tuple uid e1 e2 e3 e4) (recur-all e1 e2 e3 e4)]
-    [(Cast-Tuple-In-Place uid e1 e2 e3 e4 e5 e6 e7)
-     (recur-all e1 e2 e3 e4 e5 e6 e7)]
+    [(Coerce-Tuple uid e1 e2 top-level?) (recur-all e1 e2 top-level?)]
+    [(Cast-Tuple uid e1 e2 e3 e4 top-level?) (recur-all e1 e2 e3 e4 top-level?)]
     [(Type-Tuple-Huh e) (recur e)]
     [(Type-Tuple-num e) (recur e)]
     [(Type-Tuple-item e i) (recur-all e i)]

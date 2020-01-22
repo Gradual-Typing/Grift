@@ -152,10 +152,8 @@ And a type constructor "name" expecting the types of field1 and field2
   (Create-tuple values)
   (Copy-Tuple n v)
   (Tuple-proj tuple index)
-  (Coerce-Tuple cast value coercion)
-  (Coerce-Tuple-In-Place cast value coercion mono-address base-address index)
-  (Cast-Tuple cast value t1 t2 lbl)
-  (Cast-Tuple-In-Place cast value t1 t2 lbl mono-address base-address index)
+  (Coerce-Tuple cast value coercion top-level?)
+  (Cast-Tuple cast value t1 t2 lbl top-level?)
   ;; Effectfull expressions
   ;; typed bindings annotations
   (Fml identifier type)
@@ -239,6 +237,7 @@ And a type constructor "name" expecting the types of field1 and field2
   ;; Benchmarking tools language forms
   ;; low cost repetition
   (Repeat var start end acc init body)
+  (While bool-expression expression)
   (Break-Repeat)
   ;; TODO figue out an appropriate comment about all forms here
   (Halt)

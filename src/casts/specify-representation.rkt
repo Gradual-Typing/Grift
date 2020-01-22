@@ -50,9 +50,7 @@ but a static single assignment is implicitly maintained.
     (set-box! mk-fn-coercion-code-label? #f)
     (set-box! mk-tuple-coercion-code-label? #f)
     (set-box! coerce-tuple-code-label? #f)
-    (set-box! coerce-tuple-in-place-code-label? #f)
     (set-box! cast-tuple-code-label? #f)
-    (set-box! cast-tuple-in-place-code-label? #f)
     (set-box! hashcons-type-code-label? #f)
     (set-box! access-type-hashcode-label? #f)
     (set-box! calculate-type-hashcode-label? #f)
@@ -118,14 +116,8 @@ but a static single assignment is implicitly maintained.
 (: coerce-tuple-code-label? (Boxof (Option (Code-Label Uid))))
 (define coerce-tuple-code-label? (box #f))
 
-(: coerce-tuple-in-place-code-label? (Boxof (Option (Code-Label Uid))))
-(define coerce-tuple-in-place-code-label? (box #f))
-
 (: cast-tuple-code-label? (Boxof (Option (Code-Label Uid))))
 (define cast-tuple-code-label? (box #f))
-
-(: cast-tuple-in-place-code-label? (Boxof (Option (Code-Label Uid))))
-(define cast-tuple-in-place-code-label? (box #f))
 
 (: mk-tuple-coercion-code-label? (Boxof (Option (Code-Label Uid))))
 (define mk-tuple-coercion-code-label? (box #f))
@@ -231,7 +223,7 @@ but a static single assignment is implicitly maintained.
     (define coerce-tuple-label (Code-Label coerce-tuple))
     (define coerce-label (Code-Label coerce))
     (define coerce-tuple-c : D0-Code
-      (code$ (val crcn)
+      (code$ (val crcn top-level?)
         (assign$ tagged-count
           (sr-tagged-array-ref
            crcn COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
@@ -242,7 +234,7 @@ but a static single assignment is implicitly maintained.
           (assign$ val-i (op$ - i COERCION-TUPLE-ELEMENTS-OFFSET))
           (assign$ vala (op$ Array-ref val val-i))
           (assign$ crcna (sr-tagged-array-ref crcn COERCION-MEDIATING-TAG i))
-          (assign$ casted-vala (app-code$ coerce-label vala crcna ZERO-IMDT ZERO-IMDT ZERO-IMDT))
+          (assign$ casted-vala (app-code$ coerce-label vala crcna top-level?))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
     (add-new-code! (cons coerce-tuple coerce-tuple-c))
@@ -250,104 +242,6 @@ but a static single assignment is implicitly maintained.
     coerce-tuple-label)
   (let ([cl? (unbox coerce-tuple-code-label?)])
     (or cl? (make-code! coerce))))
-
-;; all input variables to this macro should have been already defined and
-;; initialized. tuple-copy-code-gen expands into a loop that populates the new
-;; tuples from the old tuples and writes the address of the new tuple into
-;; @base-address at @index.
-(define-syntax-rule (tuple-copy-code-gen old-tpl-val count base-addr index)
-  (begin$
-    (assign$ new-tpl-val (op$ Alloc count))
-    (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-      (op$ Array-set! new-tpl-val i (op$ Array-ref old-tpl-val i)))
-     ;; writing the address of the new tuple in place of the address of the
-     ;; old one
-    (op$ Array-set! base-addr index new-tpl-val)
-    new-tpl-val))
-
-(: get-coerce-tuple-in-place! (Uid -> (Code-Label Uid)))
-(define (get-coerce-tuple-in-place! cast)
-  (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! cast)
-    (define-track-next-uid!$ coerce-tuple-in-place)
-    (define cast-label (Code-Label cast))
-    (define coerce-tuple-in-place-label (Code-Label coerce-tuple-in-place))
-    (define coerce-tuple-in-place-c : D0-Code
-      ;; mono-address: is the address of the monotonic box/vector being
-      ;; casted. It is used to query the rtti during the cast.
-      ;; base-address: is the address to write a casted tuple value to. This
-      ;; address is either a monotonic box/vector address or an address of a
-      ;; tuple that resides in a monotonic heap either directly or inside another
-      ;; tuple that does.
-      ;; index: is the index used to write into the base address.
-      (code$ (old-tpl-val tpl-crcn mono-addr base-addr index)
-        (begin$
-          (assign$ tagged-count
-            (sr-tagged-array-ref
-             tpl-crcn COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
-          (assign$ count (op$ %>> tagged-count COERCION-SECOND-TAG-SHIFT))
-          (assign$ new-tpl-val (tuple-copy-code-gen old-tpl-val count base-addr index))
-          (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-            (assign$ val (op$ Array-ref new-tpl-val i))
-            (assign$ crcn
-              (sr-tagged-array-ref
-               tpl-crcn
-               COERCION-MEDIATING-TAG
-               (sr-plus COERCION-TUPLE-ELEMENTS-OFFSET i)))
-            (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-            (assign$ new-val (app-code$ cast-label val crcn mono-addr new-tpl-val i))
-            (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-            (If (op$ = rtti1 rtti2)
-                (op$ Array-set! new-tpl-val i new-val)
-                ZERO-IMDT))
-          new-tpl-val)))
-    (add-new-code! (cons coerce-tuple-in-place coerce-tuple-in-place-c))
-    (set-box! coerce-tuple-in-place-code-label? coerce-tuple-in-place-label)
-    coerce-tuple-in-place-label)
-  (let ([cl? (unbox coerce-tuple-in-place-code-label?)])
-    (or cl? (make-code! cast))))
-
-(: get-cast-tuple-in-place! (Uid -> (Code-Label Uid)))
-(define (get-cast-tuple-in-place! cast)
-  (: make-code! (Uid -> (Code-Label Uid)))
-  (define (make-code! cast)
-    (define-track-next-uid!$ cast-tuple-in-place)
-    (define cast-tuple-in-place-label (Code-Label cast-tuple-in-place))
-    (define cast-label (Code-Label cast))
-    (define cast-tuple-in-place-c : D0-Code
-      ;; mono-address: is the address of the monotonic box/vector being
-      ;; casted. It is used to query the rtti during the cast.
-      ;; base-address: is the address to write a casted tuple value to. This
-      ;; address is either a monotonic box/vector address or an address of a
-      ;; tuple that resides in a monotonic heap either directly or inside another
-      ;; tuple that does.
-      ;; index: is the index used to write into the base address.
-      (code$ (old-tpl-val t1 t2 l mono-addr base-addr index)
-        (begin$
-          (assign$ count
-            (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
-          (assign$ new-tpl-val (tuple-copy-code-gen old-tpl-val count base-addr index))
-          (repeat$ (i ZERO-IMDT count) (_ UNIT-IMDT)
-            (assign$ val (op$ Array-ref new-tpl-val i))
-            (assign$ t1a
-              (sr-tagged-array-ref
-               t1 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-            (assign$ t2a
-              (sr-tagged-array-ref
-               t2 TYPE-TUPLE-TAG (sr-plus TYPE-TUPLE-ELEMENTS-OFFSET i)))
-            (assign$ rtti1 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-            (assign$ new-val
-              (app-code$ cast-label val t1a t2a l mono-addr new-tpl-val i))
-            (assign$ rtti2 (op$ Array-ref mono-addr MONO-RTTI-INDEX))
-            (If (op$ = rtti1 rtti2)
-                (op$ Array-set! new-tpl-val i new-val)
-                ZERO-IMDT))
-          new-tpl-val)))
-    (add-new-code! (cons cast-tuple-in-place cast-tuple-in-place-c))
-    (set-box! cast-tuple-in-place-code-label? cast-tuple-in-place-label)
-    cast-tuple-in-place-label)
-  (let ([cl? (unbox cast-tuple-in-place-code-label?)])
-    (or cl? (make-code! cast))))
 
 (: get-cast-tuple! (Uid -> (Code-Label Uid)))
 (define (get-cast-tuple! cast)
@@ -357,7 +251,7 @@ but a static single assignment is implicitly maintained.
     (define cast-tuple-label (Code-Label cast-tuple))
     (define cast-label (Code-Label cast))
     (define cast-tuple-c : D0-Code
-      (code$ (val t1 t2 l)
+      (code$ (val t1 t2 l top-level?)
         (assign$ count
           (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
         (assign$ new-val (op$ Alloc count))
@@ -367,7 +261,7 @@ but a static single assignment is implicitly maintained.
           (assign$ vala (op$ Array-ref val val-i))
           (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
           (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
-          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l ZERO-IMDT ZERO-IMDT ZERO-IMDT))
+          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l top-level?))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
     (add-new-code! (cons cast-tuple cast-tuple-c))
@@ -805,6 +699,7 @@ but a static single assignment is implicitly maintained.
         [(Repeat i (app recur e1) (app recur e2) u (app recur e3) e4)
          (Repeat i e1 e2 u e3
            (recur/env e4 (extend (extend env u (Var u)) i (Var i)) cenv))]
+        [(While (app recur e1) (app recur e2)) (While e1 e2)]
         [(Break-Repeat) (Break-Repeat)]
         ;; Guarded
         [(Unguarded-Box (app recur e))
@@ -1014,21 +909,10 @@ but a static single assignment is implicitly maintained.
         [(Type-Tuple-num (app recur e)) (type-tuple-count-access e)]
         [(Type-Tuple-item (app recur e) (app recur i))
          (type-tuple-elements-access e i)]
-        [(Coerce-Tuple coerce (app recur v) (app recur c))
-         (app-code$ (get-coerce-tuple! coerce) v c)]
-        [(Coerce-Tuple-In-Place coerce (app recur v) (app recur c)
-                                (app recur mono-address)
-                                (app recur base-address)
-                                (app recur index))
-         (app-code$ (get-coerce-tuple-in-place! coerce) v c
-                    mono-address base-address index)]
-        [(Cast-Tuple-In-Place
-          cast (app recur v) (app recur t1) (app recur t2) (app recur l)
-          (app recur mono-address) (app recur base-address) (app recur index))
-         (app-code$ (get-cast-tuple-in-place! cast) v t1 t2 l
-                    mono-address base-address index)]
-        [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l))
-         (app-code$ (get-cast-tuple! cast) v t1 t2 l)]
+        [(Coerce-Tuple coerce (app recur v) (app recur c) (app recur top-level?))
+         (app-code$ (get-coerce-tuple! coerce) v c top-level?)]
+        [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l) (app recur top-level?))
+         (app-code$ (get-cast-tuple! cast) v t1 t2 l top-level?)]
         #;
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]

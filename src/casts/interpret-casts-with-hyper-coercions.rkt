@@ -61,17 +61,11 @@ that can be located throughout this file:
   (define apply-med-coercion-uid
     (next-uid! "apply_mediating_coercion"))  
   (: apply-coercion : Apply-Coercion-Type)
-  (define (apply-coercion e c
-                          [mono-address ZERO-EXPR]
-                          [base-address ZERO-EXPR]
-                          [index ZERO-EXPR])
-    (apply-code apply-coercion-uid e c mono-address base-address index))
+  (define (apply-coercion e c [top-level? (Quote #t)])
+    (apply-code apply-coercion-uid e c top-level?))
   (: apply-med-coercion : Apply-Coercion-Type)
-  (define (apply-med-coercion e c
-                              [mono-address ZERO-EXPR]
-                              [base-address ZERO-EXPR]
-                              [index ZERO-EXPR])
-    (apply-code apply-med-coercion-uid e c mono-address base-address index))
+  (define (apply-med-coercion e c [top-level? (Quote #t)])
+    (apply-code apply-med-coercion-uid e c top-level?))
 
   (: get-fn-cast! : Nat -> Uid)
   (define get-fn-cast!
@@ -122,11 +116,8 @@ that can be located throughout this file:
        (define interp-cast-uid (next-uid! "interp-cast"))
        
        (: interp-cast Cast-Type)
-       (define (interp-cast v t1 t2 l
-                            [mono-address : CoC3-Expr ZERO-EXPR]
-                            [base-address : CoC3-Expr ZERO-EXPR]
-                            [index : CoC3-Expr ZERO-EXPR])
-         (apply-code interp-cast-uid v t1 t2 l mono-address base-address index))
+       (define (interp-cast v t1 t2 l [top-level? (Quote #t)])
+         (apply-code interp-cast-uid v t1 t2 l top-level?))
        
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
@@ -208,21 +199,13 @@ that can be located throughout this file:
        (values interp-cast compile-cast)]
       [else
        (: interp-cast/coercions Cast-Type)
-       (define (interp-cast/coercions e t1 t2 l
-                                      [mono-address : CoC3-Expr ZERO-EXPR]
-                                      [base-address : CoC3-Expr ZERO-EXPR]
-                                      [index : CoC3-Expr ZERO-EXPR])
-         (apply-coercion e (compile-make-coercion t1 t2 l)
-                         mono-address base-address index))
+       (define (interp-cast/coercions e t1 t2 l [top-level? (Quote #t)])
+         (apply-coercion e (compile-make-coercion t1 t2 l top-level?)))
        (: interp-med-cast/coercions Cast-Type)
        (define (interp-med-cast/coercions
-                e t1 t2 l
-                [mono-address : CoC3-Expr ZERO-EXPR]
-                [base-address : CoC3-Expr ZERO-EXPR]
-                [index : CoC3-Expr ZERO-EXPR]
+                e t1 t2 l [top-level? (Quote #t)]
                 #:know-not-eq? [know-not-eq? : Boolean #f])
-         (apply-med-coercion e (compile-make-med-coercion t1 t2 l)
-                             mono-address base-address index))
+         (apply-med-coercion e (compile-make-med-coercion t1 t2 l) top-level?))
 
        (define compile-tuple-cast/coercions
          (make-compile-cast-tuple/coercions
@@ -360,15 +343,15 @@ that can be located throughout this file:
 
   (add-cast-runtime-binding!
    apply-coercion-uid
-   (code$ (v c mono-address base-address index)
+   (code$ (v c top-level?)
      (let*$ ([v1 (cond$
                   [(HC-Project-Huh c)
-                   (project v (HC-T1 c) (HC-Label c) mono-address base-address index)] 
+                   (project v (HC-T1 c) (HC-Label c) top-level?)]
                   [else v])]
              [m (HC-Med c)]
              [v2 (If (Id-Coercion-Huh m)
                      v1
-                     (apply-med-coercion v1 m mono-address base-address index))])
+                     (apply-med-coercion v1 m top-level?))])
        (If (HC-Inject-Huh c)
            (If (and$ (Id-Coercion-Huh m) (HC-Project-Huh c))
                v
@@ -395,7 +378,7 @@ that can be located throughout this file:
 
   (add-cast-runtime-binding!
    apply-med-coercion-uid
-   (code$ (v m mono-address base-address index)
+   (code$ (v m top-level?)
      (precondition$
          (not$ (Id-Coercion-Huh m))
        (cond$
@@ -404,12 +387,12 @@ that can be located throughout this file:
         [(Mediating-Coercion-Huh m)
          (cond$
           [(Fn-Coercion-Huh m)    (apply-fn-coercion v m)]
-          [(Tuple-Coercion-Huh m) (apply-tup-coercion v m mono-address base-address index)]
+          [(Tuple-Coercion-Huh m) (apply-tup-coercion v m top-level?)]
           [(Ref-Coercion-Huh m)   (apply-pref-coercion v m)]
           [(MRef-Coercion-Huh m)
-           (mbox-cast v (MRef-Coercion-Type m))]
+           (mbox-cast v (MRef-Coercion-Type m) top-level?)]
           [(MVect-Coercion-Huh m)
-           (mvec-cast v (MVect-Coercion-Type m))]
+           (mvec-cast v (MVect-Coercion-Type m) top-level?)]
           [else
            (Blame
             (Quote "Internal Error: hyper-coercions/apply-med-coercion 1"))])]

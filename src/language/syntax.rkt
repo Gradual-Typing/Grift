@@ -135,6 +135,11 @@
            (let ([i (Var iu)] [a (Var au)])
              (begin$ b* ... b))))]))
 
+(define-syntax (while$ stx)
+  (syntax-case stx ()
+    [(_ e b* ... b)
+     #'(While e (begin$ b* ... b))]))
+
 (define-syntax cond$
   (syntax-rules (else)
     [(_ [else ee* ... ee]) (begin$ ee* ... ee)]
@@ -179,6 +184,12 @@
 (define-syntax-rule (op=? e1 e2) (op$ = e1 e2))
 (define-syntax-rule (op<=? e1 e2) (op$ <= e1 e2))
 (define-syntax-rule (op>=? e1 e2) (op$ >= e1 e2))
+
+(define-syntax (when$ stx)
+  (syntax-case stx ()
+    [(_ c b* ... b)
+     #`(let ([e (begin$ b* ... b)])
+         (If c e (No-Op)))]))
 
 (define-syntax (precondition$ stx)
   (syntax-case stx ()

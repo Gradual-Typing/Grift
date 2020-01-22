@@ -1,0 +1,11 @@
+(let ([r0 (mvector 2 (ann (tuple (ann 1 Dyn)
+                                 (ann 2 Dyn)
+                                 (ann 3 Dyn)) Dyn))])
+   (let ([v : Dyn (tuple (ann 4 Dyn)
+                         (ann 5  Dyn)
+                         (ann r0 Dyn))])
+     (begin
+       (mvector-set! r0 0 v)
+       (mvector-set! r0 1 v)
+       (let ([r1 : (MVect (Tuple Int Dyn (MVect (Tuple Int Int Dyn)))) r0])
+         (ann (tuple-proj (mvector-ref r0 1) 0) Int)))))

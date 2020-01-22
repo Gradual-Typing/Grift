@@ -1,10 +1,12 @@
 NDEBUG ?= -D NDEBUG
 
-all : boehm-gc-install nonegc.o runtime.o castprofiler.o
+all : libgc nonegc.o runtime.o castprofiler.o
 
 debug: tidy ndebug all
 
-boehm-gc-install :
+libgc : boehm-gc-install/lib/libgc.a
+
+boehm-gc-install/lib/libgc.a :
 	PWD=`pwd`; cd boehm-gc; ./configure --prefix=${PWD}/boehm-gc-install
 	$(MAKE) -C boehm-gc
 	$(MAKE) -C boehm-gc check
@@ -15,19 +17,22 @@ boehm-gc-install :
 %.c :
 
 %.o : %.c
-	cc $(NDEBUG) -std=c99 $< -c -o $@
+	cc $(NDEBUG) -Iboehm-gc-install/include -std=c99 $< -c -o $@
 
-runtime.o : io.o assoc_stack.o hashcons.o
+runtime.o : boehm-gc-install/lib/libgc.a io.o assoc_stack.o hashcons.o suspended_cast.o cast_queue.o
 	ld -r $^ -o $@
 
+test : runtime.o
+	cd tests && make all && ./tests
+
 tidy :
-	rm -f *.o	
+	rm -f *.o
 
 clean : tidy
 	rm -rf boehm-gc-install
 	-$(MAKE) -C boehm-gc/libatomic_ops -k distclean
 	-$(MAKE) -C boehm-gc -k distclean
-
+	cd tests && make clean
 
 ndebug :
 	$(eval NDEBUG := )

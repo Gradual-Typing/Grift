@@ -137,6 +137,7 @@ becuse it is actually more of a stmt contexts itself.
              [t2 (fv-trivial t2)]
              [e  (fv-effect  e)])
          (Repeat i t1 t2 #f #f e))]
+      [(While e1 e2) (While (fv-pred e1) (fv-effect e2))]
       [(App-Code t t*)
        (let ([t (fv-trivial t)]
              [t* (fv-trivial* t*)]

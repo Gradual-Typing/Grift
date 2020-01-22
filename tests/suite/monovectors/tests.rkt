@@ -29,4 +29,5 @@
    (test-file "monovectors" "mvect12.grift" (int 100))
    (test-file "monovectors" "mvect13.grift" (int 42))
    (test-file "monovectors" "mvect14.grift" (int 0))
+   (test-file "monovectors" "mvect15.grift" (int 4))
    ))
