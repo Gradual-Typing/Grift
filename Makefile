@@ -3,6 +3,15 @@ all:
 	raco make -v -j 4 main.rkt
 	cd src/backend-c/runtime/; make
 
+install:
+	raco pkg install --batch --auto --fail-fast --name grift
+
+remove:
+	raco pkg remove --batch --auto grift
+
+update:
+	raco pkg update --batch --auto grift
+
 timed:
 	time raco make main.rkt
 
