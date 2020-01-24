@@ -64,7 +64,7 @@
 
 
 ;; Default places for everything, but there is no default source
-(define c-path : (Parameterof (Option Path))
+(define ir-code-path : (Parameterof (Option Path))
   (make-parameter #f))
 (define s-path : (Parameterof (Option Path))
   (make-parameter #f))
@@ -85,6 +85,8 @@
 ;; Interaction with the c compiler
 (define c-flags : (Parameterof (Listof String))
   (make-parameter '("-Wno-int-conversion" "-Wno-format" "-Wno-unused-value")))
+(define backend : (Parameterof (U 'LLVM 'C))
+  (make-parameter 'C))
 ;; where is the runtime to be used located
 (define runtime-path : (Parameterof (Option Path)) (make-parameter #f))
 (define hashcons-path : (Parameterof (Option Path)) (make-parameter #f))
@@ -92,7 +94,16 @@
 
 (define with-contracts : (Parameterof Boolean)  (make-parameter #f))
 
-
 ;; Toggle coercion-passing style translation
 (define enable-tail-coercion-composition? : (Parameterof Boolean)
   (make-parameter #f))
+
+;; Filter applied to logging macros : Setting it to a file name white
+;; lists debugging macros from that file and blacklist everything else.
+;; You can use glob notation and a relative path to white list multiple
+;; files at the same time.
+;; Not you still have to direct grift to save or print the log.
+;; For example: "src/grift/*" allows only output from debugging macros
+;; for parsing and typechecking.
+(define grift-logger-filter : (Parameterof (Option String)) (make-parameter #f))
+

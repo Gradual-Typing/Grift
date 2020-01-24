@@ -93,6 +93,10 @@
    (test-file "static" "letrec6.grift" (int 1))
    (test-file "static" "letrec7.grift" (int 2))
    (test-file "static" "letrec8.grift" (int 0))
+
+   (test-file "static" "timer-start.grift" (unit))
+   (test-file "static" "timer-stop.grift" (unit))
+   (test-file "static" "timer-test.grift" (unit))
    ;; ;; Ascription
    ;; (test-file "static" "int-dyn-int.grift"   (int 1))
    ;; (test-file "static" "ascribe-dyn.grift"       (dyn))
