@@ -1,15 +1,16 @@
 #lang typed/racket/no-check
 
-(require "./configuration.rkt"
-         ;; "./helpers.rkt"
-         (submod "./logging.rkt" typed)
-         "./grift/reduce-to-cast-calculus.rkt"
-         "./casts/impose-cast-semantics.rkt"
-         "./data/convert-representation.rkt"
-         "./backend-c/code-generator.rkt"
-         racket/logging)
+(require
+ "./configuration.rkt"
+ "./logging.rkt"
+ "./grift/reduce-to-cast-calculus.rkt"
+ "./casts/impose-cast-semantics.rkt"
+ "./backend/code-generator.rkt"
+ racket/logging)
 
-(provide (all-defined-out) (all-from-out "./configuration.rkt"))
+(provide (all-defined-out)
+         (all-from-out "./configuration.rkt")
+         grift-logger-filter)
 
 (define-type Log-Level (U 'none 'fatal 'error 'warning 'info 'debug))
 
@@ -27,11 +28,9 @@
   (let* (;; read(lex), parse, typecheck, insert-implicit-casts
          [c0  : Cast0-Lang  (reduce-to-cast-calculus path)]
          ;; specify behavior/representation of casts, and all language constructs
-         [d0  : Data0-Lang (impose-cast-semantics c0)]
-         ;; change how the language represents expressions to get a c like ast
-         [uil : Data5-Lang (convert-representation d0)])
-    ;; generate c code and compile it
-    (c-backend-generate-code uil)))
+         [uil  : Data0-Lang (impose-cast-semantics c0)])
+    ;; generate machine code
+    (generate-code uil)))
 
 ;; compile file at path
 ;; exec-path = path/name of final executable
@@ -55,7 +54,7 @@
                 Path))
 (define (compile target
                  #:output     [output     (output-path)]
-                 #:keep-c     [keep-c     (c-path)]
+                 #:keep-ir    [keep-ir     (ir-code-path)]
                  #:keep-s     [keep-s     (s-path)]
                  #:blame      [blame      (blame-semantics)]
                  #:cast       [cast       (cast-representation)]
@@ -73,7 +72,7 @@
   ;; convert all convience types to internal API
   (let* ([target  (if (string? target) (build-path target) target)]
          [output  (if (string? output) (build-path output) output)]
-         [keep-c  (if (string? keep-c) (build-path keep-c) keep-c)]
+         [keep-ir (if (string? keep-ir) (build-path keep-ir) keep-ir)]
          [keep-s  (if (string? keep-s) (build-path keep-s) keep-s)]
          [cc-opts (if (string? cc-opts) (list cc-opts) cc-opts)] 
          [rt      (if (string? rt)     (build-path rt)     rt)]
@@ -81,7 +80,7 @@
                    (if (string? log-port) (build-path log-port) log-port)])
     ;; Setup compile time parameters based off of these flags
     (parameterize ([output-path output]
-                   [c-path      keep-c]
+                   [ir-code-path keep-ir]
                    [s-path      keep-s]
                    [blame-semantics blame]
                    [cast-representation cast]
@@ -93,9 +92,10 @@
                    [garbage-collector gc]
                    [bounds-checks? ckbs]
                    [reference-semantics rs])
-      (define (compile-target) : Path (compile/current-parameterization target))
+      (define (compile-target) : Path
+        (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
-        (with-logging-to-port p compile-target log-level 'grift))
+        (with-logging-to-port p compile-target log-level #:logger grift-logger))
       (cond
         [(not log-port) (compile-target)]
         [(output-port? log-port) (compile/log-port log-port)]
@@ -124,7 +124,7 @@
       [(not (directory-exists? dir)) (make-directory* dir)])
     dir)
   
-  (define c-dir (path?-valid-dir! (c-path)))
+  (define c-dir (path?-valid-dir! (ir-code-path)))
   (define s-dir (path?-valid-dir! (s-path)))
   (define out-suffix (output-suffix))
 
@@ -147,4 +147,4 @@
         (renaming-output-files p?)))
 
     ;; Use current parameterization plus new file names to compile the file
-    (compile fl #:output out-path #:keep-c c-path? #:keep-s s-path?)))
+    (compile fl #:output out-path #:keep-ir c-path? #:keep-s s-path?)))

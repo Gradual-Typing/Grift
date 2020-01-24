@@ -26,9 +26,12 @@
        (hash)
        'module
        (list
-        (function^
-         'main () i64
-         (return (ui64 42))))))))
+        (function^ 'main () i64
+                   (block^ (app^ (re #f 'printf i64 #t)
+                                 (cstring "atan: %f\n")
+                                 (app^ (re #f 'atan f64)
+                                       (fl64 10.0)))
+                           (return (si64 42)))))))))
 
   (define-runtime-path basename "./test42")
   (define bc-path (path-add-extension basename ".bc"))
@@ -50,6 +53,7 @@
    (system*
     (build-path bin-path "clang")
     asm-path
+    "-lm"
     "-o"
     basename))
 

@@ -14,9 +14,9 @@
 [hoist-types-and-coercions.rkt]: casts/hoist-types-and-coercions.rkt
 [specify-representation.rkt]: casts/specify-representation.rkt
 [data/convert-representation.rkt]: data/conver-representation.rkt
-[backend-c/code-generator.rkt]: backend-c/code-generator.rkt
-[runtime/]: backend-c/runtime/
-[generate-c.rkt]: backend-c/generate-c.rkt
+[backend/code-generator.rkt]: backend/code-generator.rkt
+[runtime/]: backend/runtime/
+[c/generate-c.rkt]: backend/c/generate-c.rkt
 [language/]: language/
 [language/forms.rkt]: language/forms.rkt
 [compile.rkt]: compile.rkt
@@ -59,8 +59,8 @@ of multiple passes.
     concrete memory manipulation.
 - [data/convert-representation.rkt]: Takes an expression oriented
   language to a statement oriented language.
-- [backend-c/code-generator.rkt]: 
-  - [generate-c.rkt]: Write a c-src file.
+- [backend/code-generator.rkt]: 
+  - [c/generate-c.rkt]: Write a c-src file.
   - [runtime/]: GC and other runtime facilities
 
 ## Language Definitions and Types

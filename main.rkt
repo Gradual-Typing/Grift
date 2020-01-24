@@ -47,6 +47,9 @@
        (cast-representation 'Hyper-Coercions)]
       [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
+   [("--llvm")
+    "enable LLVM backend"
+    (backend 'LLVM)]
    [("--check-asserts")
     ((format "Compile code with assertions (~a)" (check-asserts?)))
     (check-asserts? #t)]
@@ -100,9 +103,9 @@
    [("-o") output-str
     "specify output path for executable"
     (output-path (string->path output-str))]
-   [("--keep-c") name
+   [("--keep-ir") name
     "keep the c intermediate representation"
-    (c-path (build-path name))]
+    (ir-code-path (build-path name))]
    [("--keep-s") name
     "keep the assembly representation"
     (s-path (build-path name))]
@@ -155,8 +158,13 @@
    [("-r" "--recursive")
     "recursively compile directory"
     (recursive-parameter #t)]
+   [("--log-filter")
+    filter
+    ("filter debugging logging to specific files"
+     "can be a filename, glob, or regular expression for a relative path") 
+    (grift-logger-filter filter)]
    [("-d" "--debug-logging") debug-file
-    "enable debuging logging to file (1=stdout, 2=stderr)"
+    "enable debugging logging to file (1=stdout, 2=stderr)"
     (begin
       (grift-log-level 'debug)
       (match debug-file

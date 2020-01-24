@@ -95,7 +95,7 @@
          #:unless (and (eq? cast-rep 'Static) spec?))
     (parameterize ([cast-representation cast-rep]
                    [output-path (build-path test-tmp-path "t.out")]
-                   [c-path (build-path test-tmp-path "t.c")]
+                   [ir-code-path (build-path test-tmp-path "t.c")]
                    [c-flags (cons "-O3" (c-flags))]
                    [specialize-cast-code-generation? spec?]
                    [check-asserts? #t])
@@ -149,7 +149,7 @@
          #:unless (and (eq? cast-rep 'Static) spec?))
     (parameterize ([cast-representation cast-rep]
                    [output-path (build-path test-tmp-path "t.out")]
-                   [c-path (build-path test-tmp-path "t.c")]
+                   [ir-code-path (build-path test-tmp-path "t.c")]
                    [c-flags (cons "-O3" (c-flags))]
                    [specialize-cast-code-generation? spec?]
                    [check-asserts? #t])
@@ -212,6 +212,12 @@
  ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
  ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
  #:once-each
+ [("--specialize-casts")
+  "specialize casts with known types"
+  (test-specialize-cast-code-generation (list #t))]
+ [("--llvm")
+  "Use the llvm backend"
+  (backend 'LLVM)]
  [("--without-contracts" "-C")
   "Speed up tests by not checking compiler invariants"
   (with-contracts #f)]
