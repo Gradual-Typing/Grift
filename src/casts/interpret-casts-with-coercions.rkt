@@ -1055,7 +1055,10 @@ form, to the shortest branch of the cast tree that is relevant.
      #:apply-coercion apply-coercion))
   
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!)
-    (make-monotonic-helpers #:compile-cast compile-cast))
+    (make-monotonic-helpers
+     #:interp-cast interp-cast
+     #:greatest-lower-bound compile-types-greatest-lower-bound
+     #:compile-cast compile-cast))
 
   (define-values (dyn-pbox-ref
                   dyn-pbox-set!

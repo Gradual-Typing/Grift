@@ -132,7 +132,7 @@ TODO write unit tests
 
 (define-type Compile-Cast-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr)
-       (#:t1-not-dyn Boolean #:t2-not-dyn Boolean)
+       (CoC3-Expr #:t1-not-dyn Boolean #:t2-not-dyn Boolean)
        CoC3-Expr))
 (define-type Cast-Type (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
 (define-type Cast-Tuple-Type (->* (CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
@@ -560,14 +560,52 @@ TODO write unit tests
   ;; TODO help compile coercion
   (apply-coercion v (make-coercion t1 t2 l) top-level?))
 
+(define monotonic-blame (Quote "Monotonic references do not currently track blame"))
+
+(define (code-gen-mref-state-reduction
+         #:interp-cast interp-cast
+         #:greatest-lower-bound greatest-lower-bound)
+  (while$ (op$ mref-cast-queue-not-empty?)
+          (let*$ ([address (op$ mref-cast-queue-peek-address)]
+                  [t1 (Mbox-rtti-ref address)]                 
+                  [t2 (op$ mref-cast-queue-peek-type)]
+                  [t3 (app-code$ greatest-lower-bound t1 t2)])
+            (op$ mref-cast-queue-dequeue)
+            (when$ (not$ (op=? t1 t3))
+                   (let*$ ([vi (Mbox-val-ref address)]
+                           [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))])
+                     (Mbox-rtti-set! address t3)
+                     (Mbox-val-set! address cvi))))))
+
+(define (code-gen-mvect-state-reduction
+         #:interp-cast interp-cast
+         #:greatest-lower-bound greatest-lower-bound)
+  (while$ (op$ mvect-cast-queue-not-empty?)
+          (let*$ ([address (op$ mvect-cast-queue-peek-address)]
+                  [t1 (Mvector-rtti-ref address)]                 
+                  [t2 (op$ mvect-cast-queue-peek-type)]
+                  [t3 (app-code$ greatest-lower-bound t1 t2)])
+            (op$ mvect-cast-queue-dequeue)
+            (when$ (not$ (op=? t1 t3))
+                   (let$ ([len (Mvector-length address)])
+                     (repeat$ (i ZERO-EXPR len) ()
+                       (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
+                               [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))]
+                               [t4 (Mvector-rtti-ref address)])
+                         (Mvector-val-set! address i cvi 'no-check-bounds)))
+                     (Mvector-rtti-set! address t3))))))
+
 (: make-monotonic-helpers
-   (->* ()
+   (->* (#:interp-cast Cast-Type
+         #:greatest-lower-bound (Code-Label Uid))
         (#:compile-cast   Compile-Cast-Type
          #:apply-coercion Apply-Coercion-Type
          #:make-coercion  Make-Coercion-Type) 
         (Values MBox-Ref-Type MBox-Set-Type
                 MVec-Ref-Type MVec-Set-Type)))
 (define (make-monotonic-helpers
+         #:interp-cast interp-cast
+         #:greatest-lower-bound greatest-lower-bound
          #:compile-cast   [compile-cast : (Option Compile-Cast-Type) #f] 
          #:apply-coercion [apply-coercion : (Option Apply-Coercion-Type) #f]
          #:make-coercion  [make-coercion : (Option Make-Coercion-Type) #f])
@@ -598,14 +636,17 @@ TODO write unit tests
   (define (code-gen-mbox-set! mref val t1)
     (bnd-t1-if-not-type
      t1
-     (lambda ([t1 : CoC3-Expr])
-       : CoC3-Expr
+     (lambda ([t1 : CoC3-Expr]) : CoC3-Expr
        (let*$ ([address mref]
                [val val]
                [t2 (Mbox-rtti-ref address)]
-               [cv (cast val t1 t2 (Quote "Monotonic ref write error"))])
-         (Mbox-val-set! address cv)))))
-  
+               [cv (cast val t1 t2 (Quote "Monotonic ref write error") (Quote #f))])
+         (Mbox-val-set! address cv)
+         (code-gen-mref-state-reduction
+          #:interp-cast interp-cast
+          #:greatest-lower-bound greatest-lower-bound)
+         (Quote 0)))))
+
   (: code-gen-mvec-ref MVec-Ref-Type)
   (define (code-gen-mvec-ref mvec i t2)
     (let*$ ([v mvec])
@@ -619,8 +660,11 @@ TODO write unit tests
        : CoC3-Expr
        (let*$ ([address mvec] [i i] [val val] 
                [t2 (Mvector-rtti-ref address)]
-               [cvi (cast val t1 t2 (Quote "Monotonic vect write error"))])
-         (Mvector-val-set! address i cvi 'check-bounds)))))
+               [cvi (cast val t1 t2 (Quote "Monotonic vect write error") (Quote #f))])
+         (Mvector-val-set! address i cvi 'check-bounds)
+         (code-gen-mvect-state-reduction #:interp-cast interp-cast
+                                         #:greatest-lower-bound greatest-lower-bound)
+         (Quote 0)))))
 
   (cond
     [(inline-monotonic-branch?)
@@ -1306,22 +1350,22 @@ TODO write unit tests
   ;; we could make this code slightly better by inlining
   ;; this eq check here?
   (: compile-cast Compile-Cast-Type)
-  (define (compile-cast v t1 t2 l
+  (define (compile-cast v t1 t2 l [top-level? (Quote #t)]
                         #:t1-not-dyn [t1-not-dyn : Boolean #f]
                         #:t2-not-dyn [t2-not-dyn : Boolean #f]) 
     (match* (t1 t2)
       [(t t) v]
       [((Type (Dyn)) (Type _))
        ;; t2 not dyn because of (t t) case
-       (compile-project v t2 l)]
+       (compile-project v t2 l top-level?)]
       [((Type (Dyn)) t2)  #:when t2-not-dyn
-       (compile-project v t2 l)]
+       (compile-project v t2 l top-level?)]
       [((Type (Dyn)) t2) ;; t2 not Type (2 above)
        (bind-value$
         ([v v] [t2 t2] [l l])
         (If (Type-Dyn-Huh t2)
             v
-            (compile-project v t2 l)))]
+            (compile-project v t2 l top-level?)))]
       [((Type _) (Type (Dyn)))
        ;; t1 not dyn because of (t t) case
        (compile-inject v t1)]
@@ -1340,20 +1384,20 @@ TODO write unit tests
        ;; (It would mean the program wasn't consistent 
        (Blame l)]
       [((Type _) (Type _))
-       (compile-med-cast v t1 t2 l)]
+       (compile-med-cast v t1 t2 l top-level?)]
       [(t1 (Type _)) #:when t1-not-dyn
-       (compile-med-cast v t1 t2 l)]
+       (compile-med-cast v t1 t2 l top-level?)]
       [((Type _) t2) #:when t2-not-dyn
-       (compile-med-cast v t1 t2 l)]
-      [(t1 t2) (interp-cast v t1 t2 l)]))
+       (compile-med-cast v t1 t2 l top-level?)]
+      [(t1 t2) (interp-cast v t1 t2 l top-level?)]))
 
   ;; This dumb compilation strategy is simply used
   ;; for benchmarking purposes
   (: compile-cast/interp Compile-Cast-Type)
-  (define (compile-cast/interp v t1 t2 l
+  (define (compile-cast/interp v t1 t2 l [top-level? (Quote #t)]
                                #:t1-not-dyn [t1-not-dyn : Boolean #f]
                                #:t2-not-dyn [t2-not-dyn : Boolean #f])
-    (interp-cast v t1 t2 l))
+    (interp-cast v t1 t2 l top-level?))
   (cond
     [(specialize-cast-code-generation?) compile-cast]
     [else compile-cast/interp]))
@@ -1769,41 +1813,6 @@ TODO write unit tests
   (make-parameter #f))
 (define monotonic-cast-close-code-specialization? : (Parameterof Boolean)
   (make-parameter #t))
-
-(define monotonic-blame (Quote "Monotonic references do not currently track blame"))
-
-(define (code-gen-mref-state-reduction
-         #:interp-cast interp-cast
-         #:greatest-lower-bound greatest-lower-bound)
-  (while$ (op$ mref-cast-queue-not-empty?)
-          (let*$ ([address (op$ mref-cast-queue-peek-address)]
-                  [t1 (Mbox-rtti-ref address)]                 
-                  [t2 (op$ mref-cast-queue-peek-type)]
-                  [t3 (app-code$ greatest-lower-bound t1 t2)])
-            (op$ mref-cast-queue-dequeue)
-            (when$ (not$ (op=? t1 t3))
-                   (let*$ ([vi (Mbox-val-ref address)]
-                           [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))])
-                     (Mbox-rtti-set! address t3)
-                     (Mbox-val-set! address cvi))))))
-
-(define (code-gen-mvect-state-reduction
-         #:interp-cast interp-cast
-         #:greatest-lower-bound greatest-lower-bound)
-  (while$ (op$ mvect-cast-queue-not-empty?)
-          (let*$ ([address (op$ mvect-cast-queue-peek-address)]
-                  [t1 (Mvector-rtti-ref address)]                 
-                  [t2 (op$ mvect-cast-queue-peek-type)]
-                  [t3 (app-code$ greatest-lower-bound t1 t2)])
-            (op$ mvect-cast-queue-dequeue)
-            (when$ (not$ (op=? t1 t3))
-                   (let$ ([len (Mvector-length address)])
-                     (repeat$ (i ZERO-EXPR len) ()
-                       (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
-                               [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))]
-                               [t4 (Mvector-rtti-ref address)])
-                         (Mvector-val-set! address i cvi 'no-check-bounds)))
-                     (Mvector-rtti-set! address t3))))))
 
 (: make-compile-mbox-cast
    (->* (#:interp-cast Cast-Type

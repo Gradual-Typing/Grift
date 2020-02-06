@@ -278,6 +278,8 @@ that can be located throughout this file:
   
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!)
     (make-monotonic-helpers
+     #:interp-cast interp-cast
+     #:greatest-lower-bound greatest-lower-bound
      #:apply-coercion apply-coercion
      #:make-coercion  compile-make-coercion))
   
