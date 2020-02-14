@@ -91,3 +91,8 @@
 
 
 (define with-contracts : (Parameterof Boolean)  (make-parameter #f))
+
+
+;; Toggle coercion-passing style translation
+(define enable-crcps? : (Parameterof Boolean)
+  (make-parameter #f))
