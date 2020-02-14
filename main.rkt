@@ -200,6 +200,9 @@
     (c-flags (cons "-pg" (c-flags)))
     (make-runtime-with-param "profile" profile_runtime.o-path)
     (runtime-path profile_runtime.o-path)]
+   #:once-any
+   ["--crcps" "Enable coercion-passing style translation" (enable-crcps? #t)]
+   ["--no-crcps" "Disable coercion-passing style translation" (enable-crcps? #f)]
    #:args args
    (match args
      [(list)
