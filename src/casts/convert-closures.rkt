@@ -181,10 +181,10 @@ TODO We can generate better code in this pass for function casts.
      (Mutable-HashTable Integer (Closure Uid CoC5-Expr)))
   (define arity->apply-casted-closure (make-hash '()))
   
-  (: make-apply-casted-closure! : Integer Uid -> (Closure Uid CoC5-Expr))
+  (: make-apply-casted-closure! : Integer Uid Uid -> (Closure Uid CoC5-Expr))
   ;; TODO if we kept an immutable hash of symbol->uid we could
   ;; get away without storing the cast is every fn-proxy node.
-  (define (make-apply-casted-closure! i cast-uid)
+  (define (make-apply-casted-closure! i cast-uid compose-uid)
     (cond
       [(hash-ref arity->apply-casted-closure i #f) => values]
       [else
@@ -215,6 +215,7 @@ TODO We can generate better code in this pass for function casts.
           name #f 'code-only label self
           #f (list closure-field coercion-field) p*
           (cast-apply-cast cast-uid
+                           compose-uid
                            (Var closure-field)
                            v*
                            (Var coercion-field))))
@@ -560,7 +561,7 @@ TODO We can generate better code in this pass for function casts.
           ;; of if we can see the lambda.
           ;; But this also might be doable in a constant folding pass.
           [(App-Fn-or-Proxy? current-expr)
-           (match-define (App-Fn-or-Proxy cast-uid e e*) current-expr)
+           (match-define (App-Fn-or-Proxy cast-uid compose-uid e e*) current-expr)
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -569,19 +570,19 @@ TODO We can generate better code in this pass for function casts.
                 [(Hybrid) (rec (App-Fn e e*))]
                 [(Data)
                  (: cast-clos-app :
-                    Uid CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr)
-                 (define (cast-clos-app cast v e*)
+                    Uid Uid CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr)
+                 (define (cast-clos-app cast compose v e*)
                    (If (Fn-Proxy-Huh v)
                        (let$ ([data-fn-proxy-closure (Fn-Proxy-Closure v)]
                               [data-fn-proxy-coercion (Fn-Proxy-Coercion v)])
-                         (cast-apply-cast cast data-fn-proxy-closure e*
+                         (cast-apply-cast cast compose data-fn-proxy-closure e*
                                           data-fn-proxy-coercion)) 
                        (Closure-App (Closure-Code v) v e*)))
                  (: let-cast-clos-app :
-                    Uid CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr)
-                 (define (let-cast-clos-app cast e e*)
+                    Uid Uid CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr)
+                 (define (let-cast-clos-app cast compose e e*)
                    (let$ ([maybe-data-fn-proxy e])
-                     (cast-clos-app cast e e*)))
+                     (cast-clos-app cast compose e e*)))
                  (define e*^ (map rec e*))
                  (match e
                    [(and v (Var u))
@@ -601,7 +602,7 @@ TODO We can generate better code in this pass for function casts.
              [else (error 'covert-closures "Unkown Cast Representaion")])]
           [(Fn-Proxy? current-expr)
            (match-define
-             (Fn-Proxy `(,i ,cast) (app rec clos) (app rec crcn))
+             (Fn-Proxy `(,i ,cast ,compose) (app rec clos) (app rec crcn))
              current-expr)
            (case cast-rep
              [(Coercions Hyper-Coercions)
@@ -618,7 +619,7 @@ TODO We can generate better code in this pass for function casts.
                  (define closure (next-uid! "closure-field"))
                  (define coercion (next-uid! "coercion-field"))
                  (match-define (Closure _ _ _ label _ caster? _ p* _)
-                   (make-apply-casted-closure! i cast))
+                   (make-apply-casted-closure! (if (enable-crcps?) (+ i 1) i) cast))
                  (Let (list (cons closure clos) (cons coercion crcn))
                    (Let-Closures
                     ;; The layout of this closure is very specific
@@ -1182,22 +1183,33 @@ TODO We can generate better code in this pass for function casts.
 ;; Helpers that belong here
 
 ;; create a casted fn application call site
-(: cast-apply-cast (Uid (Var Uid) (Listof CoC5-Expr) (Var Uid) -> CoC5-Expr))
-(define (cast-apply-cast cast-uid fun arg* crcn)
+(: cast-apply-cast (Uid Uid (Var Uid) (Listof CoC5-Expr) (Var Uid) -> CoC5-Expr))
+(define (cast-apply-cast cast-uid compose-uid fun arg* crcn)
   (define cl (Code-Label cast-uid))
-  (define top-level? (Quote #t))
+  (define cmcl (Code-Label compose-uid))
+  (define mono-address ZERO-EXPR)
+  (define base-address ZERO-EXPR)
+  (define index ZERO-EXPR)
   (define-values (v* b*)
     (for/lists ([v* : (Listof (Var Uid))]
                 [b* : (Bnd* CoC5-Expr)])
-               ([arg arg*] [i (in-naturals)])
+               ([arg (if (enable-crcps?) (cdr arg*) arg*)]
+                [i (in-naturals)])
       (define u (next-uid! (format "fn-cast-arg~a" i)))
       (define arg-crcn (Fn-Coercion-Arg crcn (Quote i)))
-      (define args (list arg arg-crcn top-level?))
+      (define args (list arg arg-crcn mono-address base-address index))
       (values (Var u) (cons u (App-Code cl args)))))
-  (define clos-app (Closure-App (Closure-Code fun) fun v*))
-  (define args
-    (list clos-app (Fn-Coercion-Return crcn) top-level?))
-  (Let b* (App-Code cl args)))
+  (cond
+   [(enable-crcps?)
+    (define passed-crcn (car arg*))
+    (define composed-crcn (App-Code cmcl (list (Fn-Coercion-Return crcn) passed-crcn  ZERO-EXPR ZERO-EXPR)))
+    (define clos-app (Closure-App (Closure-Code fun) fun (cons composed-crcn v*)))
+    (Let b* clos-app)]
+   [else
+    (define clos-app (Closure-App (Closure-Code fun) fun v*))
+    (define args
+      (list clos-app (Fn-Coercion-Return crcn) mono-address base-address index))
+    (Let b* (App-Code cl args))]))
 
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
 (define (bnd-code<? x y) (uid<? (car x) (car y)))
