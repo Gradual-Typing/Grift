@@ -233,7 +233,11 @@ And a type constructor "name" expecting the types of field1 and field2
   (App-Code rand rators)
   (App-Fn rand rators)
   (App/Fn-Proxy-Huh rand rators)
-  (App-Fn-or-Proxy cast rand rators)
+  ;; cast:    Uid of apply-coercion
+  ;; compose: Uid of compose-coercions
+  ;; (cast and compose are necessary in cast-apply-cast in convert-closures)
+  ;; rand for operand; rators for operators.
+  (App-Fn-or-Proxy cast compose rand rators)
   ;; Benchmarking tools language forms
   ;; low cost repetition
   (Repeat var start end acc init body)
