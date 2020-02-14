@@ -185,6 +185,9 @@
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
+   #:once-any
+   ["--crcps" "Enable coercion-passing style translation" (enable-crcps? #t)]
+   ["--no-crcps" "Disable coercion-passing style translation" (enable-crcps? #f)]
    #:args args
    (match args
      [(list)
