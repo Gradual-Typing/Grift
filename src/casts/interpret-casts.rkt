@@ -9,7 +9,8 @@
  "./interpret-casts-with-type-based-casts.rkt"
  "./interpret-casts-with-coercions.rkt"
  "./interpret-casts-with-hyper-coercions.rkt"
- "./interpret-casts-with-error.rkt")
+ "./interpret-casts-with-error.rkt"
+ "./coercion-passing.rkt")
 
 (provide
  interpret-casts)
@@ -30,7 +31,21 @@
     (define ic-expr! : (C0-Expr -> CoC3-Expr)
       (case (cast-representation)
         [(|Type-Based Casts|) (interpret-casts/type-based-casts)]
-        [(Coercions) (interpret-casts/coercions)]
+        [(Coercions)
+         (cond
+          [(enable-crcps?)
+           ;; avoid removing id coercions around injection/projection:
+           (optimize-first-order-coercions? #f)  ; should be parameterize?
+           (define-values (icc apply-coercion-uid compose-coercions-uid)
+             (interpret-casts/coercions))
+           (compose1 (coercion-passing-trans #:apply-coercion-uid apply-coercion-uid
+                                             #:compose-coercions-uid compose-coercions-uid)
+                     icc)]
+          [else
+           (optimize-first-order-coercions? #t)  ; should be parameterize?
+           (define-values (icc apply-coercion-uid compose-coercions-uid)
+             (interpret-casts/coercions))
+           icc])]
         [(Hyper-Coercions) (interpret-casts/hyper-coercions)]
         [(Static) (interpret-casts/error)]
         [else (error 'grift/interpret-casts
