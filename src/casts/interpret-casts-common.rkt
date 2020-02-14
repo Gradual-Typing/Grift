@@ -371,6 +371,7 @@ TODO write unit tests
 ;; The casted is attatched to the proxy
 (define ((make-build-caster/coercions
           #:apply-coercion-uid [apply-coercion-uid : Uid]
+          #:compose-coercions-uid [compose-coercions-uid : Uid]
           #:compose-coercions  [compose-coercions : Compose-Coercions-Type]
           #:id-coercion-huh    [id-coercion-huh : Id-Coercion-Huh-Type])
          [arity : Nat])
@@ -459,11 +460,11 @@ TODO write unit tests
                      ;; If so the original closure is the correct type
                      raw-clos
                      ;; Otherwise a new proxy is needed
-                     (Fn-Proxy (list #{arity :: Index} apply-coercion-uid)
+                     (Fn-Proxy (list #{arity :: Index} apply-coercion-uid compose-coercions-uid)
                                raw-clos
                                (new-fn-crcn t1 t2 arity arg* ret)))))
              ;; Closure is unproxied --> just make a new proxy
-             (Fn-Proxy (list #{arity :: Index} apply-coercion-uid) fun crcn))))))
+             (Fn-Proxy (list #{arity :: Index} apply-coercion-uid compose-coercions-uid) fun crcn))))))
   (values casting-code-name casting-code))
 
 (: make-fn-cast-helpers : (Nat -> (Values Uid CoC3-Code)) -> (Nat -> Uid))
@@ -479,9 +480,10 @@ TODO write unit tests
         (cond
           [uid? uid?]
           [else
-           (define-values (uid code) (build-caster! arity))
+           (define-values (uid code)
+             (build-caster! (if (enable-crcps?) (- arity 1) arity)))
            (add-cast-runtime-binding! uid code)
-           (hash-set! fn-cast-uid-map arity uid)
+           (hash-set! fn-cast-uid-map arity uid)  ;; Should be decremented, too?
            uid])))
     get-fn-cast!)
 
