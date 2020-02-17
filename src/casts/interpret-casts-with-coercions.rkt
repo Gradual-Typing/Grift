@@ -832,7 +832,7 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; For now we are not even trying to be good at compiling coercion composition
   (values compose-coercions-uid compose-coercions/id/fvs))
 
-(: interpret-casts/coercions : -> (C0-Expr -> CoC3-Expr))
+(: interpret-casts/coercions : -> (C0-Expr -> (Values CoC3-Expr Uid Uid)))
 (define (interpret-casts/coercions)
   (define greatest-lower-bound (make-compile-types-greatest-lower-bound))
   (define-values (compile-make-coercion compile-make-med-coercion)
@@ -849,17 +849,19 @@ form, to the shortest branch of the cast tree that is relevant.
     (make-fn-cast-helpers
      (make-build-caster/coercions
       #:apply-coercion-uid apply-coercion-uid
+      #:compose-coercions-uid compose-coercions-uid
       #:compose-coercions compose-coercions
       #:id-coercion-huh   Id-Coercion-Huh)))
   
   (: compile-lambda Lambda-Type)
   (define (compile-lambda fml* e)
-    (define ctr (get-fn-cast! (length fml*)))
+    (define arity (length fml*))
+    (define ctr (get-fn-cast! (if (enable-crcps?) (+ 1 arity) arity)))
     (Lambda fml* (Castable ctr (cast-profile/max-function-chain$ e))))
   
   (: compile-app App-Type)
   (define (compile-app e e*)
-    (App-Fn-or-Proxy apply-coercion-uid e e*))
+    (App-Fn-or-Proxy apply-coercion-uid compose-coercions-uid e e*))
   
   (define compile-fn-cast/coercions
     (make-compile-fn-cast/coercions
@@ -1100,30 +1102,33 @@ form, to the shortest branch of the cast tree that is relevant.
      #:mbox-ref mbox-ref #:mbox-set mbox-set!
      #:mvec-ref mvec-ref #:mvec-set mvec-set!))
   
-  (make-map-expr
-   #:compile-cast    compile-cast
-   #:compile-lambda  compile-lambda
-   #:compile-app     compile-app
-   #:pbox-ref        pbox-ref
-   #:pbox-set        pbox-set!
-   #:pvec-ref        pvec-ref
-   #:pvec-set        pvec-set!
-   #:pvec-len        pvec-len
-   #:mbox-ref        mbox-ref
-   #:mbox-set        mbox-set!
-   #:mvec-ref        mvec-ref
-   #:mvec-set        mvec-set!
-   #:dyn-pbox-ref    dyn-pbox-ref
-   #:dyn-pbox-set    dyn-pbox-set!
-   #:dyn-pvec-ref    dyn-pvec-ref
-   #:dyn-pvec-set    dyn-pvec-set!
-   #:dyn-pvec-len    dyn-pvec-len
-   #:dyn-mbox-ref    dyn-mbox-ref
-   #:dyn-mbox-set    dyn-mbox-set!
-   #:dyn-mvec-ref    dyn-mvec-ref
-   #:dyn-mvec-set    dyn-mvec-set!
-   #:dyn-fn-app      dyn-fn-app
-   #:dyn-tup-prj     dyn-tup-prj))
+  (values
+   (make-map-expr
+    #:compile-cast    compile-cast
+    #:compile-lambda  compile-lambda
+    #:compile-app     compile-app
+    #:pbox-ref        pbox-ref
+    #:pbox-set        pbox-set!
+    #:pvec-ref        pvec-ref
+    #:pvec-set        pvec-set!
+    #:pvec-len        pvec-len
+    #:mbox-ref        mbox-ref
+    #:mbox-set        mbox-set!
+    #:mvec-ref        mvec-ref
+    #:mvec-set        mvec-set!
+    #:dyn-pbox-ref    dyn-pbox-ref
+    #:dyn-pbox-set    dyn-pbox-set!
+    #:dyn-pvec-ref    dyn-pvec-ref
+    #:dyn-pvec-set    dyn-pvec-set!
+    #:dyn-pvec-len    dyn-pvec-len
+    #:dyn-mbox-ref    dyn-mbox-ref
+    #:dyn-mbox-set    dyn-mbox-set!
+    #:dyn-mvec-ref    dyn-mvec-ref
+    #:dyn-mvec-set    dyn-mvec-set!
+    #:dyn-fn-app      dyn-fn-app
+    #:dyn-tup-prj     dyn-tup-prj)
+   apply-coercion-uid
+   compose-coercions-uid))
 
 
 

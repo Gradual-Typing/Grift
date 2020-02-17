@@ -647,9 +647,7 @@ TODO We can generate better code in this pass for function casts.
                  (define closure (next-uid! "closure-field"))
                  (define coercion (next-uid! "coercion-field"))
                  (match-define (Closure _ _ _ label _ caster? _ p* _)
-                   (make-apply-casted-closure! (if (enable-crcps?) (+ i 1) i)
-                                               cast
-                                               compose))
+                   (make-apply-casted-closure! (if (enable-crcps?) (+ i 1) i) cast compose))
                  (Let (list (cons closure clos) (cons coercion crcn))
                       (Let-Closures
                        ;; The layout of this closure is very specific
