@@ -1220,11 +1220,11 @@ TODO We can generate better code in this pass for function casts.
 ;; create a casted fn application call site
 (: cast-apply-cast (Uid Uid (Var Uid) (Listof CoC5-Expr) (Var Uid) -> CoC5-Expr))
 (define (cast-apply-cast cast-uid compose-uid fun arg* crcn)
-  (define cl (Code-Label cast-uid))
   (define suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts)
-  (define cmcl (Code-Label compose-uid))
   (define (let-bind bnd* body)
     (if (null? bnd*) body (Let bnd* body)))
+  (define cast-cl (Code-Label cast-uid))
+  (define compose-cl (Code-Label compose-uid))
   (define-values (v* b*)
     (for/lists ([v* : (Listof (Var Uid))]
                 [b* : (Bnd* CoC5-Expr)])
@@ -1233,19 +1233,19 @@ TODO We can generate better code in this pass for function casts.
       (define u (next-uid! (format "fn-cast-arg~a" i)))
       (define arg-crcn (Fn-Coercion-Arg crcn (Quote i)))
       (define args (list arg arg-crcn suspend-monotonic-heap-casts?))
-      (values (Var u) (cons u (App-Code cl args)))))
+      (values (Var u) (cons u (App-Code cast-cl args)))))
   (cond
     [(enable-crcps?)
-    (define passed-crcn (car arg*))
-    (define composed-crcn
-      (App-Code cmcl (list (Fn-Coercion-Return crcn) passed-crcn suspend-monotonic-heap-casts?)))
-    (define clos-app (Closure-App (Closure-Code fun) fun (cons composed-crcn v*)))
-    (let-bind b* clos-app)]
-   [else
-    (define clos-app (Closure-App (Closure-Code fun) fun v*))
-    (define args
-      (list clos-app (Fn-Coercion-Return crcn) suspend-monotonic-heap-casts?))
-    (let-bind b* (App-Code cl args))]))
+     (define passed-crcn (car arg*))
+     (define composed-crcn
+       (App-Code compose-cl (list (Fn-Coercion-Return crcn) passed-crcn ZERO-EXPR ZERO-EXPR)))
+     (define clos-app (Closure-App (Closure-Code fun) fun (cons composed-crcn v*)))
+     (let-bind b* clos-app)]
+    [else ;; without crcps
+     (define clos-app (Closure-App (Closure-Code fun) fun v*))
+     (define args
+       (list clos-app (Fn-Coercion-Return crcn) suspend-monotonic-heap-casts?))
+     (let-bind b* (App-Code cast-cl args))]))
 
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
 (define (bnd-code<? x y) (uid<? (car x) (car y)))

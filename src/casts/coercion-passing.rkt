@@ -19,13 +19,11 @@
                                 #:compose-coercions-uid compose-coercions-uid)
 
   ;; cf. interpret-casts/coercions
-  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr]) : CoC3-Expr
-    ;; TODO: We're not quite sure what these are:
-    ;; mono-address, base-address, index
-    (let ([mono-address ZERO-EXPR]
-          [base-address ZERO-EXPR]
-          [index ZERO-EXPR])
-      (apply-code apply-coercion-uid v c mono-address base-address index)))
+  (define (apply-coercion [v : CoC3-Expr]
+                          [c : CoC3-Expr]
+                          [top-level? : CoC3-Expr (Quote #f)])
+    : CoC3-Expr
+    (apply-code apply-coercion-uid v c top-level?))
 
   ;; coercion composition
   ;; cf. make-compose-coercions in interpret-casts/coercions
