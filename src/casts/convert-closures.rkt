@@ -81,16 +81,6 @@ TODO We can generate better code in this pass for function casts.
  "../logging.rkt"
  "../language/form-map.rkt")
 
-#;
-(unsafe-require/typed
- "../language/form-map.rkt"
- ;; One common cause of type-checking time explosion is having type
- ;; errors involving this type.
- [form-map
-  (case->
-   [(U= CoC4-Expr) (CoC4-Expr -> CoC5-Expr) -> (U= CoC5-Expr)]
-   [CoC5-Expr (CoC5-Expr -> CoC6-Expr) -> CoC6-Expr])])
-
 (module+ test
   (require
    (for-syntax
@@ -158,13 +148,9 @@ TODO We can generate better code in this pass for function casts.
 (define-type Propagant
   (U Bound-Var (Quote Cast-Literal)))
 
-(: convert-closures
-   (->* ((Bnd* CoC4-Expr) CoC4-Expr)
-        (#:cast-rep Cast-Representation
-         #:fn-proxy-rep Fn-Proxy-Representation)
-        (Values (Closure* Uid CoC5-Expr)
-                (Bnd* CoC5-Expr)
-                CoC5-Expr)))
+(define close-code-data-fn-proxy-application?
+  (make-parameter #t))
+
 (define (convert-closures
          const-bnd*
          main-expr
@@ -172,58 +158,90 @@ TODO We can generate better code in this pass for function casts.
          #:direct-call?    [direct-call? (optimize? 'direct-call)]
          #:self-reference? [self-reference? (optimize? 'self-reference)]
          #:cast-rep [cast-rep (cast-representation)]
-         #:fn-proxy-rep [fn-proxy-rep (fn-proxy-representation)])
+         #:fn-proxy-rep [fn-proxy-rep (fn-proxy-representation)]
+         #:close-code-data-fn-app? [close-code-data-fn-app? (close-code-data-fn-proxy-application?)])
   (define well-known-closures : (MSet Uid)
     (mset))
   
   ;; hash that caches the results of calls to `make-apply-casted-closure!`
-  (: arity->apply-casted-closure
+  (: arity->apply-casted-closure-closure
      (Mutable-HashTable Integer (Closure Uid CoC5-Expr)))
-  (define arity->apply-casted-closure (make-hash '()))
+  (define arity->apply-casted-closure-closure (make-hash '()))
+  (define arity->apply-casted-closure-code (make-hash '()))
   
-  (: make-apply-casted-closure! : Integer Uid -> (Closure Uid CoC5-Expr))
   ;; TODO if we kept an immutable hash of symbol->uid we could
   ;; get away without storing the cast is every fn-proxy node.
-  (define (make-apply-casted-closure! i cast-uid)
-    (cond
-      [(hash-ref arity->apply-casted-closure i #f) => values]
+  (define make-apply-casted-closure!
+    (case fn-proxy-rep
+      [(Data)
+       (cond
+         [close-code-data-fn-app?
+          (lambda (i cast-uid)
+            (match (hash-ref arity->apply-casted-closure-code i #f)
+              [(cons l _) (Code-Label l)]
+              [_
+               (define label (next-uid! (format "apply_proxied_closure_arity_~a" i))) 
+               ;; The uids for formal parameters of this function.
+               (define p* (build-list i (lambda (a) (next-uid! "arg"))))
+               ;; and likewise variable for those arguments.
+               (define v* (map (inst Var Uid) p*))
+               ;; The free-variables of this closure.
+               (define closure (next-uid! "closure"))
+               (define coercion (next-uid! "coercion"))
+               (hash-set!
+                arity->apply-casted-closure-code
+                i
+                (cons
+                 label
+                 (Code `(,closure ,coercion . ,p*)
+                       (cast-apply-cast cast-uid
+                                        (Var closure)
+                                        v*
+                                        (Var coercion)))))
+               (Code-Label label)]))]
+         [else
+          (lambda _ (error 'make-apply-casted-closure! "this shouldn't be called"))])]
       [else
-       ;; NOTE: The following code is tricky and fragile. Read the
-       ;; comments and write/run tests when modified.
-
-       ;; This is the name of the closure that is never allocated.
-       ;; After closure conversion it should never be seen.
-       (define name (next-uid! ""))
-       ;; The label for the code that applies arbitrary casted closures
-       ;; for functions of this arity.
-       (define label (next-uid! (format "apply_casted_closure_arity~a" i))) 
-       ;; The self variable for the code
-       (define self (next-uid! "hybrid_closure_self"))
-       ;; The uids for formal parameters of this function.
-       (define p* (build-list i (lambda (a) (next-uid! "arg"))))
-       ;; and likewise variable for those arguments.
-       (define v* (map (inst Var Uid) p*))
-       ;; The free-variables of this closure.
-       (define closure-field (next-uid! "closure-field"))
-       (define coercion-field (next-uid! "coercion-field"))
-       ;; TODO the apply line just uses the caster from here
-       ;; code-gen cast-casted-closure and used that code
-       ;; as the castor for this code.
-       ;; TODO Can we speed up applications of this code?
-       (define apply-casted-closure-i
-         (Closure 
-          name #f 'code-only label self
-          #f (list closure-field coercion-field) p*
-          (cast-apply-cast cast-uid
-                           (Var closure-field)
-                           v*
-                           (Var coercion-field))))
-       ;; Update the bindings that we have generate
-       (hash-set! arity->apply-casted-closure
-                  i
-                  apply-casted-closure-i)
-       apply-casted-closure-i]))
-
+       (lambda (i cast-uid)
+         (cond
+           [(hash-ref arity->apply-casted-closure-closure i #f) => values]
+           [else
+            ;; NOTE: The following code is tricky and fragile. Read the
+            ;; comments and write/run tests when modified.
+            
+            ;; This is the name of the closure that is never allocated.
+            ;; After closure conversion it should never be seen.
+            (define name (next-uid! ""))
+            ;; The label for the code that applies arbitrary casted closures
+            ;; for functions of this arity.
+            (define label (next-uid! (format "apply_casted_closure_arity~a" i))) 
+            ;; The self variable for the code
+            (define self (next-uid! "hybrid_closure_self"))
+            ;; The uids for formal parameters of this function.
+            (define p* (build-list i (lambda (a) (next-uid! "arg"))))
+            ;; and likewise variable for those arguments.
+            (define v* (map (inst Var Uid) p*))
+            ;; The free-variables of this closure.
+            (define closure-field (next-uid! "closure-field"))
+            (define coercion-field (next-uid! "coercion-field"))
+            ;; TODO the apply line just uses the caster from here
+            ;; code-gen cast-casted-closure and used that code
+            ;; as the castor for this code.
+            ;; TODO Can we speed up applications of this code?
+            (define apply-casted-closure-i
+              (Closure 
+               name #f 'code-only label self
+               #f (list closure-field coercion-field) p*
+               (cast-apply-cast cast-uid
+                                (Var closure-field)
+                                v*
+                                (Var coercion-field))))
+            ;; Update the bindings that we have generate
+            (hash-set! arity->apply-casted-closure-closure
+                       i
+                       apply-casted-closure-i)
+            apply-casted-closure-i]))]))
+  
   (: convert-closures-in-expr : CoC4-Expr (HashTable Uid Propagant) -> CoC5-Expr)
   (define (convert-closures-in-expr expr static-env)
     (let rec/env ([current-expr : CoC4-Expr expr]
@@ -579,16 +597,25 @@ TODO We can generate better code in this pass for function casts.
                    (define v* (map Var u*))
                    (define b* (map cons u* e*))
                    (define body
-                     (If (Fn-Proxy-Huh v)
-                         (let$ ([data-fn-proxy-closure (Fn-Proxy-Closure v)]
-                                [data-fn-proxy-coercion (Fn-Proxy-Coercion v)])
-                               (cast-apply-cast cast-uid data-fn-proxy-closure v* data-fn-proxy-coercion)) 
-                         (Closure-App (Closure-Code v) v v*)) )
+                     (If
+                      (Fn-Proxy-Huh v)
+                      (let$
+                       ([data-fn-proxy-closure (Fn-Proxy-Closure v)]
+                        [data-fn-proxy-coercion (Fn-Proxy-Coercion v)])
+                       (cond
+                         [close-code-data-fn-app?
+                          (App-Code
+                           (make-apply-casted-closure! (length e*) cast-uid)
+                           `(,data-fn-proxy-closure
+                             ,data-fn-proxy-coercion
+                             . ,v*))]
+                         [else
+                          (cast-apply-cast cast-uid data-fn-proxy-closure v* data-fn-proxy-coercion)])) 
+                      (Closure-App (Closure-Code v) v v*)))
                    (cond
                      [(null? b*) body]
                      [else (Let b* body)]))
                  (do-app-fn build-possibly-proxy-app e e*)])])]
-          
           [(Fn-Proxy `(,i ,cast) (app rec clos) (app rec crcn))
            (case cast-rep
              [(Coercions Hyper-Coercions)
@@ -619,35 +646,35 @@ TODO We can generate better code in this pass for function casts.
                 [(Data) (Fn-Proxy i clos crcn)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])]
-          [(Fn-Proxy-Huh (app rec e))
-           (case cast-rep
-             [(Coercions Hyper-Coercions)
-              (case fn-proxy-rep
-                [(Hybrid) (Hybrid-Proxy-Huh e)]
-                [(Data)   (Fn-Proxy-Huh e)]
-                [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
-             [else (error 'convert-closures "unkown cast representation")])]
-          ;; The Hybrid cases that follow allow specify representation
-          ;; to exploit the layout chosen for closure representation
-          ;; to reference the closure and coercion fields outside of
-          ;; the closures.
-          [(Fn-Proxy-Closure (app rec e))
-           (case cast-rep
-             [(Coercions Hyper-Coercions)
-              (case fn-proxy-rep
-                [(Hybrid) (Hybrid-Proxy-Closure e)]
-                [(Data)   (Fn-Proxy-Closure e)]
-                [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
-             [else (error 'convert-closures "unkown cast representation")])]
-          [(Fn-Proxy-Coercion (app rec e)) 
-           (case cast-rep
-             [(Coercions Hyper-Coercions)
-              (case fn-proxy-rep
-                [(Hybrid) (Hybrid-Proxy-Coercion e)]
-                [(Data)   (Fn-Proxy-Coercion e)]
-                [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
-             [else (error 'convert-closures "unkown cast representation")])] 
-          [else (form-map current-expr rec)]))))
+    [(Fn-Proxy-Huh (app rec e))
+     (case cast-rep
+       [(Coercions Hyper-Coercions)
+        (case fn-proxy-rep
+          [(Hybrid) (Hybrid-Proxy-Huh e)]
+          [(Data)   (Fn-Proxy-Huh e)]
+          [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+       [else (error 'convert-closures "unkown cast representation")])]
+    ;; The Hybrid cases that follow allow specify representation
+    ;; to exploit the layout chosen for closure representation
+    ;; to reference the closure and coercion fields outside of
+    ;; the closures.
+    [(Fn-Proxy-Closure (app rec e))
+     (case cast-rep
+       [(Coercions Hyper-Coercions)
+        (case fn-proxy-rep
+          [(Hybrid) (Hybrid-Proxy-Closure e)]
+          [(Data)   (Fn-Proxy-Closure e)]
+          [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+       [else (error 'convert-closures "unkown cast representation")])]
+    [(Fn-Proxy-Coercion (app rec e)) 
+     (case cast-rep
+       [(Coercions Hyper-Coercions)
+        (case fn-proxy-rep
+          [(Hybrid) (Hybrid-Proxy-Coercion e)]
+          [(Data)   (Fn-Proxy-Coercion e)]
+          [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
+       [else (error 'convert-closures "unkown cast representation")])] 
+    [else (form-map current-expr rec)]))))
 
   (define static-env 
     (for/hasheq : (HashTable Uid Propagant)
@@ -663,10 +690,13 @@ TODO We can generate better code in this pass for function casts.
   
   (define closure-coverted-main-expr : CoC5-Expr
     (convert-closures-in-expr main-expr static-env))
-  
-  (values (hash-values arity->apply-casted-closure)
+
+  (define code* (hash-values arity->apply-casted-closure-code))
+  (values (hash-values arity->apply-casted-closure-closure)
           new-const-bnd*
-          closure-coverted-main-expr))
+          (if (null? code*)
+              closure-coverted-main-expr
+              (Labels code* closure-coverted-main-expr))))
 
 (struct shared-tuple ([closure : Uid][free-variables : Uid*]))
 (struct shared-closure ([closure : Uid][free-variables : Uid*]))

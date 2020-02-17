@@ -47,6 +47,8 @@
        (cast-representation 'Hyper-Coercions)]
       [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
+   ["--data-fn-proxies" "enable inefficient function proxy representation"
+    (fn-proxy-representation 'Data)]
    [("--check-asserts")
     ((format "Compile code with assertions (~a)" (check-asserts?)))
     (check-asserts? #t)]

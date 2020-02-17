@@ -54,10 +54,20 @@
 (define default-test-cast-representation
   '(Static |Type-Based Casts| Coercions )) #;Hyper-Coercions
 
+(define default-test-fn-proxy-representation
+  '(Hybrid))
+
+(define all-test-fn-proxy-representation
+  '(Hybrid Data))
+
 ;; Parameter Specifying which cast-representation variables
 ;; get tested when running the test suite
 (define test-cast-representation
   (make-parameter default-test-cast-representation))
+
+(define test-fn-proxy-representation
+  (make-parameter default-test-fn-proxy-representation))
+
 (define test-blame-semantics
   (make-parameter '(Lazy-D)))
 
@@ -145,9 +155,11 @@
 
 (define (old-run-tests)
   (for* ([spec? (test-specialize-cast-code-generation)]
-         [cast-rep (test-cast-representation)] 
+         [cast-rep (test-cast-representation)]
+         [fn-proxy-rep (test-fn-proxy-representation)]
          #:unless (and (eq? cast-rep 'Static) spec?))
     (parameterize ([cast-representation cast-rep]
+                   [fn-proxy-representation fn-proxy-rep]
                    [output-path (build-path test-tmp-path "t.out")]
                    [c-path (build-path test-tmp-path "t.c")]
                    [c-flags (cons "-O3" (c-flags))]
@@ -158,7 +170,11 @@
           [(eq? cast-rep 'Static) ""]
           [spec? "Specialized"]
           [else  "Unspecialized"]))
-      (printf "~a ~a tests running:\n" spec-str cast-rep)
+      (define fn-proxy-rep
+        (cond
+          [(eq? cast-rep 'Data) "Data Fn Proxies "]
+          [else ""]))
+      (printf "~a ~a ~atests running:\n" spec-str cast-rep fn-proxy-rep)
       (match cast-rep
         ['Static (run-tests static-tests)]
         [_ (run-tests (suite))]))))
@@ -207,6 +223,20 @@
       [else 
        (error 'tests
               "--cast-representation given invalid argument ~a" crep)]))]
+ [("--fn-proxy-representation") crep
+  "add a fn-proxy-representation to the tests"
+  (let ((crep (string->symbol crep)))
+    (case crep 
+      [(Hybrid Data)
+       (define current-test-fn-proxy-representation (test-fn-proxy-representation))
+       (test-fn-proxy-representation
+        (if (eq? default-test-fn-proxy-representation
+                 current-test-fn-proxy-representation)
+            (list crep)
+            (cons crep current-test-fn-proxy-representation)))]
+      [else 
+       (error 'tests
+              "--fn-proxy-representation given invalid argument ~a" crep)]))]
  ;; Compiler Configuration -> GC Selection
  #:once-any
  ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
