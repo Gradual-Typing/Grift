@@ -1188,7 +1188,6 @@ TODO We can generate better code in this pass for function casts.
   (define cast-cl (Code-Label cast-uid))
   (define compose-cl (Code-Label compose-uid))
   (define top-level? (Quote #t))
-  (define index ZERO-EXPR)
   (define-values (v* b*)
     (for/lists ([v* : (Listof (Var Uid))]
                 [b* : (Bnd* CoC5-Expr)])
