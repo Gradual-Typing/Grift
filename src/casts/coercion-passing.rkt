@@ -161,49 +161,31 @@
          )]
 
       [(Dyn-Immediate-Tag=Huh v type)
-       (if (equal? cont ID-EXPR)
-           (Dyn-Immediate-Tag=Huh (trans-exp v ID-EXPR) type)
-           (begin
-             (pretty-print exp)
-             (pretty-print cont)
-             (error 'cont-not-id-in-trivial)))]
+       (apply-coercion-opt
+        (Dyn-Immediate-Tag=Huh (trans-exp v ID-EXPR) type)
+        cont)]
       [(Dyn-Box-Value v)
-       (if (equal? cont ID-EXPR)
-           (Dyn-Box-Value (trans-exp v ID-EXPR))
-           (begin
-             (pretty-print exp)
-             (pretty-print cont)
-             (error 'cont-not-id-in-trivial)))]
-
+       (apply-coercion-opt
+        (Dyn-Box-Value (trans-exp v ID-EXPR))
+        cont)]
       [(Dyn-Box-Type v)
-       (if (equal? cont ID-EXPR)
-           (Dyn-Box-Type (trans-exp v ID-EXPR))
-           (begin
-             (pretty-print exp)
-             (pretty-print cont)
-             (error 'cont-not-id-in-trivial)))]
+       (apply-coercion-opt
+        (Dyn-Box-Type (trans-exp v ID-EXPR))
+        cont)]
 
       [(Type-Mu-Huh v)
-       (if (equal? cont ID-EXPR)
-           (Type-Mu-Huh (trans-exp v ID-EXPR))
-           (begin
-             (pretty-print exp)
-             (pretty-print cont)
-             (error 'cont-not-id-in-trivial)))]
+       (apply-coercion-opt
+        (Type-Mu-Huh (trans-exp v ID-EXPR))
+        cont)]
       [(Type-Mu-Body v)
-       (if (equal? cont ID-EXPR)
-           (Type-Mu-Body (trans-exp v ID-EXPR))
-           (begin
-             (pretty-print exp)
-             (pretty-print cont)
-             (error 'cont-not-id-in-trivial)))]
+       (apply-coercion-opt
+        (Type-Mu-Body (trans-exp v ID-EXPR))
+        cont)]
+
       [(Type-Fn-Huh v)
-       (if (equal? cont ID-EXPR)
-           (Type-Fn-Huh (trans-exp v ID-EXPR))
-           (begin
-             (pretty-print exp)
-             (pretty-print cont)
-             (error 'cont-not-id-in-trivial)))]
+       (apply-coercion-opt
+        (Type-Fn-Huh (trans-exp v ID-EXPR))
+        cont)]
       [(Type-Fn-arity v)
        (apply-coercion-opt
         (Type-Fn-arity (trans-exp v ID-EXPR))
