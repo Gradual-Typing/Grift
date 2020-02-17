@@ -1185,10 +1185,9 @@ TODO We can generate better code in this pass for function casts.
 ;; create a casted fn application call site
 (: cast-apply-cast (Uid Uid (Var Uid) (Listof CoC5-Expr) (Var Uid) -> CoC5-Expr))
 (define (cast-apply-cast cast-uid compose-uid fun arg* crcn)
-  (define cl (Code-Label cast-uid))
-  (define cmcl (Code-Label compose-uid))
-  (define mono-address ZERO-EXPR)
-  (define base-address ZERO-EXPR)
+  (define cast-cl (Code-Label cast-uid))
+  (define compose-cl (Code-Label compose-uid))
+  (define top-level? (Quote #t))
   (define index ZERO-EXPR)
   (define-values (v* b*)
     (for/lists ([v* : (Listof (Var Uid))]
@@ -1197,19 +1196,19 @@ TODO We can generate better code in this pass for function casts.
                 [i (in-naturals)])
       (define u (next-uid! (format "fn-cast-arg~a" i)))
       (define arg-crcn (Fn-Coercion-Arg crcn (Quote i)))
-      (define args (list arg arg-crcn mono-address base-address index))
-      (values (Var u) (cons u (App-Code cl args)))))
+      (define args (list arg arg-crcn top-level?))
+      (values (Var u) (cons u (App-Code cast-cl args)))))
   (cond
    [(enable-crcps?)
     (define passed-crcn (car arg*))
-    (define composed-crcn (App-Code cmcl (list (Fn-Coercion-Return crcn) passed-crcn  ZERO-EXPR ZERO-EXPR)))
+    (define composed-crcn (App-Code compose-cl (list (Fn-Coercion-Return crcn) passed-crcn ZERO-EXPR ZERO-EXPR)))
     (define clos-app (Closure-App (Closure-Code fun) fun (cons composed-crcn v*)))
     (Let b* clos-app)]
-   [else
+   [else  ;; without crcps
     (define clos-app (Closure-App (Closure-Code fun) fun v*))
     (define args
-      (list clos-app (Fn-Coercion-Return crcn) mono-address base-address index))
-    (Let b* (App-Code cl args))]))
+      (list clos-app (Fn-Coercion-Return crcn) top-level?))
+    (Let b* (App-Code cast-cl args))]))
 
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
 (define (bnd-code<? x y) (uid<? (car x) (car y)))
