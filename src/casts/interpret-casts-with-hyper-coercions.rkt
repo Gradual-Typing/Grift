@@ -61,11 +61,11 @@ that can be located throughout this file:
   (define apply-med-coercion-uid
     (next-uid! "apply_mediating_coercion"))  
   (: apply-coercion : Apply-Coercion-Type)
-  (define (apply-coercion e c [top-level? (Quote #t)])
-    (apply-code apply-coercion-uid e c top-level?))
+  (define (apply-coercion e c [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+    (apply-code apply-coercion-uid e c suspend-monotonic-heap-casts?))
   (: apply-med-coercion : Apply-Coercion-Type)
-  (define (apply-med-coercion e c [top-level? (Quote #t)])
-    (apply-code apply-med-coercion-uid e c top-level?))
+  (define (apply-med-coercion e c [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+    (apply-code apply-med-coercion-uid e c suspend-monotonic-heap-casts?))
 
   (: get-fn-cast! : Nat -> Uid)
   (define get-fn-cast!
@@ -107,7 +107,7 @@ that can be located throughout this file:
      #:compose-coercions compose-coercions
      #:id-coercion? HC-Identity-Huh))
   
-  (define-values (interp-cast compile-cast)
+  (define-values (interp-cast compile-cast mref-state-reduction mvect-state-reduction)
     (cond
       [(hybrid-cast/coercion-runtime?)
        ;; interp-cast-refers to running code which uses type-based
@@ -116,8 +116,16 @@ that can be located throughout this file:
        (define interp-cast-uid (next-uid! "interp-cast"))
        
        (: interp-cast Cast-Type)
-       (define (interp-cast v t1 t2 l [top-level? (Quote #t)])
-         (apply-code interp-cast-uid v t1 t2 l top-level?))
+       (define (interp-cast v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+         (apply-code interp-cast-uid v t1 t2 l suspend-monotonic-heap-casts?))
+
+       (define mref-state-reduction (make-compile-mref-state-reduction
+                                     #:interp-cast interp-cast
+                                     #:greatest-lower-bound greatest-lower-bound))
+
+       (define mvect-state-reduction (make-compile-mvect-state-reduction
+                                     #:interp-cast interp-cast
+                                     #:greatest-lower-bound greatest-lower-bound))
        
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
@@ -139,12 +147,14 @@ that can be located throughout this file:
        (define compile-mbox-cast/type-based
          (make-compile-mbox-cast
           #:interp-cast interp-cast
-          #:greatest-lower-bound greatest-lower-bound))
+          #:greatest-lower-bound greatest-lower-bound
+          #:mref-state-reduction mref-state-reduction))
        
        (define compile-mvec-cast/type-based
          (make-compile-mvec-cast
           #:interp-cast interp-cast
-          #:greatest-lower-bound greatest-lower-bound))
+          #:greatest-lower-bound greatest-lower-bound
+          #:mvect-state-reduction mvect-state-reduction))
        
        (define interp-med-cast
          (make-interp-med-cast-runtime!
@@ -196,16 +206,25 @@ that can be located throughout this file:
           #:inject  compile-inject
           #:compile-med-cast compile-med-cast))
 
-       (values interp-cast compile-cast)]
+       (values interp-cast compile-cast mref-state-reduction mvect-state-reduction)]
       [else
        (: interp-cast/coercions Cast-Type)
-       (define (interp-cast/coercions e t1 t2 l [top-level? (Quote #t)])
-         (apply-coercion e (compile-make-coercion t1 t2 l top-level?)))
+       (define (interp-cast/coercions e t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+         (apply-coercion e (compile-make-coercion t1 t2 l suspend-monotonic-heap-casts?)))
+
+       (define mref-state-reduction (make-compile-mref-state-reduction
+                                     #:interp-cast interp-cast/coercions
+                                     #:greatest-lower-bound greatest-lower-bound))
+
+       (define mvect-state-reduction (make-compile-mvect-state-reduction
+                                     #:interp-cast interp-cast/coercions
+                                     #:greatest-lower-bound greatest-lower-bound))
+       
        (: interp-med-cast/coercions Cast-Type)
        (define (interp-med-cast/coercions
-                e t1 t2 l [top-level? (Quote #t)]
+                e t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts]
                 #:know-not-eq? [know-not-eq? : Boolean #f])
-         (apply-med-coercion e (compile-make-med-coercion t1 t2 l) top-level?))
+         (apply-med-coercion e (compile-make-med-coercion t1 t2 l) suspend-monotonic-heap-casts?))
 
        (define compile-tuple-cast/coercions
          (make-compile-cast-tuple/coercions
@@ -227,12 +246,14 @@ that can be located throughout this file:
        (define compile-mbox-cast/coercions
          (make-compile-mbox-cast
           #:interp-cast interp-cast/coercions
-          #:greatest-lower-bound greatest-lower-bound))
+          #:greatest-lower-bound greatest-lower-bound
+          #:mref-state-reduction mref-state-reduction))
 
        (define compile-mvec-cast/coercions
          (make-compile-mvec-cast
           #:interp-cast interp-cast/coercions
-          #:greatest-lower-bound greatest-lower-bound))
+          #:greatest-lower-bound greatest-lower-bound
+          #:mvect-state-reduction mvect-state-reduction))
        
        (make-apply-med-coercion-runtime!
         #:apply-med-coercion-uid apply-med-coercion-uid 
@@ -270,7 +291,7 @@ that can be located throughout this file:
           #:inject  compile-inject
           #:compile-med-cast compile-med-cast/coercions))
        
-       (values interp-cast/coercions compile-cast)]))
+       (values interp-cast/coercions compile-cast mref-state-reduction mvect-state-reduction)]))
     
   (define-values (pbox-ref pbox-set! pvec-ref pvec-set! pvec-len)
     (make-proxied-reference/coercions-code-gen-helpers
@@ -278,6 +299,9 @@ that can be located throughout this file:
   
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!)
     (make-monotonic-helpers
+     #:interp-cast interp-cast
+     #:mref-state-reduction mref-state-reduction
+     #:mvect-state-reduction mvect-state-reduction
      #:apply-coercion apply-coercion
      #:make-coercion  compile-make-coercion))
   
@@ -343,15 +367,15 @@ that can be located throughout this file:
 
   (add-cast-runtime-binding!
    apply-coercion-uid
-   (code$ (v c top-level?)
+   (code$ (v c suspend-monotonic-heap-casts?)
      (let*$ ([v1 (cond$
                   [(HC-Project-Huh c)
-                   (project v (HC-T1 c) (HC-Label c) top-level?)]
+                   (project v (HC-T1 c) (HC-Label c) suspend-monotonic-heap-casts?)]
                   [else v])]
              [m (HC-Med c)]
              [v2 (If (Id-Coercion-Huh m)
                      v1
-                     (apply-med-coercion v1 m top-level?))])
+                     (apply-med-coercion v1 m suspend-monotonic-heap-casts?))])
        (If (HC-Inject-Huh c)
            (If (and$ (Id-Coercion-Huh m) (HC-Project-Huh c))
                v
@@ -378,7 +402,7 @@ that can be located throughout this file:
 
   (add-cast-runtime-binding!
    apply-med-coercion-uid
-   (code$ (v m top-level?)
+   (code$ (v m suspend-monotonic-heap-casts?)
      (precondition$
          (not$ (Id-Coercion-Huh m))
        (cond$
@@ -387,12 +411,12 @@ that can be located throughout this file:
         [(Mediating-Coercion-Huh m)
          (cond$
           [(Fn-Coercion-Huh m)    (apply-fn-coercion v m)]
-          [(Tuple-Coercion-Huh m) (apply-tup-coercion v m top-level?)]
+          [(Tuple-Coercion-Huh m) (apply-tup-coercion v m suspend-monotonic-heap-casts?)]
           [(Ref-Coercion-Huh m)   (apply-pref-coercion v m)]
           [(MRef-Coercion-Huh m)
-           (mbox-cast v (MRef-Coercion-Type m) top-level?)]
+           (mbox-cast v (MRef-Coercion-Type m) suspend-monotonic-heap-casts?)]
           [(MVect-Coercion-Huh m)
-           (mvec-cast v (MVect-Coercion-Type m) top-level?)]
+           (mvec-cast v (MVect-Coercion-Type m) suspend-monotonic-heap-casts?)]
           [else
            (Blame
             (Quote "Internal Error: hyper-coercions/apply-med-coercion 1"))])]

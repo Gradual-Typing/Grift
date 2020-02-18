@@ -132,7 +132,7 @@
           (Repeat i (nc-value e1) (nc-value e2) #f #f
                   (Assign a (nc-value e4))))
          NO-OP)]
-      [(While e1 e2) (Begin (list (While (nc-pred e1) (nc-effect e2))) No-Op)]
+      [(While e1 e2) (Begin (list (While (nc-pred e1) (nc-effect e2))) NO-OP)]
       [(Break-Repeat) (Break-Repeat)]
       [(App-Code exp exp*)
        (App-Code (nc-value exp) (nc-value* exp*))]

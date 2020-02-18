@@ -223,7 +223,7 @@ but a static single assignment is implicitly maintained.
     (define coerce-tuple-label (Code-Label coerce-tuple))
     (define coerce-label (Code-Label coerce))
     (define coerce-tuple-c : D0-Code
-      (code$ (val crcn top-level?)
+      (code$ (val crcn suspend-monotonic-heap-casts?)
         (assign$ tagged-count
           (sr-tagged-array-ref
            crcn COERCION-MEDIATING-TAG COERCION-TUPLE-COUNT-INDEX))
@@ -234,7 +234,7 @@ but a static single assignment is implicitly maintained.
           (assign$ val-i (op$ - i COERCION-TUPLE-ELEMENTS-OFFSET))
           (assign$ vala (op$ Array-ref val val-i))
           (assign$ crcna (sr-tagged-array-ref crcn COERCION-MEDIATING-TAG i))
-          (assign$ casted-vala (app-code$ coerce-label vala crcna top-level?))
+          (assign$ casted-vala (app-code$ coerce-label vala crcna suspend-monotonic-heap-casts?))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
     (add-new-code! (cons coerce-tuple coerce-tuple-c))
@@ -251,7 +251,7 @@ but a static single assignment is implicitly maintained.
     (define cast-tuple-label (Code-Label cast-tuple))
     (define cast-label (Code-Label cast))
     (define cast-tuple-c : D0-Code
-      (code$ (val t1 t2 l top-level?)
+      (code$ (val t1 t2 l suspend-monotonic-heap-casts?)
         (assign$ count
           (sr-tagged-array-ref t2 TYPE-TUPLE-TAG TYPE-TUPLE-COUNT-INDEX))
         (assign$ new-val (op$ Alloc count))
@@ -261,7 +261,7 @@ but a static single assignment is implicitly maintained.
           (assign$ vala (op$ Array-ref val val-i))
           (assign$ t1a (sr-tagged-array-ref t1 TYPE-TUPLE-TAG i))
           (assign$ t2a (sr-tagged-array-ref t2 TYPE-TUPLE-TAG i))
-          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l top-level?))
+          (assign$ casted-vala (app-code$ cast-label vala t1a t2a l suspend-monotonic-heap-casts?))
           (op$ Array-set! new-val val-i casted-vala))
         new-val))
     (add-new-code! (cons cast-tuple cast-tuple-c))
@@ -909,10 +909,10 @@ but a static single assignment is implicitly maintained.
         [(Type-Tuple-num (app recur e)) (type-tuple-count-access e)]
         [(Type-Tuple-item (app recur e) (app recur i))
          (type-tuple-elements-access e i)]
-        [(Coerce-Tuple coerce (app recur v) (app recur c) (app recur top-level?))
-         (app-code$ (get-coerce-tuple! coerce) v c top-level?)]
-        [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l) (app recur top-level?))
-         (app-code$ (get-cast-tuple! cast) v t1 t2 l top-level?)]
+        [(Coerce-Tuple coerce (app recur v) (app recur c) (app recur suspend-monotonic-heap-casts?))
+         (app-code$ (get-coerce-tuple! coerce) v c suspend-monotonic-heap-casts?)]
+        [(Cast-Tuple cast (app recur v) (app recur t1) (app recur t2) (app recur l) (app recur suspend-monotonic-heap-casts?))
+         (app-code$ (get-cast-tuple! cast) v t1 t2 l suspend-monotonic-heap-casts?)]
         #;
         [(Make-Tuple-Coercion mk-crcn (app recur t1) (app recur t2) (app recur l))
          (app-code$ (get-mk-tuple-crcn! mk-crcn) t1 t2 l)]

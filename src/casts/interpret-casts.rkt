@@ -23,7 +23,9 @@
   (parameterize ([cast-runtime-code-bindings '()]
                  [cast-runtime-constant-bindings '()]
                  [current-unique-counter next-unique]
-                 [types-greatest-lower-bound-code-label? #f])
+                 [types-greatest-lower-bound-code-label? #f]
+                 [mref-state-reduction-uid? #f]
+                 [mvect-state-reduction-uid? #f])
 
     (define ic-expr! : (C0-Expr -> CoC3-Expr)
       (case (cast-representation)
