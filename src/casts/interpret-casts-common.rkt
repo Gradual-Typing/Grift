@@ -93,9 +93,9 @@ TODO write unit tests
 
 (define-type Id-Coercion-Huh-Type (CoC3-Expr -> CoC3-Expr))
 
-;; top-level? optional keyword parameter is a runtime boolean value that
-;; indiciates whether the current call to the cast interpreter is not a
-;; recursive call under another one that does a monotonic ref/vector cast.
+;; suspend-monotonic-heap-casts? optional keyword parameter is a runtime boolean
+;; value that indiciates whether the next monotonic heap cast should be added to
+;; the queue or executed.
 (define-type Compile-Make-Coercion-Type
   (->* (CoC3-Expr CoC3-Expr CoC3-Expr)
        (#:top-level? Boolean #:know-not-eq? Boolean)
@@ -563,9 +563,9 @@ TODO write unit tests
    Apply-Coercion-Type Make-Coercion-Type -> Cast-Type)
 (define ((apply-coercion/make-coercion->compile-cast
           apply-coercion make-coercion)
-         v t1 t2 l [top-level? (Quote #t)])
+         v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
   ;; TODO help compile coercion
-  (apply-coercion v (make-coercion t1 t2 l) top-level?))
+  (apply-coercion v (make-coercion t1 t2 l) suspend-monotonic-heap-casts?))
 
 (define monotonic-blame (Quote "Monotonic references do not currently track blame"))
 
@@ -581,7 +581,7 @@ TODO write unit tests
               (op$ mref-cast-queue-dequeue)
               (when$ (not$ (op=? t1 t3))
                      (let*$ ([vi (Mbox-val-ref address)]
-                             [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))])
+                             [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)])
                        (Mbox-rtti-set! address t3)
                        (Mbox-val-set! address cvi))))))
   (define (interp-mref-state-reduction)
@@ -618,7 +618,7 @@ TODO write unit tests
                      (let$ ([len (Mvector-length address)])
                        (repeat$ (i ZERO-EXPR len) ()
                          (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
-                                 [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))]
+                                 [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)]
                                  [t4 (Mvector-rtti-ref address)])
                            (Mvector-val-set! address i cvi 'no-check-bounds)))
                        (Mvector-rtti-set! address t3))))))
@@ -689,10 +689,9 @@ TODO write unit tests
        (let*$ ([address mref]
                [val val]
                [t2 (Mbox-rtti-ref address)]
-               [cv (cast val t1 t2 (Quote "Monotonic ref write error") (Quote #f))])
+               [cv (cast val t1 t2 (Quote "Monotonic ref write error") suspend-monotonic-heap-casts)])
          (Mbox-val-set! address cv)
-         (mref-state-reduction)
-         (Quote 0)))))
+         (mref-state-reduction)))))
 
   (: code-gen-mvec-ref MVec-Ref-Type)
   (define (code-gen-mvec-ref mvec i t2)
@@ -707,10 +706,9 @@ TODO write unit tests
        : CoC3-Expr
        (let*$ ([address mvec] [i i] [val val] 
                [t2 (Mvector-rtti-ref address)]
-               [cvi (cast val t1 t2 (Quote "Monotonic vect write error") (Quote #f))])
+               [cvi (cast val t1 t2 (Quote "Monotonic vect write error") suspend-monotonic-heap-casts)])
          (Mvector-val-set! address i cvi 'check-bounds)
-         (mvect-state-reduction)
-         (Quote 0)))))
+         (mvect-state-reduction)))))
 
   (cond
     [(inline-monotonic-branch?)
@@ -1095,7 +1093,7 @@ TODO write unit tests
                                   #:mbox-cast  compile-mbox-cast
                                   #:mvec-cast  compile-mvec-cast
                                   #:interp-med-cast interp-med-cast
-                                  [top-level? (Quote #t)])
+                                  [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
   ;; Assumes it will always be given values
   (precondition$ (and$ (not$ (op=? t1 t2))
                        (not$ (Type-Dyn-Huh t1))
@@ -1109,25 +1107,25 @@ TODO write unit tests
       (compile-fn-cast v t1 t2 l)]
      [(and$ (Type-Tuple-Huh t1) (Type-Tuple-Huh t2)
             (op<=? (Type-Tuple-num t2) (Type-Tuple-num t1)))
-      (compile-tuple-cast v t1 t2 l top-level?)]
+      (compile-tuple-cast v t1 t2 l suspend-monotonic-heap-casts?)]
      [(and$ (Type-GRef-Huh t1) (Type-GRef-Huh t2))
       (compile-pref-cast v (Type-GRef-Of t1) (Type-GRef-Of t2) l)]
      [(and$ (Type-GVect-Huh t1) (Type-GVect-Huh t2))
       (compile-pvec-cast v (Type-GVect-Of t1) (Type-GVect-Of t2) l)]
      [(and$ (Type-MRef-Huh t1) (Type-MRef-Huh t2))
-      (compile-mbox-cast v (Type-MRef-Of t2) top-level?)]
+      (compile-mbox-cast v (Type-MRef-Of t2) suspend-monotonic-heap-casts?)]
      [(and$ (Type-MVect-Huh t1) (Type-MVect-Huh t2))
-      (compile-mvec-cast v (Type-MVect-Of t2) top-level?)]
+      (compile-mvec-cast v (Type-MVect-Of t2) suspend-monotonic-heap-casts?)]
      [(Type-Mu-Huh t1)
       (let$ ([t1-mu-body (Type-Mu-Body t1)])
         (cond$
          [(op=? t1-mu-body t2) v]
-         [else (interp-med-cast v t1-mu-body t2 l top-level?)]))]
+         [else (interp-med-cast v t1-mu-body t2 l suspend-monotonic-heap-casts?)]))]
      [(Type-Mu-Huh t2)
       (let$ ([t2-mu-body (Type-Mu-Body t2)])
         (cond$
          [(op=? t2-mu-body t1) v]
-         [else (interp-med-cast v t1 t2-mu-body l top-level?)]))]
+         [else (interp-med-cast v t1 t2-mu-body l suspend-monotonic-heap-casts?)]))]
      [else (Blame l)])))
 
 (: make-interp-med-cast-runtime!
@@ -1150,12 +1148,12 @@ TODO write unit tests
   (define med-cast-uid (next-uid! "interp-med-cast"))
 
   (: interp-med-cast Cast-Type)
-  (define (interp-med-cast v t1 t2 l top-level?)
-    (apply-code med-cast-uid v t1 t2 l top-level?))
+  (define (interp-med-cast v t1 t2 l suspend-monotonic-heap-casts?)
+    (apply-code med-cast-uid v t1 t2 l suspend-monotonic-heap-casts?))
 
   (add-cast-runtime-binding!
    med-cast-uid
-   (code$ (v t1 t2 l top-level?)
+   (code$ (v t1 t2 l suspend-monotonic-heap-casts?)
      (code-gen-entire-med-cast
       v t1 t2 l
       #:fn-cast    compile-fn-cast
@@ -1165,7 +1163,7 @@ TODO write unit tests
       #:mbox-cast  compile-mbox-cast
       #:mvec-cast  compile-mvec-cast
       #:interp-med-cast interp-med-cast
-      top-level?)))
+      suspend-monotonic-heap-casts?)))
   
   interp-med-cast)
 
@@ -1195,7 +1193,7 @@ TODO write unit tests
   (define limit (*mu-casts-limit*))
   (: aux :
      CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define (aux v t1 t2 l top-level?)
+  (define (aux v t1 t2 l suspend-monotonic-heap-casts?)
     (match* (t1 t2)
       ;; TODO add tests that specifically target each of these cases
       [((Type t1-t) (Type t2-t))
@@ -1318,12 +1316,12 @@ TODO write unit tests
            #:mbox-cast  compile-mbox-cast
            #:mvec-cast  compile-mvec-cast
            #:interp-med-cast interp-med-cast
-           top-level?)]
-         [else (interp-med-cast v t1 t2 l top-level?)])]))
+           suspend-monotonic-heap-casts?)]
+         [else (interp-med-cast v t1 t2 l suspend-monotonic-heap-casts?)])]))
   (: compile-med-cast Compile-Med-Cast-Type)
   (define (compile-med-cast
            v t1 t2 l
-           [top-level? (Quote #t)]
+           [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts]
            #:know-not-eq? [know-not-eq? : Boolean #f]
            #:interpret? [interpret? : Boolean #f])
     (bind-value$
@@ -1332,8 +1330,8 @@ TODO write unit tests
             (lambda ()
               (if interpret?
                   (interp-med-cast
-                   v t1 t2 l top-level?)
-                  (aux v t1 t2 l top-level?)))])
+                   v t1 t2 l suspend-monotonic-heap-casts?)
+                  (aux v t1 t2 l suspend-monotonic-heap-casts?)))])
        (match* (t1 t2)
          ;; Check some invarients
          [((Type (Dyn)) _)
@@ -1367,18 +1365,18 @@ TODO write unit tests
          #:compile-med-cast compile-med-cast)
   (add-cast-runtime-binding!
    interp-cast-uid
-   (code$ (v t1 t2 l top-level?)
+   (code$ (v t1 t2 l suspend-monotonic-heap-casts?)
      (cond$
       [(op=? t1 t2) v]
       [(Type-Dyn-Huh t1)
        (parameterize ([project-inline-without-types? (interp-cast-project/inject-inline?)])
-         (compile-project v t2 l top-level?))]
+         (compile-project v t2 l suspend-monotonic-heap-casts?))]
       [(Type-Dyn-Huh t2)
        (parameterize ([inject-inline-without-types? (interp-cast-project/inject-inline?)])
          (compile-inject v t1))]
       [else
        (parameterize ([med-cast-inline-without-types? (interp-cast-med-cast-inline?)])
-         (compile-med-cast v t1 t2 l top-level? #:know-not-eq? #t))]))))
+         (compile-med-cast v t1 t2 l suspend-monotonic-heap-casts? #:know-not-eq? #t))]))))
 
 (: make-compile-cast
    (->* (#:interp-cast  Cast-Type
@@ -1396,22 +1394,22 @@ TODO write unit tests
   ;; we could make this code slightly better by inlining
   ;; this eq check here?
   (: compile-cast Compile-Cast-Type)
-  (define (compile-cast v t1 t2 l [top-level? (Quote #t)]
+  (define (compile-cast v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts]
                         #:t1-not-dyn [t1-not-dyn : Boolean #f]
                         #:t2-not-dyn [t2-not-dyn : Boolean #f]) 
     (match* (t1 t2)
       [(t t) v]
       [((Type (Dyn)) (Type _))
        ;; t2 not dyn because of (t t) case
-       (compile-project v t2 l top-level?)]
+       (compile-project v t2 l suspend-monotonic-heap-casts?)]
       [((Type (Dyn)) t2)  #:when t2-not-dyn
-       (compile-project v t2 l top-level?)]
+       (compile-project v t2 l suspend-monotonic-heap-casts?)]
       [((Type (Dyn)) t2) ;; t2 not Type (2 above)
        (bind-value$
         ([v v] [t2 t2] [l l])
         (If (Type-Dyn-Huh t2)
             v
-            (compile-project v t2 l top-level?)))]
+            (compile-project v t2 l suspend-monotonic-heap-casts?)))]
       [((Type _) (Type (Dyn)))
        ;; t1 not dyn because of (t t) case
        (compile-inject v t1)]
@@ -1430,20 +1428,20 @@ TODO write unit tests
        ;; (It would mean the program wasn't consistent 
        (Blame l)]
       [((Type _) (Type _))
-       (compile-med-cast v t1 t2 l top-level?)]
+       (compile-med-cast v t1 t2 l suspend-monotonic-heap-casts?)]
       [(t1 (Type _)) #:when t1-not-dyn
-       (compile-med-cast v t1 t2 l top-level?)]
+       (compile-med-cast v t1 t2 l suspend-monotonic-heap-casts?)]
       [((Type _) t2) #:when t2-not-dyn
-       (compile-med-cast v t1 t2 l top-level?)]
-      [(t1 t2) (interp-cast v t1 t2 l top-level?)]))
+       (compile-med-cast v t1 t2 l suspend-monotonic-heap-casts?)]
+      [(t1 t2) (interp-cast v t1 t2 l suspend-monotonic-heap-casts?)]))
 
   ;; This dumb compilation strategy is simply used
   ;; for benchmarking purposes
   (: compile-cast/interp Compile-Cast-Type)
-  (define (compile-cast/interp v t1 t2 l [top-level? (Quote #t)]
+  (define (compile-cast/interp v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts]
                                #:t1-not-dyn [t1-not-dyn : Boolean #f]
                                #:t2-not-dyn [t2-not-dyn : Boolean #f])
-    (interp-cast v t1 t2 l top-level?))
+    (interp-cast v t1 t2 l suspend-monotonic-heap-casts?))
   (cond
     [(specialize-cast-code-generation?) compile-cast]
     [else compile-cast/interp]))
@@ -1453,27 +1451,27 @@ TODO write unit tests
         Project-Type))
 (define (make-compile-project #:compile-med-cast compile-med-cast)
   (: code-gen-full-project Project-Type)
-  (define (code-gen-full-project v t2 l [top-level? (Quote #t)])
+  (define (code-gen-full-project v t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     (: help Project-Type)
-    (define (help v t2 l top-level?)
+    (define (help v t2 l suspend-monotonic-heap-casts?)
       (precondition$ (not$ (Type-Dyn-Huh t2))
         (let*$ ([u  (Dyn-Value v)]
                 [t1 (Dyn-Type v)]) 
-          (compile-med-cast u t1 t2 l top-level?))))
+          (compile-med-cast u t1 t2 l suspend-monotonic-heap-casts?))))
     (match t2
-      [(Type _) (help v t2 l top-level?)]
-      [_ (let$ ([t2 t2]) (help v t2 l top-level?))]))
+      [(Type _) (help v t2 l suspend-monotonic-heap-casts?)]
+      [_ (let$ ([t2 t2]) (help v t2 l suspend-monotonic-heap-casts?))]))
   
   (define project-code
-    (code$ (e t l top-level?)
-      (code-gen-full-project e t l top-level?)))
+    (code$ (e t l suspend-monotonic-heap-casts?)
+      (code-gen-full-project e t l suspend-monotonic-heap-casts?)))
   
   (define get-uid!
     (make-lazy-add-cast-runtime-binding! "project" project-code))
 
   (: interp-project Project-Type)
-  (define (interp-project v t2 l [top-level? (Quote #t)])
-    (apply-code (get-uid!) v t2 l top-level?))
+  (define (interp-project v t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+    (apply-code (get-uid!) v t2 l suspend-monotonic-heap-casts?))
   
   ;; Generates code that will project a dynamic value to a static type t2
   ;; or fail and blame l.
@@ -1487,7 +1485,7 @@ TODO write unit tests
   ;; using the runtime cast interpreter. 
   ;; TODO let med-cast take care of the eq check
   (: compile-project Project-Type)
-  (define (compile-project e t2 l [top-level? (Quote #t)])
+  (define (compile-project e t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     (let*$ ([v e] [l l])
       (cast-profile/inc-projects-casts$
        (match t2
@@ -1496,17 +1494,17 @@ TODO write unit tests
          [(Type (or (Int) (Character) (Unit) (Bool)))
           (If (Dyn-Immediate-Tag=Huh v t2)
               (Dyn-Immediate-Value v)
-              (interp-project v t2 l top-level?))]
+              (interp-project v t2 l suspend-monotonic-heap-casts?))]
          [(Type _) 
           (If (Dyn-Immediate-Tag=Huh v t2)
               (let*$ ([u  (Dyn-Box-Value v)]
                       [t1 (Dyn-Box-Type v)])
-                (compile-med-cast u t1 t2 l top-level?))
-              (interp-project v t2 l top-level?))]
+                (compile-med-cast u t1 t2 l suspend-monotonic-heap-casts?))
+              (interp-project v t2 l suspend-monotonic-heap-casts?))]
          [_
           (if (project-inline-without-types?)
-              (code-gen-full-project v t2 l top-level?)
-              (interp-project v t2 l top-level?))]))))
+              (code-gen-full-project v t2 l suspend-monotonic-heap-casts?)
+              (interp-project v t2 l suspend-monotonic-heap-casts?))]))))
   compile-project)
 
 (: make-compile-inject : -> (CoC3-Expr CoC3-Expr -> CoC3-Expr))
@@ -1626,9 +1624,9 @@ TODO write unit tests
    (->* (#:apply-coercion-uid Uid) Apply-Coercion-Type))
 (define ((make-compile-apply-tuple-coercion
           #:apply-coercion-uid apply-coercion-uid)
-         [e : CoC3-Expr] [m : CoC3-Expr] [top-level? : CoC3-Expr (Quote #t)])
+         [e : CoC3-Expr] [m : CoC3-Expr] [suspend-monotonic-heap-casts? : CoC3-Expr do-not-suspend-monotonic-heap-casts])
   (let$ ([v e][m m])
-    (Coerce-Tuple apply-coercion-uid v m top-level?)))
+    (Coerce-Tuple apply-coercion-uid v m suspend-monotonic-heap-casts?)))
 
 (: make-compile-cast-tuple/coercions
    (->* (#:apply-coercion-uid Uid
@@ -1643,11 +1641,11 @@ TODO write unit tests
      #:apply-coercion-uid apply-coercion-uid))
   
   (: compile-cast-tuple Cast-Tuple-Type)
-  (define (compile-cast-tuple e t1 t2 l [top-level? (Quote #t)])
+  (define (compile-cast-tuple e t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     (let$ ([c (make-med-coercion t1 t2 l)])
       (precondition$ (and$ (tup-coercion?$ c)
                            (not$ (op=? t1 t2)))
-        (compile-apply-tuple-coercion e c top-level?))))
+        (compile-apply-tuple-coercion e c suspend-monotonic-heap-casts?))))
 
   compile-cast-tuple)
 
@@ -1657,10 +1655,10 @@ TODO write unit tests
 (define (make-compile-cast-tuple #:interp-cast-uid cast-uid)
 
   (: compile-cast-tuple Cast-Tuple-Type)
-  (define (compile-cast-tuple e t1 t2 l [top-level? (Quote #t)])
+  (define (compile-cast-tuple e t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     (cast-profile/inc-tuple-casts$
      (ann (let$ ([v e] [t1 t1] [t2 t2] [l l])
-            (Cast-Tuple cast-uid v t1 t2 l top-level?))
+            (Cast-Tuple cast-uid v t1 t2 l suspend-monotonic-heap-casts?))
           CoC3-Expr)))
 
   compile-cast-tuple)
@@ -1862,48 +1860,58 @@ TODO write unit tests
 
 (: make-compile-mbox-cast
    (->* (#:interp-cast Cast-Type
+         #:greatest-lower-bound (Code-Label Uid)
          #:mref-state-reduction State-Reduction-Type)
         Monotonic-Cast-Type))
 (define (make-compile-mbox-cast
          #:interp-cast interp-cast
+         #:greatest-lower-bound greatest-lower-bound
          #:mref-state-reduction mref-state-reduction)
 
   (: code-gen-full-mbox-cast : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define (code-gen-full-mbox-cast e t2 l top-level?)
+  (define (code-gen-full-mbox-cast e t2 l suspend-monotonic-heap-casts?)
     (let*$ ([address e][t2 t2])
       (cond$
        [(Type-Dyn-Huh t2) address]
-       [else (code-gen-mbox-cast/no-dyn address t2 l top-level?)])))
+       [else (code-gen-mbox-cast/no-dyn address t2 l suspend-monotonic-heap-casts?)])))
 
   (: code-gen-mbox-cast/no-dyn : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define (code-gen-mbox-cast/no-dyn address t2 l top-level?)
+  (define (code-gen-mbox-cast/no-dyn address t2 l suspend-monotonic-heap-casts?)
     (begin$
-      (op$ mref-cast-queue-enqueue address t2)
-      (when$ top-level? (mref-state-reduction))
+      (If suspend-monotonic-heap-casts?
+          (op$ mref-cast-queue-enqueue address t2)
+          (let*$ ([t1 (Mbox-rtti-ref address)]                 
+                  [t3 (app-code$ greatest-lower-bound t1 t2)])
+            (when$ (not$ (op=? t1 t3))
+                   (let*$ ([vi (Mbox-val-ref address)]
+                           [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)])
+                     (Mbox-rtti-set! address t3)
+                     (Mbox-val-set! address cvi)
+                     (mref-state-reduction)))))
       address))
 
   (define interp-mbox-cast
     (let ([uid! (make-lazy-add-cast-runtime-binding!
                  "mbox-cast"
-                 (code$ (e t2 l top-level?)
-                   (code-gen-full-mbox-cast e t2 l top-level?)))])
+                 (code$ (e t2 l suspend-monotonic-heap-casts?)
+                   (code-gen-full-mbox-cast e t2 l suspend-monotonic-heap-casts?)))])
       (lambda ([mref : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr]
-               [top-level? : CoC3-Expr])
+               [suspend-monotonic-heap-casts? : CoC3-Expr])
         : CoC3-Expr
-        (apply-code (uid!) mref t2 l top-level?))))
+        (apply-code (uid!) mref t2 l suspend-monotonic-heap-casts?))))
 
   (define interp-mbox-cast/no-dyn
     (let ([uid! (make-lazy-add-cast-runtime-binding!
                  "mbox-cast/no-dyn"
-                 (code$ (e t2 l top-level?)
-                   (code-gen-mbox-cast/no-dyn e t2 l top-level?)))])
+                 (code$ (e t2 l suspend-monotonic-heap-casts?)
+                   (code-gen-mbox-cast/no-dyn e t2 l suspend-monotonic-heap-casts?)))])
       (lambda ([mref : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr]
-               [top-level? : CoC3-Expr])
+               [suspend-monotonic-heap-casts? : CoC3-Expr])
         : CoC3-Expr
-        (apply-code (uid!) mref t2 l top-level?))))
+        (apply-code (uid!) mref t2 l suspend-monotonic-heap-casts?))))
 
   (: compile-mbox-cast Monotonic-Cast-Type)
-  (define  (compile-mbox-cast e t2 [top-level? (Quote #t)] [l (Quote "Monotonic")]
+  (define  (compile-mbox-cast e t2 [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts] [l (Quote "Monotonic")]
                               ;; The t1 optional type allows compiling
                               ;; away some of the code if it is provided
                               ;; t1 is only used at compile time
@@ -1913,58 +1921,71 @@ TODO write unit tests
        [(_ (Type (Dyn))) e]
        [((Type (not (Dyn))) _)
         (if (monotonic-cast-close-code-specialization?)
-            (interp-mbox-cast/no-dyn e t2 l top-level?)
+            (interp-mbox-cast/no-dyn e t2 l suspend-monotonic-heap-casts?)
             (let$ ([address e])
-              (code-gen-mbox-cast/no-dyn address t2 l top-level?)))]
+              (code-gen-mbox-cast/no-dyn address t2 l suspend-monotonic-heap-casts?)))]
        [(_ _)
         (if (monotonic-cast-inline-without-types?)
-            (code-gen-full-mbox-cast e t2 l top-level?)
-            (interp-mbox-cast e t2 l top-level?))])))
+            (code-gen-full-mbox-cast e t2 l suspend-monotonic-heap-casts?)
+            (interp-mbox-cast e t2 l suspend-monotonic-heap-casts?))])))
   compile-mbox-cast)
 
 (: make-compile-mvec-cast
    (->* (#:interp-cast Cast-Type
+         #:greatest-lower-bound (Code-Label Uid)
          #:mvect-state-reduction State-Reduction-Type)
         Monotonic-Cast-Type))
 (define (make-compile-mvec-cast
          #:interp-cast interp-cast
+         #:greatest-lower-bound greatest-lower-bound
          #:mvect-state-reduction mvect-state-reduction)
   (: code-gen-mvec-cast (->* (CoC3-Expr CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
-  (define (code-gen-mvec-cast e t2 l [top-level? (Quote #t)])
+  (define (code-gen-mvec-cast e t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     (let*$ ([address e] [t2 t2] [l l])
       (cond$
        [(type-dyn?$ t2) address]
-       [else (code-gen-mvec-cast/no-dyn address t2 l top-level?)])))
+       [else (code-gen-mvec-cast/no-dyn address t2 l suspend-monotonic-heap-casts?)])))
 
   (: code-gen-mvec-cast/no-dyn : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
-  (define (code-gen-mvec-cast/no-dyn address t2 l top-level?)
+  (define (code-gen-mvec-cast/no-dyn address t2 l suspend-monotonic-heap-casts?)
     (begin$
-      (op$ mvect-cast-queue-enqueue address t2)
-      (when$ top-level? (mvect-state-reduction))
+      (If suspend-monotonic-heap-casts?
+          (op$ mvect-cast-queue-enqueue address t2)
+          (let*$ ([t1 (Mvector-rtti-ref address)]
+                  [t3 (app-code$ greatest-lower-bound t1 t2)])
+            (when$ (not$ (op=? t1 t3))
+                   (let$ ([len (Mvector-length address)])
+                     (repeat$ (i ZERO-EXPR len) ()
+                       (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
+                               [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)]
+                               [t4 (Mvector-rtti-ref address)])
+                         (Mvector-val-set! address i cvi 'no-check-bounds)))
+                     (Mvector-rtti-set! address t3)
+                     (mvect-state-reduction)))))
       address))
 
   (define interp-mvec-cast
     (let ([uid! (make-lazy-add-cast-runtime-binding!
                  "mvec-cast"
-                 (code$ (v t2 l top-level?)
-                   (code-gen-mvec-cast v t2 l top-level?)))])
-      (lambda ([v : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr] [top-level? : CoC3-Expr])
-        (apply-code (uid!) v t2 l top-level?))))
+                 (code$ (v t2 l suspend-monotonic-heap-casts?)
+                   (code-gen-mvec-cast v t2 l suspend-monotonic-heap-casts?)))])
+      (lambda ([v : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr] [suspend-monotonic-heap-casts? : CoC3-Expr])
+        (apply-code (uid!) v t2 l suspend-monotonic-heap-casts?))))
 
   (define interp-mvec-cast/no-dyn
     (let ([uid! (make-lazy-add-cast-runtime-binding!
                  "mvec-cast/no-dyn"
-                 (code$ (v t2 l top-level?)
-                   (code-gen-mvec-cast/no-dyn v t2 l top-level?)))])
-      (lambda ([v : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr] [top-level? : CoC3-Expr])
-        (apply-code (uid!) v t2 l top-level?))))
+                 (code$ (v t2 l suspend-monotonic-heap-casts?)
+                   (code-gen-mvec-cast/no-dyn v t2 l suspend-monotonic-heap-casts?)))])
+      (lambda ([v : CoC3-Expr] [t2 : CoC3-Expr] [l : CoC3-Expr] [suspend-monotonic-heap-casts? : CoC3-Expr])
+        (apply-code (uid!) v t2 l suspend-monotonic-heap-casts?))))
   
   (: compile-mvec-cast Monotonic-Cast-Type)
   (define (compile-mvec-cast
            ;; This blame label is fabricated from nothing because
            ;; monotonic references are not completely implemented.
            [e : CoC3-Expr] [t2 : CoC3-Expr]
-           [top-level? : CoC3-Expr (Quote #t)]
+           [suspend-monotonic-heap-casts? : CoC3-Expr do-not-suspend-monotonic-heap-casts]
            [l : CoC3-Expr (Quote "Monotonic")]
            #:t1 [t1 : (Option CoC3-Expr) #f])
     : CoC3-Expr 
@@ -1973,12 +1994,12 @@ TODO write unit tests
        [(_ (Type (Dyn))) e]
        [((Type (not (Dyn))) _)
         (if (monotonic-cast-close-code-specialization?)
-            (interp-mvec-cast/no-dyn e t2 l top-level?)
-            (code-gen-mvec-cast/no-dyn e t2 l top-level?))]
+            (interp-mvec-cast/no-dyn e t2 l suspend-monotonic-heap-casts?)
+            (code-gen-mvec-cast/no-dyn e t2 l suspend-monotonic-heap-casts?))]
        [(_ _)
         (if (monotonic-cast-inline-without-types?)
-            (code-gen-mvec-cast e t2 l top-level?)
-            (interp-mvec-cast e t2 l top-level?))])))
+            (code-gen-mvec-cast e t2 l suspend-monotonic-heap-casts?)
+            (interp-mvec-cast e t2 l suspend-monotonic-heap-casts?))])))
   compile-mvec-cast)
 
 (: make-compose-fn-coercions

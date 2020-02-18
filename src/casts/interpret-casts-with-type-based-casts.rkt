@@ -26,8 +26,8 @@
   (define interp-cast-uid (next-uid! "interp-cast"))
   (define (interp-cast [v : CoC3-Expr] [t1 : CoC3-Expr]
                        [t2 : CoC3-Expr] [l : CoC3-Expr]
-                       [top-level? : CoC3-Expr (Quote #t)])
-    (apply-code interp-cast-uid v t1 t2 l top-level?))
+                       [suspend-monotonic-heap-casts? : CoC3-Expr do-not-suspend-monotonic-heap-casts])
+    (apply-code interp-cast-uid v t1 t2 l suspend-monotonic-heap-casts?))
 
   ;; Compiling Function Casts
   (: build-fn-caster : Nat -> (Values Uid CoC3-Code))
@@ -38,7 +38,7 @@
     (match-define (list fn-var t1-var t2-var lbl-var)
       (map #{Var @ Uid} #{caster-fmls :: Uid*}))
     (define uid* (map next-uid! (make-list ary "v")))
-    (define top-level? (Quote #t))
+    (define suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts)
     (define args
       (for/list : (Listof CoC3-Expr)
                 ([u uid*]
@@ -46,11 +46,11 @@
         (let* ([i  : CoC3-Expr (Quote i)]
                [t1 : CoC3-Expr (Type-Fn-arg t1-var i)]
                [t2 : CoC3-Expr (Type-Fn-arg t2-var i)])
-          (interp-cast (Var u) t2 t1 lbl-var top-level?))))
+          (interp-cast (Var u) t2 t1 lbl-var suspend-monotonic-heap-casts?))))
     (define t1-ret (Type-Fn-return t1-var))
     (define t2-ret (Type-Fn-return t2-var))
     (define call (App-Fn fn-var args))
-    (define cast-call (interp-cast call t1-ret t2-ret lbl-var top-level?))
+    (define cast-call (interp-cast call t1-ret t2-ret lbl-var suspend-monotonic-heap-casts?))
     (define then-cast (Lambda uid* (Castable name (cast-profile/inc-function-proxies-accessed$
                                                    cast-call))))
     (values name (Code caster-fmls (cast-profile/inc-function-casts$ then-cast))))
@@ -86,11 +86,13 @@
   (define compile-mbox-cast
     (make-compile-mbox-cast
      #:interp-cast interp-cast
+     #:greatest-lower-bound compile-types-greatest-lower-bound
      #:mref-state-reduction mref-state-reduction))
 
   (define compile-mvec-cast
     (make-compile-mvec-cast
      #:interp-cast interp-cast
+     #:greatest-lower-bound compile-types-greatest-lower-bound
      #:mvect-state-reduction mvect-state-reduction))
 
   (define interp-med-cast

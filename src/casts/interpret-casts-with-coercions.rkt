@@ -582,7 +582,7 @@ form, to the shortest branch of the cast tree that is relevant.
 
   (add-cast-runtime-binding!
    apply-coercion-uid
-   (code$ (v c top-level?)
+   (code$ (v c suspend-monotonic-heap-casts?)
      (cond$
       [(Id-Coercion-Huh c) v]
       [(Sequence-Coercion-Huh c)
@@ -609,27 +609,27 @@ form, to the shortest branch of the cast tree that is relevant.
                          [else (apply-code apply-coercion-uid v seq-fst mt)])])
                 (inject v (Inject-Coercion-Type c)))])]
            [else
-            (let$ ([v (apply-code apply-coercion-uid v seq-fst top-level?)])
-              (apply-code apply-coercion-uid v seq-snd top-level?))]))]
+            (let$ ([v (apply-code apply-coercion-uid v seq-fst suspend-monotonic-heap-casts?)])
+              (apply-code apply-coercion-uid v seq-snd suspend-monotonic-heap-casts?))]))]
       [(Project-Coercion-Huh c)
-       (project v (Project-Coercion-Type c) (Project-Coercion-Label c) top-level?)]
+       (project v (Project-Coercion-Type c) (Project-Coercion-Label c) suspend-monotonic-heap-casts?)]
       [(Inject-Coercion-Huh c)
        (inject v (Inject-Coercion-Type c))]
       [(Mediating-Coercion-Huh c)
        (cond$
         [(Fn-Coercion-Huh c) (apply-fn-coercion v c)]
         [(Tuple-Coercion-Huh c)
-         (apply-tup-coercion v c top-level?)]
+         (apply-tup-coercion v c suspend-monotonic-heap-casts?)]
         [(Mu-Coercion-Huh c)
-         (apply-code apply-coercion-uid v (Mu-Coercion-Body c) top-level?)]
+         (apply-code apply-coercion-uid v (Mu-Coercion-Body c) suspend-monotonic-heap-casts?)]
         [(Ref-Coercion-Huh c)
          (if (cast-profiler?)
              (cond$
               [(Ref-Coercion-Ref-Huh c) (apply-pref-coercion v c)]
               [else (apply-pvec-coercion v c)])
              (apply-pref-coercion v c))] 
-        [(MRef-Coercion-Huh c) (mbox-cast v (MRef-Coercion-Type c) top-level?)]
-        [(MVect-Coercion-Huh c) (mvec-cast v (MRef-Coercion-Type c) top-level?)]
+        [(MRef-Coercion-Huh c) (mbox-cast v (MRef-Coercion-Type c) suspend-monotonic-heap-casts?)]
+        [(MVect-Coercion-Huh c) (mvec-cast v (MRef-Coercion-Type c) suspend-monotonic-heap-casts?)]
         [else (Blame (Quote "bad implemention of mediating coercions"))])]
       ;; the coercion must be failure
       [else
@@ -841,9 +841,9 @@ form, to the shortest branch of the cast tree that is relevant.
     (make-compose-coercions #:make-coercion compile-make-coercion
                             #:greatest-lower-bound greatest-lower-bound))
   (define apply-coercion-uid (next-uid! "apply-coercion"))
-  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr] [top-level? : CoC3-Expr (Quote #t)])
+  (define (apply-coercion [v : CoC3-Expr] [c : CoC3-Expr] [suspend-monotonic-heap-casts? : CoC3-Expr do-not-suspend-monotonic-heap-casts])
     : CoC3-Expr
-    (apply-code apply-coercion-uid v c top-level?))
+    (apply-code apply-coercion-uid v c suspend-monotonic-heap-casts?))
 
   (define get-fn-cast!
     (make-fn-cast-helpers
@@ -900,8 +900,8 @@ form, to the shortest branch of the cast tree that is relevant.
        (define interp-cast-uid (next-uid! "interp-cast"))
 
        (: interp-cast Cast-Type)
-       (define (interp-cast v t1 t2 l [top-level? (Quote #t)])
-         (apply-code interp-cast-uid v t1 t2 l top-level?))
+       (define (interp-cast v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+         (apply-code interp-cast-uid v t1 t2 l suspend-monotonic-heap-casts?))
 
        (define mref-state-reduction (make-compile-mref-state-reduction
                                      #:interp-cast interp-cast
@@ -931,11 +931,13 @@ form, to the shortest branch of the cast tree that is relevant.
        (define compile-mbox-cast/type-based
          (make-compile-mbox-cast
           #:interp-cast interp-cast
+          #:greatest-lower-bound compile-types-greatest-lower-bound
           #:mref-state-reduction mref-state-reduction))
        
        (define compile-mvec-cast/type-based
          (make-compile-mvec-cast
           #:interp-cast interp-cast
+          #:greatest-lower-bound compile-types-greatest-lower-bound
           #:mvect-state-reduction mvect-state-reduction))
 
        (define interp-med-cast
@@ -989,12 +991,12 @@ form, to the shortest branch of the cast tree that is relevant.
        (define interp-cast-uid (next-uid! "interp-cast"))
        
        (: interp-cast/coercions Cast-Type)
-       (define (interp-cast/coercions v t1 t2 l [top-level? (Quote #t)])
-         (apply-coercion v (compile-make-coercion t1 t2 l #:top-level? #t) top-level?))
+       (define (interp-cast/coercions v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+         (apply-coercion v (compile-make-coercion t1 t2 l #:top-level? #t) suspend-monotonic-heap-casts?))
 
        (: interp-med-cast/coercions Cast-Type)
-       (define (interp-med-cast/coercions v t1 t2 l [top-level? (Quote #t)])
-         (apply-coercion v (compile-make-med-coercion t1 t2 l) top-level?))
+       (define (interp-med-cast/coercions v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+         (apply-coercion v (compile-make-med-coercion t1 t2 l) suspend-monotonic-heap-casts?))
 
        (define mref-state-reduction (make-compile-mref-state-reduction
                                      #:interp-cast interp-cast/coercions
@@ -1026,11 +1028,13 @@ form, to the shortest branch of the cast tree that is relevant.
        (define compile-mbox-cast/coercions
          (make-compile-mbox-cast
           #:interp-cast interp-cast/coercions
+          #:greatest-lower-bound compile-types-greatest-lower-bound
           #:mref-state-reduction mref-state-reduction))
        
        (define compile-mvec-cast/coercions
          (make-compile-mvec-cast
           #:interp-cast interp-cast/coercions
+          #:greatest-lower-bound compile-types-greatest-lower-bound
           #:mvect-state-reduction mvect-state-reduction))
        
        (define compile-med-cast/coercions

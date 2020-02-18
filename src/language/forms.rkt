@@ -927,3 +927,5 @@ class literal constants
 (struct Let-Closures form:simple-branch (bindings body)
   #:transparent)
 
+(define do-not-suspend-monotonic-heap-casts (Quote #f))
+(define suspend-monotonic-heap-casts (Quote #t))
