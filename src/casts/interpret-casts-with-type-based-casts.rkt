@@ -74,16 +74,24 @@
 
   (define compile-types-greatest-lower-bound
     (make-compile-types-greatest-lower-bound))
+
+  (define mref-state-reduction (make-compile-mref-state-reduction
+                                #:interp-cast interp-cast
+                                #:greatest-lower-bound compile-types-greatest-lower-bound))
+
+  (define mvect-state-reduction (make-compile-mvect-state-reduction
+                                 #:interp-cast interp-cast
+                                 #:greatest-lower-bound compile-types-greatest-lower-bound))
   
   (define compile-mbox-cast
     (make-compile-mbox-cast
      #:interp-cast interp-cast
-     #:greatest-lower-bound compile-types-greatest-lower-bound))
+     #:mref-state-reduction mref-state-reduction))
 
   (define compile-mvec-cast
     (make-compile-mvec-cast
      #:interp-cast interp-cast
-     #:greatest-lower-bound compile-types-greatest-lower-bound))
+     #:mvect-state-reduction mvect-state-reduction))
 
   (define interp-med-cast
     (make-interp-med-cast-runtime!
@@ -129,7 +137,8 @@
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!)
     (make-monotonic-helpers
      #:interp-cast interp-cast
-     #:greatest-lower-bound compile-types-greatest-lower-bound
+     #:mref-state-reduction mref-state-reduction
+     #:mvect-state-reduction mvect-state-reduction
      #:compile-cast compile-cast))
     
   (define-values (dyn-pbox-ref

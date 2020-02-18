@@ -37,6 +37,12 @@ TODO write unit tests
 (define types-greatest-lower-bound-code-label? : (Parameterof (Option (Code-Label Uid)))
   (make-parameter #f))
 
+(define mref-state-reduction-uid? : (Parameterof (Option Uid))
+  (make-parameter #f))
+
+(define mvect-state-reduction-uid? : (Parameterof (Option Uid))
+  (make-parameter #f))
+
 (: apply-code (->* (Uid) #:rest CoC3-Expr CoC3-Expr))
 (define (apply-code u . a*)
   (App-Code (Code-Label u) a*))
@@ -147,6 +153,7 @@ TODO write unit tests
 (define-type PVec-Ref-Type (CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type PVec-Set-Type (CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr))
 (define-type PVec-Len-Type (CoC3-Expr -> CoC3-Expr))
+(define-type State-Reduction-Type (-> CoC3-Expr))
 
 ;; This next section of code are the procedures that build all
 ;; of the runtime code for hyper coercions based casting.
@@ -562,42 +569,83 @@ TODO write unit tests
 
 (define monotonic-blame (Quote "Monotonic references do not currently track blame"))
 
-(define (code-gen-mref-state-reduction
+(define (make-compile-mref-state-reduction
          #:interp-cast interp-cast
          #:greatest-lower-bound greatest-lower-bound)
-  (while$ (op$ mref-cast-queue-not-empty?)
-          (let*$ ([address (op$ mref-cast-queue-peek-address)]
-                  [t1 (Mbox-rtti-ref address)]                 
-                  [t2 (op$ mref-cast-queue-peek-type)]
-                  [t3 (app-code$ greatest-lower-bound t1 t2)])
-            (op$ mref-cast-queue-dequeue)
-            (when$ (not$ (op=? t1 t3))
-                   (let*$ ([vi (Mbox-val-ref address)]
-                           [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))])
-                     (Mbox-rtti-set! address t3)
-                     (Mbox-val-set! address cvi))))))
+  (define (code-gen-mref-state-reduction)
+    (while$ (op$ mref-cast-queue-not-empty?)
+            (let*$ ([address (op$ mref-cast-queue-peek-address)]
+                    [t1 (Mbox-rtti-ref address)]                 
+                    [t2 (op$ mref-cast-queue-peek-type)]
+                    [t3 (app-code$ greatest-lower-bound t1 t2)])
+              (op$ mref-cast-queue-dequeue)
+              (when$ (not$ (op=? t1 t3))
+                     (let*$ ([vi (Mbox-val-ref address)]
+                             [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))])
+                       (Mbox-rtti-set! address t3)
+                       (Mbox-val-set! address cvi))))))
+  (define (interp-mref-state-reduction)
+    (apply-code (mref-state-reduction-uid?)))
+  (define (make-code!)
+    (define-track-next-uid!$ mref-state-reduction)
+    (define mref-state-reduction-uid mref-state-reduction)
+    (add-cast-runtime-binding!
+     mref-state-reduction
+     (code$ ()
+       (begin$
+         (code-gen-mref-state-reduction)
+         ZERO-EXPR)))
+    (mref-state-reduction-uid? mref-state-reduction-uid))
+  (define (mref-state-reduction)
+    (if (monotonic-cast-inline-without-types?)
+        (code-gen-mref-state-reduction)
+        (let ([uid? (mref-state-reduction-uid?)])
+          (or uid? (make-code!))
+          (interp-mref-state-reduction))))
+  mref-state-reduction)
 
-(define (code-gen-mvect-state-reduction
+(define (make-compile-mvect-state-reduction
          #:interp-cast interp-cast
          #:greatest-lower-bound greatest-lower-bound)
-  (while$ (op$ mvect-cast-queue-not-empty?)
-          (let*$ ([address (op$ mvect-cast-queue-peek-address)]
-                  [t1 (Mvector-rtti-ref address)]                 
-                  [t2 (op$ mvect-cast-queue-peek-type)]
-                  [t3 (app-code$ greatest-lower-bound t1 t2)])
-            (op$ mvect-cast-queue-dequeue)
-            (when$ (not$ (op=? t1 t3))
-                   (let$ ([len (Mvector-length address)])
-                     (repeat$ (i ZERO-EXPR len) ()
-                       (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
-                               [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))]
-                               [t4 (Mvector-rtti-ref address)])
-                         (Mvector-val-set! address i cvi 'no-check-bounds)))
-                     (Mvector-rtti-set! address t3))))))
+  (define (code-gen-mvect-state-reduction)
+    (while$ (op$ mvect-cast-queue-not-empty?)
+            (let*$ ([address (op$ mvect-cast-queue-peek-address)]
+                    [t1 (Mvector-rtti-ref address)]                 
+                    [t2 (op$ mvect-cast-queue-peek-type)]
+                    [t3 (app-code$ greatest-lower-bound t1 t2)])
+              (op$ mvect-cast-queue-dequeue)
+              (when$ (not$ (op=? t1 t3))
+                     (let$ ([len (Mvector-length address)])
+                       (repeat$ (i ZERO-EXPR len) ()
+                         (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
+                                 [cvi (interp-cast vi t1 t3 monotonic-blame (Quote #f))]
+                                 [t4 (Mvector-rtti-ref address)])
+                           (Mvector-val-set! address i cvi 'no-check-bounds)))
+                       (Mvector-rtti-set! address t3))))))
+  (define (interp-mvect-state-reduction)
+    (apply-code (mvect-state-reduction-uid?)))
+  (define (make-code!)
+    (define-track-next-uid!$ mvect-state-reduction)
+    (define mvect-state-reduction-uid mvect-state-reduction)
+    (add-cast-runtime-binding!
+     mvect-state-reduction
+     (code$ ()
+       (begin$
+         (code-gen-mvect-state-reduction)
+         ZERO-EXPR)))
+    (mvect-state-reduction-uid? mvect-state-reduction-uid))
+  (define (mvect-state-reduction)
+    (if (monotonic-cast-inline-without-types?)
+        (code-gen-mvect-state-reduction)
+        (let ([uid? (mvect-state-reduction-uid?)])
+          (or uid? (make-code!))
+          (interp-mvect-state-reduction))))
+  mvect-state-reduction)
 
 (: make-monotonic-helpers
    (->* (#:interp-cast Cast-Type
-         #:greatest-lower-bound (Code-Label Uid))
+         #:mref-state-reduction State-Reduction-Type
+         #:mvect-state-reduction State-Reduction-Type)
         (#:compile-cast   Compile-Cast-Type
          #:apply-coercion Apply-Coercion-Type
          #:make-coercion  Make-Coercion-Type) 
@@ -605,7 +653,8 @@ TODO write unit tests
                 MVec-Ref-Type MVec-Set-Type)))
 (define (make-monotonic-helpers
          #:interp-cast interp-cast
-         #:greatest-lower-bound greatest-lower-bound
+         #:mref-state-reduction mref-state-reduction
+         #:mvect-state-reduction mvect-state-reduction
          #:compile-cast   [compile-cast : (Option Compile-Cast-Type) #f] 
          #:apply-coercion [apply-coercion : (Option Apply-Coercion-Type) #f]
          #:make-coercion  [make-coercion : (Option Make-Coercion-Type) #f])
@@ -642,9 +691,7 @@ TODO write unit tests
                [t2 (Mbox-rtti-ref address)]
                [cv (cast val t1 t2 (Quote "Monotonic ref write error") (Quote #f))])
          (Mbox-val-set! address cv)
-         (code-gen-mref-state-reduction
-          #:interp-cast interp-cast
-          #:greatest-lower-bound greatest-lower-bound)
+         (mref-state-reduction)
          (Quote 0)))))
 
   (: code-gen-mvec-ref MVec-Ref-Type)
@@ -662,8 +709,7 @@ TODO write unit tests
                [t2 (Mvector-rtti-ref address)]
                [cvi (cast val t1 t2 (Quote "Monotonic vect write error") (Quote #f))])
          (Mvector-val-set! address i cvi 'check-bounds)
-         (code-gen-mvect-state-reduction #:interp-cast interp-cast
-                                         #:greatest-lower-bound greatest-lower-bound)
+         (mvect-state-reduction)
          (Quote 0)))))
 
   (cond
@@ -1816,11 +1862,11 @@ TODO write unit tests
 
 (: make-compile-mbox-cast
    (->* (#:interp-cast Cast-Type
-         #:greatest-lower-bound (Code-Label Uid))
+         #:mref-state-reduction State-Reduction-Type)
         Monotonic-Cast-Type))
 (define (make-compile-mbox-cast
          #:interp-cast interp-cast
-         #:greatest-lower-bound greatest-lower-bound)
+         #:mref-state-reduction mref-state-reduction)
 
   (: code-gen-full-mbox-cast : CoC3-Expr CoC3-Expr CoC3-Expr CoC3-Expr -> CoC3-Expr)
   (define (code-gen-full-mbox-cast e t2 l top-level?)
@@ -1833,9 +1879,7 @@ TODO write unit tests
   (define (code-gen-mbox-cast/no-dyn address t2 l top-level?)
     (begin$
       (op$ mref-cast-queue-enqueue address t2)
-      (when$ top-level?
-             (code-gen-mref-state-reduction #:interp-cast interp-cast
-                                            #:greatest-lower-bound greatest-lower-bound))
+      (when$ top-level? (mref-state-reduction))
       address))
 
   (define interp-mbox-cast
@@ -1880,11 +1924,11 @@ TODO write unit tests
 
 (: make-compile-mvec-cast
    (->* (#:interp-cast Cast-Type
-         #:greatest-lower-bound (Code-Label Uid))
+         #:mvect-state-reduction State-Reduction-Type)
         Monotonic-Cast-Type))
 (define (make-compile-mvec-cast
          #:interp-cast interp-cast
-         #:greatest-lower-bound greatest-lower-bound)
+         #:mvect-state-reduction mvect-state-reduction)
   (: code-gen-mvec-cast (->* (CoC3-Expr CoC3-Expr CoC3-Expr) (CoC3-Expr) CoC3-Expr))
   (define (code-gen-mvec-cast e t2 l [top-level? (Quote #t)])
     (let*$ ([address e] [t2 t2] [l l])
@@ -1896,9 +1940,7 @@ TODO write unit tests
   (define (code-gen-mvec-cast/no-dyn address t2 l top-level?)
     (begin$
       (op$ mvect-cast-queue-enqueue address t2)
-      (when$ top-level?
-             (code-gen-mvect-state-reduction #:interp-cast interp-cast
-                                             #:greatest-lower-bound greatest-lower-bound))
+      (when$ top-level? (mvect-state-reduction))
       address))
 
   (define interp-mvec-cast

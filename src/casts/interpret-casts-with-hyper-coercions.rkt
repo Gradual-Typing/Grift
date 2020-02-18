@@ -107,7 +107,7 @@ that can be located throughout this file:
      #:compose-coercions compose-coercions
      #:id-coercion? HC-Identity-Huh))
   
-  (define-values (interp-cast compile-cast)
+  (define-values (interp-cast compile-cast mref-state-reduction mvect-state-reduction)
     (cond
       [(hybrid-cast/coercion-runtime?)
        ;; interp-cast-refers to running code which uses type-based
@@ -118,6 +118,14 @@ that can be located throughout this file:
        (: interp-cast Cast-Type)
        (define (interp-cast v t1 t2 l [top-level? (Quote #t)])
          (apply-code interp-cast-uid v t1 t2 l top-level?))
+
+       (define mref-state-reduction (make-compile-mref-state-reduction
+                                     #:interp-cast interp-cast
+                                     #:greatest-lower-bound greatest-lower-bound))
+
+       (define mvect-state-reduction (make-compile-mvect-state-reduction
+                                     #:interp-cast interp-cast
+                                     #:greatest-lower-bound greatest-lower-bound))
        
        ;; This first section builds the cast interpreter that falls
        ;; back to make-coercion when a higher-order cast is applied
@@ -139,12 +147,12 @@ that can be located throughout this file:
        (define compile-mbox-cast/type-based
          (make-compile-mbox-cast
           #:interp-cast interp-cast
-          #:greatest-lower-bound greatest-lower-bound))
+          #:mref-state-reduction mref-state-reduction))
        
        (define compile-mvec-cast/type-based
          (make-compile-mvec-cast
           #:interp-cast interp-cast
-          #:greatest-lower-bound greatest-lower-bound))
+          #:mvect-state-reduction mvect-state-reduction))
        
        (define interp-med-cast
          (make-interp-med-cast-runtime!
@@ -196,11 +204,20 @@ that can be located throughout this file:
           #:inject  compile-inject
           #:compile-med-cast compile-med-cast))
 
-       (values interp-cast compile-cast)]
+       (values interp-cast compile-cast mref-state-reduction mvect-state-reduction)]
       [else
        (: interp-cast/coercions Cast-Type)
        (define (interp-cast/coercions e t1 t2 l [top-level? (Quote #t)])
          (apply-coercion e (compile-make-coercion t1 t2 l top-level?)))
+
+       (define mref-state-reduction (make-compile-mref-state-reduction
+                                     #:interp-cast interp-cast/coercions
+                                     #:greatest-lower-bound greatest-lower-bound))
+
+       (define mvect-state-reduction (make-compile-mvect-state-reduction
+                                     #:interp-cast interp-cast/coercions
+                                     #:greatest-lower-bound greatest-lower-bound))
+       
        (: interp-med-cast/coercions Cast-Type)
        (define (interp-med-cast/coercions
                 e t1 t2 l [top-level? (Quote #t)]
@@ -227,12 +244,12 @@ that can be located throughout this file:
        (define compile-mbox-cast/coercions
          (make-compile-mbox-cast
           #:interp-cast interp-cast/coercions
-          #:greatest-lower-bound greatest-lower-bound))
+          #:mref-state-reduction mref-state-reduction))
 
        (define compile-mvec-cast/coercions
          (make-compile-mvec-cast
           #:interp-cast interp-cast/coercions
-          #:greatest-lower-bound greatest-lower-bound))
+          #:mvect-state-reduction mvect-state-reduction))
        
        (make-apply-med-coercion-runtime!
         #:apply-med-coercion-uid apply-med-coercion-uid 
@@ -270,7 +287,7 @@ that can be located throughout this file:
           #:inject  compile-inject
           #:compile-med-cast compile-med-cast/coercions))
        
-       (values interp-cast/coercions compile-cast)]))
+       (values interp-cast/coercions compile-cast mref-state-reduction mvect-state-reduction)]))
     
   (define-values (pbox-ref pbox-set! pvec-ref pvec-set! pvec-len)
     (make-proxied-reference/coercions-code-gen-helpers
@@ -279,7 +296,8 @@ that can be located throughout this file:
   (define-values (mbox-ref mbox-set! mvec-ref mvec-set!)
     (make-monotonic-helpers
      #:interp-cast interp-cast
-     #:greatest-lower-bound greatest-lower-bound
+     #:mref-state-reduction mref-state-reduction
+     #:mvect-state-reduction mvect-state-reduction
      #:apply-coercion apply-coercion
      #:make-coercion  compile-make-coercion))
   
