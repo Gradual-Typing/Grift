@@ -2,12 +2,20 @@
 #lang racket/base
 
 (require "src/compile.rkt"
+         "src/backend-c/runtime-location.rkt"
 	 racket/cmdline
 	 racket/match
 	 racket/runtime-path
 	 racket/system)
 
 (provide (all-from-out "src/compile.rkt"))
+
+(define (build-runtime-with-debug)
+  (when (not (directory-exists? debug_runtime.o-path))
+    (define-values (pwd _1 _2) (split-path runtime.c-path))
+    (parameterize ([current-directory pwd])
+      (unless (system "make debug" #:set-pwd? #t)
+        (printf (format "\nError: Running make failed in ~a" pwd))))))
 
 (define-runtime-path this-dir ".")
 (define (print-version-info)
@@ -171,7 +179,9 @@
          (grift-log-port of-port)]))]
    [("-g" "--with-debug-symbols")
     "Invoke c compiler so that debugging symbols are retained."
-    (c-flags (cons "-g" (c-flags)))]
+    (c-flags (cons "-g" (c-flags)))
+    (build-runtime-with-debug)
+    (runtime-path debug_runtime.o-path)]
    [("--profile")
     "Invoke c compiler with profiling flags"
     (c-flags (cons "-pg" (c-flags)))]

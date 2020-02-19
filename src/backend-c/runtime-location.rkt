@@ -14,6 +14,9 @@
 (define-runtime-path runtime.c-path "runtime/runtime.c")
 (define-runtime-path runtime.h-path "runtime/runtime.h")
 
+(: debug_runtime.o-path Path)
+(define-runtime-path debug_runtime.o-path "runtime/debug_object/runtime.o")
+
 ;; hashcons implementation in c
 (: hashcons.o-path Path)
 (: hashcons.c-path Path)

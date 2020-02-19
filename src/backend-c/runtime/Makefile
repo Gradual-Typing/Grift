@@ -2,7 +2,7 @@ NDEBUG ?= -D NDEBUG
 
 all : libgc nonegc.o runtime.o castprofiler.o
 
-debug: tidy ndebug all
+debug: tidy ndebug libgc nonegc.o debug_object/runtime.o castprofiler.o
 
 libgc : boehm-gc-install/lib/libgc.a
 
@@ -20,6 +20,15 @@ boehm-gc-install/lib/libgc.a :
 	cc $(NDEBUG) -Iboehm-gc-install/include -std=c99 $< -c -o $@
 
 runtime.o : boehm-gc-install/lib/libgc.a io.o assoc_stack.o hashcons.o suspended_cast.o cast_queue.o
+	ld -r $^ -o $@
+
+debug_object/%.o : %.c debug_object
+	cc -Iboehm-gc-install/include -std=c99 -g $< -c -o $@
+
+debug_object:
+	mkdir $@
+
+debug_object/runtime.o : boehm-gc-install/lib/libgc.a debug_object/io.o debug_object/assoc_stack.o debug_object/hashcons.o debug_object/suspended_cast.o debug_object/cast_queue.o
 	ld -r $^ -o $@
 
 test : runtime.o
