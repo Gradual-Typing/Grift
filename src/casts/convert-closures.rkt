@@ -279,15 +279,46 @@ TODO We can generate better code in this pass for function casts.
             ;; The variable was bound to a constant that can be propogated
             [else propagant]))
         (debug off u p/r-ret))
-      
+
+
       (let rec ([current-expr current-expr])
         (debug off current-expr)
-        (cond
+
+        (: App-Fn-build-closure-app : (Var Uid) (Listof CoC5-Expr) -> CoC5-Expr) 
+        (define (App-Fn-build-closure-app v e*) (Closure-App (Closure-Code v) v e*))
+
+        (define (do-app-fn build-closure-app e e*)
+          (: let-clos-app : CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr) 
+          (define (let-clos-app e e*)
+            (let$ ([closure e]) (build-closure-app closure e*)))
+          (match e
+            [(Var u)
+             (match (propogate/recognize u #:rator? #t)
+               [(and v (Var u))
+                (define label? (hash-ref code-env u #f))
+                (cond 
+                  [label?
+                   ;; Invariant: The latter closure optimization
+                   ;; passes identify known function application by
+                   ;; the presence of a code-label literal in code
+                   ;; position.  Note: This code works even in the
+                   ;; data representation of fn-proxies because if
+                   ;; we know what lambda a variable maps to then
+                   ;; we know it isn't casted.
+                   (Closure-App (Code-Label label?) v e*)]
+                  [else (build-closure-app v e*)])]
+               [other
+                ;; There are no propagants except variables who's types
+                ;; are functions.
+                (error 'convert-closures "this shouldn't happen: " other)])] 
+            [e (let-clos-app (rec e) e*)]))
+
+        (match current-expr
           ;; Variable found in non-application position
-          [(Var? current-expr) (propogate/recognize (Var-id current-expr))]
-          [(Letrec? current-expr)
+          ;; All variables found in application position are not recurred on
+          [(Var u) (propogate/recognize u)]
+          [(Letrec lr-bnd* lr-body)
            (debug off current-expr)
-           (match-define (Letrec lr-bnd* lr-body) current-expr)
            (define letrec-binding-depth (add1 current-binding-depth))
            (define closures-in-this-binding : (MSet Uid) (mset))
            (define-values (code-label* self-parameter*)
@@ -417,7 +448,8 @@ TODO We can generate better code in this pass for function casts.
                    ;; added yet.
                    (dgraph-add-edge! captures name fv)))
                (values name c)))
-           
+
+           (flush-output (current-output-port))
            (: u->c : Uid -> (Closure Uid CoC5-Expr))
            (define (u->c x) (hash-ref u->c-hash x))
 
@@ -432,8 +464,7 @@ TODO We can generate better code in this pass for function casts.
              (match scc*
                ['() lr-converted-body]
                [(cons scc scc*) (Let-Closures (map u->c scc) (loop scc*))]))]
-          [(Labels? current-expr)
-           (match-define (Labels b* b) current-expr)
+          [(Labels b* b)
            (define code-binding-depth (add1 current-binding-depth))
            (define rec-b* : (Bnd* (Fun CoC5-Expr))
              (for/list ([b b*])
@@ -443,15 +474,14 @@ TODO We can generate better code in this pass for function casts.
                            ([u p*])
                    (hash-set e u (Bound-Var u (Var u) code-binding-depth))))
                (cons l (Code p*
-                         (rec/env e (hasheq) opt-env^
-                                  code-binding-depth
-                                  current-closure-name
-                                  current-closure-self
-                                  current-closure-depth
-                                  (mset))))))
+                             (rec/env e (hasheq) opt-env^
+                                      code-binding-depth
+                                      current-closure-name
+                                      current-closure-self
+                                      current-closure-depth
+                                      (mset))))))
            (Labels rec-b* (rec b))]
-          [(Let? current-expr)
-           (match-define (Let b* e) current-expr)
+          [(Let b* e)
            (define let-binding-depth (add1 current-binding-depth))
            (define-values (b*^ opt-env^)
              (for/fold ([b*^ : (Bnd* CoC5-Expr) '()]
@@ -503,8 +533,7 @@ TODO We can generate better code in this pass for function casts.
            (cond
              [(null? b*^) rec-e]
              [else (Let b*^ rec-e)])]
-          [(Repeat? current-expr)
-           (match-define (Repeat i e1 e2 a e3 e4) current-expr)
+          [(Repeat i e1 e2 a e3 e4)
            (define rec-e1 (rec e1))
            (define rec-e2 (rec e2))
            (define rec-e3 (rec e3))
@@ -522,36 +551,13 @@ TODO We can generate better code in this pass for function casts.
                       free-variables))
            (Repeat i rec-e1 rec-e2 a rec-e3 rec-e4)]
           ;; Castable Function Operations
-          [(Fn-Caster? current-expr)
+          [(Fn-Caster e)
            ;; TODO If e is well known variable then we should be able
            ;; to know its arity and thus the static code that this
            ;; gets resolved to.
-           (match-define (Fn-Caster e) current-expr)
            (Closure-Caster (rec e))]
-          [(App-Fn? current-expr)
-           (: let-clos-app : CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr) 
-           (define (let-clos-app e e*)
-             (let$ ([closure e]) (clos-app closure e*)))
-           (: clos-app : (Var Uid) (Listof CoC5-Expr) -> CoC5-Expr) 
-           (define (clos-app v e*) (Closure-App (Closure-Code v) v e*))
-           (match-define (App-Fn e (app (cmap rec) e*)) current-expr)
-           (match e
-             [(Var u)
-              (match (propogate/recognize u #:rator? #t)
-                [(and v (Var u))
-                 (define label? (hash-ref code-env u #f))
-                 (cond 
-                   [label?
-                    ;; Invariant: The latter closure optimization passes
-                    ;; identify known function application by the presence
-                    ;; of a code-label literal in code position.
-                    (Closure-App (Code-Label label?) v e*)]
-                   [else (clos-app v e*)])]
-                [other
-                 ;; There are no propagants except variables who's types
-                 ;; are functions.
-                 (error 'convert-closures "this shouldn't happen: " other)])] 
-             [e (let-clos-app (rec e) e*)])]
+          [(App-Fn e (app (cmap rec) e*))
+           (do-app-fn App-Fn-build-closure-app e e*)]
           ;; Fn-Proxy Operations
           ;; App-Fn-or-Proxy is very similar to Fn-App
           ;; If we were lowering forms (Fn-Cast e t1 t2 l)
@@ -559,50 +565,31 @@ TODO We can generate better code in this pass for function casts.
           ;; to do better here, because we have kept track
           ;; of if we can see the lambda.
           ;; But this also might be doable in a constant folding pass.
-          [(App-Fn-or-Proxy? current-expr)
-           (match-define (App-Fn-or-Proxy cast-uid e e*) current-expr)
+          [(App-Fn-or-Proxy cast-uid e (app (cmap rec) e*))
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
-                ;; If it is a hybrid representation then proxies and closures
-                ;; are applied the same way.
-                [(Hybrid) (rec (App-Fn e e*))]
+                ;; Note: this case should be precisely the same as
+                ;; Fn-App
+                [(Hybrid) (do-app-fn App-Fn-build-closure-app e e*)]
                 [(Data)
-                 (: cast-clos-app :
-                    Uid CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr)
-                 (define (cast-clos-app cast v e*)
-                   (If (Fn-Proxy-Huh v)
-                       (let$ ([data-fn-proxy-closure (Fn-Proxy-Closure v)]
-                              [data-fn-proxy-coercion (Fn-Proxy-Coercion v)])
-                         (cast-apply-cast cast data-fn-proxy-closure e*
-                                          data-fn-proxy-coercion)) 
-                       (Closure-App (Closure-Code v) v e*)))
-                 (: let-cast-clos-app :
-                    Uid CoC5-Expr (Listof CoC5-Expr) -> CoC5-Expr)
-                 (define (let-cast-clos-app cast e e*)
-                   (let$ ([maybe-data-fn-proxy e])
-                     (cast-clos-app cast e e*)))
-                 (define e*^ (map rec e*))
-                 (match e
-                   [(and v (Var u))
-                    (cond
-                      ;; If it a data representation and it is a
-                      ;; known definition site then it can't be a
-                      ;; proxy because we can see the lambda
-                      [(hash-ref code-env u #f) =>
-                       (lambda ([u : Uid])
-                         ;; Invariant: The latter closure optimization passes
-                         ;; identify known function application by the presence
-                         ;; of a code-label literal in code position.
-                         (Closure-App (Code-Label u) v e*^))]
-                      [else (cast-clos-app cast-uid v e*^)])] 
-                   [e^ (let-cast-clos-app cast-uid (rec e^) e*^)])]
-                [else (error 'covert-closures "Unkown Fn-Proxy Representaion")])]
-             [else (error 'covert-closures "Unkown Cast Representaion")])]
-          [(Fn-Proxy? current-expr)
-           (match-define
-             (Fn-Proxy `(,i ,cast) (app rec clos) (app rec crcn))
-             current-expr)
+                 ;; This shouldn't be lifted because it captures cast-uid
+                 (define (build-possibly-proxy-app v e*)
+                   (define u* (map next-uid! (make-list (length e*) "arg")))
+                   (define v* (map Var u*))
+                   (define b* (map cons u* e*))
+                   (define body
+                     (If (Fn-Proxy-Huh v)
+                         (let$ ([data-fn-proxy-closure (Fn-Proxy-Closure v)]
+                                [data-fn-proxy-coercion (Fn-Proxy-Coercion v)])
+                               (cast-apply-cast cast-uid data-fn-proxy-closure v* data-fn-proxy-coercion)) 
+                         (Closure-App (Closure-Code v) v v*)) )
+                   (cond
+                     [(null? b*) body]
+                     [else (Let b* body)]))
+                 (do-app-fn build-possibly-proxy-app e e*)])])]
+          
+          [(Fn-Proxy `(,i ,cast) (app rec clos) (app rec crcn))
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep              
@@ -620,20 +607,19 @@ TODO We can generate better code in this pass for function casts.
                  (match-define (Closure _ _ _ label _ caster? _ p* _)
                    (make-apply-casted-closure! i cast))
                  (Let (list (cons closure clos) (cons coercion crcn))
-                   (Let-Closures
-                    ;; The layout of this closure is very specific
-                    ;; the closure must be the first free variable
-                    ;; the coercions the second
-                    ;; any change to this requires an update to the
-                    ;; constants in constants-and-codes.rkt
-                    (list (Closure name #f 'closure-only label name caster? 
-                                   (list closure coercion) p* ZERO-EXPR))
-                    (Closure-Proxy (Var name))))]
-                [(Data)   (Fn-Proxy i clos crcn)]
+                      (Let-Closures
+                       ;; The layout of this closure is very specific
+                       ;; the closure must be the first free variable
+                       ;; the coercions the second
+                       ;; any change to this requires an update to the
+                       ;; constants in constants-and-codes.rkt
+                       (list (Closure name #f 'closure-only label name caster? 
+                                      (list closure coercion) p* ZERO-EXPR))
+                       (Closure-Proxy (Var name))))]
+                [(Data) (Fn-Proxy i clos crcn)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])]
-          [(Fn-Proxy-Huh? current-expr)
-           (match-define (Fn-Proxy-Huh (app rec e)) current-expr) 
+          [(Fn-Proxy-Huh (app rec e))
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -645,8 +631,7 @@ TODO We can generate better code in this pass for function casts.
           ;; to exploit the layout chosen for closure representation
           ;; to reference the closure and coercion fields outside of
           ;; the closures.
-          [(Fn-Proxy-Closure? current-expr)
-           (match-define (Fn-Proxy-Closure (app rec e)) current-expr)
+          [(Fn-Proxy-Closure (app rec e))
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -654,8 +639,7 @@ TODO We can generate better code in this pass for function casts.
                 [(Data)   (Fn-Proxy-Closure e)]
                 [else (error 'convert-closures "Unkown Fn-Proxy Representation")])]
              [else (error 'convert-closures "unkown cast representation")])]
-          [(Fn-Proxy-Coercion? current-expr)
-           (match-define (Fn-Proxy-Coercion (app rec e)) current-expr) 
+          [(Fn-Proxy-Coercion (app rec e)) 
            (case cast-rep
              [(Coercions Hyper-Coercions)
               (case fn-proxy-rep
@@ -732,6 +716,7 @@ TODO We can generate better code in this pass for function casts.
      -> CoC6-Expr)
   (define (rec/env e uid->uid fv->expr fv-set->shared-closure)
     (let rec ([e e])
+      (debug off e uid->uid fv->expr fv-set->shared-closure label->closure-status)
       (match e
         [(Let-Closures '() e) (rec e)] 
         [(Let-Closures c* e)
@@ -1098,10 +1083,13 @@ TODO We can generate better code in this pass for function casts.
            [(hash-ref fv->expr u^ #f) => values]
            [else (Var u^)])]
         [(Closure-App (and l (Code-Label u)) s (app (cmap rec) a*))
-         (match (hash-ref label->closure-status u)
+         (match (hash-ref label->closure-status u #f)
            ['eliminated      (App-Code l a*)]
            ['free-variables  (App-Code l (cons (rec s) a*))]
-           ['regular         (Closure-App l (rec s) a*)])]
+           ['regular         (Closure-App l (rec s) a*)]
+           [#f (error 'grift/convert-closures/optimize-closures
+                      "Label, ~a, in closure application wasn't recorded as belonging to a closure"
+                      (uid->string u))])]
         [other (form-map other rec)])))
 
   (: closures-borrow-tuple :
@@ -1197,7 +1185,9 @@ TODO We can generate better code in this pass for function casts.
   (define clos-app (Closure-App (Closure-Code fun) fun v*))
   (define args
     (list clos-app (Fn-Coercion-Return crcn) suspend-monotonic-heap-casts?))
-  (Let b* (App-Code cl args)))
+  (if (null? b*)
+      (App-Code cl args)
+      (Let b* (App-Code cl args))))
 
 (: bnd-code<? : (Pairof Uid Any) (Pairof Uid Any) -> Boolean)
 (define (bnd-code<? x y) (uid<? (car x) (car y)))
@@ -1308,14 +1298,14 @@ TODO We can generate better code in this pass for function casts.
                                           ":\n    "
                                           (syntax->datum #'description))]) 
          #`(begin
-           (define defined-id expect)
-           #,(quasisyntax/loc stx
-               (test-not-exn
-                dscn
-                (lambda ()
-                  (let ([tmp test])
-                    #,(quasisyntax/loc stx
-                        (test-equal? dscn tmp defined-id))))))))]
+             (define defined-id expect)
+             #,(quasisyntax/loc stx
+                 (test-not-exn
+                  dscn
+                  (lambda ()
+                    (let ([tmp test])
+                      #,(quasisyntax/loc stx
+                          (test-equal? dscn tmp defined-id))))))))]
       [(define/test-equal? def-id:id test:expr expect:expr)
        (with-syntax ([dsc (format "~a" (syntax->datum #'id))]) 
          (syntax/loc stx
@@ -1373,8 +1363,8 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Let (list (cons u0 non-propagant))
-        (Let (list (cons u1 v0))
-          v1))))
+           (Let (list (cons u1 v0))
+                v1))))
     (list '() '() (Let (list (cons u0 non-propagant)) v0)))
   (test-equal?
    "optimize closures - copy propagation"
@@ -1397,7 +1387,7 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Letrec (list (cons u0 (Lambda '() (Castable #f (Quote 1)))))
-        (App-Fn (Let (list (cons u1 v0)) v1) '()))))
+              (App-Fn (Let (list (cons u1 v0)) v1) '()))))
     (list
      '()
      '()
@@ -1405,7 +1395,7 @@ TODO We can generate better code in this pass for function casts.
       (list
        (Closure u0 #f 'regular code0 self1 #f '() '() (Quote 1)))
       (Let (list (cons c2 v0))
-        (Closure-App (Closure-Code (Var c2)) (Var c2) '())))))
+           (Closure-App (Closure-Code (Var c2)) (Var c2) '())))))
 
   (test-equal?
    "optimize closures - known problem with copy propogation"
@@ -1415,9 +1405,9 @@ TODO We can generate better code in this pass for function casts.
     (list (Closure u0 #f 'regular code0 self1 #f '() '() (Quote 1)))
     '()
     (Let (list (cons c2 v0))
-      (Closure-App (Closure-Code (Var c2)) (Var c2) '()))))
+         (Closure-App (Closure-Code (Var c2)) (Var c2) '()))))
 
-
+  
   ;; correct free variable discovery for single closure
   (refresh!)
   (define/test-equal? cc-result3
@@ -1426,15 +1416,15 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Let (list (cons u0 non-propagant))
-        (Letrec (list (cons u1 (Lambda '() (Castable #f v0))))
-          v1))))
+           (Letrec (list (cons u1 (Lambda '() (Castable #f v0))))
+                   v1))))
     (list
      '()
      '()
      (Let (list (cons u0 non-propagant))
-       (Let-Closures
-        (list (Closure u1 #f 'regular code0 self1 #f (list u0) '() v0))
-        v1))))
+          (Let-Closures
+           (list (Closure u1 #f 'regular code0 self1 #f (list u0) '() v0))
+           v1))))
   (test-equal?
    "optimize closures - single closure"
    (values->list (apply optimize-closures cc-result3))
@@ -1443,11 +1433,11 @@ TODO We can generate better code in this pass for function casts.
     '()
     '()
     (Let (list (cons u0 non-propagant))
-      (Let-Closures
-       ;; ! wk w/ 1 fv -> arbitrary flat closure
-       (list (Closure u1 #f 'regular code0 self1 #f (list v0) '()
-                      (Closure-Ref selfv1 0)))
-       v1))))
+         (Let-Closures
+          ;; ! wk w/ 1 fv -> arbitrary flat closure
+          (list (Closure u1 #f 'regular code0 self1 #f (list v0) '()
+                         (Closure-Ref selfv1 0)))
+          v1))))
   
   ;; correct free variable discovery for nested closure 1
   (refresh!)
@@ -1457,60 +1447,60 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Let (list (cons u0 non-propagant))
-        (Letrec
+           (Letrec
             (list 
              (cons
               u1
               (Lambda (list p1)
-                (Castable
-                 #f
-                 (Letrec
-                     (list
-                      (cons
-                       u2
-                       (Lambda '()
-                         (Castable
-                          #f
-                          (Create-tuple (list v0 (Tuple-proj pv1 (Quote 2))))))))
-                   v2)))))
-          v1))))
+                      (Castable
+                       #f
+                       (Letrec
+                        (list
+                         (cons
+                          u2
+                          (Lambda '()
+                                  (Castable
+                                   #f
+                                   (Create-tuple (list v0 (Tuple-proj pv1 (Quote 2))))))))
+                        v2)))))
+            v1))))
     (list
      '()
      '()
      (Let (list (cons u0 non-propagant))
-       (Let-Closures
-        (list
-         (Closure
-          u1 #f 'regular code0 self1 #f (list u0) (list p1)
           (Let-Closures
            (list
             (Closure
-             u2 #f 'regular code2 self3 #f (list u0 p1) '()
-             (Create-tuple 
-              (list v0 (Tuple-proj pv1 (Quote 2))))))
-           v2)))
-        v1))))
+             u1 #f 'regular code0 self1 #f (list u0) (list p1)
+             (Let-Closures
+              (list
+               (Closure
+                u2 #f 'regular code2 self3 #f (list u0 p1) '()
+                (Create-tuple 
+                 (list v0 (Tuple-proj pv1 (Quote 2))))))
+              v2)))
+           v1))))
   (test-equal?
    "optimize closures - nested closure 1"
    (values->list (apply optimize-closures cc-result4))
    (list
     '() '() '()
     (Let (list (cons u0 non-propagant))
-      (Let-Closures
-       (list
-        (Closure
-         u1 #f 'regular code0 self1 #f (list v0) (list p1)
          (Let-Closures
           (list
            (Closure
-            u2 #f 'regular code2 self3 #f
-            (list (Closure-Ref selfv1 0) pv1) '()
-            (Create-tuple
-             (list (Closure-Ref selfv3 0)
-                   (Tuple-proj (Closure-Ref selfv3 1)
-                               (Quote 2))))))
-          v2)))
-       v1))))
+            u1 #f 'regular code0 self1 #f (list v0) (list p1)
+            (Let-Closures
+             (list
+              (Closure
+               u2 #f 'regular code2 self3 #f
+               (list (Closure-Ref selfv1 0) pv1) '()
+               (Create-tuple
+                (list (Closure-Ref selfv3 0)
+                      (Tuple-proj (Closure-Ref selfv3 1)
+                                  (Quote 2))))))
+             v2)))
+          v1))))
   
   ;; correct free variable discovery for nested closure 2
   ;; TODO test 5
@@ -1521,15 +1511,15 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Letrec
-          (list
-           (cons
-            u0
-            (Lambda '()
-              (Castable
-               #f
-               (Letrec (list (cons u1 (Lambda '() (Castable #f v0))))
-                 v1)))))
-        v0)))
+       (list
+        (cons
+         u0
+         (Lambda '()
+                 (Castable
+                  #f
+                  (Letrec (list (cons u1 (Lambda '() (Castable #f v0))))
+                          v1)))))
+       v0)))
     (list
      '() '() 
      (Let-Closures
@@ -1561,7 +1551,7 @@ TODO We can generate better code in this pass for function casts.
       '()
       (Letrec (list (cons u0 (Lambda '() (Castable #f (App-Fn v1 '()))))
                     (cons u1 (Lambda '() (Castable #f (App-Fn v0 '())))))
-        v1)))
+              v1)))
     (list
      '() '()
      (Let-Closures
@@ -1592,12 +1582,12 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Let (list (cons u0 (Quote 1)))
-        (Letrec (list (cons u1 (Lambda (list u2) (Castable #f v0))))
-          (Let (list (cons u3 v1))
-            (Letrec
-                (list
-                 (cons u4 (Lambda '() (Castable #f (App-Fn v3 (list v4))))))
-              v4))))))
+           (Letrec (list (cons u1 (Lambda (list u2) (Castable #f v0))))
+                   (Let (list (cons u3 v1))
+                        (Letrec
+                         (list
+                          (cons u4 (Lambda '() (Castable #f (App-Fn v3 (list v4))))))
+                         v4))))))
     (list
      '() '()
      (Let-Closures
@@ -1625,16 +1615,16 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Letrec
-          (list
-           (cons
-            u0
-            (Lambda (list p0)
-              (Castable
-               u1
-               (If (op$ = v0 pv0)
-                   (App-Fn-or-Proxy u2 v0 (list pv0))
-                   (App-Fn-or-Proxy u2 pv0 (list v0)))))))
-        (App-Fn v0 (list v0)))))
+       (list
+        (cons
+         u0
+         (Lambda (list p0)
+                 (Castable
+                  u1
+                  (If (op$ = v0 pv0)
+                      (App-Fn-or-Proxy u2 v0 (list pv0))
+                      (App-Fn-or-Proxy u2 pv0 (list v0)))))))
+       (App-Fn v0 (list v0)))))
     (list
      '() '()
      (Let-Closures
@@ -1669,7 +1659,7 @@ TODO We can generate better code in this pass for function casts.
                     (cons u1 (Lambda '() (Castable #f (App-Fn v0 '()))))
                     (cons u2 (Lambda '() (Castable #f (App-Fn v1 '()))))
                     (cons u3 (Lambda '() (Castable #f (App-Fn v2 '())))))
-        v3)))
+              v3)))
     (list
      '() '()
      (Let-Closures
@@ -1707,11 +1697,11 @@ TODO We can generate better code in this pass for function casts.
       '()
       (Letrec (list
                (cons u0 (Lambda '()
-                          (Castable
-                           #f
-                           (op$ + (Quote 1) (App-Fn v2 '())))))
+                                (Castable
+                                 #f
+                                 (op$ + (Quote 1) (App-Fn v2 '())))))
                (cons u2 (Lambda '() (Castable #f (Quote 0)))))
-        (App-Fn v0 '()))))
+              (App-Fn v0 '()))))
     (list
      '() '()
      (Let-Closures 
@@ -1739,13 +1729,13 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Letrec
-          (list
-           (cons
-            u0
-            (Lambda (list p1)
-              (Castable
-               #f
-               (Letrec
+       (list
+        (cons
+         u0
+         (Lambda (list p1)
+                 (Castable
+                  #f
+                  (Letrec
                    (list
                     ;; x -> pv1
                     ;; f -> v2 
@@ -1757,20 +1747,20 @@ TODO We can generate better code in this pass for function casts.
                     [cons
                      u3
                      (Lambda '()
-                       (Castable #f (App-Fn v2 (list (App-Fn v4 (list pv1))))))]
+                             (Castable #f (App-Fn v2 (list (App-Fn v4 (list pv1))))))]
                     [cons
                      u4
                      (Lambda (list p3)
-                       (Castable #f (App-Fn v3 '())))]
+                             (Castable #f (App-Fn v3 '())))]
                     ;; q -> u5
                     [cons
                      u5
                      (Lambda (list p4)
-                       (Castable
-                        #f
-                        (op$ + (Unguarded-Vect-length pv4) (Quote 1))))])
-                 (App-Fn v5 (list (App-Fn v4 '()))))))))
-        v0)))
+                             (Castable
+                              #f
+                              (op$ + (Unguarded-Vect-length pv4) (Quote 1))))])
+                   (App-Fn v5 (list (App-Fn v4 '()))))))))
+       v0)))
     (list
      '()
      '()
@@ -1804,11 +1794,11 @@ TODO We can generate better code in this pass for function casts.
      (cons
       code2
       (Code (list self3 p2)
-        (Closure-App (Closure-Code pv2) pv2 (list selfv3))))
+            (Closure-App (Closure-Code pv2) pv2 (list selfv3))))
      (cons
       code4
       (Code (list self5)
-        (App-Code label2 (list selfv5 (App-Code label6 (list selfv5 selfv5))))))
+            (App-Code label2 (list selfv5 (App-Code label6 (list selfv5 selfv5))))))
      (cons code6 (Code (list self7 p3) (App-Code label4 (list selfv7))))
      (cons code8 (Code (list p4) (op$ + (Unguarded-Vect-length pv4) (Quote 1))))) 
     (list
@@ -1827,14 +1817,14 @@ TODO We can generate better code in this pass for function casts.
                (cons
                 u1
                 (Lambda '() 
-                  (Castable
-                   #f
-                   (Letrec (list
-                            (cons
-                             u2
-                             (Lambda '() (Castable #f (App-Fn v1 '())))))
-              v2)))))
-        (No-Op))))
+                        (Castable
+                         #f
+                         (Letrec (list
+                                  (cons
+                                   u2
+                                   (Lambda '() (Castable #f (App-Fn v1 '())))))
+                                 v2)))))
+              (No-Op))))
     (list
      '() '()
      (Let-Closures
@@ -1849,14 +1839,14 @@ TODO We can generate better code in this pass for function casts.
       (No-Op))))
 
   (test-equal? 
-    "optimize-closures - tests/suite/program/sieve.100.grift count-from"
-    (values->list (apply optimize-closures cc-result-count-from))
-    (list
-     (list (cons code0 (Code '() v2)))
-     (list (Closure u2 #f 'regular code2 self3 #f '() '()
-                    (App-Code label0 '())))
-     '()
-     (No-Op)))
+   "optimize-closures - tests/suite/program/sieve.100.grift count-from"
+   (values->list (apply optimize-closures cc-result-count-from))
+   (list
+    (list (cons code0 (Code '() v2)))
+    (list (Closure u2 #f 'regular code2 self3 #f '() '()
+                   (App-Code label0 '())))
+    '()
+    (No-Op)))
 
 
   (refresh!)  
@@ -1869,14 +1859,14 @@ TODO We can generate better code in this pass for function casts.
                (cons
                 u1
                 (Lambda '() 
-                  (Castable
-                   #f
-                   (Letrec (list
-                            (cons
-                             u2
-                             (Lambda '() (Castable #f (App-Fn v1 '())))))
-              v2)))))
-        v1)))
+                        (Castable
+                         #f
+                         (Letrec (list
+                                  (cons
+                                   u2
+                                   (Lambda '() (Castable #f (App-Fn v1 '())))))
+                                 v2)))))
+              v1)))
     (list
      '() '()
      (Let-Closures
@@ -1931,21 +1921,21 @@ TODO We can generate better code in this pass for function casts.
       '()
       '()
       (Let (list (cons u0 non-propagant))
-        (Let-Closures
-         (list
-          (Closure
-           u1 #f 'closure-only code0 self1 #f (list u0) '() (Quote 0)))
-         v1)))))
+           (Let-Closures
+            (list
+             (Closure
+              u1 #f 'closure-only code0 self1 #f (list u0) '() (Quote 0)))
+            v1)))))
    (list
     '()
     '()
     '()
     (Let (list (cons u0 non-propagant))
-      (Let-Closures
-       (list
-        (Closure
-         u1 #f 'closure-only code0 self1 #f (list v0) '() (Quote 0)))
-       v1))))
+         (Let-Closures
+          (list
+           (Closure
+            u1 #f 'closure-only code0 self1 #f (list v0) '() (Quote 0)))
+          v1))))
 
 
   ;; loop5 -> u0
@@ -1974,129 +1964,129 @@ TODO We can generate better code in this pass for function casts.
      (convert-closures
       '()
       (Let
-          (list
-           (cons init (Unguarded-Box (Quote #f)))
-           (cons loop4 (Unguarded-Box (Quote 0))))
-        (Letrec
-            (list
-             (cons
-              loop5
-              (Lambda
-                  '()
-                (Castable
-                 fn-cast
-                 (App-Code
-                  app-crcn-cl
-                  (list
-                   (Begin
-                     (list
-                      (App-Fn-or-Proxy apply-coercion (Var loop5) '()))
-                     (App-Fn-or-Proxy
-                      apply-coercion
-                      (Unguarded-Box-Ref (Var loop4)) '()))
-                   (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
-                   (Quote 0) (Quote 0) (Quote 0)))))))
-          (Let
-           (list
-            (cons
-                tmp
-                (App-Code
-                 (Code-Label apply-coercion)
-                 (list
-                  (Letrec
-                      (list
-                       (cons
-                        annon
-                        (Lambda '()
-                          (Castable
-                           fn-cast
-                           (App-Fn-or-Proxy
-                            apply-coercion
-                            (If (Unguarded-Box-Ref (Var init))
-                                (Var loop5)
-                                (Blame (Quote "")))
-                            '())))))
-                    (Var annon))
-                  (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
-                  (Quote 0) (Quote 0) (Quote 0)))))            
-           (Begin
+       (list
+        (cons init (Unguarded-Box (Quote #f)))
+        (cons loop4 (Unguarded-Box (Quote 0))))
+       (Letrec
+        (list
+         (cons
+          loop5
+          (Lambda
+           '()
+           (Castable
+            fn-cast
+            (App-Code
+             app-crcn-cl
              (list
-              (Unguarded-Box-Set! (Var loop4) (Var tmp))
-              (Unguarded-Box-Set! (Var init) (Quote #t)))
-             (App-Fn-or-Proxy apply-coercion
-                              (Unguarded-Box-Ref (Var loop4))
-                              '())))))))
+              (Begin
+                (list
+                 (App-Fn-or-Proxy apply-coercion (Var loop5) '()))
+                (App-Fn-or-Proxy
+                 apply-coercion
+                 (Unguarded-Box-Ref (Var loop4)) '()))
+              (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
+              (Quote 0) (Quote 0) (Quote 0)))))))
+        (Let
+         (list
+          (cons
+           tmp
+           (App-Code
+            (Code-Label apply-coercion)
+            (list
+             (Letrec
+              (list
+               (cons
+                annon
+                (Lambda '()
+                        (Castable
+                         fn-cast
+                         (App-Fn-or-Proxy
+                          apply-coercion
+                          (If (Unguarded-Box-Ref (Var init))
+                              (Var loop5)
+                              (Blame (Quote "")))
+                          '())))))
+              (Var annon))
+             (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
+             (Quote 0) (Quote 0) (Quote 0)))))            
+         (Begin
+           (list
+            (Unguarded-Box-Set! (Var loop4) (Var tmp))
+            (Unguarded-Box-Set! (Var init) (Quote #t)))
+           (App-Fn-or-Proxy apply-coercion
+                            (Unguarded-Box-Ref (Var loop4))
+                            '())))))))
     (list
      '()
      '()
      (Let
-         (list
-          (cons
-           loop4
-           (Unguarded-Box (Quote 0)))
-          (cons
-           init
-           (Unguarded-Box (Quote #f))))
-       (Let-Closures
-        (list
-         (Closure
-          loop5 #f 'regular loop5-code loop5-self
-          fn-cast (list loop4) '()
-          (ann
-           (App-Code
+      (list
+       (cons
+        loop4
+        (Unguarded-Box (Quote 0)))
+       (cons
+        init
+        (Unguarded-Box (Quote #f))))
+      (Let-Closures
+       (list
+        (Closure
+         loop5 #f 'regular loop5-code loop5-self
+         fn-cast (list loop4) '()
+         (ann
+          (App-Code
            app-crcn-cl
            (list
             (Begin
               (list
-                 (Closure-App (Code-Label loop5-code)
-                              (Var loop5-self)
-                              '()))
-                (Let (list (cons tmp-closure1 (Unguarded-Box-Ref (Var loop4))))
-                  (Closure-App (Closure-Code (Var tmp-closure1))
-                               (Var tmp-closure1)
-                               '())))
+               (Closure-App (Code-Label loop5-code)
+                            (Var loop5-self)
+                            '()))
+              (Let (list (cons tmp-closure1 (Unguarded-Box-Ref (Var loop4))))
+                   (Closure-App (Closure-Code (Var tmp-closure1))
+                                (Var tmp-closure1)
+                                '())))
             (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
             (Quote 0) (Quote 0) (Quote 0)))
-           CoC5-Expr)))
-        (ann
-         (Let
-             (list
-              (cons
-               tmp
-               (App-Code
-                (Code-Label apply-coercion)
-                (list
-                 (Let-Closures
-                  (list
-                   (Closure
-                    annon #f 'regular annon-code annon-self fn-cast
-                    (list loop5 init) '()
-                    (ann
-                     (Let
-                         (list
-                          (cons
-                           tmp-closure2
-                           (If (Unguarded-Box-Ref (Var init))
-                               (Var loop5)
-                               (Blame (Quote "")))))
-                       (Closure-App
-                        (Closure-Code (Var tmp-closure2))
-                        (Var tmp-closure2) '()))
-                     CoC5-Expr)))
-                  (Var annon))
-                 (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
-                 (Quote 0) (Quote 0) (Quote 0)))))
-           (ann
-            (Begin
+          CoC5-Expr)))
+       (ann
+        (Let
+         (list
+          (cons
+           tmp
+           (App-Code
+            (Code-Label apply-coercion)
+            (list
+             (Let-Closures
               (list
-               (Unguarded-Box-Set! (Var loop4) (Var tmp))
-               (Unguarded-Box-Set! (Var init) (Quote #t)))
-              (Let (list (cons tmp-closure3 (Unguarded-Box-Ref (Var loop4))))
-                (Closure-App (Closure-Code (Var tmp-closure3))
-                             (Var tmp-closure3)
-                             '())))
-            CoC5-Expr))
-         CoC5-Expr)))))
+               (Closure
+                annon #f 'regular annon-code annon-self fn-cast
+                (list loop5 init) '()
+                (ann
+                 (Let
+                  (list
+                   (cons
+                    tmp-closure2
+                    (If (Unguarded-Box-Ref (Var init))
+                        (Var loop5)
+                        (Blame (Quote "")))))
+                  (Closure-App
+                   (Closure-Code (Var tmp-closure2))
+                   (Var tmp-closure2) '()))
+                 CoC5-Expr)))
+              (Var annon))
+             (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
+             (Quote 0) (Quote 0) (Quote 0)))))
+         (ann
+          (Begin
+            (list
+             (Unguarded-Box-Set! (Var loop4) (Var tmp))
+             (Unguarded-Box-Set! (Var init) (Quote #t)))
+            (Let (list (cons tmp-closure3 (Unguarded-Box-Ref (Var loop4))))
+                 (Closure-App (Closure-Code (Var tmp-closure3))
+                              (Var tmp-closure3)
+                              '())))
+          CoC5-Expr))
+        CoC5-Expr)))))
   
   (test-equal? 
    "optimize-closures - bug in fft"
@@ -2107,28 +2097,28 @@ TODO We can generate better code in this pass for function casts.
     '()
     (Let (list (cons loop4 (Unguarded-Box (Quote 0)))
                (cons init (Unguarded-Box (Quote #f))))
-      (Let-Closures
-       (list
-        (Closure
-         loop5 #f 'regular loop5-code loop5-self fn-cast
-         (list (Var loop4)) '()
-         (App-Code
-           (Code-Label apply-coercion)
-           (list
-            (Begin
-              (list
-               (Closure-App (Code-Label loop5-code) (Var loop5-self) '()))
-              (Let
-                  (list
-                   (cons
-                    tmp-closure1 
-                    (Unguarded-Box-Ref (Closure-Ref (Var loop5-self) 0))))
-                (Closure-App
-                 (Closure-Code (Var tmp-closure1)) (Var tmp-closure1) '())))
-            (Quote-Coercion
-             (Static-Id (Uid "static_project_crcn" 464)))
-            (Quote 0) (Quote 0) (Quote 0)))))
-       (Let
+         (Let-Closures
+          (list
+           (Closure
+            loop5 #f 'regular loop5-code loop5-self fn-cast
+            (list (Var loop4)) '()
+            (App-Code
+             (Code-Label apply-coercion)
+             (list
+              (Begin
+                (list
+                 (Closure-App (Code-Label loop5-code) (Var loop5-self) '()))
+                (Let
+                 (list
+                  (cons
+                   tmp-closure1 
+                   (Unguarded-Box-Ref (Closure-Ref (Var loop5-self) 0))))
+                 (Closure-App
+                  (Closure-Code (Var tmp-closure1)) (Var tmp-closure1) '())))
+              (Quote-Coercion
+               (Static-Id (Uid "static_project_crcn" 464)))
+              (Quote 0) (Quote 0) (Quote 0)))))
+          (Let
            (list
             (cons
              tmp
@@ -2147,20 +2137,251 @@ TODO We can generate better code in this pass for function casts.
                          (If (Unguarded-Box-Ref (Closure-Ref (Var annon-self) 1))
                              (Closure-Ref (Var annon-self) 0)
                              (Blame (Quote "")))))
-                    (Closure-App (Closure-Code (Var tmp-closure2))
-                                 (Var tmp-closure2)
-                                 '()))))
+                       (Closure-App (Closure-Code (Var tmp-closure2))
+                                    (Var tmp-closure2)
+                                    '()))))
                 (Var annon))
                (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
-            (Quote 0) (Quote 0) (Quote 0))))) 
-         (Begin
+               (Quote 0) (Quote 0) (Quote 0))))) 
+           (Begin
+             (list
+              (Unguarded-Box-Set! (Var loop4) (Var tmp))
+              (Unguarded-Box-Set! (Var init) (Quote #t)))
+             (Let (list (cons tmp-closure3 (Unguarded-Box-Ref (Var loop4))))
+                  (Closure-App (Closure-Code (Var tmp-closure3))
+                               (Var tmp-closure3)
+                               '()))))))))
+
+  (refresh!)
+  (define c4 (Uid "data-fn-proxy-closure" 4))
+  (define c5 (Uid "data-fn-proxy-coercion" 5))
+  (define c6 (Uid "closure" 6))
+  (define a7 (Uid "arg" 7))
+  (define c8 (Uid "data-fn-proxy-closure" 8))
+  (define c9 (Uid "data-fn-proxy-coercion" 9))
+  (define a010 (Uid "fn-cast-arg0" 10))
+  
+  (define/test-equal? cc-result-debugging
+    "convert-closures - duplicate closure bug"
+    (values->list
+     (convert-closures
+      '()
+      (Let
+       '()
+       (App-Fn-or-Proxy
+        u0
+        (Letrec `([,u1 . ,(Lambda `(,u2) (Castable #f (App-Fn-or-Proxy u0 v2 '())))]) v1)
+        (list
+         (Letrec `([,u3 . ,(Lambda `() (Castable #f (Quote 1)))]) v3))))
+      #:fn-proxy-rep 'Data))
+    (list
+     '()
+     '()
+     (Let
+      (list
+       (cons
+        c6
+        (Let-Closures
+         (list
+          (Closure
+           u1
+           #f
+           'regular
+           code2
+           self3
+           #f
+           '()
+           (list u2)
+           (If
+            (Fn-Proxy-Huh v2)
+            (Let
+             (list
+              (cons
+               c4
+               (Fn-Proxy-Closure v2))
+              (cons
+               c5
+               (Fn-Proxy-Coercion v2)))
+             (App-Code
+              (Code-Label u0)
+              (list
+               (Closure-App
+                (Closure-Code (Var c4))
+                (Var c4)
+                '())
+               (Fn-Coercion-Return (Var c5))
+               do-not-suspend-monotonic-heap-casts)))
+            (Closure-App (Closure-Code v2) v2 '()))))
+         v1)))
+      (Let
+       (list
+        (cons
+         a7
+         (Let-Closures
+          (list
+           (Closure
+            u3
+            #f
+            'regular
+            code0
+            self1
+            #f
+            '()
+            '()
+            (Quote 1)))
+          v3)))
+       (If
+        (Fn-Proxy-Huh (Var c6))
+        (Let
+         (list
+          (cons
+           c8
+           (Fn-Proxy-Closure (Var c6)))
+          (cons
+           c9
+           (Fn-Proxy-Coercion (Var c6))))
+         (Let
+          (list
+           (cons
+            a010
+            (App-Code
+             (Code-Label u0)
+             (list
+              (Var a7)
+              (Fn-Coercion-Arg (Var c9) (Quote 0))
+              do-not-suspend-monotonic-heap-casts))))
+          (App-Code
+           (Code-Label u0)
            (list
-            (Unguarded-Box-Set! (Var loop4) (Var tmp))
-            (Unguarded-Box-Set! (Var init) (Quote #t)))
-           (Let (list (cons tmp-closure3 (Unguarded-Box-Ref (Var loop4))))
-             (Closure-App (Closure-Code (Var tmp-closure3))
-                          (Var tmp-closure3)
-                          '())))))))))
+            (Closure-App
+             (Closure-Code (Var c8))
+             (Var c8)
+             (list (Var a010)))
+            (Fn-Coercion-Return (Var c9))
+            do-not-suspend-monotonic-heap-casts))))
+        (Closure-App
+         (Closure-Code (Var c6))
+         (Var c6)
+         (list (Var a7))))))))
+
+  (refresh!)
+  (define/test-equal? cc-result-debugging0
+    "convert-closures - bug"
+    (values->list
+     (convert-closures
+      '()
+      (Letrec
+       `([,u0 . ,(Lambda '() (Castable #f (App-Fn-or-Proxy u1 v2 '())))]
+         [,u2 . ,(Lambda '() (Castable #f (Quote 0)))])
+       (App-Fn-or-Proxy u1 v0 '()))
+      #:fn-proxy-rep 'Data))
+    (list
+     '()
+     '()
+     (Let-Closures
+      (list
+       (Closure u2 #t 'regular code2 self3 #f '() '() (Quote 0)))
+      (Let-Closures
+       (list
+        (Closure u0 #t 'regular code0 self1 #f `(,u2) '()
+                 (Closure-App (Code-Label code2) v2 '())))
+       (Closure-App (Code-Label code0) v0 '())))))
+  (refresh!)
+  (test-equal?
+   "optimize-closures - bug"
+   (values->list (apply optimize-closures cc-result-debugging0))
+   (list
+   (list
+    (cons code0 (Code '() (App-Code (Code-Label code2) '())))
+    (cons code2 (Code '() (Quote 0))))
+   '()
+   '()
+   (App-Code (Code-Label code0) '())))
+
+
+  (refresh!)
+  (define/test-equal? cc-result-debugging1
+    "convert-closures - bug"
+    (values->list
+     (convert-closures
+      '()
+      ;; u0 #2# (Uid "z" 1)
+      ;; u1 #3# (Uid "fn-cast-0" 438)
+      ;; u2 #0# (Uid "apply-coercion" 158)
+      ;; u3 #1# (Uid "o" 0)
+      (Letrec
+       `([,u0 . ,(Lambda
+                  '()
+                  (Castable
+                   u1
+                   (App-Code (Code-Label u2) (list (Quote 0) (Quote 1) (Quote #t)))))]
+         [,u3 . ,(Lambda
+                  '()
+                  (Castable
+                   u1
+                   (Op
+                    '+
+                    (list
+                     (Quote 1)
+                     (App-Code
+                      (Code-Label u2)
+                      (list (App-Fn-or-Proxy u2 v0 '())
+                            (Quote 3)
+                            (Quote #t)))))))])
+       (App-Fn-or-Proxy u2 v3 '()))
+      #:fn-proxy-rep 'Data))
+    (list
+     '()
+     '()
+     (Let-Closures
+      (list
+       (Closure u0 #t 'regular code0 self1 u1 '() '()
+                (App-Code (Code-Label u2) (list (Quote 0) (Quote 1) (Quote #t)))))
+      (Let-Closures
+       (list
+        (Closure u3 #t 'regular code2 self3 u1 (list u0) '()
+         (Op
+          '+
+          (list
+           (Quote 1)
+           (App-Code
+            (Code-Label u2)
+            (list
+             (Closure-App (Code-Label code0) v0 '())
+             (Quote 3)
+             (Quote #t)))))))
+       (Closure-App (Code-Label code2) v3 '())))))
+
+  (refresh!)
+  (test-equal?
+   "optimize-closures - bug"
+   (values->list (apply optimize-closures cc-result-debugging1))
+   (list
+    (list
+     (cons
+      code0
+      (Code
+       '()
+       (App-Code (Code-Label u2) (list (Quote 0) (Quote 1) (Quote #t)))))
+     (cons
+      code2
+      (Code
+       '()
+       (Op
+        '+
+        (list
+         (Quote 1)
+         (App-Code
+          (Code-Label u2)
+          (list
+           (App-Code (Code-Label code0) '())
+           (Quote 3)
+           (Quote #t))))))))
+    '()
+    '()
+    (App-Code (Code-Label code2) '())))
+
+  )
 
 (: optimize? : Symbol -> Boolean)
 (define (optimize? x)
