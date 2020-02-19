@@ -2207,92 +2207,113 @@ TODO We can generate better code in this pass for function casts.
     (list
      '()
      '()
-     (Let
+     (Labels
       (list
        (cons
-        c6
-        (Let-Closures
-         (list
-          (Closure
-           u1
-           #f
-           'regular
-           code2
-           self3
-           #f
-           '()
-           (list u2)
-           (If
-            (Fn-Proxy-Huh v2)
-            (Let
-             (list
-              (cons
-               c4
-               (Fn-Proxy-Closure v2))
-              (cons
-               c5
-               (Fn-Proxy-Coercion v2)))
-             (App-Code
-              (Code-Label u0)
-              (list
-               (Closure-App
-                (Closure-Code (Var c4))
-                (Var c4)
-                '())
-               (Fn-Coercion-Return (Var c5))
-               do-not-suspend-monotonic-heap-casts)))
-            (Closure-App (Closure-Code v2) v2 '()))))
-         v1)))
-      (Let
-       (list
-        (cons
-         a7
-         (Let-Closures
-          (list
-           (Closure
-            u3
-            #f
-            'regular
-            code0
-            self1
-            #f
-            '()
-            '()
-            (Quote 1)))
-          v3)))
-       (If
-        (Fn-Proxy-Huh (Var c6))
-        (Let
-         (list
-          (cons
-           c8
-           (Fn-Proxy-Closure (Var c6)))
-          (cons
-           c9
-           (Fn-Proxy-Coercion (Var c6))))
+        (Uid "apply_proxied_closure_arity_1" 13)
+        (Code
+         (list (Uid "closure" 15) (Uid "coercion" 16) (Uid "arg" 14))
          (Let
           (list
            (cons
-            a010
+            (Uid "fn-cast-arg0" 17)
             (App-Code
-             (Code-Label u0)
+             (Code-Label (Uid "" 0))
              (list
-              (Var a7)
-              (Fn-Coercion-Arg (Var c9) (Quote 0))
-              do-not-suspend-monotonic-heap-casts))))
+              (Var (Uid "arg" 14))
+              (Fn-Coercion-Arg (Var (Uid "coercion" 16)) (Quote 0))
+              (Quote #f)))))
           (App-Code
-           (Code-Label u0)
+           (Code-Label (Uid "" 0))
            (list
             (Closure-App
-             (Closure-Code (Var c8))
-             (Var c8)
-             (list (Var a010)))
-            (Fn-Coercion-Return (Var c9))
-            do-not-suspend-monotonic-heap-casts))))
-        (Closure-App
-         (Closure-Code (Var c6))
-         (Var c6)
-         (list (Var a7))))))))
+             (Closure-Code (Var (Uid "closure" 15)))
+             (Var (Uid "closure" 15))
+             (list (Var (Uid "fn-cast-arg0" 17))))
+            (Fn-Coercion-Return (Var (Uid "coercion" 16)))
+            (Quote #f))))))
+       (cons
+        (Uid "apply_proxied_closure_arity_0" 6)
+        (Code
+         (list (Uid "closure" 7) (Uid "coercion" 8))
+         (App-Code
+          (Code-Label (Uid "" 0))
+          (list
+           (Closure-App
+            (Closure-Code (Var (Uid "closure" 7)))
+            (Var (Uid "closure" 7))
+            '())
+           (Fn-Coercion-Return (Var (Uid "coercion" 8)))
+           (Quote #f))))))
+      (Let
+       (list
+        (cons
+         (Uid "closure" 9)
+         (Let-Closures
+          (list
+           (Closure
+            (Uid "" 1)
+            #f
+            'regular
+            (Uid "_code" 2)
+            (Uid "_closure_self" 3)
+            #f
+            '()
+            (list (Uid "" 2))
+            (If
+             (Fn-Proxy-Huh (Var (Uid "" 2)))
+             (Let
+              (list
+               (cons
+                (Uid "data-fn-proxy-closure" 4)
+                (Fn-Proxy-Closure (Var (Uid "" 2))))
+               (cons
+                (Uid "data-fn-proxy-coercion" 5)
+                (Fn-Proxy-Coercion (Var (Uid "" 2)))))
+              (App-Code
+               (Code-Label (Uid "apply_proxied_closure_arity_0" 6))
+               (list
+                (Var (Uid "data-fn-proxy-closure" 4))
+                (Var (Uid "data-fn-proxy-coercion" 5)))))
+             (Closure-App (Closure-Code (Var (Uid "" 2))) (Var (Uid "" 2)) '()))))
+          (Var (Uid "" 1)))))
+       (Let
+        (list
+         (cons
+          (Uid "arg" 10)
+          (Let-Closures
+           (list
+            (Closure
+             (Uid "" 3)
+             #f
+             'regular
+             (Uid "_code" 0)
+             (Uid "_closure_self" 1)
+             #f
+             '()
+             '()
+             (Quote 1)))
+           (Var (Uid "" 3)))))
+        (If
+         (Fn-Proxy-Huh (Var (Uid "closure" 9)))
+         (Let
+          (list
+           (cons
+            (Uid "data-fn-proxy-closure" 11)
+            (Fn-Proxy-Closure (Var (Uid "closure" 9))))
+           (cons
+            (Uid "data-fn-proxy-coercion" 12)
+            (Fn-Proxy-Coercion (Var (Uid "closure" 9)))))
+          (App-Code
+           (Code-Label (Uid "apply_proxied_closure_arity_1" 13))
+           (list
+            (Var (Uid "data-fn-proxy-closure" 11))
+            (Var (Uid "data-fn-proxy-coercion" 12))
+            (Var (Uid "arg" 10)))))
+         (Closure-App
+          (Closure-Code (Var (Uid "closure" 9)))
+          (Var (Uid "closure" 9))
+          (list (Var (Uid "arg" 10))))))))))
 
   (refresh!)
   (define/test-equal? cc-result-debugging0
