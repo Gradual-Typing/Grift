@@ -55,10 +55,8 @@
   '(Static |Type-Based Casts| Coercions )) #;Hyper-Coercions
 
 (define default-test-fn-proxy-representation
-  '(Hybrid))
-
-(define all-test-fn-proxy-representation
   '(Hybrid Data))
+
 
 ;; Parameter Specifying which cast-representation variables
 ;; get tested when running the test suite
@@ -86,36 +84,6 @@
      ("-O3" "-Wno-int-conversion" "-Wno-format" "-Wno-unused-value"))))
 
 (define test-suite-dir (make-parameter test-suite-path))
-
-(define (run-test-suite)
-  (define dir  (build-path (test-suite-dir)))
-  (debug off dir)
-  (run-tests
-   (make-test-suite
-    "/"
-    (for*/list ([p (in-directory dir)]
-                [e (in-value (debug off (path-get-extension p)))] 
-                #:when (and e (equal? e #".grift")))
-      (test-path dir p)))))
-
-(define (run-single-path p)
-  (define dir  (build-path (test-suite-dir)))
-  (for* ([spec? (test-specialize-cast-code-generation)]
-         [cast-rep (test-cast-representation)] 
-         #:unless (and (eq? cast-rep 'Static) spec?))
-    (parameterize ([cast-representation cast-rep]
-                   [output-path (build-path test-tmp-path "t.out")]
-                   [c-path (build-path test-tmp-path "t.c")]
-                   [c-flags (cons "-O3" (c-flags))]
-                   [specialize-cast-code-generation? spec?]
-                   [check-asserts? #t])
-      (define spec-str
-        (cond
-          [(eq? cast-rep 'Static) ""]
-          [spec? "Specialized"]
-          [else  "Unspecialized"]))
-      (printf "~a ~a tests running:\n" spec-str cast-rep) 
-      (run-tests (test-path dir p)))))
 
 (define (test-path suite-dir p)
   (define-values (base src-name _) (split-path p))
@@ -153,11 +121,15 @@
     [(file-exists? p) (file->string p)]
     [else d]))
 
-(define (old-run-tests)
-  (for* ([spec? (test-specialize-cast-code-generation)]
-         [cast-rep (test-cast-representation)]
+(define (my-run-tests)
+  (for* ([cast-rep (test-cast-representation)]
          [fn-proxy-rep (test-fn-proxy-representation)]
-         #:unless (and (eq? cast-rep 'Static) spec?))
+         [spec? (test-specialize-cast-code-generation)]
+         #:unless
+         ;; We rule out unmeaningful or redundant combinations
+         (or
+          (and (eq? fn-proxy-rep 'Data) (not (eq? cast-rep 'Coercions)))
+          (and (eq? cast-rep 'Static) (not spec?))))
     (parameterize ([cast-representation cast-rep]
                    [fn-proxy-representation fn-proxy-rep]
                    [output-path (build-path test-tmp-path "t.out")]
@@ -170,17 +142,20 @@
           [(eq? cast-rep 'Static) ""]
           [spec? "Specialized"]
           [else  "Unspecialized"]))
-      (define fn-proxy-rep
-        (cond
-          [(eq? cast-rep 'Data) "Data Fn Proxies "]
-          [else ""]))
-      (printf "~a ~a ~atests running:\n" spec-str cast-rep fn-proxy-rep)
-      (match cast-rep
-        ['Static (run-tests static-tests)]
-        [_ (run-tests (suite))]))))
+      (match* (cast-rep fn-proxy-rep spec?)
+        [('Coercions 'Data _)         
+         (printf "~a Coercions w/ Function Proxies running:\n" spec-str)
+         (run-tests (suite))]
+        [('Static 'Hybrid #t)
+         (printf "Static Hybrid Specialized running:\n")
+         (run-tests static-tests)]
+        [(_ _ _)
+         (printf "~a ~a running:\n" spec-str cast-rep)
+         (run-tests (suite))]))))
+
 
 ;; Parse the command line arguments
-(define main-function (make-parameter old-run-tests))
+(define main-function (make-parameter my-run-tests))
 
 ;; Default to running with contracts
 (with-contracts #t)
@@ -193,13 +168,12 @@
   (define p (build-path path-to-test))
   (unless (file-exists? p)
     (error 'grift-test-runner "invalid path to test: ~v" path-to-test))
-  (main-function (thunk (run-single-path p)))]
+  (suite (test-path (test-suite-dir) p))]
  [("-d" "--dir") dir
   "run all files in a directiory"
   (unless (directory-exists? dir)
     (error 'grift-test-runner "invalid directory ~v" dir))
-  (main-function run-test-suite)
-  (test-suite-dir (build-path dir))]
+  (test-suite-dir (test-path (test-suite-dir) (build-path dir)))]
  [("-s" "--suite") choice
   "specify suite: all most core box vector tool program large"
   (let* ([s? (assq (string->symbol choice) suite-choices)])
