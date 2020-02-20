@@ -176,21 +176,21 @@ TODO We can generate better code in this pass for function casts.
       [(Data)
        (cond
          [close-code-data-fn-app?
-          (lambda (i cast-uid)
-            (match (hash-ref arity->apply-casted-closure-code i #f)
+          (lambda (arity cast-uid)
+            (match (hash-ref arity->apply-casted-closure-code arity #f)
               [(cons l _) (Code-Label l)]
               [_
-               (define label (next-uid! (format "apply_proxied_closure_arity_~a" i))) 
+               (define label (next-uid! (format "apply_proxied_closure_arity_~a" arity))) 
                ;; The uids for formal parameters of this function.
-               (define p* (build-list i (lambda (a) (next-uid! "arg"))))
+               (define p* (build-list arity (lambda (a) (next-uid! "arg"))))
                ;; and likewise variable for those arguments.
-               (define v* (map (inst Var Uid) p*))
+               (define v* (map Var p*))
                ;; The free-variables of this closure.
                (define closure (next-uid! "closure"))
                (define coercion (next-uid! "coercion"))
                (hash-set!
                 arity->apply-casted-closure-code
-                i
+                arity
                 (cons
                  label
                  (Code `(,closure ,coercion . ,p*)
@@ -202,9 +202,9 @@ TODO We can generate better code in this pass for function casts.
          [else
           (lambda _ (error 'make-apply-casted-closure! "this shouldn't be called"))])]
       [else
-       (lambda (i cast-uid)
+       (lambda (arity cast-uid)
          (cond
-           [(hash-ref arity->apply-casted-closure-closure i #f) => values]
+           [(hash-ref arity->apply-casted-closure-closure arity #f) => values]
            [else
             ;; NOTE: The following code is tricky and fragile. Read the
             ;; comments and write/run tests when modified.
@@ -214,13 +214,13 @@ TODO We can generate better code in this pass for function casts.
             (define name (next-uid! ""))
             ;; The label for the code that applies arbitrary casted closures
             ;; for functions of this arity.
-            (define label (next-uid! (format "apply_casted_closure_arity~a" i))) 
+            (define label (next-uid! (format "apply_casted_closure_arity~a" arity))) 
             ;; The self variable for the code
             (define self (next-uid! "hybrid_closure_self"))
             ;; The uids for formal parameters of this function.
-            (define p* (build-list i (lambda (a) (next-uid! "arg"))))
+            (define p* (build-list arity (lambda (a) (next-uid! "arg"))))
             ;; and likewise variable for those arguments.
-            (define v* (map (inst Var Uid) p*))
+            (define v* (map Var p*))
             ;; The free-variables of this closure.
             (define closure-field (next-uid! "closure-field"))
             (define coercion-field (next-uid! "coercion-field"))
@@ -238,7 +238,7 @@ TODO We can generate better code in this pass for function casts.
                                 (Var coercion-field))))
             ;; Update the bindings that we have generate
             (hash-set! arity->apply-casted-closure-closure
-                       i
+                       arity
                        apply-casted-closure-i)
             apply-casted-closure-i]))]))
   
@@ -2018,7 +2018,7 @@ TODO We can generate better code in this pass for function casts.
                  apply-coercion
                  (Unguarded-Box-Ref (Var loop4)) '()))
               (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
-              (Quote 0) (Quote 0) (Quote 0)))))))
+              do-not-suspend-monotonic-heap-casts))))))
         (Let
          (list
           (cons
@@ -2041,7 +2041,7 @@ TODO We can generate better code in this pass for function casts.
                           '())))))
               (Var annon))
              (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
-             (Quote 0) (Quote 0) (Quote 0)))))            
+             do-not-suspend-monotonic-heap-casts))))            
          (Begin
            (list
             (Unguarded-Box-Set! (Var loop4) (Var tmp))
@@ -2079,7 +2079,7 @@ TODO We can generate better code in this pass for function casts.
                                 (Var tmp-closure1)
                                 '())))
             (Quote-Coercion (Static-Id (Uid "static_project_crcn" 464)))
-            (Quote 0) (Quote 0) (Quote 0)))
+            do-not-suspend-monotonic-heap-casts))
           CoC5-Expr)))
        (ann
         (Let
@@ -2108,7 +2108,7 @@ TODO We can generate better code in this pass for function casts.
                  CoC5-Expr)))
               (Var annon))
              (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
-             (Quote 0) (Quote 0) (Quote 0)))))
+             do-not-suspend-monotonic-heap-casts))))
          (ann
           (Begin
             (list
@@ -2150,7 +2150,7 @@ TODO We can generate better code in this pass for function casts.
                   (Closure-Code (Var tmp-closure1)) (Var tmp-closure1) '())))
               (Quote-Coercion
                (Static-Id (Uid "static_project_crcn" 464)))
-              (Quote 0) (Quote 0) (Quote 0)))))
+              do-not-suspend-monotonic-heap-casts))))
           (Let
            (list
             (cons
@@ -2175,7 +2175,7 @@ TODO We can generate better code in this pass for function casts.
                                     '()))))
                 (Var annon))
                (Quote-Coercion (Static-Id (Uid "static_fn_crcn" 463)))
-               (Quote 0) (Quote 0) (Quote 0))))) 
+               do-not-suspend-monotonic-heap-casts)))) 
            (Begin
              (list
               (Unguarded-Box-Set! (Var loop4) (Var tmp))
