@@ -30,14 +30,12 @@
                        (raise e))]
                     [exn?
                      (lambda ([e : exn])
-                       (define t?
-                         (value=? expected (blame #t (exn-message e))))
-                       (unless t?
-                         (display (exn->string e))
-                         (check value=?
-                                expected
-                                (blame #t (exn-message e))
-                                "static type error"))
+                       (unless (value=? (blame #t (exn-message e)) expected)
+                         (display (exn->string e)))
+                       (check value=?
+                              (blame #t (exn-message e))
+                              expected
+                              "static type error")
                        (void))])
       (define f
         (compile path))

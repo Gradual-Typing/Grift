@@ -80,9 +80,9 @@
       [else
        (and (string? x) (string? y)
             (cond
-             [(equal? x y)]
-             [(regexp-match y x) #t]
-             [else #f]))]))))
+              [(equal? x y)]
+              [(regexp-match y x) #t]
+              [else #f]))]))))
 
 
 (: bool=? (bool bool . -> . Boolean))

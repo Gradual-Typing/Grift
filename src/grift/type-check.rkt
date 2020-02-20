@@ -701,7 +701,7 @@ The type rules for core forms that have interesting type rules
     (define (validate t) (validate-type src t))
  
     (define (trace-type-error e)
-      (printf "error while type-checking: ~a\n" (srcloc->string src))
+      ;;(printf "error while type-checking: ~a\n" (srcloc->string src))
       (raise e))
 
     (define-values (new-exp type)
