@@ -10,11 +10,11 @@
 
 (provide (all-from-out "src/compile.rkt"))
 
-(define (build-runtime-with-debug)
-  (when (not (directory-exists? debug_runtime.o-path))
-    (define-values (pwd _1 _2) (split-path runtime.c-path))
+(define (make-runtime-with-param param param_runtime.o-path)
+  (when (not (directory-exists? param_runtime.o-path))
+    (define-values (pwd _1 _2) (split-path runtime.o-path))
     (parameterize ([current-directory pwd])
-      (unless (system "make debug" #:set-pwd? #t)
+      (unless (system (string-append "make " param) #:set-pwd? #t)
         (printf (format "\nError: Running make failed in ~a" pwd))))))
 
 (define-runtime-path this-dir ".")
@@ -177,14 +177,6 @@
                                            #:mode 'text
                                            #:exists 'replace))
          (grift-log-port of-port)]))]
-   [("-g" "--with-debug-symbols")
-    "Invoke c compiler so that debugging symbols are retained."
-    (c-flags (cons "-g" (c-flags)))
-    (build-runtime-with-debug)
-    (runtime-path debug_runtime.o-path)]
-   [("--profile")
-    "Invoke c compiler with profiling flags"
-    (c-flags (cons "-pg" (c-flags)))]
    [("--no-inline-proxied-branch")
     "Do not inline proxied operations"
     (inline-proxied-branch? #f)]
@@ -197,6 +189,17 @@
    #:once-any
    ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
    ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
+   #:once-any
+   [("-g" "--with-debug-symbols")
+    "Invoke c compiler so that debugging symbols are retained."
+    (c-flags (cons "-g" (c-flags)))
+    (make-runtime-with-param "debug" debug_runtime.o-path)
+    (runtime-path debug_runtime.o-path)]
+   [("-p" "--profile")
+    "Invoke c compiler with profiling flags"
+    (c-flags (cons "-pg" (c-flags)))
+    (make-runtime-with-param "profile" profile_runtime.o-path)
+    (runtime-path profile_runtime.o-path)]
    #:args args
    (match args
      [(list)

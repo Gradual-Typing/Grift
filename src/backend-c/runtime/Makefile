@@ -4,6 +4,8 @@ all : libgc nonegc.o runtime.o castprofiler.o
 
 debug: tidy ndebug libgc nonegc.o debug_object/runtime.o castprofiler.o
 
+profile: tidy ndebug libgc nonegc.o profile_object/runtime.o castprofiler.o
+
 libgc : boehm-gc-install/lib/libgc.a
 
 boehm-gc-install/lib/libgc.a :
@@ -29,6 +31,15 @@ debug_object:
 	mkdir $@
 
 debug_object/runtime.o : boehm-gc-install/lib/libgc.a debug_object/io.o debug_object/assoc_stack.o debug_object/hashcons.o debug_object/suspended_cast.o debug_object/cast_queue.o
+	ld -r $^ -o $@
+
+profile_object/%.o : %.c profile_object
+	cc -Iboehm-gc-install/include -std=c99 -pg $< -c -o $@
+
+profile_object:
+	mkdir $@
+
+profile_object/runtime.o : boehm-gc-install/lib/libgc.a profile_object/io.o profile_object/assoc_stack.o profile_object/hashcons.o profile_object/suspended_cast.o profile_object/cast_queue.o
 	ld -r $^ -o $@
 
 test : runtime.o
