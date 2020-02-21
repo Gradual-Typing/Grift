@@ -1,5 +1,10 @@
 #lang racket
-
+;; The intention of the test is to ensure that sham is installed and
+;; that the llvm portion is working. Does our install script
+;; successfully install sham and if the llvm is present can we
+;; generate code. Sham is build around a JIT system which I don't care
+;; about working correctly, and in fact doesn't work on my laptop. The
+;; sham test suite would check the functionality of the JIT.
 (module+ test
   (require
    racket/runtime-path
