@@ -8,11 +8,14 @@
 
 ;; primitive functions implemented in c
 (: runtime.o-path Path)
-(: runtime.c-path Path)
 (: runtime.h-path Path)
 (define-runtime-path runtime.o-path "runtime/runtime.o")
-(define-runtime-path runtime.c-path "runtime/runtime.c")
 (define-runtime-path runtime.h-path "runtime/runtime.h")
+
+(: debug_runtime.o-path Path)
+(: profile_runtime.o-path Path)
+(define-runtime-path debug_runtime.o-path "runtime/debug_object/runtime.o")
+(define-runtime-path profile_runtime.o-path "runtime/profile_object/runtime.o")
 
 ;; hashcons implementation in c
 (: hashcons.o-path Path)
