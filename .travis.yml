@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 os: linux
 dist: bionic
 language: c
@@ -11,6 +12,10 @@ before_install:
 - curl -L -o installer.sh http://www.cs.utah.edu/plt/snapshots/current/installers/racket-current-x86_64-linux-precise.sh
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
+# Install LLVM
+- sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+- sudo apt-get install libllvm9 llvm-9 llvm-9-dev llvm-9-runtime
+- export LLVM_CONFIG=llvm-config-9
 install:
 - raco pkg install
 script:
@@ -20,3 +25,4 @@ notifications:
   slack:
     rooms:
       secure: TzCPb/tBYnnpiLLqVqguZ40dFfceRwCn0vIigrqRS1njjc4a8N6CPBLXlfgg9+CkYWD5hWZCMfa2aYkmmpX1B74MugeNQcWJ0LHY8TM3W6917xGp5UrpXrgNDHxzYt68OP5wsi1suBj/SKDFUobuqGP+CHcDfTeRjpO9QAbQF7YBEA0D84pzy5oJ/hFk4jxQc45oB7qCfb0BEllafQYMGeo5OeUNR9nXgCuBL0FmayAmw+R1pnbdm3rMV/GzNu/EoJj5IWWewVoV1XwIhfJuz6dhm6+a34M+97qHpyz/NkzQJ0hIRvKIwwrdNCdL92Jh5HySr36DSmyDQxgcnefpNf3kdB4DPDRZRx1ab66ryKEYwubh6TJC8DGrrot/muWRDUgkubfkGKAUUgEb+5BISaKZTRw7hWJPoBRxKcCW9ReRmMVrklKBCbUBAP5LMxtJr8y1IMZ0S7nZZXE/HY7TRo1t+cHosIDwAUjBN7BJ8nT3fC4iMxhmRloHzgy79MiW8XHRprC8iImUmbdCb2BOaO+Kym//ARjAN1Y9qRE3Rhuqdcgt918IsVThW7xcvZG4f33Vdl+24ppm3uHPObefbrbPKfWxl62a1FSUgZLh4BxCyQ/Ste860RttuRNOyQgnOfs7GOW+VsWm8bAXqz+qKsHcmDqTugMykysuEG3prZQ=
+
