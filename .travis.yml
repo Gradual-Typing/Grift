@@ -1,19 +1,22 @@
-sudo: false
+sudo: true
 language: c
 services:
 - xvfb
-env:
-- PATH=~/racket/bin:$PATH
 
 before_install:
+# Install racket
 - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16"
 - curl -L -o installer.sh http://www.cs.utah.edu/plt/snapshots/current/installers/racket-current-x86_64-linux-precise.sh
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
+# Install LLVM
+- sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+- sudo apt-get install libllvm9 llvm-9 llvm-9-dev llvm-9-runtime
+- export LLVM_CONFIG=llvm-config-9
 
 install:
 - # cat /proc/meminfo
-- raco pkg install
+- make install
 
 script:
 - make test
