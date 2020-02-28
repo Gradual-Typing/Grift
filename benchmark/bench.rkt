@@ -20,7 +20,7 @@
 (define-syntax-rule (debug v ...)
   (begin (printf "~a=~v\n" 'v v) ... (newline)))
 
-(define (guarded-compile src i cast ref specialize hybrid-runtime)
+(define (guarded-compile src i cast ref specialize hybrid-runtime fun-proxy-rep)
   (define hybrid-runtime?
     (match hybrid-runtime
       ['Eager   #f]
@@ -35,11 +35,19 @@
       [_ (error 'benchmark/bench/guarded-compile
                 "invalid specialization: ~a"
                 specialize)]))
+  (define fun-proxy-rep-param
+    (match fun-proxy-rep
+      ['ProxyClosureRep 'Hybrid]
+      ['ProxyDataRep    'Data]
+      [_ (error 'benchmark/bench/guarded-compile
+                "invalid option for function proxy representation: ~a"
+                fun-proxy-rep)]))
   (define ext (string-append ".o" (number->string i)))
   (define exe (path-replace-extension src ext))
   (define exe.prof (path-replace-extension src (string-append ext ".prof.o")))
   (parameterize ([specialize-cast-code-generation? specialize-casts?]
-                 [hybrid-cast/coercion-runtime? hybrid-runtime?])
+                 [hybrid-cast/coercion-runtime? hybrid-runtime?]
+                 [fn-proxy-representation fun-proxy-rep-param])
     (unless (and (file-exists? exe) (if (cast-profiler?) (file-exists? exe.prof) #t))
       (printf "~a\n" exe)
       (if (cast-profiler?)
