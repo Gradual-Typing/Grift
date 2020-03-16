@@ -691,7 +691,9 @@ form, to the shortest branch of the cast tree that is relevant.
       [(id-coercion?$ c1)
        (if (id-coercion?$ c2)
            (Quote '())
-           (Unguarded-Box-Set! ret-id? (Quote #f)))         
+           (if (enable-crcps?)
+               (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
+               (Unguarded-Box-Set! ret-id? (Quote #f))))
        c2]
       [(id-coercion?$ c2)
        ;; We know that c1 isn't id because of the test above
@@ -704,11 +706,15 @@ form, to the shortest branch of the cast tree that is relevant.
          (cond$
           [(prj-coercion?$ seq_fst)
            (let*$ ([comp_seq_snd (compose-coercions seq_snd c2 ret-id? ret-fvs)])
-             (Unguarded-Box-Set! ret-id? (Quote #f))
+             (if (enable-crcps?)
+                 (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
+                 (Unguarded-Box-Set! ret-id? (Quote #f)))
              (seq-coercion$ seq_fst comp_seq_snd))]
           ;; We have to prioritize failure on the right over injection
           [(failed-coercion?$ c2)
-           (Unguarded-Box-Set! ret-id? (Quote #f))
+           (if (enable-crcps?)
+               (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
+               (Unguarded-Box-Set! ret-id? (Quote #f)))
            c2]
           ;; Because of the typeing rule for coercions we know that
           ;; c2 must be a (I?;i) aka projection sequence because
@@ -731,19 +737,25 @@ form, to the shortest branch of the cast tree that is relevant.
       [(seq-coercion?$ c2)
        (cond$
         [(failed-coercion?$ c1)
-         (Unguarded-Box-Set! ret-id? (Quote #f))
+         (if (enable-crcps?)
+             (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
+             (Unguarded-Box-Set! ret-id? (Quote #f)))
          c1]
         [else
          ;; must be c1 & (g;I?)
          (let*$ ([seq_fst (seq-coercion-fst$ c2)]
                  [seq_snd (seq-coercion-snd$ c2)]
                  [comp_c1_final (compose-coercions c1 seq_fst ret-id? ret-fvs)])
-           (Unguarded-Box-Set! ret-id? (Quote #f))
+           (if (enable-crcps?)
+               (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
+               (Unguarded-Box-Set! ret-id? (Quote #f)))
            (seq-coercion$ comp_c1_final seq_snd))])]
       ;; All Branches from here out will have to check if c2 is failure
       ;; so we do it once to eliminate the possibility
       [(failed-coercion?$ c2)
-       (Unguarded-Box-Set! ret-id? (Quote #f))
+       (if (enable-crcps?)
+           (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
+           (Unguarded-Box-Set! ret-id? (Quote #f)))
        (If (failed-coercion?$ c1)
            c1
            c2)]
