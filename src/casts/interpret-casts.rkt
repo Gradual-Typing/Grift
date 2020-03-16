@@ -32,15 +32,12 @@
         [(Coercions)
          (cond
           [(enable-crcps?)
-           ;; avoid removing id coercions around injection/projection:
-           (optimize-first-order-coercions? #f)  ; should be parameterize?
            (define-values (icc apply-coercion-uid compose-coercions-uid)
              (interpret-casts/coercions))
            (compose1 (coercion-passing-trans #:apply-coercion-uid apply-coercion-uid
                                              #:compose-coercions-uid compose-coercions-uid)
                      icc)]
           [else
-           (optimize-first-order-coercions? #t)  ; should be parameterize?
            (define-values (icc apply-coercion-uid compose-coercions-uid)
              (interpret-casts/coercions))
            icc])]
@@ -49,8 +46,13 @@
         [else (error 'grift/interpret-casts
                      "unexpected cast representation: ~a"
                      (cast-representation))]))
-    
-    (define new-e (ic-expr! e))
+
+    (define new-e
+      (cond [(enable-crcps?)
+             ;; avoid removing id coercions around injection/projection:
+             (parameterize ([optimize-first-order-coercions? #f])
+               (ic-expr! e))]
+             [else (ic-expr! e)]))
     
     (define rt-bindings  (cast-runtime-code-bindings))
     (define rt-constants : (Option CoC3-Bnd*)
