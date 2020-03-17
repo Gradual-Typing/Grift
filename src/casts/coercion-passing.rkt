@@ -141,17 +141,13 @@
          [(Code-Label (Uid "apply-coercion" u))
           ;; e0 ---> (Code-Label (Uid "apply-coercion" 160))
           ;; e* ---> 1st: target, 2nd: coercion expr
-          (let ([e1 (car e*)]   ;; target exp
-                [c1 (cadr e*)]  ;; coercion
-                [kappa (next-uid! "kappa")])
+          (let ([e1 (car e*)]    ;; target exp
+                [c1 (cadr e*)])  ;; coercion
             (if (equal? cont ID-EXPR)
                 ;; case: cont is identity coercion
                 (trans-exp e1 c1)
                 ;; otherwise:
-                (Let (list
-                      (cons kappa (compose-coercions/id/fvs c1
-                                                            cont)))
-                     (trans-exp e1 (Var kappa)))))]
+                (trans-exp e1 (compose-coercions/id/fvs c1 cont))))]
          [(Code-Label (Uid _ _))
           (apply-coercion-opt
            (App-Code e0 (for/list ([v e*])
