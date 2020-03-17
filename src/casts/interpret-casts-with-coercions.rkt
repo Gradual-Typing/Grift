@@ -691,7 +691,7 @@ form, to the shortest branch of the cast tree that is relevant.
       [(id-coercion?$ c1)
        (if (id-coercion?$ c2)
            (Quote '())
-           (if (enable-crcps?)
+           (if (enable-tail-coercion-composition?)
                (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
                (Unguarded-Box-Set! ret-id? (Quote #f))))
        c2]
@@ -706,13 +706,13 @@ form, to the shortest branch of the cast tree that is relevant.
          (cond$
           [(prj-coercion?$ seq_fst)
            (let*$ ([comp_seq_snd (compose-coercions seq_snd c2 ret-id? ret-fvs)])
-             (if (enable-crcps?)
+             (if (enable-tail-coercion-composition?)
                  (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
                  (Unguarded-Box-Set! ret-id? (Quote #f)))
              (seq-coercion$ seq_fst comp_seq_snd))]
           ;; We have to prioritize failure on the right over injection
           [(failed-coercion?$ c2)
-           (if (enable-crcps?)
+           (if (enable-tail-coercion-composition?)
                (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
                (Unguarded-Box-Set! ret-id? (Quote #f)))
            c2]
@@ -737,7 +737,7 @@ form, to the shortest branch of the cast tree that is relevant.
       [(seq-coercion?$ c2)
        (cond$
         [(failed-coercion?$ c1)
-         (if (enable-crcps?)
+         (if (enable-tail-coercion-composition?)
              (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
              (Unguarded-Box-Set! ret-id? (Quote #f)))
          c1]
@@ -746,14 +746,14 @@ form, to the shortest branch of the cast tree that is relevant.
          (let*$ ([seq_fst (seq-coercion-fst$ c2)]
                  [seq_snd (seq-coercion-snd$ c2)]
                  [comp_c1_final (compose-coercions c1 seq_fst ret-id? ret-fvs)])
-           (if (enable-crcps?)
+           (if (enable-tail-coercion-composition?)
                (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
                (Unguarded-Box-Set! ret-id? (Quote #f)))
            (seq-coercion$ comp_c1_final seq_snd))])]
       ;; All Branches from here out will have to check if c2 is failure
       ;; so we do it once to eliminate the possibility
       [(failed-coercion?$ c2)
-       (if (enable-crcps?)
+       (if (enable-tail-coercion-composition?)
            (when$ (not$ (op$ = (Quote 0) ret-id?)) (Unguarded-Box-Set! ret-id? (Quote #f)))
            (Unguarded-Box-Set! ret-id? (Quote #f)))
        (If (failed-coercion?$ c1)
@@ -868,7 +868,7 @@ form, to the shortest branch of the cast tree that is relevant.
   (: compile-lambda Lambda-Type)
   (define (compile-lambda fml* e)
     (define arity (length fml*))
-    (define ctr (get-fn-cast! (if (enable-crcps?) (+ 1 arity) arity)))
+    (define ctr (get-fn-cast! (if (enable-tail-coercion-composition?) (+ 1 arity) arity)))
     (Lambda fml* (Castable ctr (cast-profile/max-function-chain$ e))))
   
   (: compile-app App-Type)
