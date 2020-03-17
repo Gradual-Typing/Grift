@@ -298,8 +298,8 @@
        (Project-Coercion e1 e2)]
 
       ;; forms whose translations are unimplemented:
-      [_ (pretty-print exp)
-         (error 'todo-no-case)]
+      ;; [_ (pretty-print exp)
+      ;;    (error 'todo-no-case)]
       ))
 
   ;; Translate toplevel expressions with identity continuation coercion:
