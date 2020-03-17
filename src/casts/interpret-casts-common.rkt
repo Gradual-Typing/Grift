@@ -481,7 +481,7 @@ TODO write unit tests
           [uid? uid?]
           [else
            (define-values (uid code)
-             (build-caster! (if (enable-crcps?) (- arity 1) arity)))
+             (build-caster! (if (enable-tail-coercion-composition?) (- arity 1) arity)))
            (add-cast-runtime-binding! uid code)
            (hash-set! fn-cast-uid-map arity uid)  ;; Should be decremented, too?
            uid])))

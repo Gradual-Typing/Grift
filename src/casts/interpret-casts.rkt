@@ -33,7 +33,7 @@
         [(|Type-Based Casts|) (interpret-casts/type-based-casts)]
         [(Coercions)
          (cond
-          [(enable-crcps?)
+          [(enable-tail-coercion-composition?)
            (define-values (icc apply-coercion-uid compose-coercions-uid)
              (interpret-casts/coercions))
            (compose1 (coercion-passing-trans #:apply-coercion-uid apply-coercion-uid
@@ -50,7 +50,7 @@
                      (cast-representation))]))
 
     (define new-e
-      (cond [(enable-crcps?)
+      (cond [(enable-tail-coercion-composition?)
              ;; avoid removing id coercions around injection/projection:
              (parameterize ([optimize-first-order-coercions? #f])
                (ic-expr! e))]

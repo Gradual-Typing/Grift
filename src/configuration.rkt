@@ -94,5 +94,5 @@
 
 
 ;; Toggle coercion-passing style translation
-(define enable-crcps? : (Parameterof Boolean)
+(define enable-tail-coercion-composition? : (Parameterof Boolean)
   (make-parameter #f))

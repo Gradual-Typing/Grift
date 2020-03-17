@@ -647,7 +647,7 @@ TODO We can generate better code in this pass for function casts.
                  (define closure (next-uid! "closure-field"))
                  (define coercion (next-uid! "coercion-field"))
                  (match-define (Closure _ _ _ label _ caster? _ p* _)
-                   (make-apply-casted-closure! (if (enable-crcps?) (+ i 1) i) cast compose))
+                   (make-apply-casted-closure! (if (enable-tail-coercion-composition?) (+ i 1) i) cast compose))
                  (Let (list (cons closure clos) (cons coercion crcn))
                       (Let-Closures
                        ;; The layout of this closure is very specific
@@ -1228,14 +1228,14 @@ TODO We can generate better code in this pass for function casts.
   (define-values (v* b*)
     (for/lists ([v* : (Listof (Var Uid))]
                 [b* : (Bnd* CoC5-Expr)])
-               ([arg (if (enable-crcps?) (cdr arg*) arg*)]
+               ([arg (if (enable-tail-coercion-composition?) (cdr arg*) arg*)]
                 [i (in-naturals)])
       (define u (next-uid! (format "fn-cast-arg~a" i)))
       (define arg-crcn (Fn-Coercion-Arg crcn (Quote i)))
       (define args (list arg arg-crcn suspend-monotonic-heap-casts?))
       (values (Var u) (cons u (App-Code cast-cl args)))))
   (cond
-    [(enable-crcps?)
+    [(enable-tail-coercion-composition?)
      (define passed-crcn (car arg*))
      (define composed-crcn
        (App-Code compose-cl (list (Fn-Coercion-Return crcn) passed-crcn ZERO-EXPR ZERO-EXPR)))
