@@ -251,6 +251,28 @@
         (Unguarded-Vect-length (trans-exp v ID-EXPR))
         cont)]
 
+      ;; monovector:
+      [(Mvector e1 e2 ty)
+       (apply-coercion-opt
+        (Mvector (trans-exp e1 ID-EXPR) (trans-exp e2 ID-EXPR) ty)
+        cont)]
+      [(Mvector-val-ref e1 e2 guarded?)
+       (apply-coercion-opt
+        (Mvector-val-ref (trans-exp e1 ID-EXPR) (trans-exp e2 ID-EXPR) guarded?)
+        cont)]
+      [(Mvector-rtti-ref e)
+       (apply-coercion-opt
+        (Mvector-rtti-ref (trans-exp e ID-EXPR))
+        cont)]
+      [(Mvector-val-set! e1 e2 e3 guarded?)
+       (apply-coercion-opt
+        (Mvector-val-set! (trans-exp e1 ID-EXPR) (trans-exp e2 ID-EXPR) (trans-exp e3 ID-EXPR) guarded?)
+        cont)]
+      [(Mvector-length e)
+       (apply-coercion-opt
+        (Mvector-length (trans-exp e ID-EXPR))
+        cont)]
+
       ;; proxied reference coercions:
       [(Ref-Coercion-Read e)
        (apply-coercion-opt
