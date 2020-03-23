@@ -12,15 +12,6 @@ remove:
 update:
 	raco pkg update --batch --auto grift
 
-install:
-	raco pkg install --batch --auto --fail-fast --name grift
-
-remove:
-	raco pkg remove --batch --auto grift
-
-update:
-	raco pkg update --batch --auto grift
-
 timed:
 	time raco make main.rkt
 
