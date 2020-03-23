@@ -12,6 +12,9 @@
 
 (define FIRST-UID-SUFFIX 0)
 
+(: uid->symbol (-> Uid Symbol))
+(define (uid->symbol u) (string->symbol (uid->string u)))
+
 (: uid->string (-> Uid String))
 (define (uid->string u)
   ;; Rubout all non c identifier characters
