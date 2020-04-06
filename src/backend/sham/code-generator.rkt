@@ -3,9 +3,11 @@
 (require
  ffi/unsafe
  racket/file
+ racket/logging
  sham/ast
  sham/ir
  sham/env
+ (only-in sham/logging sham-logger)
  sham/llvm/ffi/all
  sham/llvm/llvm-config
  syntax/location
@@ -39,17 +41,23 @@
     (define context (LLVMContextCreate))
     ;; Create The Sham IR
     (define sham-module (generate-sham uil))
-    (debug off sham-module)
+    (debug sham-module)
     ;; Create the LLVM Module using sham
     (define llvm-module
-      (parameterize ([current-logger grift-logger])
-        (env-get-llvm-module
-         (build-llvm-module sham-module))))
-
+      (let ([th (λ () (env-get-llvm-module (build-llvm-module sham-module)))])
+        (cond
+          [(grift-log-port)
+           =>
+           (λ (p)
+             (with-logging-to-port p th (grift-log-level) #:logger sham-logger))]
+          [else (th)])))
+    
     ;; Compile module with llc
-    (define ll-path (path-replace-extension o-path ".ll"))
+    (define ll-path (or keep-ll-code-file? (path-replace-extension o-path ".ll")))
+    
     (match-define (vector error? error-message)
       (LLVMPrintModuleToFile llvm-module ll-path))
+
     (when error?
       (error 'grift/backend/sham/generate-code
              (format
@@ -59,22 +67,21 @@
                "\n")
               ll-path
               error-message)))
-    
-    (log-grift-debug-filter
-     (format
-      "LLVM Module Precompilation:\n~a\n\n"
-      (file->string ll-path)))
 
-    (unless (llc "-asm-show-inst" "-asm-verbose" "-O3" ll-path "-o" s-path)
+    (unless (llc "-asm-verbose"
+                 "-fatal-warnings"
+                 "-tailcallopt"
+                 "-O3"
+                 ll-path "-o" s-path)
       (error 'grift/backend/sham/generate-code "failed to compile llvm module"))
-
-    (delete-file ll-path)
-
+    
+    (unless keep-ll-code-file?
+      (delete-file ll-path))
+    
     (log-grift-debug-filter
      (format
       "LLVM ASM Output:\n~a\n\n"
       (file->string s-path)))
-
     
     ;; Link the executable
     (cc/runtime o-path s-path (append-flags (append (runtime-entry-flags) (c-flags)))
@@ -82,7 +89,6 @@
     
     (unless keep-s?
       (delete-file s-path))
-    
     o-path))
 
 

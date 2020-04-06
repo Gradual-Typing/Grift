@@ -176,8 +176,8 @@
                                            #:exists 'replace))
          (grift-log-port of-port)]))]
    [("-g" "--with-debug-symbols")
-    "Invoke c compiler so that debugging symbols are retained."
-    (c-flags (cons "-g" (c-flags)))]
+    "retain debugging symbols for IR."
+    (with-debug-symbols #t)]
    [("--profile")
     "Invoke c compiler with profiling flags"
     (c-flags (cons "-pg" (c-flags)))]

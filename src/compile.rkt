@@ -12,15 +12,6 @@
          (all-from-out "./configuration.rkt")
          grift-logger-filter)
 
-(define-type Log-Level (U 'none 'fatal 'error 'warning 'info 'debug))
-
-;; These ports only effect function how logging is configured during
-;; calls to compile exported from this file. Otherwise the standard
-;; environment flags are used.
-(define grift-log-level : (Parameterof Log-Level) (make-parameter 'none))
-(define grift-log-port : (Parameterof (Option Output-Port)) (make-parameter #f))
-
-
 ;; This is the main compiler it is composed of several micro
 ;; compilers for successivly lower level languages.
 (: compile/current-parameterization : (Path -> Path))
@@ -95,7 +86,13 @@
       (define (compile-target) : Path
         (compile/current-parameterization target))
       (define (compile/log-port [p : Output-Port]) : Path
-        (with-logging-to-port p compile-target log-level #:logger grift-logger))
+        (parameterize ([grift-log-port p])
+          (with-handlers ([exn? (λ (e)
+                                  (flush-output p)
+                                  (sleep 1)
+                                  (flush-output p)
+                                  (raise e))])
+            (with-logging-to-port p compile-target log-level #:logger grift-logger))))
       (cond
         [(not log-port) (compile-target)]
         [(output-port? log-port) (compile/log-port log-port)]
