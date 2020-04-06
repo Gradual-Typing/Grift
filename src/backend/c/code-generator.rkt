@@ -78,11 +78,21 @@
      ['macosx ""]))
   (define rt-cast-profiler
     (if (cast-profiler?)
-        cast-profiler.o-path
+        (path->string cast-profiler.o-path)
         ""))
+  (define debug-flag
+    (cond
+      [(with-debug-symbols) "-g"]
+      [else ""]))
   (define cmd
-    (format "clang -o ~a ~a ~a ~a ~a ~a ~a ~a"
-            out in entry rt rt-math gc rt-cast-profiler flags))
+    (string-join
+     (list "clang -o"
+           (if (path? out)   (path->string   out)   out)
+           (if (path?  in)   (path->string    in)    in)
+           (if (path? entry) (path->string entry) entry)
+           (if (path?  rt)   (path->string    rt)    rt)
+           rt-math gc debug-flag rt-cast-profiler flags)
+     " "))
   (flush-output (current-error-port))
   (flush-output)
   (unless (system cmd)

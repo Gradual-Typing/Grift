@@ -93,6 +93,7 @@
 
 
 (define with-contracts : (Parameterof Boolean)  (make-parameter #f))
+(define with-debug-symbols : (Parameterof Boolean) (make-parameter #f))
 
 ;; Toggle coercion-passing style translation
 (define enable-tail-coercion-composition? : (Parameterof Boolean)
@@ -105,5 +106,8 @@
 ;; Not you still have to direct grift to save or print the log.
 ;; For example: "src/grift/*" allows only output from debugging macros
 ;; for parsing and typechecking.
-(define grift-logger-filter : (Parameterof (Option String)) (make-parameter #f))
+(define grift-logger-filter : (Parameterof String (Option String)) (make-parameter #f))
+(define-type Log-Level (U 'none 'fatal 'error 'warning 'info 'debug))
+(define grift-log-level : (Parameterof Log-Level) (make-parameter 'none))
+(define grift-log-port : (Parameterof Output-Port (Option Output-Port)) (make-parameter #f))
 

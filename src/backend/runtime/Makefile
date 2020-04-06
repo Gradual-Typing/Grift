@@ -1,4 +1,4 @@
-NDEBUG ?= -D NDEBUG
+NDEBUG ?= -g -D NDEBUG
 
 all : libgc nonegc.o runtime.o castprofiler.o
 
@@ -9,6 +9,7 @@ profile: tidy ndebug libgc nonegc.o profile_object/runtime.o castprofiler.o
 libgc : boehm-gc-install/lib/libgc.a
 
 boehm-gc-install/lib/libgc.a :
+	cc --version
 	PWD=`pwd`; mkdir boehm-gc/build; \
 		   cd boehm-gc/build; \
 		   ../configure --prefix=${PWD}/boehm-gc-install

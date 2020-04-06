@@ -14,4 +14,4 @@ tests : tests.o
 
 clean :
 	rm -f *.o
-	rm tests
+	rm -f tests
