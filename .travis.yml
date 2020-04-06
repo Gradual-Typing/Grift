@@ -1,4 +1,5 @@
-sudo: true
+os: linux
+dist: bionic
 language: c
 services:
 - xvfb
@@ -10,9 +11,14 @@ before_install:
 - sh installer.sh --in-place --dest ~/racket/
 - export PATH=~/racket/bin:$PATH
 # Install LLVM
-- sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
-- sudo apt-get install libllvm9 llvm-9 llvm-9-dev llvm-9-runtime
+- wget https://apt.llvm.org/llvm.sh
+- chmod +x llvm.sh
+- sudo ./llvm.sh 9
 - export LLVM_CONFIG=llvm-config-9
+#- sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+#- sudo apt-get install libllvm9 llvm-9 llvm-9-dev llvm-9-runtime
+# - export LLVM_CONFIG=llvm-config-9
+# - $LLVM_CONFIG --version
 
 install:
 - # cat /proc/meminfo

@@ -21,7 +21,7 @@ test: all
 # raco test .
 # This push currently only passes all the static tests
 # I plan to revert this once everything works -Andre
-	racket tests/main.rkt --llvm -R Static
+	racket tests/main.rkt --llvm
 
 
 clean:
