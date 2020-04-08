@@ -17,26 +17,31 @@ table alloc_hash_table(int64_t slots, float load_factor)
   return ht;
 }
 
+void ht_resize(table ht) {
+  int64_t old_slots = ht->slots;
+  chain* old_array = ht->array;
+  int64_t new_slots = old_slots * 2;
+  ht->slots = new_slots;
+  ht->array = GC_MALLOC(8 * new_slots);
+  int i;
+  for (i = 0; i < old_slots; ++i) {
+    chain C = old_array[i];
+    if (C != NULL) {
+      list p = C->list;
+      while (p != NULL) {
+        types_reinsert(ht, p->data);
+        p = p->next;
+      }
+    }
+  }
+  if (old_array) GC_FREE(old_array);
+}
+
 int64_t hashcons(table ht, int64_t e, int64_t hcode)
 {
   float current_load = (float) ht->num_elems/(float) ht->slots;
   if (current_load > ht->load_factor) {
-    int64_t old_slots = ht->slots;
-    chain* old_array = ht->array;
-    int64_t new_slots = old_slots * 2;
-    ht->slots = new_slots;
-    ht->array = GC_MALLOC(8 * new_slots);
-    int i;
-    for (i = 0; i < old_slots; ++i) {
-      chain C = old_array[i];
-      if (C != NULL) {
-        list p = C->list;
-        while (p != NULL) {
-          types_reinsert(ht, p->data);
-          p = p->next;
-        }
-      }
-    }
+    ht_resize(ht);
   }
   int h = hcode % ht->slots;
   h = h < 0 ? h + ht->slots : h;
@@ -122,8 +127,7 @@ void types_reinsert(table ht, int64_t ty)
   int64_t h;
   switch (tag) {
   case TYPE_FN_TAG ... TYPE_MU_TAG:
-    // the hash index is the same for all types
-    h = ((int64_t*)untagged_ty)[TYPE_FN_HASH_INDEX] % ht->slots;
+    h = ((int64_t*)untagged_ty)[TYPE_HASHCONS_HASHCODE_INDEX] % ht->slots;
     h = h < 0 ? h + ht->slots : h;
     chain C = ht->array[h];
     if (C == NULL) {

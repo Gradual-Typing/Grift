@@ -652,6 +652,8 @@
      (display ")")]
     [('Types-gen-index! (list))
      (display "types_unique_index_counter++")]
+    [('get-types-hashcons-index (list))
+     (display "types_unique_index_counter")]
     [('mref-cast-queue-enqueue (list addr ty))
      (display "cast_queue_enqueue(mref_cast_q,")
      (emit-value addr)

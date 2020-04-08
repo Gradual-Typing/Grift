@@ -27,5 +27,6 @@ table alloc_hash_table(int64_t slots, float load_factor);
 int64_t hashcons(table ht, int64_t e, int64_t hcode);
 int types_equal(int64_t t1, int64_t t2);
 void types_reinsert(table ht, int64_t ty);
+void ht_resize(table ht);
 
 #endif
