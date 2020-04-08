@@ -22,7 +22,6 @@
 #include "suspended_cast.h"
 
 extern table types_ht;
-extern int64_t types_unique_index_counter;
 extern cast_queue* mref_cast_q;
 extern cast_queue* mvect_cast_q;
 

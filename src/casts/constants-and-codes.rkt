@@ -44,8 +44,7 @@
   (TYPE-FLOAT-RT-VALUE      #b100111)
   (TYPE-CHAR-RT-VALUE       #b101111)
   (TYPE-MAX-ATOMIC-RT-VALUE #b111111)
-  (TYPE-HASHCONS-INDEX-INDEX    0)
-  (TYPE-HASHCONS-HASHCODE-INDEX 1)
+  (TYPE-HASHCONS-HASHCODE-INDEX 0)
 
   (HC-PRJ-TAG-MASK  #b10)
   (HC-INJ-TAG-MASK  #b01)
@@ -229,8 +228,6 @@
        (format-id stx "~a-~a?" namespace-string name-string))
      (define/with-syntax namespace-mask-def
        (format-id stx "~a-TAG-MASK" namespace-string-caps))
-     (define/with-syntax index-def
-       (format-id stx "~a-INDEX-INDEX" qualified-upcase-name))
      (define/with-syntax hash-def
        (format-id stx "~a-HASH-INDEX" qualified-upcase-name))
      (define/with-syntax tag-def (format-id stx "~a-TAG" qualified-upcase-name))
@@ -259,8 +256,7 @@
                    [else
                     #`(sr-alloc
                        #,name-string tag-def
-                       `(("index"    . ,(Quote 0))
-                        ("hashcode" . ,(Quote 0))
+                       `(("hashcode" . ,(Quote 0))
                         (field* . ,alloc-val*) ...))]))))
      (define/with-syntax equal-arg (generate-temporary))
      (define (gen-func-access*)
@@ -309,8 +305,7 @@
      #`(begin
          (define-constants
            (tag-def tag)
-           (index-def 0)
-           (hash-def 1)
+           (hash-def 0)
            (sindex/offset-def* sindex/offset-val*) ...)
          func-alloc
          (define (func-huh-name equal-arg)
@@ -401,11 +396,7 @@
              ;; one for the index in the hashconsing table and one for the
              ;; hashcode.
              (when$ (op$ = ty hty)
-                    (assign$ index (op$ get-types-hashcons-index))
-                    (assign$ _unused (op$ Types-gen-index!))
                     (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-                    (sr-tagged-array-set!
-                     hty tag TYPE-HASHCONS-INDEX-INDEX index)
                     (sr-tagged-array-set!
                      hty tag TYPE-HASHCONS-HASHCODE-INDEX hcode))
              hty)])))
