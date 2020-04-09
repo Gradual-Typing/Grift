@@ -26,7 +26,9 @@
 
 (define bin-path (llvm-config "--bindir"))
 (define llc-path (build-path bin-path "llc"))
+(define opt-path (build-path bin-path "opt"))
 (define (llc . a) (apply system* llc-path a))
+(define (opt . a) (apply system* opt-path a))
 
 ;; Basic driver for the entire backend
 (: generate-code (Data5-Lang . -> . Path))
@@ -67,7 +69,11 @@
                "\n")
               ll-path
               error-message)))
-
+    
+    (when (optimize-tail-calls?)
+      (unless (opt "-tailcallopt" "-tailcallelim" "-S" "-o" ll-path ll-path)
+        (error 'grift/backend/sham/generate-code "failed to optimize tailcalls in llvm module")))
+    
     (unless (llc "-asm-verbose"
                  "-fatal-warnings"
                  "-tailcallopt"

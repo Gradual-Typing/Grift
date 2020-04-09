@@ -27,7 +27,7 @@
        'module
        (list
         (function^ 'main () i64
-                   (block^ (app^ (re #f 'printf i64 #t)
+                   (block^ (app^ (re #f 'printf i64 (list i8*))
                                  (cstring "atan: %f\n")
                                  (app^ (re #f 'atan f64)
                                        (fl64 10.0)))

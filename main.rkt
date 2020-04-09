@@ -47,9 +47,19 @@
        (cast-representation 'Hyper-Coercions)]
       [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
    #:once-each
-   [("--llvm")
-    "enable LLVM backend"
-    (backend 'LLVM)]
+   [("--backend")
+    value
+    ((format "switch between C and LLVM backends (~a)" (backend)))
+    (backend
+     (case value
+      [("C" "c") 'C]
+      [("LLVM" "llvm") 'LLVM]))]
+   [("--no-optimize-tailcalls")
+    "disable LLVM backends tail call optimization"
+    (optimize-tail-calls? #f)]
+   [("--c-calling-convention")
+    "use C calling convention instead of better options"
+    (calling-convention 'C)]
    [("--check-asserts")
     ((format "Compile code with assertions (~a)" (check-asserts?)))
     (check-asserts? #t)]
