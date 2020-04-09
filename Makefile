@@ -16,16 +16,11 @@ timed:
 	time raco make main.rkt
 
 test: all
-# FIXME
-# The following line is what this recipe should be: 
-# raco test .
-# This push currently only passes all the static tests
-# I plan to revert this once everything works -Andre
-	racket tests/main.rkt --llvm
+	raco test .
 
 
 clean:
-	rm -f *.c *.out *.o *.s
+	rm -fr *.c *.out *.o *.s *.ll *.dSYM *.log
 	find . -name '*~' -delete
 	find . -name '*#*' -delete
 	find . -path '*/compiled/*' -delete

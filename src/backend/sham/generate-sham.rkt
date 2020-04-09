@@ -23,7 +23,8 @@
  "../runtime-location.rkt"
  "../../logging.rkt"
  "../../lib/mutable-set.rkt"
- sham/ast)
+ sham/ast
+ sham/env)
 
 (module+ test
   (require rackunit))
@@ -89,8 +90,10 @@
 ;; function definitions that need to be present at the top of this
 ;; sham module. The function adds to this list.
 ;; stmt = the main statement of the grift module
-(define (generate-program lifted-code* stmt)  
-
+(define (generate-program lifted-code* stmt [call-conv (calling-convention)])  
+  (define (set-call-conv! rator)
+    (set-calling-conv! rator call-conv)
+    rator)
   ;; lift-code! is used to add function definitions to the lifted-code* parameter
   (define (lift-code! x)
     (set-box! lifted-code* (cons x (unbox lifted-code*))))
@@ -104,7 +107,7 @@
       (debug u (Code u* t))
       (lift-code!
        (dfunction
-        #f
+        (function-info-set-call-conv (empty-function-info) call-conv)
         (uid->symbol u)
         (map uid->symbol u*)
         (for/list ([_ u*]) imdt-type)
@@ -187,6 +190,7 @@
         (map generate-tail rhs*)
         (generate-tail default))]
       [(and value-expr (or (Halt) (App-Code _ _) (Op _ _) (Var _) (Global _) (Quote _)))
+       ;; we don't explicitly mark tail calls in sham
        (return (generate-value value-expr))]
       [(and other
             (or
@@ -232,7 +236,7 @@
       [(Break-Repeat)
        (sham:ast:expr:let '() '() '() (break) UNIT-EXPR)]
       [(App-Code (Code-Label l) exp*)
-       (app (rs (uid->symbol l)) (map generate-value exp*))]
+       (app (set-call-conv! (rs (uid->symbol l))) (map generate-value exp*))]
       [(App-Code exp exp*)
        (define rator (gensym 'rator))
        (define rator-type (tptr (tfun (map (const imdt-type) exp*) imdt-type)))
@@ -241,7 +245,7 @@
         (list rator-type)
         (list (int->ptr (generate-value exp) (etype rator-type)))
         (svoid)
-        (app (rs rator) (map generate-value exp*)))]
+        (app (set-call-conv! (rs rator)) (map generate-value exp*)))]
       [(Op p e*)
        (define ret (Fn-ret (grift-primitive->type p)))
        (define e*^ (map generate-value e*))
@@ -319,6 +323,8 @@
        (while (imdt->bool (generate-value e1))
          (generate-effect e2))]
       [(Break-Repeat) (break)]
+      [(App-Code (Code-Label l) exp*)
+       (app (set-call-conv! (rs (uid->symbol l))) (map generate-value exp*))]
       [(App-Code exp exp*)
        ;; the application form doesn't expect an expression for the operator
        (define rator (gensym 'rator))
@@ -329,7 +335,7 @@
          (list rator-type)
          (list (int->ptr (generate-value exp) (etype rator-type)))
          (svoid)
-         (app (rs rator) (map generate-value exp*))))]
+         (app (set-call-conv! (rs rator)) (map generate-value exp*))))]
       [(Op p exp*) 
        (cond
          [(grift-primitive-effect? p)

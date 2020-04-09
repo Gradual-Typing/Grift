@@ -82,14 +82,21 @@
 
 
 
-;; Interaction with the c compiler
+;; Interaction with the backend
 (define c-flags : (Parameterof (Listof String))
   (make-parameter '("-Wno-int-conversion" "-Wno-format" "-Wno-unused-value")))
 (define backend : (Parameterof (U 'LLVM 'C))
-  (make-parameter 'C))
+  (make-parameter 'LLVM))
+(define optimize-tail-calls? : (Parameterof Boolean)
+  (make-parameter #t))
+(define calling-convention : (Parameterof (U 'C 'Fast))
+  (make-parameter 'Fast))
+
+
 ;; where is the runtime to be used located
 (define runtime-path : (Parameterof (Option Path)) (make-parameter #f))
 (define hashcons-path : (Parameterof (Option Path)) (make-parameter #f))
+
 
 
 (define with-contracts : (Parameterof Boolean)  (make-parameter #f))

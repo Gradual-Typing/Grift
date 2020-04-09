@@ -219,9 +219,9 @@
  [("--specialize-casts")
   "specialize casts with known types"
   (test-specialize-cast-code-generation (list #t))]
- [("--llvm")
-  "Use the llvm backend"
-  (backend 'LLVM)]
+ [("--c-backend")
+  "Use the c backend"
+  (backend 'C)]
  [("--without-contracts" "-C")
   "Speed up tests by not checking compiler invariants"
   (with-contracts #f)]

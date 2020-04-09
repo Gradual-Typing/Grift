@@ -97,6 +97,10 @@
    (test-file "static" "timer-start.grift" (unit))
    (test-file "static" "timer-stop.grift" (unit))
    (test-file "static" "timer-test.grift" (unit))
+
+   ;; Tail Call works without casts
+   (test-file "static" "tail-call.grift" (unit))
+
    ;; ;; Ascription
    ;; (test-file "static" "int-dyn-int.grift"   (int 1))
    ;; (test-file "static" "ascribe-dyn.grift"       (dyn))
