@@ -139,6 +139,9 @@
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
+   [("--keep-c") name
+    "keep the c intermediate representation"
+    (c-path (build-path name))]
    [("--configs" "-s") cs
     "Compile a path with multiple configurations"
     (match (regexp-match* #px"(\\d+)" cs)
