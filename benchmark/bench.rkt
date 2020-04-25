@@ -37,8 +37,8 @@
                 specialize)]))
   (define fun-proxy-rep-param
     (match fun-proxy-rep
-      ['ProxyClosureRep 'Hybrid]
-      ['ProxyDataRep    'Data]
+      ['UniformClosure   'Hybrid]
+      ['NoUniformClosure 'Data]
       [_ (error 'benchmark/bench/guarded-compile
                 "invalid option for function proxy representation: ~a"
                 fun-proxy-rep)]))
