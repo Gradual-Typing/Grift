@@ -100,6 +100,7 @@
 
    ;; Tail Call works without casts
    (test-file "static" "tail-call.grift" (unit))
+   (test-file "static" "y-combinator.grift" (int 720))
 
    ;; ;; Ascription
    ;; (test-file "static" "int-dyn-int.grift"   (int 1))

@@ -1,66 +1,15 @@
+(define (id [x : Bool]) : Bool x)
 
-(define (inc [a : Int]) : Int (+ a 1))
+(define (odd-cps [n : Int] [k : (Bool -> Bool)]) : Bool
+ (cond
+  [(= n 0) (k #f)]
+  [else (even-cps (- n 1) (lambda ([x : Bool]) (k (not x))))]))
 
-(define (pred [a : Int]) : Int (- a 1))
-
-(define (ho-add [pred : (Int -> Int)] [inc : (Int -> Int)])
-  : (Int Int -> Int)
-  (letrec ([loop (lambda ([a : Int] [acc : Int]) : Int
-                  (if (= a 0)
-                      acc
-                      (loop (pred a) (inc acc))))])
-    loop))
-   
-(define (add [a : Int] [b : Int]) : Int
- (if (= a 0)
-     b
-     (add (pred a) (inc b))))
-
-(define add^ : (Int Int -> Int) (ho-add pred inc))
-
-(define (times [a : Int] [b : Int])
- : Int
- (letrec
-   ([loop (lambda ([a : Int] [acc : Int]) : Int
-            (if (= a 0)
-                acc
-                (loop (pred a) (add b acc))))])
-   (loop a 0)))
-
-(define (times^ [a : Int] [b : Int]) : Int
- ((ho-add pred (lambda ([a : Int]) (add^ b a))) a 0))
-
-
-(define (factorial [a : Int]) : Int
-  (letrec ([loop (lambda ([i : Int] [acc : Int]) : Int
-                  (if (>= i a)
-                      (times^ acc i)
-                      (loop (inc i) (times^ acc i))))])
-   (loop 1 1)))
+(define (even-cps [n : Int] [k : (Bool -> Bool)]) : Bool
+ (cond
+  [(= n 0) (k #t)]
+  [else (odd-cps (- n 1) (lambda ([x : Bool]) : Bool (k (not x))))]))
 
 (begin
- 
-(print-int (inc 41))
-(display-char #\newline)
-
-(print-int (pred 43))
-(display-char #\newline)
-
-(print-int (add 40 2))
-(display-char #\newline)
-
-(print-int (add^ 40 2))
-(display-char #\newline)
-
-(print-int (times 21 2))
-(display-char #\newline)
-
-(print-int (times^ 21 2))
-(display-char #\newline)
-
-;; 9 does not segfault on my machine without tail-call optimization
-;; 10 segfaults on my machine without tail-call optimization
-;; 11 runs immediatly with tco
-;; 12 runs with just a few seconds delay with tco
-(print-int (factorial 11))
-(display-char #\newline))
+ (print-bool (even-cps 42 id))
+ (display-char #\newline))
