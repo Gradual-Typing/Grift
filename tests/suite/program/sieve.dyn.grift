@@ -6,13 +6,13 @@
 ;; Natrual = Int
 
 ;; "Optimized" version
-;; - changes the order of function calls to improve data locality
 ;; - manually inline "abstration hiding" functions
-;; - change recursive loop to iterative loop
 
 ;; [stream-get st i] Get the [i]-th element from the stream [st]
 (define (stream-get [st : Dyn] [i : Dyn]) : Dyn
-  (tuple-proj (repeat (_ 0 i) (st st) ((tuple-proj st 1))) 0))
+  (if (= 0 1)
+      (tuple-proj st 0)
+      ((tuple-proj st 1))))
 
 ;; `count-from n` Build a stream of integers starting from `n` and iteratively adding 1
 (define (count-from [n : Dyn]) : Dyn

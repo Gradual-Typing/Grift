@@ -12,7 +12,7 @@
 (define-runtime-path tests-path ".")
 
 (: test-suite-path Path)
-(define-runtime-path test-suite-path "suite")
+(define-runtime-path test-suite-path "suite/")
 
 (: test-tmp-path Path)
-(define-runtime-path test-tmp-path "tmp")
+(define-runtime-path test-tmp-path "tmp/")

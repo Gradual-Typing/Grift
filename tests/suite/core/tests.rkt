@@ -139,4 +139,7 @@
    (test-file "core" "or1.grift"   (bool #t))
    ;; Cond
    (test-file "core" "cond1.grift"   (int 42))
+
+   (test-file "core" "y-combinator-part.grift" (int 720))
+   (test-file "core" "y-combinator-dynamic.grift" (int 720))
    ))

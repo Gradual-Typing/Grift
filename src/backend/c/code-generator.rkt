@@ -7,7 +7,8 @@
  syntax/location
  (for-syntax racket/system)
  (for-syntax "../runtime-location.rkt")
- "../runtime-location.rkt")
+ "../runtime-location.rkt"
+ "../lib.rkt")
 
 (provide (all-defined-out))
 
@@ -17,11 +18,9 @@
 ;; Basic driver for the entire backend
 (define (generate-code ast)
   (let* ([uil (convert-representation ast)]
+         [o-path (get-write-file (build-path "a") "" (output-path))]
          [keep-c? (ir-code-path)]
-         [c-path (or keep-c? (find-unused-path ".c"))]
-         [c-path (normalize-path c-path)]
-         [o-path (or (output-path) (build-path "a.out"))]
-         [o-path (normalize-path o-path)])
+         [c-path (get-write-file (find-unused-path ".c") ".c" keep-c?)])
     ;; Write the C code to a file
     (with-output-to-file c-path #:mode 'text #:exists 'replace
       (lambda ()

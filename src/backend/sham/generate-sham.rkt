@@ -373,8 +373,8 @@
        (app^ (re #f 'printf tvoid (list str-ptr-type)) (cstring "%ld") d)]
       [('print-bool (list b))
        (if^ (imdt->bool b)
-            (app^ (re #f 'puts tvoid) (cstring "#t"))
-            (app^ (re #f 'puts tvoid) (cstring "#f")))]
+            (se (app^ (re #f 'printf tvoid (list str-ptr-type)) (cstring "#t")))
+            (se (app^ (re #f 'printf tvoid (list str-ptr-type)) (cstring "#f"))))]
       [('Printf (cons fmt exp*))
        (app (re #f 'printf tvoid (list str-ptr-type)) (cons (->string fmt) exp*))]
       [('Alloc (list exp)) (alloc (mul size-of-imdt exp))]

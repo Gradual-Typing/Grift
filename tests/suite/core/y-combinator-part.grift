@@ -1,0 +1,34 @@
+(define Y2
+ (lambda ([f : ((Dyn Int -> Int) -> (Int Dyn -> Int))])
+  (let ([x (lambda ([x : (Rec X (X -> (Int Int -> Int)))])
+            (f (lambda ([y1 : Int] [y2 : Int]) : Int ((x x) y1 y2))))])
+    (x x))))
+
+(define add
+ (Y2 (lambda ([f : (Int Int -> Int)])
+       (lambda (n acc)
+         (if (= n 0)
+             acc
+             (f (- n 1) (+ acc 1)))))))
+
+(define mul
+ (lambda (n m)
+  ((Y2 (lambda (f)
+        (lambda ([n : Int] [acc : Int])
+          (if (= n 0)
+              acc
+              (f (- n 1) (add acc m))))))
+   n 0)))
+
+(define factorial
+ (lambda ([n : Int])
+   ((Y2 (lambda ([f : (Dyn Dyn -> Int)])
+         (lambda ([n : Int][acc : Int])
+          (if (= n 0)
+              acc
+              (f (- n 1) (mul acc n))))))
+    n 1)))
+
+(: (factorial 6) Int)
+   
+ 

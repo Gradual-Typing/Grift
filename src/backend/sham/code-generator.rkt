@@ -17,27 +17,31 @@
  "../c/code-generator.rkt"
  (for-syntax racket/system)
  (for-syntax "../runtime-location.rkt")
- "../runtime-location.rkt")
+ "../runtime-location.rkt"
+ "../lib.rkt")
 
 (provide
  generate-code)
 
 (llvm-initialize-all)
 
-(define bin-path (llvm-config "--bindir"))
-(define llc-path (build-path bin-path "llc"))
-(define opt-path (build-path bin-path "opt"))
-(define (llc . a) (apply system* llc-path a))
-(define (opt . a) (apply system* opt-path a))
+(define (llvm-call name)
+  (define path (build-path (llvm-config "--bindir") name))
+  (lambda a (apply system* path a)))
+
+(define llc (llvm-call "llc"))
+(define opt (llvm-call "opt"))
+(define clang (llvm-call "clang"))
 
 ;; Basic driver for the entire backend
 (: generate-code (Data5-Lang . -> . Path))
 (define (generate-code uil) 
   (debug uil)
-  (let* ([keep-ll-code-file? (ir-code-path)]
-         [o-path (normalize-path (or (output-path) (build-path "a.out")))]
-         [keep-s? (s-path)]
-         [s-path (or keep-s? (path-replace-extension o-path ".s"))])
+  (let* ([o-path (get-write-file (build-path "a") "" (output-path))]
+         [keep-ll-code-file? (not (not (ir-code-path)))]
+         [keep-s? (not (not (s-path)))]
+         [ll-path (get-write-file o-path ".ll" (ir-code-path))]
+         [s-path (get-write-file o-path ".s" (s-path))])
 
     ;; Empty LLVM State
     (define context (LLVMContextCreate))
@@ -54,9 +58,6 @@
              (with-logging-to-port p th (grift-log-level) #:logger sham-logger))]
           [else (th)])))
     
-    ;; Compile module with llc
-    (define ll-path (or keep-ll-code-file? (path-replace-extension o-path ".ll")))
-    
     (match-define (vector error? error-message)
       (LLVMPrintModuleToFile llvm-module ll-path))
 
@@ -71,9 +72,10 @@
               error-message)))
     
     (when (optimize-tail-calls?)
-      (unless (opt "-tailcallopt" "-tailcallelim" "-S" "-o" ll-path ll-path)
+      (unless (opt "-tailcallopt" "-tailcallelim" "-S" "-O3" "-o" ll-path ll-path)
         (error 'grift/backend/sham/generate-code "failed to optimize tailcalls in llvm module")))
     
+    #;
     (unless (llc "-asm-verbose"
                  "-fatal-warnings"
                  "-tailcallopt"
@@ -81,18 +83,33 @@
                  ll-path "-o" s-path)
       (error 'grift/backend/sham/generate-code "failed to compile llvm module"))
     
-    (unless keep-ll-code-file?
-      (delete-file ll-path))
-    
     (log-grift-debug-filter
      (format
       "LLVM ASM Output:\n~a\n\n"
       (file->string s-path)))
+
+    (when keep-s?
+      (clang  ll-path "-O3" "-S" "-o" s-path))
+
+    (clang "-o" o-path "-O3"
+           "-Wno-override-module" ;; Keep us from emitting a warning that I think is harmless
+           (format "-DINIT_TYPES_HT_SLOTS=~a" (init-types-hash-table-slots))
+           (format "-DTYPES_HT_LOAD_FACTOR=~a" (types-hash-table-load-factor))
+           (format "-DGC_INITIAL_HEAP_SIZE=~a" (* (init-heap-kilobytes) 1024))
+           (if (cast-profiler?) "-DCAST_PROFILER" "")
+           ll-path runtime.o-path runtime-entry.c-path)
+
+    (unless keep-ll-code-file?
+      (delete-file ll-path))
     
+
     ;; Link the executable
-    (cc/runtime o-path s-path (append-flags (append (runtime-entry-flags) (c-flags)))
+    #;
+    (cc/runtime o-path s-path
+                (append-flags (append  (runtime-entry-flags) (c-flags)))
                 #:runtime-entry runtime-entry.c-path)
     
+    #;
     (unless keep-s?
       (delete-file s-path))
     o-path))

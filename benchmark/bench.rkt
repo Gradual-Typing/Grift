@@ -42,12 +42,19 @@
                  [hybrid-cast/coercion-runtime? hybrid-runtime?])
     (unless (and (file-exists? exe) (if (cast-profiler?) (file-exists? exe.prof) #t))
       (printf "~a\n" exe)
-      (if (cast-profiler?)
-          (begin
-            (compile src #:output exe.prof #:cast cast #:ref ref)
-            (parameterize ([cast-profiler? #f])
-              (compile src #:output exe #:cast cast #:ref ref)))
-          (compile src #:output exe #:cast cast #:ref ref))))
+      (let doit ()
+        (cond
+          [(*custom-feature*)
+           =>
+           (λ (x)
+             (let ([config (if (< i 0)
+                               (custom-feature-neg-config x)
+                               (custom-feature-pos-config x))])
+               (call-with-grift-parameterization config doit)))]
+          [(cast-profiler?)
+           (compile src #:output exe.prof #:cast cast #:ref ref)
+           (parameterize ([cast-profiler? #f]) (doit))]
+          [else (compile src #:output exe #:cast cast #:ref ref)]))))
   exe)
 
 (define (compile-file f cs)
@@ -128,6 +135,10 @@
   (c-flags (cons "-O3" (c-flags)))
   (command-line
    #:once-each
+   ["--custom-feature"
+    config
+    "todo"
+    (parameterize-*custom-feature*/string config)]
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
