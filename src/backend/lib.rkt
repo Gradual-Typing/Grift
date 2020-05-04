@@ -15,13 +15,13 @@
 ;; Otherwise write to the default-path
 (define (get-write-file default-path suffix path)
   (normalize-path
-   (path-replace-extension
-    (cond
-      [(not path) default-path]
+   (cond
+      [(not path) (path-replace-extension default-path suffix)]
       [(directory-path? path)
        (unless (directory-exists? path)
          (make-directory* path))
-       (build-path path (file-name-from-path default-path))]
-      [else path])
-    suffix)))
+          (path-replace-extension
+           (build-path path (file-name-from-path default-path))
+           suffix)]
+      [else path])))
 
