@@ -25,12 +25,12 @@
  */
 
 STATIC bottom_index * GC_all_bottom_indices = 0;
-                                /* Pointer to first (lowest addr) */
-                                /* bottom_index.                  */
+                        /* Pointer to the first (lowest address)        */
+                        /* bottom_index.  Assumes the lock is held.     */
 
 STATIC bottom_index * GC_all_bottom_indices_end = 0;
-                                /* Pointer to last (highest addr) */
-                                /* bottom_index.                  */
+                        /* Pointer to the last (highest address)        */
+                        /* bottom_index.  Assumes the lock is held.     */
 
 /* Non-macro version of header location routine */
 GC_INNER hdr * GC_find_header(ptr_t h)
@@ -108,7 +108,7 @@ GC_INNER hdr *
 }
 
 /* Routines to dynamically allocate collector data structures that will */
-/* never be freed.                                                       */
+/* never be freed.                                                      */
 
 static ptr_t scratch_free_ptr = 0;
 
@@ -117,45 +117,48 @@ static ptr_t scratch_free_ptr = 0;
 
 GC_INNER ptr_t GC_scratch_alloc(size_t bytes)
 {
-    register ptr_t result = scratch_free_ptr;
+    ptr_t result = scratch_free_ptr;
+    size_t bytes_to_get;
 
-    bytes += GRANULE_BYTES-1;
-    bytes &= ~(GRANULE_BYTES-1);
-    scratch_free_ptr += bytes;
-    if (scratch_free_ptr <= GC_scratch_end_ptr) {
-        return(result);
-    }
-    {
-        word bytes_to_get = MINHINCR * HBLKSIZE;
+    bytes = ROUNDUP_GRANULE_SIZE(bytes);
+    for (;;) {
+        scratch_free_ptr += bytes;
+        if ((word)scratch_free_ptr <= (word)GC_scratch_end_ptr) {
+            /* Unallocated space of scratch buffer has enough size. */
+            return result;
+        }
 
-        if (bytes_to_get <= bytes) {
-          /* Undo the damage, and get memory directly */
+        if (bytes >= MINHINCR * HBLKSIZE) {
             bytes_to_get = ROUNDUP_PAGESIZE_IF_MMAP(bytes);
             result = (ptr_t)GET_MEM(bytes_to_get);
             GC_add_to_our_memory(result, bytes_to_get);
+            /* Undo scratch free area pointer update; get memory directly. */
             scratch_free_ptr -= bytes;
             if (result != NULL) {
+                /* Update end point of last obtained area (needed only  */
+                /* by GC_register_dynamic_libraries for some targets).  */
                 GC_scratch_last_end_ptr = result + bytes;
             }
-            return(result);
+            return result;
         }
 
-        bytes_to_get = ROUNDUP_PAGESIZE_IF_MMAP(bytes_to_get); /* for safety */
+        bytes_to_get = ROUNDUP_PAGESIZE_IF_MMAP(MINHINCR * HBLKSIZE);
+                                                /* round up for safety */
         result = (ptr_t)GET_MEM(bytes_to_get);
         GC_add_to_our_memory(result, bytes_to_get);
-        if (result == 0) {
-            if (GC_print_stats)
-                GC_log_printf("Out of memory - trying to allocate less\n");
-            scratch_free_ptr -= bytes;
+        if (NULL == result) {
+            WARN("Out of memory - trying to allocate requested amount"
+                 " (%" WARN_PRIdPTR " bytes)...\n", (word)bytes);
+            scratch_free_ptr -= bytes; /* Undo free area pointer update */
             bytes_to_get = ROUNDUP_PAGESIZE_IF_MMAP(bytes);
             result = (ptr_t)GET_MEM(bytes_to_get);
             GC_add_to_our_memory(result, bytes_to_get);
             return result;
         }
+        /* Update scratch area pointers and retry.      */
         scratch_free_ptr = result;
         GC_scratch_end_ptr = scratch_free_ptr + bytes_to_get;
         GC_scratch_last_end_ptr = GC_scratch_end_ptr;
-        return(GC_scratch_alloc(bytes));
     }
 }
 
@@ -164,10 +167,10 @@ static hdr * hdr_free_list = 0;
 /* Return an uninitialized header */
 static hdr * alloc_hdr(void)
 {
-    register hdr * result;
+    hdr * result;
 
-    if (hdr_free_list == 0) {
-        result = (hdr *) GC_scratch_alloc((word)(sizeof(hdr)));
+    if (NULL == hdr_free_list) {
+        result = (hdr *)GC_scratch_alloc(sizeof(hdr));
     } else {
         result = hdr_free_list;
         hdr_free_list = (hdr *) (result -> hb_next);
@@ -189,9 +192,9 @@ GC_INLINE void free_hdr(hdr * hhdr)
 
 GC_INNER void GC_init_headers(void)
 {
-    register unsigned i;
+    unsigned i;
 
-    GC_all_nils = (bottom_index *)GC_scratch_alloc((word)sizeof(bottom_index));
+    GC_all_nils = (bottom_index *)GC_scratch_alloc(sizeof(bottom_index));
     if (GC_all_nils == NULL) {
       GC_err_printf("Insufficient memory for GC_all_nils\n");
       EXIT();
@@ -202,7 +205,7 @@ GC_INNER void GC_init_headers(void)
     }
 }
 
-/* Make sure that there is a bottom level index block for address addr  */
+/* Make sure that there is a bottom level index block for address addr. */
 /* Return FALSE on failure.                                             */
 static GC_bool get_index(word addr)
 {
@@ -210,30 +213,32 @@ static GC_bool get_index(word addr)
     bottom_index * r;
     bottom_index * p;
     bottom_index ** prev;
-    bottom_index *pi;
+    bottom_index *pi; /* old_p */
+    word i;
 
+    GC_ASSERT(I_HOLD_LOCK());
 #   ifdef HASH_TL
-      word i = TL_HASH(hi);
-      bottom_index * old;
+      i = TL_HASH(hi);
 
-      old = p = GC_top_index[i];
+      pi = p = GC_top_index[i];
       while(p != GC_all_nils) {
           if (p -> key == hi) return(TRUE);
           p = p -> hash_link;
       }
-      r = (bottom_index*)GC_scratch_alloc((word)(sizeof (bottom_index)));
-      if (r == 0) return(FALSE);
-      BZERO(r, sizeof (bottom_index));
-      r -> hash_link = old;
-      GC_top_index[i] = r;
 #   else
-      if (GC_top_index[hi] != GC_all_nils) return(TRUE);
-      r = (bottom_index*)GC_scratch_alloc((word)(sizeof (bottom_index)));
-      if (r == 0) return(FALSE);
-      GC_top_index[hi] = r;
-      BZERO(r, sizeof (bottom_index));
+      if (GC_top_index[hi] != GC_all_nils)
+        return TRUE;
+      i = hi;
 #   endif
+    r = (bottom_index *)GC_scratch_alloc(sizeof(bottom_index));
+    if (EXPECT(NULL == r, FALSE))
+      return FALSE;
+    BZERO(r, sizeof(bottom_index));
     r -> key = hi;
+#   ifdef HASH_TL
+      r -> hash_link = pi;
+#   endif
+
     /* Add it to the list of bottom indices */
       prev = &GC_all_bottom_indices;    /* pointer to p */
       pi = 0;                           /* bottom_index preceding p */
@@ -249,6 +254,8 @@ static GC_bool get_index(word addr)
       }
       r -> asc_link = p;
       *prev = r;
+
+      GC_top_index[i] = r;
     return(TRUE);
 }
 
@@ -274,17 +281,21 @@ GC_INNER struct hblkhdr * GC_install_header(struct hblk *h)
 GC_INNER GC_bool GC_install_counts(struct hblk *h, size_t sz/* bytes */)
 {
     struct hblk * hbp;
-    word i;
 
-    for (hbp = h; (char *)hbp < (char *)h + sz; hbp += BOTTOM_SZ) {
-        if (!get_index((word) hbp)) return(FALSE);
+    for (hbp = h; (word)hbp < (word)h + sz; hbp += BOTTOM_SZ) {
+        if (!get_index((word)hbp))
+            return FALSE;
+        if ((word)hbp > GC_WORD_MAX - (word)BOTTOM_SZ * HBLKSIZE)
+            break; /* overflow of hbp+=BOTTOM_SZ is expected */
     }
-    if (!get_index((word)h + sz - 1)) return(FALSE);
-    for (hbp = h + 1; (char *)hbp < (char *)h + sz; hbp += 1) {
-        i = HBLK_PTR_DIFF(hbp, h);
+    if (!get_index((word)h + sz - 1))
+        return FALSE;
+    for (hbp = h + 1; (word)hbp < (word)h + sz; hbp += 1) {
+        word i = HBLK_PTR_DIFF(hbp, h);
+
         SET_HDR(hbp, (hdr *)(i > MAX_JUMP? MAX_JUMP : i));
     }
-    return(TRUE);
+    return TRUE;
 }
 
 /* Remove the header for block h */
@@ -299,14 +310,16 @@ GC_INNER void GC_remove_header(struct hblk *h)
 /* Remove forwarding counts for h */
 GC_INNER void GC_remove_counts(struct hblk *h, size_t sz/* bytes */)
 {
-    register struct hblk * hbp;
-    for (hbp = h+1; (char *)hbp < (char *)h + sz; hbp += 1) {
+    struct hblk * hbp;
+
+    for (hbp = h+1; (word)hbp < (word)h + sz; hbp += 1) {
         SET_HDR(hbp, 0);
     }
 }
 
-/* Apply fn to all allocated blocks */
-/*VARARGS1*/
+/* Apply fn to all allocated blocks.  It is the caller responsibility   */
+/* to avoid data race during the function execution (e.g. by holding    */
+/* the allocation lock).                                                */
 void GC_apply_to_all_blocks(void (*fn)(struct hblk *h, word client_data),
                             word client_data)
 {
@@ -337,12 +350,14 @@ void GC_apply_to_all_blocks(void (*fn)(struct hblk *h, word client_data),
 /* Return 0 if there is none.                           */
 GC_INNER struct hblk * GC_next_used_block(struct hblk *h)
 {
-    register bottom_index * bi;
-    register word j = ((word)h >> LOG_HBLKSIZE) & (BOTTOM_SZ-1);
+    REGISTER bottom_index * bi;
+    REGISTER word j = ((word)h >> LOG_HBLKSIZE) & (BOTTOM_SZ-1);
 
+    GC_ASSERT(I_HOLD_LOCK());
     GET_BI(h, bi);
     if (bi == GC_all_nils) {
-        register word hi = (word)h >> (LOG_BOTTOM_SZ + LOG_HBLKSIZE);
+        REGISTER word hi = (word)h >> (LOG_BOTTOM_SZ + LOG_HBLKSIZE);
+
         bi = GC_all_bottom_indices;
         while (bi != 0 && bi -> key < hi) bi = bi -> asc_link;
         j = 0;
@@ -373,12 +388,13 @@ GC_INNER struct hblk * GC_next_used_block(struct hblk *h)
 /* Unlike the above, this may return a free block.              */
 GC_INNER struct hblk * GC_prev_block(struct hblk *h)
 {
-    register bottom_index * bi;
-    register signed_word j = ((word)h >> LOG_HBLKSIZE) & (BOTTOM_SZ-1);
+    bottom_index * bi;
+    signed_word j = ((word)h >> LOG_HBLKSIZE) & (BOTTOM_SZ-1);
 
+    GC_ASSERT(I_HOLD_LOCK());
     GET_BI(h, bi);
     if (bi == GC_all_nils) {
-        register word hi = (word)h >> (LOG_BOTTOM_SZ + LOG_HBLKSIZE);
+        word hi = (word)h >> (LOG_BOTTOM_SZ + LOG_HBLKSIZE);
         bi = GC_all_bottom_indices_end;
         while (bi != 0 && bi -> key > hi) bi = bi -> desc_link;
         j = BOTTOM_SZ - 1;

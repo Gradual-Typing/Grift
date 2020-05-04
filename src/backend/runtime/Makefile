@@ -10,7 +10,8 @@ boehm-gc-install/lib/libgc.a :
 	cc --version
 	PWD=`pwd`; mkdir boehm-gc/build; \
 		   cd boehm-gc/build; \
-		   ../configure --prefix=${PWD}/boehm-gc-install
+		   ../configure  --enable-static=yes \
+				 --prefix=${PWD}/boehm-gc-install
 	$(MAKE) -C boehm-gc/build
 	$(MAKE) -C boehm-gc/build check
 	$(MAKE) -C boehm-gc/build install
@@ -32,6 +33,7 @@ tidy :
 
 clean : tidy
 	rm -rf boehm-gc-install
+	rm -f castprofiler.h castprofiler.c
 	-cd tests && make clean
 
 ndebug :

@@ -20,8 +20,6 @@
  * to answer questions such as "who is pointing to this" or
  * "why is this object being retained by the collector"
  *
- * This API assumes that we have an ANSI C compiler.
- *
  * Most of these calls yield useful information on only after
  * a garbage collection.  Usually the client will first force
  * a full collection and then gather information, preferably
@@ -68,8 +66,8 @@ typedef enum {
 } GC_ref_kind;
 
 GC_API GC_ref_kind GC_CALL GC_get_back_ptr_info(void * /* dest */,
-                                                void ** /* base_p */,
-                                                size_t * /* offset_p */);
+                                void ** /* base_p */, size_t * /* offset_p */)
+                                GC_ATTR_NONNULL(1);
 
 /* Generate a random heap address.            */
 /* The resulting address is in the heap, but  */
@@ -89,10 +87,10 @@ GC_API void GC_CALL GC_generate_random_backtrace(void);
 /* Print a backtrace from a specific address.  Used by the      */
 /* above.  The client should call GC_gcollect() immediately     */
 /* before invocation.                                           */
-GC_API void GC_CALL GC_print_backtrace(void *);
+GC_API void GC_CALL GC_print_backtrace(void *) GC_ATTR_NONNULL(1);
 
 #ifdef __cplusplus
-  } /* end of extern "C" */
+  } /* extern "C" */
 #endif
 
 #endif /* GC_BACKPTR_H */

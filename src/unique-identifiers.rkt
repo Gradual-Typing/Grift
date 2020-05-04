@@ -26,10 +26,9 @@
           c
           #\_)))
   (string-append
-   "u"
-   (number->string (Uid-suffix u))
-   "_"
-   (list->string (map help (string->list (Uid-prefix u))))))
+   (list->string (map help (string->list (Uid-prefix u))))
+   "_u"
+   (number->string (Uid-suffix u))))
 
 ;; Are two uid equal?
 (: uid=? (-> Uid Uid Boolean))

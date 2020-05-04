@@ -136,8 +136,10 @@
   ;; Convert grift constants to sham constants
   (define (generate-constant k)
     (cond
-      [(inexact-real? k) (fp->ui (cfl k f64) int-expr)]
-      [(exact-integer? k) (csi k i64)]
+      [(inexact-real? k)
+       (->imdt (cfl k f64))]
+      [(exact-integer? k)
+       (csi k i64)]
       [(char? k)
        (define i (char->integer k))
        (if (<= 0 i 255)
@@ -200,6 +202,20 @@
              (Stack-Alloc _)))
        (error 'generate-tail "invalid return value: ~a" other)]))
 
+  (define (generate-app exp exp*)
+    (match exp
+      [(Code-Label l)
+       (app (set-call-conv! (rs (uid->symbol l))) (map generate-value exp*))]
+      [_
+       (define rator (gensym 'rator))
+       (define rator-type (tptr (tfun (map (const imdt-type) exp*) imdt-type)))
+       (sham:ast:expr:let
+        (list rator)
+        (list rator-type)
+        (list (int->ptr (generate-value exp) (etype rator-type)))
+        (svoid)
+        (app (set-call-conv! (rs rator)) (map generate-value exp*)))]))
+  
   ;; takes a grift expression and maps it to sham expression
   (define (generate-value exp)
     (debug generate-value exp)
@@ -235,17 +251,7 @@
        (generate-repeat i e1 e2 a e3 e4)]
       [(Break-Repeat)
        (sham:ast:expr:let '() '() '() (break) UNIT-EXPR)]
-      [(App-Code (Code-Label l) exp*)
-       (app (set-call-conv! (rs (uid->symbol l))) (map generate-value exp*))]
-      [(App-Code exp exp*)
-       (define rator (gensym 'rator))
-       (define rator-type (tptr (tfun (map (const imdt-type) exp*) imdt-type)))
-       (sham:ast:expr:let
-        (list rator)
-        (list rator-type)
-        (list (int->ptr (generate-value exp) (etype rator-type)))
-        (svoid)
-        (app (set-call-conv! (rs rator)) (map generate-value exp*)))]
+      [(App-Code e e*) (generate-app e e*)]
       [(Op p e*)
        (define ret (Fn-ret (grift-primitive->type p)))
        (define e*^ (map generate-value e*))
@@ -323,25 +329,19 @@
        (while (imdt->bool (generate-value e1))
          (generate-effect e2))]
       [(Break-Repeat) (break)]
-      [(App-Code (Code-Label l) exp*)
-       (app (set-call-conv! (rs (uid->symbol l))) (map generate-value exp*))]
-      [(App-Code exp exp*)
-       ;; the application form doesn't expect an expression for the operator
-       (define rator (gensym 'rator))
-       (define rator-type (tptr (tfun (map (const imdt-type) exp*) imdt-type)))
-       (se
-        (sham:ast:expr:let
-         (list rator)
-         (list rator-type)
-         (list (int->ptr (generate-value exp) (etype rator-type)))
-         (svoid)
-         (app (set-call-conv! (rs rator)) (map generate-value exp*))))]
       [(Op p exp*) 
        (cond
          [(grift-primitive-effect? p)
           (generate-stmt-op p (map generate-value exp*))]
          [else ;; evaluate values for their effects
           (block (map generate-effect exp*))])]
+      [(Switch v (list (cons (list lhs** ...) rhs*) ...) default)
+       (switch
+        (generate-value v)
+        (map (curry map (curryr csi i64)) lhs**)
+        (map generate-effect rhs*)
+        (generate-effect default))]
+      [(App-Code exp exp*) (se (generate-app exp exp*))]
       [(or
         (Stack-Alloc _)
         (Var _)
@@ -349,13 +349,7 @@
         (Code-Label _)
         (Quote _)
         (No-Op))
-       (svoid)]
-      [(Switch v (list (cons (list lhs** ...) rhs*) ...) default)
-       (switch
-        (generate-value v)
-        (map (curry map (curryr csi i64)) lhs**)
-        (map generate-effect rhs*)
-        (generate-effect default))]))
+       (svoid)]))
 
   ;; build a sham expression that allocates the argument size
   (define (alloc size) (app^ (re #f 'GC_malloc i64) size))
@@ -368,7 +362,7 @@
       [('Array-ref (list a o))
        (load (gep (->arr-ptr a) (list o)))]
       [('print-float (list f p))
-       (app^ (re #f 'printf tvoid (list str-ptr-type)) (cstring "%.*.lf") p (->float f))]
+       (app^ (re #f 'printf tvoid (list str-ptr-type)) (cstring "%.*lf") p (->float f))]
       [('print-int (list d))
        (app^ (re #f 'printf tvoid (list str-ptr-type)) (cstring "%ld") d)]
       [('print-bool (list b))
@@ -418,11 +412,11 @@
        (app (re #f 'cast_queue_peek_type i64) (list (load mvect-cast-q)))]
       [('timer-start (list))
        (store!
-        (app^ (re #f 'gettimeofday i32) (load (external #f 'timer_start_time i8)) (ui64 0))
+        (app^ (re #f 'gettimeofday i32) (external #f 'timer_start_time i8) (ui64 0))
         (external #f 'timer_started i32))]
       [('timer-stop  (list))
        (store!
-        (app^ (re #f 'gettimeofday i32) (load (external #f 'timer_stop_time i8)) (ui64 0))
+        (app^ (re #f 'gettimeofday i32) (external #f 'timer_stop_time i8) (ui64 0))
         (external #f 'timer_stopped i32))]
       [('timer-report (list)) (app^ (re #f 'timer_report tvoid))]
       [((app easy-p->impl (list f a* (list r))) e*)
@@ -525,7 +519,7 @@
      (-          ,sub    (,identity ,identity) (,identity))
      (*          ,mul    (,identity ,identity) (,identity))
      (%<<        ,shl    (,identity ,identity) (,identity))
-     (%>>        ,lshr   (,identity ,identity) (,identity))
+     (%>>        ,ashr   (,identity ,identity) (,identity))
      (%/         ,sdiv   (,identity ,identity) (,identity))
      (%%         ,srem   (,identity ,identity) (,identity))
      (binary-and ,and^   (,identity ,identity) (,identity))
@@ -546,29 +540,29 @@
      (fl*        ,fmul     (,->float ,->float) (,->imdt))
      (fl/        ,fdiv     (,->float ,->float) (,->imdt))
      (flmodulo   ,frem  (,->float ,->float) (,->imdt))
-     (flmin      ,(call (ri "llvm.minnum.f64" f64)) (,->float ,->float) (,->imdt))
-     (flmax      ,(call (ri "llvm.maxnum.f64" f64)) (,->float ,->float) (,->imdt))
+     (flmin      ,(call (ri 'llvm.minnum.f64 f64)) (,->float ,->float) (,->imdt))
+     (flmax      ,(call (ri 'llvm.maxnum.f64 f64)) (,->float ,->float) (,->imdt))
      (fl<        ,fcmp-olt     (,->float ,->float) (,bool->imdt))
      (fl<=       ,fcmp-ole   (,->float ,->float) (,bool->imdt))
      (fl=        ,fcmp-oeq    (,->float ,->float) (,bool->imdt))
      (fl>        ,fcmp-ogt     (,->float ,->float) (,bool->imdt))
      (fl>=       ,fcmp-oge    (,->float ,->float) (,bool->imdt))
-     (flquotient ,fdiv     (,->float ,->float) (,identity))
-     (flround    ,(call (ri "llvm.round.f64" f64)) (,->float) (,->imdt))
+     (flquotient ,fdiv     (,->float ,->float) (,->imdt))
+     (flround    ,(call (ri 'llvm.round.f64 f64)) (,->float) (,->imdt))
      (flnegate   ,build-negate    (,->float) (,->imdt))
-     (flabs      ,(call (ri "llvm.abs.f64" f64)) (,->float) (,->imdt))
-     (flfloor    ,(call (ri "llvm.floor.f64" f64)) (,->float) (,->imdt))
-     (flceiling  ,(call (ri "llvm.ceil.f64" f64)) (,->float) (,->imdt))
-     (flcos      ,(call (ri "llmv.cos.f64" f64)) (,->float) (,->imdt))
-     (fltan      ,(call (ri "llvm.tan.f64" f64)) (,->float) (,->imdt))
-     (flsin      ,(call (ri "llvm.sin.f64" f64)) (,->float) (,->imdt))
+     (flabs      ,(call (ri 'llvm.abs.f64 f64)) (,->float) (,->imdt))
+     (flfloor    ,(call (ri 'llvm.floor.f64 f64)) (,->float) (,->imdt))
+     (flceiling  ,(call (ri 'llvm.ceil.f64 f64)) (,->float) (,->imdt))
+     (flcos      ,(call (ri 'llmv.cos.f64 f64)) (,->float) (,->imdt))
+     (fltan      ,(call (ri 'llvm.tan.f64 f64)) (,->float) (,->imdt))
+     (flsin      ,(call (ri 'llvm.sin.f64 f64)) (,->float) (,->imdt))
      (flasin     ,(call (re #f 'asin f64)) (,->float) (,->imdt))
      (flacos     ,(call (re #f 'acos f64)) (,->float) (,->imdt))
      (flatan     ,(call (re #f 'atan f64)) (,->float) (,->imdt))
      (flatan2    ,(call (re #f 'atan2 f64)) (,->float ,->float) (,->imdt)) 
-     (fllog      ,(call (ri "llvm.log.f64" f64)) (,->float) (,->imdt))
-     (flexp      ,(call (ri "llvm.exp.f64" f64)) (,->float) (,->imdt))
-     (flsqrt     ,(call (ri "llvm.sqrt.f64" f64)) (,->float) (,->imdt))
+     (fllog      ,(call (ri 'llvm.log.f64 f64)) (,->float) (,->imdt))
+     (flexp      ,(call (ri 'llvm.exp.f64 f64)) (,->float) (,->imdt))
+     (flsqrt     ,(call (ri 'llvm.sqrt.f64 f64)) (,->float) (,->imdt))
      (Print      ,(call (re #f 'printf tvoid (list str-ptr-type)))  (,->string) (,identity))
      (Exit       ,(call (re #f 'exit tvoid)) (,identity) (,identity))
      (int->float ,int->float (,->int) (,->imdt))
