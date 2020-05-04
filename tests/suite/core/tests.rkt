@@ -140,6 +140,9 @@
    ;; Cond
    (test-file "core" "cond1.grift"   (int 42))
 
+   ;; Casts
+   (test-file "core" "project-int.grift" (bool #t))
+   
    (test-file "core" "y-combinator-part.grift" (int 720))
    (test-file "core" "y-combinator-dynamic.grift" (int 720))
    ))

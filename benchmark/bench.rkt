@@ -55,10 +55,11 @@
           [(*custom-feature*)
            =>
            (λ (x)
-             (let ([config (if (< i 0)
-                               (custom-feature-neg-config x)
-                               (custom-feature-pos-config x))])
-               (call-with-grift-parameterization config doit)))]
+             (parameterize ([*custom-feature* #f])
+               (let ([config (if (< i 0)
+                                 (custom-feature-neg-config x)
+                                 (custom-feature-pos-config x))])
+                 (call-with-grift-parameterization config doit))))]
           [(cast-profiler?)
            (compile src #:output exe.prof #:cast cast #:ref ref)
            (parameterize ([cast-profiler? #f]) (doit))]
@@ -67,7 +68,7 @@
 
 (define (compile-file f cs)
   (for ([i (in-list cs)]) 
-    (apply guarded-compile (cons f (cons i (hash-ref configs i))))))
+    (apply guarded-compile (cons f (cons i (hash-ref configs (abs i)))))))
 
 (define (place-main id my-chan cp? cflags dyn-ops?)
   (printf "~a: init\n" id)

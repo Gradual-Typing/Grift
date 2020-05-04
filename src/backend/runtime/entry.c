@@ -10,7 +10,6 @@
 struct timeval timer_start_time;
 struct timeval timer_stop_time;
 struct timeval timer_result_time;
-#define get_subseconds(t) (t.tv_usec / 1.0e6)
 
 int timer_started = 1;
 int timer_stopped = 1;

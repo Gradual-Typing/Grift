@@ -57,61 +57,50 @@
            (λ (p)
              (with-logging-to-port p th (grift-log-level) #:logger sham-logger))]
           [else (th)])))
-    
-    (match-define (vector error? error-message)
-      (LLVMPrintModuleToFile llvm-module ll-path))
 
-    (when error?
-      (error 'grift/backend/sham/generate-code
-             (format
-              (string-join
-               `("couldn't generate llvm module file: ~a"
-                 "LLVM: ~a")
-               "\n")
-              ll-path
-              error-message)))
+    #;
+    (let-values ([(error? messages) (LLVMVerifyModule llvm-module 'LLVMReturnStatusAction)])
+      (when error?
+        (error
+         'grift/backend/sham/generate-code
+         (format
+          "Grift Internal Error: couldn't verify llvm module\nLLVM: ~a"
+          messages))))
+
+    (match-let ([(vector error? error-message) (LLVMPrintModuleToFile llvm-module ll-path)])
+      (when error?
+        (error 'grift/backend/sham/generate-code
+               (format
+                (string-join
+                 `("Grift Internal Error: couldn't generate llvm module file: ~a"
+                   "LLVM: ~a")
+                 "\n")
+                ll-path
+                error-message))))
     
     (when (optimize-tail-calls?)
-      (unless (opt "-tailcallopt" "-tailcallelim" "-S" "-O3" "-o" ll-path ll-path)
+      (unless (opt "-tailcallopt" "-tailcallelim" "-S" "-o" ll-path ll-path)
         (error 'grift/backend/sham/generate-code "failed to optimize tailcalls in llvm module")))
     
-    #;
-    (unless (llc "-asm-verbose"
-                 "-fatal-warnings"
-                 "-tailcallopt"
-                 "-O3"
-                 ll-path "-o" s-path)
-      (error 'grift/backend/sham/generate-code "failed to compile llvm module"))
-    
-    (log-grift-debug-filter
-     (format
-      "LLVM ASM Output:\n~a\n\n"
-      (file->string s-path)))
-
     (when keep-s?
       (clang  ll-path "-O3" "-S" "-o" s-path))
 
-    (clang "-o" o-path "-O3"
+    (clang "-o" o-path
+           (if (optimize-ir?) "-O3" "")
+           (if (with-debug-symbols) "-g" "")
            "-Wno-override-module" ;; Keep us from emitting a warning that I think is harmless
            (format "-DINIT_TYPES_HT_SLOTS=~a" (init-types-hash-table-slots))
            (format "-DTYPES_HT_LOAD_FACTOR=~a" (types-hash-table-load-factor))
            (format "-DGC_INITIAL_HEAP_SIZE=~a" (* (init-heap-kilobytes) 1024))
            (if (cast-profiler?) "-DCAST_PROFILER" "")
-           ll-path runtime.o-path runtime-entry.c-path)
+           runtime-entry.c-path
+           ll-path
+           "-lm" runtime.o-path
+           boehm-gc.a-path "-pthreads")
 
-    (unless keep-ll-code-file?
+    (unless (or (with-debug-symbols) keep-ll-code-file?)
       (delete-file ll-path))
     
-
-    ;; Link the executable
-    #;
-    (cc/runtime o-path s-path
-                (append-flags (append  (runtime-entry-flags) (c-flags)))
-                #:runtime-entry runtime-entry.c-path)
-    
-    #;
-    (unless keep-s?
-      (delete-file s-path))
     o-path))
 
 

@@ -113,7 +113,7 @@ Description: Facilitates a user-friendly interface for Grift
 (define (custom-feature->common-name common-name cf)
   (string-join
    `(,(string-name-sep-spaces (custom-feature-neg-name cf))
-     v
+     "v"
      ,(string-name-sep-spaces (custom-feature-pos-name cf))
      ,common-name)
    (name-sep)
@@ -125,10 +125,11 @@ Description: Facilitates a user-friendly interface for Grift
       (list '+ (? symbol? pos-name) (and pos-config-alist (list (list (? symbol?) _) ...)))
       (list '- (? symbol? neg-name) (and neg-config-alist (list (list (? symbol?) _) ...))))
      (define (list->pair x) (cons (first x) (second x)))
-     (*custom-feature*
-      (custom-feature
-       (symbol->string neg-name) (map list->pair neg-config-alist)
-       (symbol->string pos-name) (map list->pair pos-config-alist)))]
+     (define cf
+       (custom-feature
+        (symbol->string neg-name) (map list->pair neg-config-alist)
+        (symbol->string pos-name) (map list->pair pos-config-alist)))
+     (*custom-feature* cf)]
     [x (raise-argument-error
         'parameterize-*custom-feature*/string
         "positive and negative configuration: ((+ name ((grift-param value) ...)) (- name ((grift-param value) ...))"
@@ -150,7 +151,7 @@ Description: Facilitates a user-friendly interface for Grift
 
   (command-line
    #:once-each
-   [("--custom-feature")
+   ["--custom-feature"
     config
     "todo"
     (parameterize-*custom-feature*/string config)]

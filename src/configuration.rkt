@@ -108,6 +108,7 @@
 
   ;; Configuring the LLVM Backend
   (define-grift-parameter optimize-tail-calls? #t #:pred boolean?)
+  (define-grift-parameter optimize-ir? #t #:pred boolean?)
   (define-grift-parameter calling-convention 'Fast #:expect '(C Fast))
 
 

@@ -25,7 +25,7 @@
 
 #ifndef SMALL_CONFIG
   /* Build a free list for size 2 (words) cleared objects inside        */
-  /* hblk h.  Set the last link to be ofl.  Return a pointer tpo the    */
+  /* hblk h.  Set the last link to be ofl.  Return a pointer to the     */
   /* first free list entry.                                             */
   STATIC ptr_t GC_build_fl_clear2(struct hblk *h, ptr_t ofl)
   {
@@ -37,7 +37,7 @@
     p[2] = (word)p;
     p[3] = 0;
     p += 4;
-    for (; p < lim; p += 4) {
+    for (; (word)p < (word)lim; p += 4) {
         p[0] = (word)(p-2);
         p[1] = 0;
         p[2] = (word)p;
@@ -57,8 +57,8 @@
     p[2] = 0;
     p[3] = 0;
     p += 4;
-    for (; p < lim; p += 4) {
-        PREFETCH_FOR_WRITE((ptr_t)(p+64));
+    for (; (word)p < (word)lim; p += 4) {
+        GC_PREFETCH_FOR_WRITE((ptr_t)(p + 64));
         p[0] = (word)(p-4);
         p[1] = 0;
         CLEAR_DOUBLE(p+2);
@@ -75,7 +75,7 @@
     p[0] = (word)ofl;
     p[2] = (word)p;
     p += 4;
-    for (; p < lim; p += 4) {
+    for (; (word)p < (word)lim; p += 4) {
         p[0] = (word)(p-2);
         p[2] = (word)p;
     };
@@ -91,8 +91,8 @@
     p[0] = (word)ofl;
     p[4] = (word)p;
     p += 8;
-    for (; p < lim; p += 8) {
-        PREFETCH_FOR_WRITE((ptr_t)(p+64));
+    for (; (word)p < (word)lim; p += 8) {
+        GC_PREFETCH_FOR_WRITE((ptr_t)(p + 64));
         p[0] = (word)(p-4);
         p[4] = (word)p;
     };
@@ -116,10 +116,10 @@ GC_INNER ptr_t GC_build_fl(struct hblk *h, size_t sz, GC_bool clear,
   /* If we were more serious about it, these should go inside   */
   /* the loops.  But write prefetches usually don't seem to     */
   /* matter much.                                               */
-    PREFETCH_FOR_WRITE((ptr_t)h);
-    PREFETCH_FOR_WRITE((ptr_t)h + 128);
-    PREFETCH_FOR_WRITE((ptr_t)h + 256);
-    PREFETCH_FOR_WRITE((ptr_t)h + 378);
+    GC_PREFETCH_FOR_WRITE((ptr_t)h);
+    GC_PREFETCH_FOR_WRITE((ptr_t)h + 128);
+    GC_PREFETCH_FOR_WRITE((ptr_t)h + 256);
+    GC_PREFETCH_FOR_WRITE((ptr_t)h + 378);
 # ifndef SMALL_CONFIG
     /* Handle small objects sizes more efficiently.  For larger objects */
     /* the difference is less significant.                              */
@@ -150,7 +150,7 @@ GC_INNER ptr_t GC_build_fl(struct hblk *h, size_t sz, GC_bool clear,
                             /* Last place for last object to start */
 
   /* make a list of all objects in *h with head as last object */
-    while (p <= last_object) {
+    while ((word)p <= (word)last_object) {
       /* current object's link points to last object */
         obj_link(p) = (ptr_t)prev;
         prev = p;
@@ -187,5 +187,5 @@ GC_INNER void GC_new_hblk(size_t gran, int kind)
   /* Build the free list */
       GC_obj_kinds[kind].ok_freelist[gran] =
         GC_build_fl(h, GRANULES_TO_WORDS(gran), clear,
-                    GC_obj_kinds[kind].ok_freelist[gran]);
+                    (ptr_t)GC_obj_kinds[kind].ok_freelist[gran]);
 }

@@ -1,0 +1,4 @@
+;; If you get some other number here it is likely that the
+;; implementation of integer projection is slightly wrong.
+;; I have made this mistake before ;) -Andre
+(= (ann (ann -32 Dyn) Int) -32)

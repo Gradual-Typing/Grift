@@ -14,13 +14,9 @@
 
 #include "private/gc_priv.h"
 
-#include <stdio.h>
-#include <setjmp.h>
+#if !defined(SN_TARGET_ORBIS) && !defined(SN_TARGET_PSP2)
 
-#if defined(OS2) || defined(CX_UX) || defined(__CC_ARM)
-# define _setjmp(b) setjmp(b)
-# define _longjmp(b,v) longjmp(b,v)
-#endif
+#include <stdio.h>
 
 #ifdef AMIGA
 # ifndef __GNUC__
@@ -30,11 +26,40 @@
 # endif
 #endif
 
-#if defined(__MWERKS__) && !defined(POWERPC)
+#if defined(MACOS) && defined(__MWERKS__)
 
-asm static void PushMacRegisters()
-{
-    sub.w   #4,sp                   // reserve space for one parameter.
+#if defined(POWERPC)
+
+# define NONVOLATILE_GPR_COUNT 19
+  struct ppc_registers {
+        unsigned long gprs[NONVOLATILE_GPR_COUNT];      /* R13-R31 */
+  };
+  typedef struct ppc_registers ppc_registers;
+
+# if defined(CPPCHECK)
+    void getRegisters(ppc_registers* regs);
+# else
+    asm static void getRegisters(register ppc_registers* regs)
+    {
+        stmw    r13,regs->gprs                          /* save R13-R31 */
+        blr
+    }
+# endif
+
+  static void PushMacRegisters(void)
+  {
+        ppc_registers regs;
+        int i;
+        getRegisters(&regs);
+        for (i = 0; i < NONVOLATILE_GPR_COUNT; i++)
+                GC_push_one(regs.gprs[i]);
+  }
+
+#else /* M68K */
+
+  asm static void PushMacRegisters(void)
+  {
+    sub.w   #4,sp                   /* reserve space for one parameter */
     move.l  a2,(sp)
     jsr         GC_push_one
     move.l  a3,(sp)
@@ -42,11 +67,11 @@ asm static void PushMacRegisters()
     move.l  a4,(sp)
     jsr         GC_push_one
 #   if !__option(a6frames)
-        // <pcb> perhaps a6 should be pushed if stack frames are not being used.
+      /* <pcb> perhaps a6 should be pushed if stack frames are not being used */
         move.l  a6,(sp)
         jsr             GC_push_one
 #   endif
-        // skip a5 (globals), a6 (frame pointer), and a7 (stack pointer)
+        /* skip a5 (globals), a6 (frame pointer), and a7 (stack pointer) */
     move.l  d2,(sp)
     jsr         GC_push_one
     move.l  d3,(sp)
@@ -59,11 +84,13 @@ asm static void PushMacRegisters()
     jsr         GC_push_one
     move.l  d7,(sp)
     jsr         GC_push_one
-    add.w   #4,sp                   // fix stack.
+    add.w   #4,sp                   /* fix stack */
     rts
-}
+  }
 
-#endif /* __MWERKS__ */
+#endif /* M68K */
+
+#endif /* MACOS && __MWERKS__ */
 
 # if defined(SPARC) || defined(IA64)
     /* Value returned from register flushing routine; either sp (SPARC) */
@@ -82,7 +109,14 @@ asm static void PushMacRegisters()
 # define HAVE_PUSH_REGS
 #else  /* No asm implementation */
 
-# if defined(M68K) && defined(AMIGA)
+# ifdef STACK_NOT_SCANNED
+    void GC_push_regs(void)
+    {
+      /* empty */
+    }
+#   define HAVE_PUSH_REGS
+
+# elif defined(M68K) && defined(AMIGA)
     /* This function is not static because it could also be             */
     /* erroneously defined in .S file, so this error would be caught    */
     /* by the linker.                                                   */
@@ -128,9 +162,9 @@ asm static void PushMacRegisters()
     }
 #   define HAVE_PUSH_REGS
 
-# elif defined(M68K) && defined(MACOS)
+# elif defined(MACOS)
 
-#   if defined(THINK_C)
+#   if defined(M68K) && defined(THINK_C) && !defined(CPPCHECK)
 #     define PushMacReg(reg) \
               move.l  reg,(sp) \
               jsr             GC_push_one
@@ -174,7 +208,12 @@ asm static void PushMacRegisters()
 #if !defined(HAVE_PUSH_REGS) && defined(UNIX_LIKE)
 # include <signal.h>
 # ifndef NO_GETCONTEXT
-#   include <ucontext.h>
+#   if defined(DARWIN) \
+       && (MAC_OS_X_VERSION_MAX_ALLOWED >= 1060 /*MAC_OS_X_VERSION_10_6*/)
+#     include <sys/ucontext.h>
+#   else
+#     include <ucontext.h>
+#   endif /* !DARWIN */
 #   ifdef GETCONTEXT_FPU_EXCMASK_BUG
 #     include <fenv.h>
 #   endif
@@ -184,18 +223,21 @@ asm static void PushMacRegisters()
 /* Ensure that either registers are pushed, or callee-save registers    */
 /* are somewhere on the stack, and then call fn(arg, ctxt).             */
 /* ctxt is either a pointer to a ucontext_t we generated, or NULL.      */
+GC_ATTR_NO_SANITIZE_ADDR
 GC_INNER void GC_with_callee_saves_pushed(void (*fn)(ptr_t, void *),
-                                          ptr_t arg)
+                                          volatile ptr_t arg)
 {
-    volatile int dummy;
-    void * context = 0;
+  volatile int dummy;
+  volatile ptr_t context = 0;
 
-#   if defined(HAVE_PUSH_REGS)
-      GC_push_regs();
-#   elif defined(UNIX_LIKE) && !defined(NO_GETCONTEXT)
-      /* Older versions of Darwin seem to lack getcontext(). */
-      /* ARM and MIPS Linux often doesn't support a real     */
-      /* getcontext().                                       */
+# if defined(HAVE_PUSH_REGS)
+    GC_push_regs();
+# else
+#   if defined(UNIX_LIKE) && !defined(NO_GETCONTEXT)
+      /* Older versions of Darwin seem to lack getcontext().    */
+      /* ARM and MIPS Linux often doesn't support a real        */
+      /* getcontext().                                          */
+      static signed char getcontext_works = 0; /* (-1) - broken, 1 - works */
       ucontext_t ctxt;
 #     ifdef GETCONTEXT_FPU_EXCMASK_BUG
         /* Workaround a bug (clearing the FPU exception mask) in        */
@@ -204,13 +246,28 @@ GC_INNER void GC_with_callee_saves_pushed(void (*fn)(ptr_t, void *),
           /* We manipulate FPU control word here just not to force the  */
           /* client application to use -lm linker option.               */
           unsigned short old_fcw;
+
+#         if defined(CPPCHECK)
+            GC_noop1((word)&old_fcw);
+#         endif
           __asm__ __volatile__ ("fstcw %0" : "=m" (*&old_fcw));
 #       else
           int except_mask = fegetexcept();
 #       endif
 #     endif
-      if (getcontext(&ctxt) < 0)
-        ABORT ("getcontext failed: Use another register retrieval method?");
+
+      if (getcontext_works >= 0) {
+        if (getcontext(&ctxt) < 0) {
+          WARN("getcontext failed:"
+               " using another register retrieval method...\n", 0);
+          /* getcontext() is broken, do not try again.          */
+          /* E.g., to workaround a bug in Docker ubuntu_32bit.  */
+        } else {
+          context = (ptr_t)&ctxt;
+        }
+        if (EXPECT(0 == getcontext_works, FALSE))
+          getcontext_works = context != NULL ? 1 : -1;
+      }
 #     ifdef GETCONTEXT_FPU_EXCMASK_BUG
 #       ifdef X86_64
           __asm__ __volatile__ ("fldcw %0" : : "m" (*&old_fcw));
@@ -226,39 +283,37 @@ GC_INNER void GC_with_callee_saves_pushed(void (*fn)(ptr_t, void *),
           if (feenableexcept(except_mask) < 0)
             ABORT("feenableexcept failed");
 #       endif
-#     endif
-      context = &ctxt;
+#     endif /* GETCONTEXT_FPU_EXCMASK_BUG */
 #     if defined(SPARC) || defined(IA64)
         /* On a register window machine, we need to save register       */
         /* contents on the stack for this to work.  This may already be */
         /* subsumed by the getcontext() call.                           */
         GC_save_regs_ret_val = GC_save_regs_in_stack();
-#     endif /* register windows. */
-#   elif defined(HAVE_BUILTIN_UNWIND_INIT) \
-         && !(defined(POWERPC) && defined(DARWIN)) \
-         && !(defined(I386) && defined(RTEMS))
-      /* This was suggested by Richard Henderson as the way to  */
-      /* force callee-save registers and register windows onto  */
-      /* the stack.                                             */
-      /* Mark Sibly points out that this doesn't seem to work   */
-      /* on MacOS 10.3.9/PowerPC.                               */
-      __builtin_unwind_init();
-#   else /* !HAVE_BUILTIN_UNWIND_INIT && !UNIX_LIKE  */
-         /* && !HAVE_PUSH_REGS                       */
+#     endif
+      if (NULL == context) /* getcontext failed */
+#   endif /* !NO_GETCONTEXT */
+    {
+#     if defined(HAVE_BUILTIN_UNWIND_INIT)
+        /* This was suggested by Richard Henderson as the way to        */
+        /* force callee-save registers and register windows onto        */
+        /* the stack.                                                   */
+        __builtin_unwind_init();
+#     else
         /* Generic code                          */
         /* The idea is due to Parag Patel at HP. */
         /* We're not sure whether he would like  */
         /* to be acknowledged for it or not.     */
         jmp_buf regs;
-        register word * i = (word *) regs;
-        register ptr_t lim = (ptr_t)(regs) + (sizeof regs);
+        word * i = (word *)&regs;
+        ptr_t lim = (ptr_t)(&regs) + sizeof(regs);
 
         /* Setjmp doesn't always clear all of the buffer.               */
         /* That tends to preserve garbage.  Clear it.                   */
-        for (; (char *)i < lim; i++) {
+        for (; (word)i < (word)lim; i++) {
             *i = 0;
         }
 #       if defined(MSWIN32) || defined(MSWINCE) || defined(UTS4) \
+           || defined(OS2) || defined(CX_UX) || defined(__CC_ARM) \
            || defined(LINUX) || defined(EWS4800) || defined(RTEMS)
           (void) setjmp(regs);
 #       else
@@ -267,23 +322,16 @@ GC_INNER void GC_with_callee_saves_pushed(void (*fn)(ptr_t, void *),
           /* SUSV3, setjmp() may or may not save signal mask.   */
           /* _setjmp won't, but is less portable.               */
 #       endif
-#   endif /* !HAVE_PUSH_REGS ... */
-    /* FIXME: context here is sometimes just zero.  At the moment the   */
-    /* callees don't really need it.                                    */
-    fn(arg, context);
-    /* Strongly discourage the compiler from treating the above */
-    /* as a tail-call, since that would pop the register        */
-    /* contents before we get a chance to look at them.         */
-    GC_noop1((word)(&dummy));
+#     endif /* !HAVE_BUILTIN_UNWIND_INIT */
+    }
+# endif /* !HAVE_PUSH_REGS */
+  /* TODO: context here is sometimes just zero.  At the moment, the     */
+  /* callees don't really need it.                                      */
+  fn(arg, (/* no volatile */ void *)context);
+  /* Strongly discourage the compiler from treating the above   */
+  /* as a tail-call, since that would pop the register          */
+  /* contents before we get a chance to look at them.           */
+  GC_noop1(COVERT_DATAFLOW(&dummy));
 }
 
-#if defined(ASM_CLEAR_CODE)
-# ifdef LINT
-    /*ARGSUSED*/
-    ptr_t GC_clear_stack_inner(ptr_t arg, word limit)
-    {
-      return(arg);
-    }
-    /* The real version is in a .S file */
-# endif
-#endif /* ASM_CLEAR_CODE */
+#endif /* !SN_TARGET_ORBIS && !SN_TARGET_PSP2 */
