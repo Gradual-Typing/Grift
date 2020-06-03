@@ -54,7 +54,7 @@ documentation here.
 Variables, X   ::= X
 Formals, F     ::= X | [X : Type]
 TopLevel, TE   ::= (define X E) | (define (X F ...) [: T] E ...) | E | TE ...
-Expression, E  ::=
+Expression, E  ::= X
 Ascription     |   (ann E T [Blame Label])
 Binding        |   (let ((X [: T] E) ...) [: T] E ...)
                |   (letrec ((X [: T] E) ...) E ...)
