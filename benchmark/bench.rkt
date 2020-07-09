@@ -63,12 +63,12 @@
     (apply guarded-compile (cons f (cons i (hash-ref configs (abs i)))))))
 
 (define (place-main id my-chan cp? cflags dyn-ops?)
-  (printf "~a: init\n" id)
+  (printf "grift-compile-place ~a: init\n" id)
   (define send-ready (lambda a (error 'unitialized)))
   (define compile    (lambda a (error 'unitialized)))
   (match (place-channel-get my-chan)
     [`(setup ,ready-chan ,my-chan-in ,cs)
-     (printf "~a: setup\n" cs)
+     (printf "grift-compile-place ~a: setup configs=~a\n" id cs)
      (set! send-ready (lambda () (place-channel-put ready-chan `(ready ,my-chan-in))))
      (set! compile (lambda (fs) (parameterize ([cast-profiler? cp?]
                                                [c-flags cflags]
@@ -79,7 +79,7 @@
   (let loop ()
     (match (place-channel-get my-chan)
       [`(compile-files ,fs)
-       (printf "~a: compile files ~a\n" id fs)
+       (printf "grift-compile-place ~a: compile files ~a\n" id fs)
        (compile fs)
        (send-ready)
        (loop)]
@@ -145,7 +145,7 @@
     (dynamic-operations? #f)]
    [("--configs" "-s") cs
     "Compile a path with multiple configurations"
-    (match (regexp-match* #px"(\\d+)" cs)
+    (match (regexp-match* #px"(-?\\d+)" cs)
       [(list ds ...)
        (config-indices (map string->number ds))]
       [other
