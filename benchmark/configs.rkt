@@ -143,6 +143,27 @@ Description: Facilitates a user-friendly interface for Grift
     [else (list->name (hash-ref configs c) sep end)]))
 
 
+(define (common-name . rest)
+  (define (s->n x)
+    (cond
+      [(exact-integer? x) x]
+      [(and (string? x) (string->number x)) => values]
+      [else (raise-argument-error
+             'common-name
+             "expected exact integer string or numbers"
+             x)]))
+  (define ns (map s->n rest))
+  (define cs (map (lambda (n) (hash-ref configs (abs n))) ns))
+  (define ss (map list->set cs))
+  (define common (apply set-intersect ss))
+  (define name (set->name common))
+  (cond
+    [(*custom-feature*)
+     =>
+     (λ (x) (display (custom-feature->common-name name x)))]
+    [else (display name)]))
+
+
 (module+ main
   (define (default-main)
     (void))
@@ -184,7 +205,7 @@ Description: Facilitates a user-friendly interface for Grift
        ;; The singleton case does not work in the general case because
        ;; subtracting the set representing the configuration from itself yields
        ;; the empty set.
-       [(x) (display (list->name (hash-ref configs (string->number x)) "_"))]
+       [(x) (config->name (string->number x) "_")]
        [rest
         (define ns (map string->number rest))
         (define names
@@ -204,59 +225,53 @@ Description: Facilitates a user-friendly interface for Grift
         (display (string-join names ","))]))]
    [("--common")
     "Generate shared features of a set of configurations"
-    (main-fn 
-     (lambda rest
-       (define ns (map string->number rest))
-       (define cs (map (lambda (n) (hash-ref configs (abs n))) ns))
-       (define ss (map list->set cs))
-       (define common (apply set-intersect ss))
-       (define name (set->name common))
-       (cond
-         [(*custom-feature*)
-          =>
-          (λ (x) (display (custom-feature->common-name name x)))]
-         [else (display name)])))]
+    (main-fn common-name)]
    [("--indices" "-i")
     "Generate configuration indices"
     (display
      (string-join
       (map number->string
            (range 1 (+ 1 (hash-count configs)))) " "))]
-   [("--compare" "-c") c1 c2
-                       "compare and contrast two configurations"
-                       (define n1 (string->number c1))
-                       (define n2 (string->number c2))
-                       (cond
-                         [(and n1 n2)
-                          (define cs configs)
-                          (define s1 (list->set (hash-ref cs n1)))
-                          (define s2 (list->set (hash-ref cs n2)))
-                          (define (f s1 s2)
-                            (define s (set-subtract s1 s2))
-                            (cond
-                              [(= (set-count s) 1) (symbol->string (set-first s))]
-                              [(and (set-member? s '|Type-Based Casts|) (set-member? s 'Strict))
-                               "Strict Type-Based Casts"]
-                              [(and (set-member? s 'Coercions) (set-member? s 'Lazy))
-                               "Lazy Coercions"]
-                              [else
-                               (string-join (map symbol->string (set->list s)) " ")]))
-                          (define-values (c1 c2)
-                            (let ([c1 (f s1 s2)] [c2 (f s2 s1)])
-                              (cond
-                                [(and (equal? "Eager Type-Based Casts" c1)
-                                      (equal? "Lazy Coercions" c2))
-                                 (values "Type-Based Casts" "Coercions")]
-                                [(and (equal? "Eager Type-Based Casts" c2)
-                                      (equal? "Lazy Coercions" c1))
-                                 (values "Coercions" "Type-Based Casts")]
-                                [else (values c1 c2)])))
-                          (define intersection
-                            (string-join
-                             (map symbol->string
-                                  (set->list (set-intersect s1 s2))) "_")) 
-                          (printf "~a,~a,~a" c1 c2 intersection)]
-                         [else
-                          (error 'config_str: "could not parse ~a and ~a as numbers" c1 c2)])]
+   [("--compare" "-c")
+    c1 c2
+    "compare and contrast two configurations"
+    (define n1 (string->number c1))
+    (define n2 (string->number c2))
+    (cond
+      [(and n1 n2)
+       (cond
+         [(*custom-feature*)
+          (printf "~a,~a,~a" (config->name n1) (config->name n2) (common-name n1 n2))]
+         [else
+          (define cs configs)
+          (define s1 (list->set (hash-ref cs n1)))
+          (define s2 (list->set (hash-ref cs n2)))
+          (define (f s1 s2)
+            (define s (set-subtract s1 s2))
+            (cond
+              [(= (set-count s) 1) (symbol->string (set-first s))]
+              [(and (set-member? s '|Type-Based Casts|) (set-member? s 'Strict))
+               "Strict Type-Based Casts"]
+              [(and (set-member? s 'Coercions) (set-member? s 'Lazy))
+               "Lazy Coercions"]
+              [else
+               (string-join (map symbol->string (set->list s)) " ")]))
+          (define-values (c1 c2)
+            (let ([c1 (f s1 s2)] [c2 (f s2 s1)])
+              (cond
+                [(and (equal? "Eager Type-Based Casts" c1)
+                      (equal? "Lazy Coercions" c2))
+                 (values "Type-Based Casts" "Coercions")]
+                [(and (equal? "Eager Type-Based Casts" c2)
+                      (equal? "Lazy Coercions" c1))
+                 (values "Coercions" "Type-Based Casts")]
+                [else (values c1 c2)])))
+          (define intersection
+            (string-join
+             (map symbol->string
+                  (set->list (set-intersect s1 s2))) "_")) 
+          (printf "~a,~a,~a" c1 c2 intersection)])]
+      [else
+       (error 'config_str: "could not parse ~a and ~a as numbers" c1 c2)])]
    #:args all
    (apply (main-fn) all)))
