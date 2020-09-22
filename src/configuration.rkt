@@ -83,7 +83,7 @@
   (define-grift-parameter optimize-first-order-coercions? #t #:pred boolean?)
   (define-grift-parameter coercions-are-space-efficient? #t #:pred boolean?)
   (define-grift-parameter hybrid-cast/coercion-runtime? #f #:pred boolean?)
-  (define-grift-parameter enable-tail-coercion-composition? #t #:pred boolean?)
+  (define-grift-parameter enable-tail-coercion-composition? #f #:pred boolean?)
   (define-grift-parameter cast-profiler? #f #:pred boolean?)
 
   
@@ -135,6 +135,10 @@
 (provide symbol->grift-parameter)
 (define (symbol->grift-parameter x) 
   (hash-ref grift-parameter-map x))
+
+(provide for-each-grift-parameter)
+(define (for-each-grift-parameter p)
+  (hash-for-each grift-parameter-map p #t))
 
 (provide call-with-grift-parameterization)
 (define (call-with-grift-parameterization params th)

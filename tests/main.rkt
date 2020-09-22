@@ -222,10 +222,16 @@
  [("--llvm")
   "Use the llvm backend"
   (backend 'LLVM)]
- #:once-each
+ #:once-any
  [("--specialize-casts")
   "specialize casts with known types"
   (test-specialize-cast-code-generation (list #t))]
+ [("--tail-cast-optimization")
+  "enable tail-coercion optimization"
+  (test-specialize-cast-code-generation (list #f))
+  (test-cast-representation `(Coercions))
+  (enable-tail-coercion-composition? #t)]
+ #:once-each
  [("--without-contracts" "-C")
   "Speed up tests by not checking compiler invariants"
   (with-contracts #f)]

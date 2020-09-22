@@ -21,7 +21,7 @@
   ;; cf. interpret-casts/coercions
   (define (apply-coercion [v : CoC3-Expr]
                           [c : CoC3-Expr]
-                          [top-level? : CoC3-Expr (Quote #f)])
+                          [top-level? : CoC3-Expr (Quote #t)])
     : CoC3-Expr
     (apply-code apply-coercion-uid v c top-level?))
 
@@ -115,7 +115,7 @@
                (trans-exp e2 cont))]
       [(Begin e* e1)
        (Begin (map (lambda (e) (trans-exp e ID-EXPR)) e*)
-                     (trans-exp e1 cont))]
+              (trans-exp e1 cont))]
       [(Repeat var start end acc ini body)
        (apply-coercion-opt
         (Repeat var
@@ -155,7 +155,10 @@
            cont)]
          [_ (error "e0 is not Code-Label" (pretty-format exp))]
          )]
-
+      [(Dyn-Immediate-Value v)
+       (apply-coercion-opt
+        (Dyn-Immediate-Value (trans-exp v ID-EXPR))
+        cont)]
       [(Dyn-Immediate-Tag=Huh v type)
        (apply-coercion-opt
         (Dyn-Immediate-Tag=Huh (trans-exp v ID-EXPR) type)
@@ -169,6 +172,13 @@
         (Dyn-Box-Type (trans-exp v ID-EXPR))
         cont)]
 
+      ;; Could reify this type into an injection coercion
+      ;; but this pass is going to be moved.
+      [(Dyn-Object v t)
+       (apply-coercion-opt
+        (Dyn-Object (trans-exp v ID-EXPR) t)
+        cont)]
+      
       [(Type-Mu-Huh v)
        (apply-coercion-opt
         (Type-Mu-Huh (trans-exp v ID-EXPR))
@@ -308,21 +318,9 @@
        (apply-coercion-opt
         (Guarded-Proxy-Coercion (trans-exp v ID-EXPR))
         cont)]
-
-      [(Type v)
-       (Type v)]
-
-      [(Quote-Coercion c)
-       (Quote-Coercion c)]
-      [(Sequence-Coercion e1 e2)
-       (Sequence-Coercion e1 e2)]
-      [(Project-Coercion e1 e2)
-       (Project-Coercion e1 e2)]
-
-      ;; forms whose translations are unimplemented:
-      ;; [_ (pretty-print exp)
-      ;;    (error 'todo-no-case)]
-      ))
+      ;; This case handles a bunch of forms that make no sense to
+      ;; traverse because this pass is in the wrong place.
+      [other other]))
 
   ;; Translate toplevel expressions with identity continuation coercion:
   (lambda (exp) (trans-exp exp ID-EXPR)))

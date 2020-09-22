@@ -414,7 +414,8 @@ TODO write unit tests
       (next-uid! "arg_coercion")))
   ;; TODO remove this sanity check once we know the code works
   (unless (= (length arg*) arity)
-    (error 'interp-casts-with-hc/build-caster/sanity-check))
+    (error 'sanity-check "argument list / arity mismatch: (length ~a) != ~a"
+           arg* arity))
   (define ret  (next-uid! "ret_coercion"))
   (define old-crcn (next-uid! "old_fn_coercion"))
   (define r-clos (next-uid! "raw_closure"))

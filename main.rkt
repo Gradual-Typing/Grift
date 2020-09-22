@@ -223,19 +223,26 @@
     (make-runtime-with-param "profile" profile_runtime.o-path)
     (runtime-path profile_runtime.o-path)]
    #:once-any
-   ["--crcps" "Enable coercion-passing style translation"
+   ["--crcps"
+    "Enable coercion-passing style translation"
+    (cast-representation 'Coercions)
+    (specialize-cast-code-generation? #f)
     (enable-tail-coercion-composition? #t)]
    ["--no-crcps" "Disable coercion-passing style translation"
     (enable-tail-coercion-composition? #f)]
    #:args args
+   (when display-grift-configuration?
+     (for-each-grift-parameter
+      (lambda (k v)
+        (printf "~a = ~a\n" k (v)))))   
    (match args
      [(list)
       (cond
-       [(not (grift-did-something?))
-        (error 'grift "no input given")])]
+        [(not (grift-did-something?))
+         (error 'grift "no input given")])]
      [(list (app string->path (and (not #f) path)))
       (cond
-       [(recursive-parameter) (compile-directory path)]
-       [else (compile path)])]
+        [(recursive-parameter) (compile-directory path)]
+        [else (compile path)])]
      [else (error 'grift "invalid arguments ~a" args)])
-     (void)))
+   (void)))
