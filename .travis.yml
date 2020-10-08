@@ -17,7 +17,7 @@ before_install:
 - sudo ./llvm.sh 9
 - export LLVM_CONFIG=llvm-config-9
 install:
-- raco pkg install
+- make install
 script:
 - make test
 after_script: 
