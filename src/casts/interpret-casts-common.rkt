@@ -481,10 +481,9 @@ TODO write unit tests
         (cond
           [uid? uid?]
           [else
-           (define-values (uid code)
-             (build-caster! (if (enable-tail-coercion-composition?) (- arity 1) arity)))
+           (define-values (uid code) (build-caster! arity))
            (add-cast-runtime-binding! uid code)
-           (hash-set! fn-cast-uid-map arity uid)  ;; Should be decremented, too?
+           (hash-set! fn-cast-uid-map arity uid)
            uid])))
     get-fn-cast!)
 
@@ -1399,7 +1398,8 @@ TODO write unit tests
   (: compile-cast Compile-Cast-Type)
   (define (compile-cast v t1 t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts]
                         #:t1-not-dyn [t1-not-dyn : Boolean #f]
-                        #:t2-not-dyn [t2-not-dyn : Boolean #f]) 
+                        #:t2-not-dyn [t2-not-dyn : Boolean #f])
+    (debug 'compile-cast v t1 t2)
     (match* (t1 t2)
       [(t t) v]
       [((Type (Dyn)) (Type _))
@@ -1457,13 +1457,16 @@ TODO write unit tests
   (define (code-gen-full-project v t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     (: help Project-Type)
     (define (help v t2 l suspend-monotonic-heap-casts?)
-      (precondition$ (not$ (Type-Dyn-Huh t2))
-        (let*$ ([u  (Dyn-Value v)]
-                [t1 (Dyn-Type v)]) 
-          (compile-med-cast u t1 t2 l suspend-monotonic-heap-casts?))))
-    (match t2
-      [(Type _) (help v t2 l suspend-monotonic-heap-casts?)]
-      [_ (let$ ([t2 t2]) (help v t2 l suspend-monotonic-heap-casts?))]))
+      (precondition$
+       (not$ (Type-Dyn-Huh t2))
+       (let$
+        ([u  (Dyn-Value v)]
+         [t1 (Dyn-Type v)]) 
+        (compile-med-cast u t1 t2 l suspend-monotonic-heap-casts?))))
+    (bind-value$
+     ([t2 t2])
+     (help v t2 l suspend-monotonic-heap-casts?)))
+
   
   (define project-code
     (code$ (e t l suspend-monotonic-heap-casts?)
@@ -1489,8 +1492,9 @@ TODO write unit tests
   ;; TODO let med-cast take care of the eq check
   (: compile-project Project-Type)
   (define (compile-project e t2 l [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
-    (let*$ ([v e] [l l])
-      (cast-profile/inc-projects-casts$
+    (bind-value$
+     ([v e] [t2 t2] [l l] [suspend-monotonic-heap-casts? suspend-monotonic-heap-casts?])
+     (cast-profile/inc-projects-casts$
        (match t2
          [(Type (Dyn))
           (error 'grift/make-code-gen-project "Called with t2 = Dyn")]
@@ -1500,10 +1504,13 @@ TODO write unit tests
               (interp-project v t2 l suspend-monotonic-heap-casts?))]
          [(Type _) 
           (If (Dyn-Immediate-Tag=Huh v t2)
-              (let*$ ([u  (Dyn-Box-Value v)]
-                      [t1 (Dyn-Box-Type v)])
-                (compile-med-cast u t1 t2 l suspend-monotonic-heap-casts?))
-              (interp-project v t2 l suspend-monotonic-heap-casts?))]
+              (let$
+               ([u  (Dyn-Box-Value v)]
+                [t1 (Dyn-Box-Type v)])
+               (compile-med-cast
+                u t1 t2 l suspend-monotonic-heap-casts?))
+              (interp-project
+               v t2 l suspend-monotonic-heap-casts?))]
          [_
           (if (project-inline-without-types?)
               (code-gen-full-project v t2 l suspend-monotonic-heap-casts?)
@@ -1574,33 +1581,45 @@ TODO write unit tests
 
   (define dfc? (direct-fn-cast-optimization?))
   (: compile-fn-cast Fn-Cast-Type)
-  (define (compile-fn-cast v t1 t2 l)
-    (let$ ([v v] [c (make-fn-coercion t1 t2 l)])
-      (cond$
-       ;; TODO: can this be more specialized to the implementation
-       ;; TODO: mk-fn-crcn is being implemented by make-coercion
-       [(Id-Coercion-Huh c) v]
-       [else
-        (match* (t1 t2)
-          [((Type (Fn n _ _)) _) #:when dfc?
-           (apply-code (get-fn-cast! n) v c)]
-          [(_ (Type (Fn n _ _))) #:when dfc?
-           (apply-code (get-fn-cast! n) v c)]
-          [(_ _)
-           ;; TODO!!! consider
-           ;; (App-Code (Fn-Caster v) (list v m))
-           ;; Benifit: no double-memory indirect
-           ;;          cast code can be specific
-           ;;          two branches eliminated
-           ;; Cost   : Proxies must have a caster slot
-           ;; (App-Code (Global-Cast-Table-Ref (Fn-Coercion-arity m))
-           ;;           (list v m))
-           ;; Benifit: Functions no longer have cast code cell
-           ;; Neg    : Another double memory indirect
-           ;;        : Another branch on the otherside cast code
-           (If (Fn-Proxy-Huh v)
-               (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
-               (App-Code (Fn-Caster v) (list v c)))])])))
+  (define (compile-fn-cast e t1 t2 l)
+    (bind-value$
+     ([v e] [t1 t1] [t2 t2] [l l] [c (make-fn-coercion t1 t2 l)])
+     (begin
+       (define (codegen-dynamic-dispatch v)
+         ;; TODO!!! consider
+         ;; (App-Code (Fn-Caster v) (list v m))
+         ;; Benifit: no double-memory indirect
+         ;;          cast code can be specific
+         ;;          two branches eliminated
+         ;; Cost   : Proxies must have a caster slot
+         ;; (App-Code (Global-Cast-Table-Ref (Fn-Coercion-arity m))
+         ;;           (list v m))
+         ;; Benifit: Functions no longer have cast code cell
+         ;; Neg    : Another double memory indirect
+         ;;        : Another branch on the otherside cast code
+         (If (Fn-Proxy-Huh v)
+             (App-Code (Fn-Caster (Fn-Proxy-Closure v)) (list v c))
+             (App-Code (Fn-Caster v) (list v c))))
+       (match c
+         [(Quote-Coercion (Identity)) v]
+         [(Quote-Coercion (Fn n _ _))
+          #:when dfc?
+          (apply-code (get-fn-cast! n) v c)]
+         [(Quote-Coercion (Fn _ _ _))
+          ;; No need for id check you would get in the next case
+          (codegen-dynamic-dispatch v)]       
+         [c ;; Non-coercion-literal
+          (cond$
+           [(Id-Coercion-Huh c) v]
+           [else
+            (match* (t1 t2)
+              [((Type (Fn n _ _)) _)
+               #:when dfc?
+               (apply-code (get-fn-cast! n) v c)]
+              [(_ (Type (Fn n _ _)))
+               #:when dfc?
+               (apply-code (get-fn-cast! n) v c)]
+              [(_ _) (codegen-dynamic-dispatch v)])])]))))
   compile-fn-cast)
 
 (: make-compile-fn-cast
@@ -1723,76 +1742,39 @@ TODO write unit tests
          Proxied-Symbol)
         Proxied-Cast-Type))
 (define (make-compile-cast-proxied/coercions
-          #:make-coercion make-coercion
-          #:compose-coercions compose-coercions
-          #:id-coercion? id-coercion?
-          proxy-kind)
-
+         #:make-coercion make-coercion
+         #:compose-coercions compose-coercions
+         #:id-coercion? id-coercion?
+         #:apply-proxied-ref-coercion
+         [apply-ref-coercion
+          (make-compile-apply-proxied-coercion
+           #:compose-coercions compose-coercions
+           #:id-coercion? id-coercion?)]
+         proxy-kind)
+  
   (: code-gen-cast-proxied Proxied-Cast-Type)
   (define (code-gen-cast-proxied e t1 t2 l)
-    (debug off t1 t2)
-    (define ret
     (bind-value$
      ;; Let literals through while let binding expressions
-     ([v e] [t1 t1] [t2 t2] [l l])
-   ;; There is a small amount of specialization here because
-   ;; we know precisely which case of inter-compose-med will
-   ;; match...
-   ;; TODO add an option to hoist this to a runtime procedure
-   ;; TODO simplify this code
-   (begin
-     (define (aux [m : CoC3-Expr] [m-read : CoC3-Expr] [m-write : CoC3-Expr])
-       : CoC3-Expr
-       (cond$
-        [(Guarded-Proxy-Huh v)
-         (precondition$ (Ref-Coercion-Huh (Guarded-Proxy-Coercion v))
-           (let*$ ([old-v (Guarded-Proxy-Ref v)]
-                   [old-m (Guarded-Proxy-Coercion v)]
-                   [o-write (Ref-Coercion-Write old-m)] 
-                   [r-write (compose-coercions m-write o-write)]
-                   [o-read (Ref-Coercion-Read old-m)]
-                   [r-read (compose-coercions o-read m-read)])
-             (cond$
-              [(and$ (id-coercion? r-read) (id-coercion? r-write))
-               old-v]
-              [else
-               (Guarded-Proxy
-                old-v
-                (Coercion (Ref-Coercion
-                           r-read
-                           r-write
-                           (Ref-Coercion-Ref-Huh old-m))))])))]
-        [else (Guarded-Proxy v (Coercion m))]))
-     (define c1 (make-coercion t1 t2 l #:top-level? #f))
-     (define c2 (make-coercion t2 t1 l #:top-level? #f))
-     (define flag (case proxy-kind
-                    [(GRef)  COERCION-REF-REF-FLAG]
-                    [(GVect) COERCION-REF-VEC-FLAG]))
-     (debug off c1 c2)
-     (match* (c1 c2)
-       [((and m-read (Quote-Coercion readc))
-         (and m-write (Quote-Coercion writec)))
-        ;; This is the optimal case because m should be statically allocated
-        (aux (Quote-Coercion (Ref readc writec proxy-kind)) m-read m-write)]
-       [(readc writec)
-        (let$ ([m-read  readc]
-               [m-write writec])
-          (aux (Ref-Coercion m-read m-write flag) m-read m-write))]))))
-    (debug off t1 t2 ret)
-    ret)
-  ;; TODO add switch to allow this to be close coded
-  (cond
-    [#t code-gen-cast-proxied]
-    [else
-     (define uid (next-uid! "cast-proxied/coercion"))
-     (add-cast-runtime-binding!
-      uid
-      (code$ (v t1 t2 l)
-        (code-gen-cast-proxied v t1 t2 l)))
-     (: build-call Proxied-Cast-Type)
-     (define (build-call v t1 t2)
-       (apply-code uid v t1 t2))
-     build-call]))
+     ([t1 t1] [t2 t2] [l l])
+     (begin
+       (define r (make-coercion t1 t2 l #:top-level? #f))
+       (define w (make-coercion t2 t1 l #:top-level? #f))
+       (apply-ref-coercion
+        e
+        (match* (r w)
+          [((Quote-Coercion r) (Quote-Coercion w))
+           (Quote-Coercion (Ref r w proxy-kind))]
+          [(r w)
+           (Ref-Coercion
+            r w
+            (case proxy-kind
+              [(GRef)  COERCION-REF-REF-FLAG]
+              [(GVect) COERCION-REF-VEC-FLAG]))])))))
+
+  ;; This is only really abstracted because it should eventually
+  ;; offer the option of close-coding this code generation.
+  code-gen-cast-proxied)
 
 (: make-compile-apply-pref-coercion
    (->* (#:compose-coercions Compose-Coercions-Type
@@ -1824,37 +1806,46 @@ TODO write unit tests
    (->* (#:compose-coercions Compose-Coercions-Type
          #:id-coercion? Id-Coercion-Huh-Type)
         Coerce-Proxied-Type))
-(define ((make-compile-apply-proxied-coercion
+(define (make-compile-apply-proxied-coercion
           #:compose-coercions compose-coercions
           #:id-coercion? id-coercion-huh)
-         e m)
-  (let*$ ([v e] [m m])
-    ;; There is a small amount of specialization here because
-    ;; we know precisely which case of inter-compose-med will
-    ;; match...
-    (cond$
-     [(Guarded-Proxy-Huh v)
-      (precondition$
-          (Ref-Coercion-Huh (Guarded-Proxy-Coercion v))
-        (let*$ ([old-v  (Guarded-Proxy-Ref v)]
-                [old-m  (Guarded-Proxy-Coercion v)]
-                [o-write (Ref-Coercion-Write old-m)]
-                [m-write (Ref-Coercion-Write m)]
-                [r-write (compose-coercions m-write o-write)]
-                [o-read  (Ref-Coercion-Read old-m)]
-                [m-read  (Ref-Coercion-Read m)]
-                [r-read  (compose-coercions o-read m-read)])
-          (cond$
-           [(and$ (id-coercion-huh r-read) (id-coercion-huh r-write))
-            old-v]
-           [else
-            (Guarded-Proxy
-             old-v
-             (Coercion (Ref-Coercion
-                        r-read
-                        r-write
-                        (Ref-Coercion-Ref-Huh m))))])))]
-     [else (Guarded-Proxy v (Coercion m))])))
+  (define (aux e m m-read m-write)
+    : CoC3-Expr
+    (bind-value$
+     ([v e])
+     (cond$
+      [(Guarded-Proxy-Huh v)
+       (precondition$
+        (Ref-Coercion-Huh (Guarded-Proxy-Coercion v))
+        (let*$
+         ([old-v (Guarded-Proxy-Ref v)]
+          [old-m (Guarded-Proxy-Coercion v)]
+          [o-write (Ref-Coercion-Write old-m)] 
+          [r-write (compose-coercions m-write o-write)]
+          [o-read (Ref-Coercion-Read old-m)]
+          [r-read (compose-coercions o-read m-read)])
+         (cond$
+          [(and$ (id-coercion-huh r-read) (id-coercion-huh r-write))
+           old-v]
+          [else
+           (Guarded-Proxy
+            old-v
+            (Coercion
+             (Ref-Coercion
+              r-read
+              r-write
+              (Ref-Coercion-Ref-Huh old-m))))])))]
+      [else (Guarded-Proxy v (Coercion m))])))
+  (lambda (e m)
+    ;; This amounts to a manual value bind I am not sure it is
+    ;; worth the code. 
+    (match m
+      [(Quote-Coercion (Ref readc writec _))
+       (aux e m (Quote-Coercion readc) (Quote-Coercion writec))]
+      [m
+       (let$
+        ([m m])
+        (aux e m (Ref-Coercion-Read m) (Ref-Coercion-Write m)))])))
 
 (define monotonic-cast-inline-without-types? : (Parameterof Boolean)
   (make-parameter #f))

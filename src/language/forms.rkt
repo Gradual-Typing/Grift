@@ -637,8 +637,8 @@ class literal constants
 ;; (Bottom -> Grift-Type) -> Grift-Type Grift-Type -> Grift-Type
 (define ((down exit) t g)
   (match* (t g)
-    [((and t (Dyn)) _) t]
-    [(_ (and g (Dyn))) g]
+    [((Dyn) _) DYN-TYPE]
+    [(_ (Dyn)) DYN-TYPE]
     [(t t) t]
     [(t g) (exit (Bottom t g))]))
 
@@ -862,6 +862,9 @@ class literal constants
 (define IDENTITY (Identity))
 (define ID-EXPR (Quote-Coercion IDENTITY))
 (define ZERO-EXPR (Quote 0))
+(define ONE-EXPR (Quote 1))
+(define TRUE-EXPR (Quote #t))
+(define FALSE-EXPR (Quote #t))
 
 (define (data-literal? x)
   (or (exact-integer? x)

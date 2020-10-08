@@ -16,7 +16,7 @@ timed:
 	time raco make main.rkt
 
 test: all
-	racket tests/main.rkt --llvm
+	racket tests/main.rkt --llvm -R Coercions
 	raco test .
 
 

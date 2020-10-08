@@ -231,10 +231,11 @@
    ["--no-crcps" "Disable coercion-passing style translation"
     (enable-tail-coercion-composition? #f)]
    #:args args
+   #;
    (when display-grift-configuration?
      (for-each-grift-parameter
       (lambda (k v)
-        (printf "~a = ~a\n" k (v)))))   
+        (printf "~a = ~a\n" k (v)))))
    (match args
      [(list)
       (cond
@@ -243,6 +244,15 @@
      [(list (app string->path (and (not #f) path)))
       (cond
         [(recursive-parameter) (compile-directory path)]
-        [else (compile path)])]
+        [else
+         (when (and (with-debug-symbols)
+                    (not (ir-code-path)))
+           (ir-code-path
+            (path-replace-extension
+             path
+             (case (backend)
+               [(C) ".c"]
+               [(LLVM) ".ll"]))))
+         (compile path)])]
      [else (error 'grift "invalid arguments ~a" args)])
    (void)))

@@ -1,15 +1,17 @@
 #lang racket/base
-(require racket/match
-         racket/function
-         racket/set
-         "forms.rkt"
-         "../helpers-untyped.rkt")
+(require
+ racket/function
+ racket/match
+ racket/set
+ racket/struct
+ "forms.rkt"
+ "../helpers-untyped.rkt")
 
 (provide forms=? form=? check-forms=?)
 
 (define ((flip f) . a) (apply f (reverse a)))
 
-(define (forms=? x y [x-env (hasheq)] [y-env (hasheq)])
+(define (forms=? x y [x-env (hash)] [y-env (hash)])
   (define/match (bnd-lhs x)
     [((Bnd x _ _)) x]
     [((list x _)) x]
@@ -35,6 +37,9 @@
   (define res
     (or (eq? x y)
         (match* (x y)
+          [((Uid s _) (Uid s _)) #t]
+          [((Uid s _) (? symbol? x)) (string=? s (symbol->string x))]
+          [((? symbol? x) (Uid s _)) (string=? s (symbol->string x))]
           [((Var x) (Var y))
            ;; NOTE: two unbound variables are considered form=?
            (eq? (hash-ref x-env x #f) (hash-ref y-env y #f))]
@@ -91,8 +96,14 @@
           [((list xs ...) (list ys ...))
            (and (= (length xs) (length ys))
                 (andmap recur/env xs ys))]
+          [((? form? x) (? form? y))
+           (define-values (x-st _1) (struct-info x))
+           (define-values (y-st _2) (struct-info y))
+           (and
+            (eq? x-st y-st)
+            (andmap recur/env (struct->list x) (struct->list y)))]
           [(x y) (equal? x y)])))
-  (when #f (debug x y res))
+  ;;(debug x y res)
   res)
 
 (define ((form=? x) y)
@@ -113,4 +124,11 @@
   (check-forms=? (Lambda `(x ,(Fml 'y (Int))) (Var 'y))
                  (Lambda `(y ,(Fml 'x (Int))) (Var 'x)))
   (check-forms=? (Switch (Quote 2) `([(1 2 3) (Quote #t)]) (Quote #f))
-                 (Switch (Quote 2) `([(3 2 1) (Quote #t)]) (Quote #f))))
+                 (Switch (Quote 2) `([(3 2 1) (Quote #t)]) (Quote #f)))
+  (check-forms=? (Let `((x . ,(Var 'y))) (Var 'x))
+                 (Let `((,(Uid "" 0) . ,(Var 'y))) (Var (Uid "" 0))))
+
+  (define (example-foo x y)
+    (Let `((,x . (Quote 1))) (Let `((,y . ,(Var x))) (Var y))))
+  (check-forms=? (example-foo (Uid "" 0) (Uid "" 1))
+                 (example-foo 'x 'y)))

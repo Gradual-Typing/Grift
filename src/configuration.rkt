@@ -80,10 +80,15 @@
   ;; main function to give the best performance by default
   ;; and options to enable non-optimized configurations
   (define-grift-parameter specialize-cast-code-generation? #t #:pred boolean?)
-  (define-grift-parameter optimize-first-order-coercions? #t #:pred boolean?)
+  ;; TODO We should consider removing `optimize-first-order-coercions?`
+  ;; it adds unneeded complexity to the coercion runtime and is subsumed
+  ;; by coercion application specialization. 
+  (define-grift-parameter optimize-first-order-coercions? #f #:pred boolean?)
   (define-grift-parameter coercions-are-space-efficient? #t #:pred boolean?)
-  (define-grift-parameter hybrid-cast/coercion-runtime? #f #:pred boolean?)
-  (define-grift-parameter enable-tail-coercion-composition? #f #:pred boolean?)
+  (define-grift-parameter hybrid-cast/coercion-runtime? #t #:pred boolean?)
+  (define-grift-parameter enable-tail-coercion-composition? 'andre #:expect '(#f false tsuda andre))
+  (define-grift-parameter apply-coercions-at-first-tail-cast? #t #:pred boolean?)
+  (define-grift-parameter constant-fold-coercions? #t #:pred boolean?)
   (define-grift-parameter cast-profiler? #f #:pred boolean?)
 
   
@@ -99,7 +104,7 @@
 
 
   ;; Select Backend Code Generator
-  (define-grift-parameter backend 'C #:expect '(LLVM C))
+  (define-grift-parameter backend 'LLVM #:expect '(LLVM C))
 
   ;; Configuring the C Backend
   (define-grift-parameter c-flags

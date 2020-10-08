@@ -147,7 +147,10 @@
                 ;; case: cont is identity coercion
                 (trans-exp e1 c1)
                 ;; otherwise:
-                (trans-exp e1 (compose-coercions/id/fvs c1 cont))))]
+                (let$
+                 ;; Note: removing this let binding will duplicated code
+                 ([kappa (compose-coercions/id/fvs c1 cont)])
+                 (trans-exp e1 kappa))))]
          [(Code-Label (Uid _ _))
           (apply-coercion-opt
            (App-Code e0 (for/list ([v e*])
