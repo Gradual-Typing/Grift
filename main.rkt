@@ -2,7 +2,7 @@
 #lang racket/base
 
 (require "src/compile.rkt"
-         "src/backend-c/runtime-location.rkt"
+         "src/backend/runtime-location.rkt"
 	 racket/cmdline
 	 racket/match
 	 racket/runtime-path
