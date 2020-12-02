@@ -1,0 +1,4 @@
+(begin
+ (timer-start)
+ (timer-stop)
+ (timer-report))

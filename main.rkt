@@ -2,7 +2,7 @@
 #lang racket/base
 
 (require "src/compile.rkt"
-         "src/backend-c/runtime-location.rkt"
+         "src/backend/runtime-location.rkt"
 	 racket/cmdline
 	 racket/match
 	 racket/runtime-path
@@ -54,9 +54,26 @@
       [("Hyper-Coercions")
        (cast-representation 'Hyper-Coercions)]
       [else (error 'grift "unrecognized cast representation: ~a" cast-rep)])]
+   #:once-any
+   [("--llvm")
+    "enable LLVM backend"
+    (backend 'LLVM)]
+   [("--backend")
+    value
+    ((format "switch between C and LLVM backends (~a)" (backend)))
+    (backend
+     (case value
+      [("C" "c") 'C]
+      [("LLVM" "llvm") 'LLVM]))]
    #:once-each
    ["--data-fn-proxies" "enable inefficient function proxy representation"
     (fn-proxy-representation 'Data)]
+   [("--no-optimize-tailcalls")
+    "disable LLVM backends tail call optimization"
+    (optimize-tail-calls? #f)]
+   [("--c-calling-convention")
+    "use C calling convention instead of better options"
+    (calling-convention 'C)]
    [("--check-asserts")
     ((format "Compile code with assertions (~a)" (check-asserts?)))
     (check-asserts? #t)]
@@ -110,9 +127,9 @@
    [("-o") output-str
     "specify output path for executable"
     (output-path (string->path output-str))]
-   [("--keep-c") name
+   [("--keep-ir") name
     "keep the c intermediate representation"
-    (c-path (build-path name))]
+    (ir-code-path (build-path name))]
    [("--keep-s") name
     "keep the assembly representation"
     (s-path (build-path name))]
@@ -165,8 +182,13 @@
    [("-r" "--recursive")
     "recursively compile directory"
     (recursive-parameter #t)]
+   [("--log-filter")
+    filter
+    ("filter debugging logging to specific files"
+     "can be a filename, glob, or regular expression for a relative path") 
+    (grift-logger-filter filter)]
    [("-d" "--debug-logging") debug-file
-    "enable debuging logging to file (1=stdout, 2=stderr)"
+    "enable debugging logging to file (1=stdout, 2=stderr)"
     (begin
       (grift-log-level 'debug)
       (match debug-file
@@ -200,15 +222,37 @@
     (c-flags (cons "-pg" (c-flags)))
     (make-runtime-with-param "profile" profile_runtime.o-path)
     (runtime-path profile_runtime.o-path)]
+   #:once-any
+   ["--crcps"
+    "Enable coercion-passing style translation"
+    (cast-representation 'Coercions)
+    (specialize-cast-code-generation? #f)
+    (enable-tail-coercion-composition? #t)]
+   ["--no-crcps" "Disable coercion-passing style translation"
+    (enable-tail-coercion-composition? #f)]
    #:args args
+   #;
+   (when display-grift-configuration?
+     (for-each-grift-parameter
+      (lambda (k v)
+        (printf "~a = ~a\n" k (v)))))
    (match args
      [(list)
       (cond
-       [(not (grift-did-something?))
-        (error 'grift "no input given")])]
+        [(not (grift-did-something?))
+         (error 'grift "no input given")])]
      [(list (app string->path (and (not #f) path)))
       (cond
-       [(recursive-parameter) (compile-directory path)]
-       [else (compile path)])]
+        [(recursive-parameter) (compile-directory path)]
+        [else
+         (when (and (with-debug-symbols)
+                    (not (ir-code-path)))
+           (ir-code-path
+            (path-replace-extension
+             path
+             (case (backend)
+               [(C) ".c"]
+               [(LLVM) ".ll"]))))
+         (compile path)])]
      [else (error 'grift "invalid arguments ~a" args)])
-     (void)))
+   (void)))

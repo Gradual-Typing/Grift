@@ -138,7 +138,7 @@ Description: Provides helpers for instrumenting the AST with cast profiling code
                             "#include <stdint.h>"
                             "\n\n")
                            "\n")
-              decl* "\n"
+              "extern " decl* "\n"
               "void print_cast_profiler_results();\n"
               "void write_cast_profiler_results_file(char*);\n"
               "#endif")

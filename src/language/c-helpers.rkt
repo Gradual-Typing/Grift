@@ -3,7 +3,7 @@
 (require
  racket/string
  "../configuration.rkt"
- "../backend-c/runtime-location.rkt")
+ "../backend/runtime-location.rkt")
 
 (provide (all-defined-out))
 

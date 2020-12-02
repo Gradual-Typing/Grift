@@ -50,25 +50,33 @@
                  [fn-proxy-representation fun-proxy-rep-param])
     (unless (and (file-exists? exe) (if (cast-profiler?) (file-exists? exe.prof) #t))
       (printf "~a\n" exe)
-      (if (cast-profiler?)
-          (begin
-            (compile src #:output exe.prof #:cast cast #:ref ref)
-            (parameterize ([cast-profiler? #f])
-              (compile src #:output exe #:cast cast #:ref ref)))
-          (compile src #:output exe #:cast cast #:ref ref))))
+      (let doit ()
+        (cond
+          [(*custom-feature*)
+           =>
+           (λ (x)
+             (parameterize ([*custom-feature* #f])
+               (let ([config (if (< i 0)
+                                 (custom-feature-neg-config x)
+                                 (custom-feature-pos-config x))])
+                 (call-with-grift-parameterization config doit))))]
+          [(cast-profiler?)
+           (compile src #:output exe.prof #:cast cast #:ref ref)
+           (parameterize ([cast-profiler? #f]) (doit))]
+          [else (compile src #:output exe #:cast cast #:ref ref)]))))
   exe)
 
 (define (compile-file f cs)
   (for ([i (in-list cs)]) 
-    (apply guarded-compile (cons f (cons i (hash-ref configs i))))))
+    (apply guarded-compile (cons f (cons i (hash-ref configs (abs i)))))))
 
 (define (place-main id my-chan cp? cflags dyn-ops?)
-  (printf "~a: init\n" id)
+  (printf "grift-compile-place ~a: init\n" id)
   (define send-ready (lambda a (error 'unitialized)))
   (define compile    (lambda a (error 'unitialized)))
   (match (place-channel-get my-chan)
     [`(setup ,ready-chan ,my-chan-in ,cs)
-     (printf "~a: setup\n" cs)
+     (printf "grift-compile-place ~a: setup configs=~a\n" id cs)
      (set! send-ready (lambda () (place-channel-put ready-chan `(ready ,my-chan-in))))
      (set! compile (lambda (fs) (parameterize ([cast-profiler? cp?]
                                                [c-flags cflags]
@@ -79,7 +87,7 @@
   (let loop ()
     (match (place-channel-get my-chan)
       [`(compile-files ,fs)
-       (printf "~a: compile files ~a\n" id fs)
+       (printf "grift-compile-place ~a: compile files ~a\n" id fs)
        (compile fs)
        (send-ready)
        (loop)]
@@ -136,15 +144,19 @@
   (c-flags (cons "-O3" (c-flags)))
   (command-line
    #:once-each
+   ["--custom-feature"
+    config
+    "todo"
+    (parameterize-*custom-feature*/string config)]
    ["--no-dyn-operations"
     "disable the specialization of dynamic elimination for functions, references, and tuples"
     (dynamic-operations? #f)]
    [("--keep-c") name
     "keep the c intermediate representation"
-    (c-path (build-path name))]
+    (ir-code-path (build-path name))]
    [("--configs" "-s") cs
     "Compile a path with multiple configurations"
-    (match (regexp-match* #px"(\\d+)" cs)
+    (match (regexp-match* #px"(-?\\d+)" cs)
       [(list ds ...)
        (config-indices (map string->number ds))]
       [other

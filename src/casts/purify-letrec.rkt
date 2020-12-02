@@ -82,7 +82,7 @@
      (and (> depth 0) (simple? e uid* (+ 1 depth) #t))]
     [(App-Fn e e*) 
      (and outer-lambda? (recur e) (recur* e*))]
-    [(App-Fn-or-Proxy u e e*)
+    [(App-Fn-or-Proxy u1 u2 e e*)
      (and outer-lambda? (recur e) (recur* e*))]
     [(App-Code e e*)
      (and outer-lambda? (recur e) (recur* e*))]

@@ -12,6 +12,9 @@
 
 (define FIRST-UID-SUFFIX 0)
 
+(: uid->symbol (-> Uid Symbol))
+(define (uid->symbol u) (string->symbol (uid->string u)))
+
 (: uid->string (-> Uid String))
 (define (uid->string u)
   ;; Rubout all non c identifier characters
@@ -23,10 +26,9 @@
           c
           #\_)))
   (string-append
-   "u"
-   (number->string (Uid-suffix u))
-   "_"
-   (list->string (map help (string->list (Uid-prefix u))))))
+   (list->string (map help (string->list (Uid-prefix u))))
+   "_u"
+   (number->string (Uid-suffix u))))
 
 ;; Are two uid equal?
 (: uid=? (-> Uid Uid Boolean))

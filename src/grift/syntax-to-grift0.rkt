@@ -390,6 +390,14 @@ whatsoever identifiers maintain lexical scope according to symbolic equality.
                            (op 'timer-report)
                            (Var tmp)))))]))
 
+(define (parse-not stx env)
+  (syntax-parse stx
+    [(_ test)
+     (define src (syntax->srcloc stx))
+     (If ((parse-form env) #'test)
+         (Ann (Quote #f) src)
+         (Ann (Quote #t) src))]))
+
 (define (parse-and stx env)
   ;; this should be implemented as a macro once we have an expander
   (syntax-parse stx
@@ -559,7 +567,6 @@ represents types in the grift abstract syntax tree.
      (letrec     . ,(core parse-letrec-expression))
      (lambda     . ,(core parse-lambda-expression))
      (if         . ,(core (parse-simple-form 'if If 3)))
-     (cond       . ,(core parse-cond))
      (begin      . ,(core parse-begin))     
      (tuple      . ,(core (parse-simple*-form 'tuple Create-tuple)))
      (tuple-proj . ,(core parse-tuple-proj))
@@ -668,6 +675,7 @@ represents types in the grift abstract syntax tree.
      (=  . ,core-parse-prim)
      (>  . ,core-parse-prim)
      (>= . ,core-parse-prim)
+     (not . ,(core parse-not))
      (and . ,(core parse-and))
      (or  . ,(core parse-or))
      (cond . ,(core parse-cond))
