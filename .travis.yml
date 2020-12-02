@@ -14,8 +14,8 @@ before_install:
 # Install LLVM
 - wget https://apt.llvm.org/llvm.sh
 - chmod +x llvm.sh
-- sudo ./llvm.sh 9
-- export LLVM_CONFIG=llvm-config-9
+- sudo ./llvm.sh 10
+- export LLVM_CONFIG=llvm-config-10
 install:
 - make install
 script:

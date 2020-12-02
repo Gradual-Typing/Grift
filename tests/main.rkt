@@ -142,15 +142,22 @@
           [(eq? cast-rep 'Static) ""]
           [spec? "Specialized"]
           [else  "Unspecialized"]))
+      (define (display-config)
+        (for-each-grift-parameter
+         (lambda (k v)
+           (printf "~a = ~a\n" k (v)))))
       (match* (cast-rep fn-proxy-rep spec?)
         [('Coercions 'Data _)         
          (printf "~a Coercions w/ Function Proxies running:\n" spec-str)
+         (display-config)
          (run-tests (suite))]
         [('Static 'Hybrid #t)
          (printf "Static Hybrid Specialized running:\n")
+         (display-config)
          (run-tests static-tests)]
         [(_ _ _)
          (printf "~a ~a running:\n" spec-str cast-rep)
+         (display-config)
          (run-tests (suite))]))))
 
 
