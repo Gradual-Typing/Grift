@@ -609,8 +609,8 @@ form, to the shortest branch of the cast tree that is relevant.
          #:mbox-cast mbox-cast
          #:mvec-cast mvec-cast)
 
-  (define (interp-apply-coercion e c [top-level? (Quote #t)])
-    (apply-code apply-coercion-uid e c top-level?))
+  (define (interp-apply-coercion e c [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
+    (apply-code apply-coercion-uid e c suspend-monotonic-heap-casts?))
 
   (add-cast-runtime-binding!
    apply-coercion-uid
@@ -686,7 +686,7 @@ form, to the shortest branch of the cast tree that is relevant.
   ;; compile-apply-coercion
   (cond
     [(specialize-cast-code-generation?)
-     (lambda (e c [suspend-monotonic-heap-casts? (Quote #t)])
+     (lambda (e c [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
        (match c
          [(Quote-Coercion c)
           (let rec ([e e] [c c])
@@ -1784,7 +1784,7 @@ form, to the shortest branch of the cast tree that is relevant.
       [(not (or (Quote-Coercion? crcn) (Var? crcn)))
        (let$
         ([cont-crcn crcn])
-        (app-help e e* (Var cont-crcn) tail-crcn-ref))]
+        (app-help e e* cont-crcn tail-crcn-ref))]
       ;; Know crcn != ID-EXPR and tail-crcn-ref != #f
       ;; that e and e* are all vars
       ;; that crcn is Var? or Quote-Coercion?

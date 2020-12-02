@@ -21,9 +21,9 @@
   ;; cf. interpret-casts/coercions
   (define (apply-coercion [v : CoC3-Expr]
                           [c : CoC3-Expr]
-                          [top-level? : CoC3-Expr (Quote #t)])
+                          [suspend-monotonic-heap-casts? do-not-suspend-monotonic-heap-casts])
     : CoC3-Expr
-    (apply-code apply-coercion-uid v c top-level?))
+    (apply-code apply-coercion-uid v c suspend-monotonic-heap-casts?))
 
   ;; coercion composition
   ;; cf. make-compose-coercions in interpret-casts/coercions

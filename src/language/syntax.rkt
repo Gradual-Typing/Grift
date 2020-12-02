@@ -61,6 +61,42 @@
     [(_ ([i0 e0] [i* e*] ...) b* ... b)
      (let$ ([i0 e0]) (let*$ ([i* e*] ...) b* ... b))]))
 
+
+(define (build-begin . e*)
+  (cond
+    [(null? e*)
+     (error 'let-bind "no expression given for let body")]
+    [(and (pair? e*) (null? (cdr e*)))
+     (car e*)]
+    [else
+     (let-values ([(e* e) (split-at-right e* 1)])
+       (begin e* (car e)))]))
+
+(define (let-bind b* . e*)
+  (define body (apply build-begin e*))
+  (cond
+    [(null? b*) body]
+    [else (Let b* body)]))
+
+(define (bind-value* s* e* f)
+  (define-values (b* v*)
+    (let loop ([s* s*] [e* e*] [b* '()] [v* '()])
+      (match e*
+        ['() (values (reverse b*) (reverse v*))]
+        [(cons e e*)
+         (unless (pair? s*)
+           (error 'bind-value* "variable name list not the same length as expression list"))
+         (unless (string? (car s*))
+           (error 'bind-value* "expected string name list"))
+         (define (rec b* v*) (loop (cdr s*) e* b* v*))
+         (match e
+           [(or (Var _) (Type _) (Quote _) (Quote-Coercion _))
+            (rec b* (cons e v*))]
+           [_
+            (define u (next-uid! (car s*)))
+            (rec (cons (cons u e) b*) (cons (Var u) v*))])])))
+  (let-bind b* (f v*)))
+
 (define-syntax (bind-value$ stx)
   (syntax-case stx ()
     [(_ ([i* e*] ...) b* ... b)

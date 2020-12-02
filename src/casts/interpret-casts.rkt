@@ -101,7 +101,9 @@
 
   (define (ic-old e)
     (parameterize
-        ([specialize-cast-code-generation? #t]
+        ([cast-representation 'Coercions]
+         [hybrid-cast/coercion-runtime? #f]
+         [specialize-cast-code-generation? #t]
          [optimize-first-order-coercions? #t]
          [constant-fold-coercions? #f]
          [apply-coercions-at-first-tail-cast? #f]
@@ -110,14 +112,20 @@
   
   (define (ic-tsuda e)
     (parameterize
-        ([specialize-cast-code-generation? #f]
+        ([cast-representation 'Coercions]
+         [hybrid-cast/coercion-runtime? #f]
+         [specialize-cast-code-generation? #f]
          [optimize-first-order-coercions? #f]
+         [constant-fold-coercions? #f]
+         [apply-coercions-at-first-tail-cast? #f]
          [enable-tail-coercion-composition? 'tsuda])
       (ic e)))
 
   (define (ic-andre-emulate-old e)
     (parameterize
-        ([specialize-cast-code-generation? #t]
+        ([cast-representation 'Coercions]
+         [hybrid-cast/coercion-runtime? #f]
+         [specialize-cast-code-generation? #t]
          [optimize-first-order-coercions? #t]
          [constant-fold-coercions? #f]
          [apply-coercions-at-first-tail-cast? #f]
@@ -131,7 +139,9 @@
   
   (define (ic-andre-emulate-tsuda e)
     (parameterize
-        ([specialize-cast-code-generation? #f]
+        ([cast-representation 'Coercions]
+         [hybrid-cast/coercion-runtime? #f]
+         [specialize-cast-code-generation? #f]
          [optimize-first-order-coercions? #f]
          [constant-fold-coercions? #f]
          [apply-coercions-at-first-tail-cast? #f]
@@ -140,7 +150,9 @@
 
   (define (ic-andre-cf e)
     (parameterize
-        ([specialize-cast-code-generation? #t]
+        ([cast-representation 'Coercions]
+         [hybrid-cast/coercion-runtime? #f]
+         [specialize-cast-code-generation? #t]
          [optimize-first-order-coercions? #f]
          [constant-fold-coercions? #t]
          [apply-coercions-at-first-tail-cast? #f]
@@ -149,9 +161,12 @@
 
   (define (ic-andre e)
     (parameterize
-        ([specialize-cast-code-generation? #t]
+        ([cast-representation 'Coercions]
+         [hybrid-cast/coercion-runtime? #f]
+         [specialize-cast-code-generation? #t]
          ;; optimize-first-order is effectively done
-         ;; with the combination of specialize-cast and entail-tail-coercion... = andre
+         ;; with the combination of specialize-cast and entail-tail-coercion...
+         ;; -andre
          [optimize-first-order-coercions? #f]
          [constant-fold-coercions? #t]
          [apply-coercions-at-first-tail-cast? #t]
@@ -173,7 +188,7 @@
     (list
      (Quote 1)
      (Quote-Coercion (Sequence (Identity) (Inject (Int))))
-     (Quote #t))))
+     (Quote #f))))
   ;; effectively the same code code from above
   (check-forms=?
    (ic-andre-emulate-tsuda
@@ -182,7 +197,7 @@
     `((c . ,(Quote-Coercion (Sequence (Identity) (Inject (Int))))))
     (App-Code
      (Code-Label (Uid "apply-coercion" 159))
-     (list (Quote 1) (Var 'c) (Quote #t)))))
+     (list (Quote 1) (Var 'c) (Quote #f)))))
   (check-forms=?
    (ic-andre-cf
     (Cast (Quote 1) (Twosome (Int) (Dyn) "1")))
@@ -207,7 +222,7 @@
     (If (Dyn-Immediate-Tag=Huh (Var (Uid "v" 437)) (Type (Int)))
         (Dyn-Immediate-Value (Var (Uid "v" 437)))
         (App-Code (Code-Label (Uid "project" 241))
-                  (list (Var (Uid "v" 437)) (Type (Int)) (Quote "2") (Quote #t))))))
+                  (list (Var (Uid "v" 437)) (Type (Int)) (Quote "2") (Quote #f))))))
   (check-forms=?
    (ic-tsuda
     (Cast (Cast (Quote 1) (Twosome (Int) (Dyn) "1"))
@@ -225,7 +240,7 @@
         (Quote 0)))))
     (App-Code
      (Code-Label (Uid "apply-coercion" 159))
-     (list (Quote 1) (Var (Uid "kappa" 435)) (Quote #t)))))
+     (list (Quote 1) (Var (Uid "kappa" 435)) (Quote #f)))))
   ;; effectively the same code code from above
   ;; TODO check if tsuda code duplicates coercions composition expressions
   (check-forms=?
@@ -250,7 +265,7 @@
          (Quote 0)))))
      (App-Code
       (Code-Label (Uid "apply-coercion" 157))
-      (list (Quote 1) (Var (Uid "cont-crcn" 436)) (Quote #t))))))
+      (list (Quote 1) (Var (Uid "cont-crcn" 436)) (Quote #f))))))
   ;; What the code should produce
   (check-forms=?
    (ic-andre-cf
@@ -296,7 +311,7 @@
           (Quote 0)))))
       (App-Code
        (Code-Label (Uid "apply-coercion" 159))
-       (list (Quote 1) (Var (Uid "kappa" 448)) (Quote #t)))))))
+       (list (Quote 1) (Var (Uid "kappa" 448)) (Quote #f)))))))
 
   (check-forms=?
    (ic-andre-emulate-tsuda
@@ -318,7 +333,7 @@
           (Quote 0)))))
       (App-Code
        (Code-Label (Uid "apply-coercion" 159))
-       (list (Quote 1) (Var (Uid "cont-crcn" 436)) (Quote #t)))))))
+       (list (Quote 1) (Var (Uid "cont-crcn" 436)) (Quote #f)))))))
   
   (check-forms=?
    (ic-andre-cf
@@ -338,7 +353,7 @@
          (Var (Uid "cont-crcn" 437))
          (Quote 0)
          (Quote 0)))
-       (Quote #t))))))
+       (Quote #f))))))
   (check-forms=?
    (ic-andre
     (Lambda '() (Cast (Quote 1) (Twosome (Int) (Dyn) "1"))))
@@ -538,7 +553,7 @@
          (list
           (Var (Uid "ret-val" 439))
           (Unguarded-Box-Ref (Var (Uid "tail-crcn-ref" 438)))
-          (Quote #t)))))
+          (Quote #f)))))
       (Begin
        (list
         (Unguarded-Box-Set!
@@ -598,7 +613,7 @@
            (Dyn-Immediate-Value (Var (Uid "v" 437)))
            (App-Code
             (Code-Label (Uid "project" 241))
-            (list (Var (Uid "v" 437)) (Type (Bool)) (Quote "2") (Quote #t)))))
+            (list (Var (Uid "v" 437)) (Type (Bool)) (Quote "2") (Quote #f)))))
          (Dyn-Object (Quote 1) (Type (Int)))
          (App-Fn-or-Proxy
           (Uid "apply-coercion" 159)
@@ -610,7 +625,7 @@
        (Dyn-Immediate-Value (Var (Uid "v" 438)))
        (App-Code
         (Code-Label (Uid "project" 241))
-        (list (Var (Uid "v" 438)) (Type (Int)) (Quote "1") (Quote #t))))))))
+        (list (Var (Uid "v" 438)) (Type (Int)) (Quote "1") (Quote #f))))))))
 
   (check-forms=?
    (ic-tsuda
@@ -655,7 +670,7 @@
             (Quote 0)))))
         (App-Code
          (Code-Label (Uid "apply-coercion" 159))
-         (list (Quote 1) (Var (Uid "kappa" 453)) (Quote #t))))
+         (list (Quote 1) (Var (Uid "kappa" 453)) (Quote #f))))
        (App-Fn-or-Proxy
         (Uid "apply-coercion" 159)
         (Uid "compose-coercions" 86)
@@ -710,7 +725,7 @@
             (Quote 0)))))
         (App-Code
          (Code-Label (Uid "apply-coercion" 159))
-         (list (Quote 1) (Var (Uid "cont-crcn" 438)) (Quote #t))))
+         (list (Quote 1) (Var (Uid "cont-crcn" 438)) (Quote #f))))
        (App-Fn-or-Proxy
         (Uid "apply-coercion" 159)
         (Uid "compose-coercions" 86)
@@ -738,7 +753,7 @@
        (list (Quote-Coercion (Sequence (Project (Bool) "2") (Identity)))))
       (App-Code
        (Code-Label (Uid "apply-coercion" 159))
-       (list (Quote 1) (Var (Uid "cont-crcn" 437)) (Quote #t)))
+       (list (Quote 1) (Var (Uid "cont-crcn" 437)) (Quote #f)))
       (App-Fn-or-Proxy
        (Uid "apply-coercion" 159)
        (Uid "compose-coercions" 86)
@@ -753,6 +768,7 @@
           (Quote 0)
           (Quote 0)))))))))
 
+  #;
   (check-forms=?
    (ic-andre
     (Lambda
@@ -762,72 +778,7 @@
           (Cast (Quote 1) (Twosome (Int) (Dyn) "3"))
           (App (Var (Uid "f" 0)) (list (Var (Uid "x" 1)))))
       (Twosome (Dyn) (Int) "1"))))
-   (Lambda
-    (list (Uid "c" 2) (Uid "f" 0) (Uid "g" 3) (Uid "x" 1) (Uid "cont-crcn" 437))
-    (Castable
-     (Uid "fn-cast-4" 442)
-     (If
-      (Let
-       (list
-        (cons
-         (Uid "tail-crcn-ref" 438)
-         (Unguarded-Box
-          (Quote-Coercion (Sequence (Project (Bool) "2") (Identity))))))
-       (Let
-        (list
-         (cons
-          (Uid "ret-val" 439)
-          (App-Fn-or-Proxy
-           (Uid "apply-coercion" 159)
-           (Uid "compose-coercions" 86)
-           (Var "c")
-           (list (Var (Uid "tail-crcn-ref" 438))))))
-        (App-Code
-         (Code-Label (Uid "apply-coercion" 159))
-         (list
-          (Var (Uid "ret-val" 439))
-          (Unguarded-Box-Ref (Var (Uid "tail-crcn-ref" 438)))
-          (Quote #t)))))
-      (Quote 1)
-      (If
-       (Op '= (list (Var (Uid "cont-crcn" 437)) (Quote 0)))
-       (Let
-        (list
-         (cons
-          (Uid "tail-crcn-ref" 440)
-          (Unguarded-Box
-           (Quote-Coercion (Sequence (Project (Int) "1") (Identity))))))
-        (Let
-         (list
-          (cons
-           (Uid "ret-val" 441)
-           (App-Fn-or-Proxy
-            (Uid "apply-coercion" 159)
-            (Uid "compose-coercions" 86)
-            (Var (Uid "f" 0))
-            (list (Var (Uid "x" 1)) (Var (Uid "tail-crcn-ref" 440))))))
-         (App-Code
-          (Code-Label (Uid "apply-coercion" 159))
-          (list
-           (Var (Uid "ret-val" 441))
-           (Unguarded-Box-Ref (Var (Uid "tail-crcn-ref" 440)))
-           (Quote #t)))))
-       (Begin
-        (list
-         (Unguarded-Box-Set!
-          (Var (Uid "cont-crcn" 437))
-          (App-Code
-           (Code-Label (Uid "compose-coercions" 86))
-           (list
-            (Quote-Coercion (Sequence (Project (Int) "1") (Identity)))
-            (Unguarded-Box-Ref (Var (Uid "cont-crcn" 437)))
-            (Quote 0)
-            (Quote 0)))))
-        (App-Fn-or-Proxy
-         (Uid "apply-coercion" 159)
-         (Uid "compose-coercions" 86)
-         (Var (Uid "f" 0))
-         (list (Var (Uid "x" 1)) (Var (Uid "cont-crcn" 437))))))))))
+   )
   
 
   )

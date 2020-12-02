@@ -5,7 +5,7 @@
  racket/set
  racket/struct
  "forms.rkt"
- "../helpers-untyped.rkt")
+ "../logging.rkt")
 
 (provide forms=? form=? check-forms=?)
 
@@ -43,6 +43,12 @@
           [((Var x) (Var y))
            ;; NOTE: two unbound variables are considered form=?
            (eq? (hash-ref x-env x #f) (hash-ref y-env y #f))]
+          [((Code-Label x) (Code-Label y))
+           (or
+            (and (Uid? x) (Uid? y) (string=? (Uid-prefix x) (Uid-prefix y)))
+            (let ([x (hash-ref x-env x #f)]
+                  [y (hash-ref y-env y #f)])
+              (and x y (eq? x y))))]
           [((Quote x) (Quote y)) (equal? x y)]
           [((Ann x x-ann) (Ann y y-ann))
            (and (or (and (srcloc? x-ann) (srcloc? y-ann))
@@ -103,7 +109,7 @@
             (eq? x-st y-st)
             (andmap recur/env (struct->list x) (struct->list y)))]
           [(x y) (equal? x y)])))
-  ;;(debug x y res)
+  (debug x y res)
   res)
 
 (define ((form=? x) y)
