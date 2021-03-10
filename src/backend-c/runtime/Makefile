@@ -18,7 +18,7 @@ boehm-gc-install/lib/libgc.a :
 
 %.c :
 
-%.o : %.c
+%.o : %.c boehm-gc-install/lib/libgc.a
 	cc $(NDEBUG) -Iboehm-gc-install/include -std=c99 $< -c -o $@
 
 runtime.o : boehm-gc-install/lib/libgc.a io.o assoc_stack.o hashcons.o suspended_cast.o cast_queue.o
