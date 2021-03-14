@@ -55,7 +55,7 @@ Variables, X   ::= X
 Formals, F     ::= X | [X : Type]
 TopLevel, TE   ::= (define X E) | (define (X F ...) [: T] E ...) | E | TE ...
 Expression, E  ::= X
-Ascription     |   (ann E T [Blame Label])
+Ascription     |   (: E T [Blame Label])
 Binding        |   (let ((X [: T] E) ...) [: T] E ...)
                |   (letrec ((X [: T] E) ...) E ...)
 Functions      |   (lambda (F ...) [: T] E ...)
@@ -73,6 +73,7 @@ ops            ::= + | -  | * | binary-and | binary-or | ...
                |   fl+ | fl- | fl* | ...
                |   < | <= | = | >= | > | ...
                |   fl< | fl<= | fl= | fl>= | fl> | ...
+Blame Label    ::= "..."               
 Type, T        ::= Dyn | Unit | Bool | Int | Float 
                |   (-> T ...) | (Ref T) | (Vect T) | (Tuple T ...)
                |   X | (Rec X T)
