@@ -434,7 +434,7 @@
         (add-cast! e-src dop)
         dop]
        [else
-        (define n : Index (cast (+ n 1) Index))
+        (define n : Index (add1 (cast i Index)))
         (define tgt-ty : Grift-Type
           (STuple n (make-list n DYN-TYPE)))
         (Tuple-proj (mk-cast e-src l-th e DYN-TYPE tgt-ty) i)])]
