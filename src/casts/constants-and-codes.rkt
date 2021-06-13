@@ -44,6 +44,7 @@
   (TYPE-FLOAT-RT-VALUE      #b100111)
   (TYPE-CHAR-RT-VALUE       #b101111)
   (TYPE-MAX-ATOMIC-RT-VALUE #b111111)
+  (TYPE-HASHCONS-HASHCODE-INDEX 0)
 
   (HC-PRJ-TAG-MASK  #b10)
   (HC-INJ-TAG-MASK  #b01)
@@ -227,8 +228,6 @@
        (format-id stx "~a-~a?" namespace-string name-string))
      (define/with-syntax namespace-mask-def
        (format-id stx "~a-TAG-MASK" namespace-string-caps))
-     (define/with-syntax index-def
-       (format-id stx "~a-INDEX-INDEX" qualified-upcase-name))
      (define/with-syntax hash-def
        (format-id stx "~a-HASH-INDEX" qualified-upcase-name))
      (define/with-syntax tag-def (format-id stx "~a-TAG" qualified-upcase-name))
@@ -257,8 +256,7 @@
                    [else
                     #`(sr-alloc
                        #,name-string tag-def
-                       `(("index"    . ,(Quote 0))
-                        ("hashcode" . ,(Quote 0))
+                       `(("hashcode" . ,(Quote 0))
                         (field* . ,alloc-val*) ...))]))))
      (define/with-syntax equal-arg (generate-temporary))
      (define (gen-func-access*)
@@ -307,8 +305,7 @@
      #`(begin
          (define-constants
            (tag-def tag)
-           (index-def 0)
-           (hash-def 1)
+           (hash-def 0)
            (sindex/offset-def* sindex/offset-val*) ...)
          func-alloc
          (define (func-huh-name equal-arg)
@@ -393,52 +390,16 @@
           [(op$ <= ty TYPE-MAX-ATOMIC-RT-VALUE) ty]
           [else
            (begin$
-             (assign$ hcode (calculate-type-hashcode  ty))
+             (assign$ hcode (calculate-type-hashcode ty))
              (assign$ hty (op$ Types-hashcons! ty hcode))
-             (cond$
-              [(op$ = ty hty)
-               (begin$
-                 (assign$ index (op$ Types-gen-index!))
-                 (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
-                 (case$ tag
-                   [(data:TYPE-GREF-TAG)
+             ;; Assumtion: All structural types have two fields in the front,
+             ;; one for the index in the hashconsing table and one for the
+             ;; hashcode.
+             (when$ (op$ = ty hty)
+                    (assign$ tag (sr-get-tag ty TYPE-TAG-MASK))
                     (sr-tagged-array-set!
-                     hty TYPE-GREF-TAG TYPE-GREF-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-GREF-TAG TYPE-GREF-HASH-INDEX hcode)]
-                   [(data:TYPE-GVECT-TAG)
-                    (sr-tagged-array-set!
-                     hty TYPE-GVECT-TAG TYPE-GVECT-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-GVECT-TAG TYPE-GVECT-HASH-INDEX hcode)]
-                   [(data:TYPE-MREF-TAG)
-                    (sr-tagged-array-set!
-                     hty TYPE-MREF-TAG TYPE-MREF-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-MREF-TAG TYPE-MREF-HASH-INDEX hcode)]
-                   [(data:TYPE-MVECT-TAG)
-                    (sr-tagged-array-set!
-                     hty TYPE-MVECT-TAG TYPE-MVECT-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-MVECT-TAG TYPE-MVECT-HASH-INDEX hcode)]
-                   [(data:TYPE-TUPLE-TAG)
-                    (sr-tagged-array-set!
-                     hty TYPE-TUPLE-TAG TYPE-TUPLE-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-TUPLE-TAG TYPE-TUPLE-HASH-INDEX hcode)]
-                   [(data:TYPE-FN-TAG)
-                    (sr-tagged-array-set!
-                     hty TYPE-FN-TAG TYPE-FN-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-FN-TAG TYPE-FN-HASH-INDEX hcode)]
-                   [(data:TYPE-MU-TAG)
-                    (sr-tagged-array-set!
-                     hty TYPE-MU-TAG TYPE-MU-INDEX-INDEX index)
-                    (sr-tagged-array-set!
-                     hty TYPE-MU-TAG TYPE-MU-HASH-INDEX hcode)]
-                   [else (op$ Print err-msg) (op$ Exit (Quote 1)) UNDEF-IMDT])
-                 hty)]
-              [else hty]))])))
+                     hty tag TYPE-HASHCONS-HASHCODE-INDEX hcode))
+             hty)])))
      (add-new-code! (cons hashcons-type runtime-code))
      (set-box! hashcons-type-code-label? hashcons-type-code-label)
      (App-Code hashcons-type-code-label (list ty))]))

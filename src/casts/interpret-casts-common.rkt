@@ -618,8 +618,7 @@ TODO write unit tests
                      (let$ ([len (Mvector-length address)])
                        (repeat$ (i ZERO-EXPR len) ()
                          (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
-                                 [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)]
-                                 [t4 (Mvector-rtti-ref address)])
+                                 [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)])
                            (Mvector-val-set! address i cvi 'no-check-bounds)))
                        (Mvector-rtti-set! address t3))))))
   (define (interp-mvect-state-reduction)
@@ -1957,8 +1956,7 @@ TODO write unit tests
                    (let$ ([len (Mvector-length address)])
                      (repeat$ (i ZERO-EXPR len) ()
                        (let*$ ([vi (Mvector-val-ref address i 'no-check-bounds)]
-                               [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)]
-                               [t4 (Mvector-rtti-ref address)])
+                               [cvi (interp-cast vi t1 t3 monotonic-blame suspend-monotonic-heap-casts)])
                          (Mvector-val-set! address i cvi 'no-check-bounds)))
                      (Mvector-rtti-set! address t3)
                      (mvect-state-reduction)))))

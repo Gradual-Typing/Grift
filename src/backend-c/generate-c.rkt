@@ -163,7 +163,7 @@
 (: emit-var-declarations (-> (Listof Uid) Void))
 (define (emit-var-declarations d*)
   (display "\n//These are the variable declarations\n")
-  (display "\ntable types_ht;\nint64_t types_unique_index_counter;\n")
+  (display "\ntable types_ht;\n")
   (display "\ncast_queue* mref_cast_q;\ncast_queue* mvect_cast_q;\n")
   (display cast-profiler/external-c-decl*)
   (display-seq (map uid->string d*) "" (string-append IMDT-C-TYPE " ") "" ";\n" ""))
@@ -179,8 +179,7 @@
 (: initialize-types-table (-> Void))
 (define (initialize-types-table)
   (printf "types_ht = alloc_hash_table(~a, ~a);\n"
-          (init-types-hash-table-slots) (types-hash-table-load-factor))
-  (display "types_unique_index_counter = 0;"))
+          (init-types-hash-table-slots) (types-hash-table-load-factor)))
 
 (: initialize-suspended-cast-queues (-> Void))
 (define (initialize-suspended-cast-queues)
@@ -650,8 +649,6 @@
      (display ",")
      (emit-value hcode)
      (display ")")]
-    [('Types-gen-index! (list))
-     (display "types_unique_index_counter++")]
     [('mref-cast-queue-enqueue (list addr ty))
      (display "cast_queue_enqueue(mref_cast_q,")
      (emit-value addr)
