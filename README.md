@@ -55,12 +55,13 @@ Variables, X   ::= X
 Formals, F     ::= X | [X : Type]
 TopLevel, TE   ::= (define X E) | (define (X F ...) [: T] E ...) | E | TE ...
 Expression, E  ::= X
-Ascription     |   (ann E T [Blame Label])
+Ascription     |   (: E T [Blame Label])
 Binding        |   (let ((X [: T] E) ...) [: T] E ...)
                |   (letrec ((X [: T] E) ...) E ...)
 Functions      |   (lambda (F ...) [: T] E ...)
 Application    |   (E_rator E_rand ...)
 Conditionals   |   (if E_cond E_conseq E_alt)
+               |   (switch E [((E_opt ...) E) ...] (else E ...))
 Iteration      |   (repeat (x_i E_start E_end) [(x_acc [: T] E_init)] E)
 Sequencing     |   (begin E_eff ... E_value)
 Unit           |   ()
@@ -73,8 +74,9 @@ ops            ::= + | -  | * | binary-and | binary-or | ...
                |   fl+ | fl- | fl* | ...
                |   < | <= | = | >= | > | ...
                |   fl< | fl<= | fl= | fl>= | fl> | ...
+Blame Label    ::= "..."               
 Type, T        ::= Dyn | Unit | Bool | Int | Float 
-               |   (-> T ...) | (Ref T) | (Vect T) | (Tuple T ...)
+               |   (T ... -> T) | (Ref T) | (Vect T) | (Tuple T ...)
                |   X | (Rec X T)
 ```
 
