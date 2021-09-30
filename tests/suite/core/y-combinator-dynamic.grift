@@ -1,0 +1,37 @@
+;; This code exercises tail-call-optimization for closures
+;; by defining recursion in terms of a variant of the
+;; y-combinator.
+(define Y2
+ (lambda (f)
+  (let ([x (lambda (x)
+            (f (lambda (y1 y2) ((x x) y1 y2))))])
+    (x x))))
+
+(define add
+ (Y2 (lambda (f)
+       (lambda (n acc)
+         (if (= n 0)
+             acc
+             (f (- n 1) (+ acc 1)))))))
+
+(define mul
+ (lambda (n m)
+  ((Y2 (lambda (f)
+        (lambda (n acc)
+          (if (= n 0)
+              acc
+              (f (- n 1) (add acc m))))))
+   n 0)))
+
+(define factorial
+ (lambda (n)
+   ((Y2 (lambda (f)
+         (lambda (n acc)
+          (if (= n 0)
+              acc
+              (f (- n 1) (mul acc n))))))
+    n 1)))
+
+(: (factorial 6) Int)
+   
+ 

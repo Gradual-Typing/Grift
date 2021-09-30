@@ -132,8 +132,8 @@
           (and (eq? cast-rep 'Static) (not spec?))))
     (parameterize ([cast-representation cast-rep]
                    [fn-proxy-representation fn-proxy-rep]
-                   [output-path (build-path test-tmp-path "t.out")]
-                   [c-path (build-path test-tmp-path "t.c")]
+                   [output-path (build-path test-tmp-path "t")]
+                   [ir-code-path (build-path test-tmp-path)]
                    [c-flags (cons "-O3" (c-flags))]
                    [specialize-cast-code-generation? spec?]
                    [check-asserts? #t])
@@ -142,15 +142,22 @@
           [(eq? cast-rep 'Static) ""]
           [spec? "Specialized"]
           [else  "Unspecialized"]))
+      (define (display-config)
+        (for-each-grift-parameter
+         (lambda (k v)
+           (printf "~a = ~a\n" k (v)))))
       (match* (cast-rep fn-proxy-rep spec?)
         [('Coercions 'Data _)         
          (printf "~a Coercions w/ Function Proxies running:\n" spec-str)
+         (display-config)
          (run-tests (suite))]
         [('Static 'Hybrid #t)
          (printf "Static Hybrid Specialized running:\n")
+         (display-config)
          (run-tests static-tests)]
         [(_ _ _)
          (printf "~a ~a running:\n" spec-str cast-rep)
+         (display-config)
          (run-tests (suite))]))))
 
 
@@ -215,6 +222,17 @@
  #:once-any
  ["--Boehm" "Use Boehm Conservative Collector" (garbage-collector 'Boehm)]
  ["--No-GC" "Do not Collect Garbage"           (garbage-collector 'None)]
+ #:once-any
+ [("--c-backend")
+  "Use the c backend"
+  (backend 'C)]
+ [("--llvm")
+  "Use the llvm backend"
+  (backend 'LLVM)]
+ #:once-each
+ [("--specialize-casts")
+  "specialize casts with known types"
+  (test-specialize-cast-code-generation (list #t))]
  #:once-each
  [("--without-contracts" "-C")
   "Speed up tests by not checking compiler invariants"

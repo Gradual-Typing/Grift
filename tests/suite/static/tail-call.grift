@@ -1,0 +1,15 @@
+(define (id [x : Bool]) : Bool x)
+
+(define (odd-cps [n : Int] [k : (Bool -> Bool)]) : Bool
+ (cond
+  [(= n 0) (k #f)]
+  [else (even-cps (- n 1) (lambda ([x : Bool]) (k (not x))))]))
+
+(define (even-cps [n : Int] [k : (Bool -> Bool)]) : Bool
+ (cond
+  [(= n 0) (k #t)]
+  [else (odd-cps (- n 1) (lambda ([x : Bool]) : Bool (k (not x))))]))
+
+(begin
+ (print-bool (even-cps 42 id))
+ (display-char #\newline))
