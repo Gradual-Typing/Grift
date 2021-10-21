@@ -301,7 +301,11 @@
     (debug generate-effect exp)
     (match exp
       [(Assign u rhs)
-       (set!^ (var (uid->symbol u)) (generate-value rhs))]
+       (define lhs
+         (cond
+           [(string? u) (string->symbol u)]
+           [else (uid->symbol u)]))
+       (set!^ (var lhs) (generate-value rhs))]
       [(Labels bndc* exp)
        (generate-bnd-code* bndc*)
        (generate-effect exp)]
