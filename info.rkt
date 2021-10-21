@@ -3,8 +3,8 @@
 (define version "0.1")
 (define deps
   '(;; Since sham isn't on the package server yet we use a direct link to github
-    "https://github.com/rjnw/sham.git/?path=sham-llvm#7ea55a07fe10a7655ac1995d15262744833d3085"
-    "https://github.com/rjnw/sham.git/?path=sham-lib#7ea55a07fe10a7655ac1995d15262744833d3085"
+    "https://github.com/rjnw/sham.git/?path=sham-llvm#b4c1f1029a7b97de5c0c93f7399fdac38e4b5495"
+    "https://github.com/rjnw/sham.git/?path=sham-lib#b4c1f1029a7b97de5c0c93f7399fdac38e4b5495"
     "https://github.com/rjnw/scf.git/?path=scf-lib#a9405041f636ac7c4368b736d10f3f8a858eed74"))
 (define racket-launcher-names '("grift" "grift-bench" "grift-configs"))
 (define racket-launcher-libraries '("main.rkt" "benchmark/bench.rkt" "benchmark/configs.rkt"))
