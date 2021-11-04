@@ -266,8 +266,7 @@
       [(Stack-Alloc n)
        (ptr->imdt (arr-alloca imdt-expr (cui n imdt-type)))]
       [(Var i) (var (uid->symbol i))]
-      [(Global s)
-       (global s)]
+      [(Global s) (load (external #f (string->symbol s) i64))]
       [(Code-Label i)
        (ptr->imdt (var (uid->symbol i)))]
       [(Quote k) (generate-constant k)]
@@ -301,11 +300,10 @@
     (debug generate-effect exp)
     (match exp
       [(Assign u rhs)
-       (define lhs
-         (cond
-           [(string? u) (string->symbol u)]
-           [else (uid->symbol u)]))
-       (set!^ (var lhs) (generate-value rhs))]
+       (cond
+         [(string? u)
+          (se (store! (generate-value rhs) (external #f (string->symbol u) i64)))]
+         [else (set!^ (var (uid->symbol u)) (generate-value rhs))])]
       [(Labels bndc* exp)
        (generate-bnd-code* bndc*)
        (generate-effect exp)]

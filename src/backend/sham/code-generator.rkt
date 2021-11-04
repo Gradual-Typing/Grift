@@ -92,10 +92,14 @@
            (format "-DINIT_TYPES_HT_SLOTS=~a" (init-types-hash-table-slots))
            (format "-DTYPES_HT_LOAD_FACTOR=~a" (types-hash-table-load-factor))
            (format "-DGC_INITIAL_HEAP_SIZE=~a" (* (init-heap-kilobytes) 1024))
+           (if (cast-profiler?)
+               (path->string cast-profiler.o-path)
+               "")
            (if (cast-profiler?) "-DCAST_PROFILER" "")
            runtime-entry.c-path
            ll-path
-           "-lm" runtime.o-path
+           "-lm"
+           runtime.o-path
            boehm-gc.a-path "-pthreads")
 
     (unless (or (with-debug-symbols) keep-ll-code-file?)
