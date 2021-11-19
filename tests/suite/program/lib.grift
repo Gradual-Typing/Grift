@@ -57,7 +57,7 @@
           : ((GVect Dyn) -> ())
           (lambda (l)
             (gvector-list-destruct l
-             (lambda ([v : (GVect Dyn)] [i : Int] [s : Int])
+             (lambda ([v : (GVect Dyn)] [i : Int] [m : Int])
                (if (= i m) 
                     (gvector-set! l 0 (gvector-double v))
                     ()))))]
@@ -71,10 +71,10 @@
                  (gvector-set! v i e)
                  (gvector-set! l 2 (add1 i))
                  ()))))]
-         
+        
          [add1 (lambda ([x : Int]) (+ x 1))]
-         [zero? (lambda ([x : Int] (= 0 x)))]
-         [])
+         [zero? (lambda ([x : Int]) (= 0 x))]
+         )
   ())
          
                          
